@@ -1,0 +1,57 @@
+services:
+  kiwix-serve:
+    image: kiwix/kiwix-serve:latest
+    restart: unless-stopped
+    volumes:
+      - ${INSTALL_ROOT}/content/kiwix:/data:ro
+    command: ["kiwix-serve", "--port", "80", "--library", "/data/library.xml"]
+    env_file:
+      - compose.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kiwix.rule=Host(`kiwix.danger`)"
+      - "traefik.http.routers.kiwix.entrypoints=websecure"
+      - "traefik.http.routers.kiwix.tls.certresolver=cloudflare"
+      - "traefik.http.services.kiwix.loadbalancer.server.port=80"
+
+      # DNS registration
+      - "dns.register=kiwix.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+      - kiwix
+    depends_on:
+      - manager
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  manager:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ${INSTALL_ROOT}/content/kiwix:/data/kiwix
+      - ${INSTALL_ROOT}/data/kiwix-manager:/app/data
+    env_file:
+      - compose.env
+    labels:
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - kiwix
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('./dist/kiwix-manager').KiwixManager.prototype.healthCheck().then(h => process.exit(h.status === 'healthy' ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  traefik:
+    external: true
+  kiwix:
+    driver: bridge

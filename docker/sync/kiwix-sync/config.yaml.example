@@ -1,0 +1,78 @@
+# Kiwix Manager Configuration
+kiwix_manager:
+  # Storage configuration
+  storage:
+    zim_directory: "/content/kiwix"
+    library_file: "/content/kiwix/library.xml"
+    temp_directory: "/tmp/kiwix-downloads"
+    max_total_size: "100GB"
+
+  # Update schedule
+  scheduler:
+    update_schedule: "0 6 * * *"  # Daily at 6 AM
+    cleanup_schedule: "0 2 * * 0"  # Weekly cleanup on Sunday at 2 AM
+
+  # Download settings
+  download:
+    concurrent_downloads: 2
+    retry_attempts: 3
+    retry_delay: 300  # 5 minutes
+    bandwidth_limit: "25MB/s"
+
+  # Logging configuration
+  logging:
+    level: "INFO"
+    file: "/app/data/logs/kiwix-manager.log"
+    max_size: "50MB"
+    backup_count: 3
+
+  # Kiwix library API
+  api:
+    base_url: "https://library.kiwix.org"
+    catalog_url: "https://library.kiwix.org/catalog/v2/entries"
+    timeout: 30000
+
+  # Mirror configuration for faster downloads
+  mirrors:
+    # Preferred mirror (tested first)
+    preferred: "https://mirrors.dotsrc.org/kiwix/"
+
+    # Available mirrors (tested for speed)
+    available:
+      - "https://mirrors.dotsrc.org/kiwix/"
+      - "https://ftp.fau.de/kiwix/zim/"
+      - "https://laotzu.ftp.acc.umu.se/mirror/kiwix.org/zim/"
+      - "https://saimei.ftp.acc.umu.se/mirror/kiwix.org/zim/"
+      - "https://www.mirrorservice.org/sites/download.kiwix.org/zim/"
+
+    # Fallback to official site
+    fallback: "https://download.kiwix.org/zim/"
+
+    # Speed test configuration
+    speed_test:
+      enabled: true
+      test_file_pattern: "wikipedia/speedtest_en_blob_{date}.zim"
+      test_timeout: 30  # seconds
+      test_size_limit: "10MB"  # Only download first 10MB for speed test
+      cache_duration: 86400  # Cache speed test results for 24 hours
+
+  # ZIM files to manage
+  zim_files:
+    - name: "wikipedia_en_all"
+      priority: 1
+      auto_update: true
+    - name: "wikipedia_en_medicine"
+      priority: 2
+      auto_update: true
+    - name: "wiktionary_en_all"
+      priority: 3
+      auto_update: true
+    - name: "wikivoyage_en_all"
+      priority: 4
+      auto_update: true
+    - name: "stackoverflow.com_en_all"
+      priority: 5
+      auto_update: true
+    - name: "gutenberg_en_all"
+      priority: 6
+      auto_update: false  # Large file, manual update only

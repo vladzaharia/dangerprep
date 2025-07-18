@@ -1,0 +1,36 @@
+services:
+  romm:
+    image: rommapp/romm:latest
+    restart: unless-stopped
+    volumes:
+      - ${INSTALL_ROOT}/data/romm/config:/romm/config
+      - ${INSTALL_ROOT}/data/romm/assets:/romm/assets
+      - ${INSTALL_ROOT}/data/romm/resources:/romm/resources
+      - ${INSTALL_ROOT}/content/games/roms:/romm/library:ro
+      - ${INSTALL_ROOT}/nfs/games:/nfs/games:ro
+    env_file:
+      - compose.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.romm.rule=Host(`romm.danger`)"
+      - "traefik.http.routers.romm.entrypoints=websecure"
+      - "traefik.http.routers.romm.tls.certresolver=cloudflare"
+      - "traefik.http.services.romm.loadbalancer.server.port=8080"
+
+      # DNS registration
+      - "dns.register=romm.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+networks:
+  traefik:
+    external: true

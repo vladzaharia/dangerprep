@@ -1,0 +1,38 @@
+services:
+  traefik:
+    image: traefik:v3.0
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${INSTALL_ROOT}/data/traefik:/data
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+    env_file:
+      - compose.env
+    labels:
+      - "traefik.enable=true"
+
+      # Dashboard
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.danger`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=cloudflare"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+
+      # Basic auth middleware for dashboard
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH_USERS}"
+
+      # DNS registration
+      - "dns.register=traefik.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    driver: bridge

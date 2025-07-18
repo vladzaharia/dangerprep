@@ -1,0 +1,67 @@
+# DangerPrep .gitignore
+
+# Environment files with sensitive data
+*.env
+compose.env
+.env.*
+
+# Local configuration files
+nfs-mounts.conf
+mount-nfs.sh
+
+# Data directories
+/data/
+/content/
+/nfs/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+.dockerignore
+
+# Backup files
+*.bak
+*.backup
+backup-*
+
+# SSL certificates and keys
+*.pem
+*.key
+*.crt
+*.csr
+
+# Local development overrides
+docker-compose.override.yml
+compose.override.yml
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+_plans
