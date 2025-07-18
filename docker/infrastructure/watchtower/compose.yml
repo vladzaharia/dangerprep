@@ -1,0 +1,18 @@
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - compose.env
+    command: --interval 86400 --cleanup --label-enable
+    labels:
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - watchtower
+
+networks:
+  watchtower:
+    driver: bridge

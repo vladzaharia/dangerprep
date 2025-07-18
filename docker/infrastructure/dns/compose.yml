@@ -1,0 +1,82 @@
+services:
+  # AdGuard Home for ad-blocking and DNS filtering
+  adguardhome:
+    image: adguard/adguardhome:latest
+    restart: unless-stopped
+    volumes:
+      - ${INSTALL_ROOT}/data/adguard/work:/opt/adguardhome/work
+      - ${INSTALL_ROOT}/data/adguard/conf:/opt/adguardhome/conf
+    env_file:
+      - compose.env
+    labels:
+      - "traefik.enable=true"
+
+      # Web interface
+      - "traefik.http.routers.adguardhome.rule=Host(`dns.danger`)"
+      - "traefik.http.routers.adguardhome.entrypoints=websecure"
+      - "traefik.http.routers.adguardhome.tls.certresolver=cloudflare"
+      - "traefik.http.services.adguardhome.loadbalancer.server.port=80"
+
+      # DNS registration
+      - "dns.register=adguard.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+      - dns
+
+  # Local DNS resolver for internal domain registration
+  coredns:
+    image: coredns/coredns:latest
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"     # Primary DNS port
+      - "53:53/udp"     # Primary DNS port
+    volumes:
+      - ${INSTALL_ROOT}/data/local-dns:/etc/coredns
+      - ./Corefile:/etc/coredns/Corefile:ro
+    command: ["-conf", "/etc/coredns/Corefile"]
+    env_file:
+      - compose.env
+    labels:
+      - "traefik.enable=false"
+      # DNS registration for internal resolution
+      - "dns.register=dns.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - dns
+    depends_on:
+      - registrar
+
+  # DNS registrar service to manage domain registrations from labels
+  registrar:
+    image: alpine:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${INSTALL_ROOT}/data/local-dns:/dns-config
+      - ./scripts:/scripts:ro
+    env_file:
+      - compose.env
+    command: ["/scripts/dns-registrar.sh"]
+    labels:
+      - "traefik.enable=false"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - dns
+    depends_on:
+      - adguardhome
+
+networks:
+  traefik:
+    external: true
+  dns:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

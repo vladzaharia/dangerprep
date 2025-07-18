@@ -1,0 +1,25 @@
+services:
+  sync:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ${INSTALL_ROOT}/data/sync:/app/data
+      - ${INSTALL_ROOT}/content:/content
+      - ${INSTALL_ROOT}/nfs:/nfs:ro
+    env_file:
+      - compose.env
+    labels:
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('./dist/sync-engine').SyncEngine.prototype.healthCheck().then(h => process.exit(h.status === 'healthy' ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  traefik:
+    external: true

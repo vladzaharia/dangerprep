@@ -1,0 +1,23 @@
+{
+  "name": "dangerprep-sync",
+  "version": "1.0.0",
+  "description": "DangerPrep Content Synchronization Service",
+  "main": "dist/sync-engine.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/sync-engine.js",
+    "dev": "ts-node src/sync-engine.ts"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "node-cron": "^3.0.2",
+    "axios": "^1.6.0",
+    "fast-xml-parser": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/js-yaml": "^4.0.5",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  }
+}

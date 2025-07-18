@@ -1,0 +1,35 @@
+services:
+  komga:
+    image: gotson/komga:latest
+    restart: unless-stopped
+    volumes:
+      - ${INSTALL_ROOT}/data/komga/config:/config
+      - ${INSTALL_ROOT}/content/books:/books:ro
+      - ${INSTALL_ROOT}/content/comics:/comics:ro
+      - ${INSTALL_ROOT}/content/magazines:/magazines:ro
+    env_file:
+      - compose.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.komga.rule=Host(`komga.danger`)"
+      - "traefik.http.routers.komga.entrypoints=websecure"
+      - "traefik.http.routers.komga.tls.certresolver=cloudflare"
+      - "traefik.http.services.komga.loadbalancer.server.port=8080"
+
+      # DNS registration
+      - "dns.register=komga.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+networks:
+  traefik:
+    external: true

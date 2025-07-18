@@ -1,0 +1,117 @@
+import { ContentTypeConfig } from '../types';
+import { Logger } from '../utils/logger';
+import { FileUtils } from '../utils/file-utils';
+
+export abstract class BaseHandler {
+  protected contentType: string = '';
+
+  constructor(
+    protected config: ContentTypeConfig,
+    protected logger: Logger
+  ) {}
+
+  abstract sync(): Promise<boolean>;
+
+  protected async getDirectorySize(dirPath: string): Promise<number> {
+    return await FileUtils.getDirectorySize(dirPath);
+  }
+
+  protected parseSize(sizeStr: string): number {
+    return FileUtils.parseSize(sizeStr);
+  }
+
+  protected formatSize(bytes: number): string {
+    return FileUtils.formatSize(bytes);
+  }
+
+  protected async ensureDirectory(dirPath: string): Promise<void> {
+    return await FileUtils.ensureDirectory(dirPath);
+  }
+
+  protected async rsyncDirectory(
+    sourcePath: string, 
+    destPath: string, 
+    options: {
+      exclude?: string[];
+      bandwidthLimit?: string;
+      dryRun?: boolean;
+    } = {}
+  ): Promise<boolean> {
+    return await FileUtils.rsyncDirectory(sourcePath, destPath, options);
+  }
+
+  protected async fileExists(filePath: string): Promise<boolean> {
+    return await FileUtils.fileExists(filePath);
+  }
+
+  protected logSyncStart(): void {
+    this.logger.info(`Starting ${this.contentType} sync`);
+  }
+
+  protected logSyncComplete(success: boolean, details?: string): void {
+    if (success) {
+      this.logger.info(`${this.contentType} sync completed successfully${details ? ': ' + details : ''}`);
+    } else {
+      this.logger.error(`${this.contentType} sync failed${details ? ': ' + details : ''}`);
+    }
+  }
+
+  protected logProgress(message: string): void {
+    this.logger.info(`[${this.contentType}] ${message}`);
+  }
+
+  protected logError(message: string, error?: any): void {
+    this.logger.error(`[${this.contentType}] ${message}${error ? ': ' + error : ''}`);
+  }
+
+  protected async checkStorageSpace(requiredSize: number = 0): Promise<boolean> {
+    try {
+      const currentSize = await this.getDirectorySize(this.config.local_path);
+      const maxSize = this.parseSize(this.config.max_size);
+      
+      if (currentSize + requiredSize > maxSize) {
+        this.logError(`Storage limit exceeded: ${this.formatSize(currentSize + requiredSize)} > ${this.config.max_size}`);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      this.logError('Failed to check storage space', error);
+      return false;
+    }
+  }
+
+  protected async validatePaths(): Promise<boolean> {
+    try {
+      // Ensure local path exists
+      await this.ensureDirectory(this.config.local_path);
+      
+      // Check if NFS path exists (if configured)
+      if (this.config.nfs_path) {
+        const nfsExists = await this.fileExists(this.config.nfs_path);
+        if (!nfsExists) {
+          this.logError(`NFS path does not exist: ${this.config.nfs_path}`);
+          return false;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      this.logError('Path validation failed', error);
+      return false;
+    }
+  }
+
+  protected getExcludePatterns(): string[] {
+    return [
+      '*.tmp',
+      '*.part',
+      '.DS_Store',
+      'Thumbs.db',
+      '*.nfo',
+      '*.srt.bak',
+      '@eaDir',
+      '.@__thumb'
+    ];
+  }
+}
