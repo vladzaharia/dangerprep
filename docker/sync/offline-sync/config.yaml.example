@@ -1,0 +1,120 @@
+# Offline Sync Configuration
+offline_sync:
+  # Storage configuration
+  storage:
+    content_directory: "/content"
+    mount_base: "/mnt/microsd"
+    temp_directory: "/tmp/offline-sync"
+    max_card_size: "2TB"
+
+  # Device detection settings
+  device_detection:
+    # Monitor for MicroSD cards and USB storage devices
+    monitor_device_types: ["mass_storage", "sd_card"]
+    # Minimum size to consider (filters out very small devices)
+    min_device_size: "1GB"
+    # Maximum time to wait for device to be ready
+    mount_timeout: 30
+    # Retry attempts for mounting
+    mount_retry_attempts: 3
+    mount_retry_delay: 5
+
+  # Content directory structure
+  content_types:
+    movies:
+      local_path: "/content/movies"
+      card_path: "movies"
+      sync_direction: "bidirectional"  # bidirectional, to_card, from_card
+      max_size: "800GB"
+      file_extensions: [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"]
+      
+    tv:
+      local_path: "/content/tv"
+      card_path: "tv"
+      sync_direction: "bidirectional"
+      max_size: "600GB"
+      file_extensions: [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"]
+      
+    webtv:
+      local_path: "/content/webtv"
+      card_path: "webtv"
+      sync_direction: "bidirectional"
+      max_size: "300GB"
+      file_extensions: [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"]
+      
+    music:
+      local_path: "/content/music"
+      card_path: "music"
+      sync_direction: "bidirectional"
+      max_size: "100GB"
+      file_extensions: [".mp3", ".flac", ".wav", ".aac", ".ogg", ".m4a"]
+      
+    audiobooks:
+      local_path: "/content/audiobooks"
+      card_path: "audiobooks"
+      sync_direction: "bidirectional"
+      max_size: "50GB"
+      file_extensions: [".mp3", ".m4a", ".m4b", ".aac", ".ogg"]
+      
+    books:
+      local_path: "/content/books"
+      card_path: "books"
+      sync_direction: "bidirectional"
+      max_size: "20GB"
+      file_extensions: [".epub", ".pdf", ".mobi", ".azw", ".azw3", ".fb2", ".txt"]
+      
+    comics:
+      local_path: "/content/comics"
+      card_path: "comics"
+      sync_direction: "bidirectional"
+      max_size: "50GB"
+      file_extensions: [".cbz", ".cbr", ".cb7", ".cbt", ".pdf"]
+      
+    magazines:
+      local_path: "/content/magazines"
+      card_path: "magazines"
+      sync_direction: "bidirectional"
+      max_size: "10GB"
+      file_extensions: [".pdf", ".epub", ".cbz", ".cbr"]
+      
+    games:
+      local_path: "/content/games/roms"
+      card_path: "games/roms"
+      sync_direction: "bidirectional"
+      max_size: "200GB"
+      file_extensions: [".iso", ".rom", ".bin", ".cue", ".img", ".nds", ".3ds", ".gba", ".gb", ".gbc", ".nes", ".snes", ".n64", ".gcn", ".wii", ".psx", ".ps2", ".psp"]
+      
+    kiwix:
+      local_path: "/content/kiwix"
+      card_path: "kiwix"
+      sync_direction: "bidirectional"
+      max_size: "100GB"
+      file_extensions: [".zim"]
+
+  # Sync behavior
+  sync:
+    # Check for changes every 30 seconds when card is inserted
+    check_interval: 30
+    # Maximum concurrent file transfers
+    max_concurrent_transfers: 3
+    # Chunk size for large file transfers (for resumability)
+    transfer_chunk_size: "10MB"
+    # Verify file integrity after transfer
+    verify_transfers: true
+    # Delete source files after successful transfer (be careful!)
+    delete_after_sync: false
+    # Create .sync_complete marker files
+    create_completion_markers: true
+
+  # Logging configuration
+  logging:
+    level: "INFO"
+    file: "/app/data/logs/offline-sync.log"
+    max_size: "50MB"
+    backup_count: 3
+
+  # Notifications (optional)
+  notifications:
+    enabled: true
+    webhook_url: "${WEBHOOK_URL}"  # Set via environment variable
+    events: ["card_inserted", "card_removed", "sync_started", "sync_completed", "sync_failed"]
