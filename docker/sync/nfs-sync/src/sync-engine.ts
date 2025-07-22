@@ -1,19 +1,22 @@
-import yaml from 'js-yaml';
-import cron from 'node-cron';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { Logger } from './utils/logger';
-import { SyncConfig, SyncStatus, SyncResult } from './types';
+
+import axios from 'axios';
+import yaml from 'js-yaml';
+import cron from 'node-cron';
+
 import { BooksHandler } from './handlers/books';
 import { MoviesHandler } from './handlers/movies';
 import { TVHandler } from './handlers/tv';
 import { WebTVHandler } from './handlers/webtv';
-import axios from 'axios';
+import { SyncConfig, SyncStatus, SyncResult } from './types';
+import { Logger } from './utils/logger';
 
 export class SyncEngine {
   private config!: SyncConfig;
   private logger: Logger;
-  private handlers: Map<string, any> = new Map();
+  private handlers: Map<string, BooksHandler | MoviesHandler | TVHandler | WebTVHandler> =
+    new Map();
   private syncStatus: SyncStatus = {
     isRunning: false,
     progress: 0,
@@ -225,7 +228,7 @@ export class SyncEngine {
           size: this.formatSize(size),
           path: config.local_path,
         };
-      } catch (error) {
+      } catch (_error) {
         stats[contentType] = {
           size: 'Error',
           path: config.local_path,
@@ -252,7 +255,7 @@ export class SyncEngine {
           totalSize += stats.size;
         }
       }
-    } catch (error) {
+    } catch (_error) {
       return 0;
     }
 
@@ -272,7 +275,7 @@ export class SyncEngine {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 
-  async healthCheck(): Promise<{ status: string; details: any }> {
+  async healthCheck(): Promise<{ status: string; details: Record<string, unknown> }> {
     try {
       const stats = await this.getStorageStats();
       const status = this.syncStatus;
@@ -332,7 +335,8 @@ if (require.main === module) {
   const engine = new SyncEngine(configPath);
 
   engine.run().catch(error => {
-    console.error('Failed to start Sync Engine:', error);
+    // Use stderr for critical startup errors
+    process.stderr.write(`Failed to start Sync Engine: ${error}\n`);
     process.exit(1);
   });
 }

@@ -18,7 +18,7 @@ export class FileUtils {
           totalSize += stats.size;
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Directory might not exist or be accessible
       return 0;
     }

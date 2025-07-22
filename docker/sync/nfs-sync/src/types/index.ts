@@ -58,12 +58,54 @@ export interface ContentTypeConfig {
 export interface FilterRule {
   type: string;
   operator: string;
-  value: any;
+  value: string | number;
 }
 
 export interface PriorityRule {
   type: string;
   weight: number;
+}
+
+// Plex XML API response interfaces
+export interface PlexVideoXML {
+  '@_title': string;
+  '@_year'?: string;
+  '@_rating'?: string;
+  '@_duration'?: string;
+  '@_addedAt'?: string;
+  Genre?: PlexGenreXML | PlexGenreXML[];
+  Media?: PlexMediaXML | PlexMediaXML[];
+}
+
+export interface PlexGenreXML {
+  '@_tag': string;
+}
+
+export interface PlexMediaXML {
+  '@_duration'?: string;
+  '@_height'?: string;
+  Part?: PlexPartXML | PlexPartXML[];
+}
+
+export interface PlexPartXML {
+  '@_file': string;
+  '@_size'?: string;
+}
+
+export interface PlexShowXML {
+  '@_title': string;
+  '@_year'?: string;
+  '@_leafCount'?: string;
+  '@_addedAt'?: string;
+}
+
+export interface PlexEpisodeXML {
+  '@_title': string;
+  '@_parentIndex'?: string;
+  '@_index'?: string;
+  '@_duration'?: string;
+  '@_addedAt'?: string;
+  Media?: PlexMediaXML | PlexMediaXML[];
 }
 
 export interface PlexMovie {

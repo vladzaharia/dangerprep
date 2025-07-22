@@ -1,6 +1,8 @@
-import { promises as fs } from 'fs';
 import { spawn } from 'child_process';
+import { promises as fs } from 'fs';
 import path from 'path';
+
+import { Logger } from './logger';
 
 export class FileUtils {
   static async getDirectorySize(dirPath: string): Promise<number> {
@@ -19,7 +21,7 @@ export class FileUtils {
           totalSize += stats.size;
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Directory might not exist or be accessible
       return 0;
     }
@@ -37,7 +39,7 @@ export class FileUtils {
     };
 
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([KMGT]?B)$/i);
-    if (!match || !match[1] || !match[2]) {
+    if (!match?.[1] || !match[2]) {
       throw new Error(`Invalid size format: ${sizeStr}`);
     }
 
@@ -84,6 +86,7 @@ export class FileUtils {
       exclude?: string[];
       bandwidthLimit?: string;
       dryRun?: boolean;
+      logger?: Logger;
     } = {}
   ): Promise<boolean> {
     return new Promise(resolve => {
@@ -106,17 +109,21 @@ export class FileUtils {
         args.push('--dry-run');
       }
 
-      args.push(sourcePath.endsWith('/') ? sourcePath : sourcePath + '/', destPath);
+      args.push(sourcePath.endsWith('/') ? sourcePath : `${sourcePath}/`, destPath);
 
       const rsyncProcess = spawn('rsync', args);
 
       rsyncProcess.stdout.on('data', data => {
         // Log progress information
-        console.log(data.toString());
+        if (options.logger) {
+          options.logger.info(`rsync: ${data.toString().trim()}`);
+        }
       });
 
       rsyncProcess.stderr.on('data', data => {
-        console.error(`rsync stderr: ${data.toString()}`);
+        if (options.logger) {
+          options.logger.error(`rsync stderr: ${data.toString().trim()}`);
+        }
       });
 
       rsyncProcess.on('close', code => {
@@ -124,7 +131,9 @@ export class FileUtils {
       });
 
       rsyncProcess.on('error', error => {
-        console.error(`Failed to start rsync: ${error}`);
+        if (options.logger) {
+          options.logger.error(`Failed to start rsync: ${error}`);
+        }
         resolve(false);
       });
     });

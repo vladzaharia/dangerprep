@@ -1,8 +1,10 @@
-import { BaseHandler } from './base';
-import { ContentTypeConfig } from '../types';
-import { Logger } from '../utils/logger';
 import { promises as fs } from 'fs';
 import path from 'path';
+
+import { ContentTypeConfig } from '../types';
+import { Logger } from '../utils/logger';
+
+import { BaseHandler } from './base';
 
 export class WebTVHandler extends BaseHandler {
   constructor(config: ContentTypeConfig, logger: Logger) {
@@ -56,7 +58,10 @@ export class WebTVHandler extends BaseHandler {
 
   private async getAvailableFolders(): Promise<string[]> {
     try {
-      const items = await fs.readdir(this.config.nfs_path!, { withFileTypes: true });
+      if (!this.config.nfs_path) {
+        throw new Error('NFS path not configured');
+      }
+      const items = await fs.readdir(this.config.nfs_path, { withFileTypes: true });
       return items
         .filter(item => item.isDirectory())
         .map(item => item.name)
@@ -72,12 +77,13 @@ export class WebTVHandler extends BaseHandler {
       return availableFolders;
     }
 
-    const filtered = availableFolders.filter(folder =>
-      this.config.include_folders!.some(
-        includePattern =>
-          folder.toLowerCase().includes(includePattern.toLowerCase()) ||
-          includePattern.toLowerCase().includes(folder.toLowerCase())
-      )
+    const filtered = availableFolders.filter(
+      folder =>
+        this.config.include_folders?.some(
+          includePattern =>
+            folder.toLowerCase().includes(includePattern.toLowerCase()) ||
+            includePattern.toLowerCase().includes(folder.toLowerCase())
+        ) ?? true
     );
 
     this.logProgress(`Filtered folders: ${filtered.join(', ')}`);
@@ -93,7 +99,10 @@ export class WebTVHandler extends BaseHandler {
 
     for (const folder of folders) {
       try {
-        const sourcePath = path.join(this.config.nfs_path!, folder);
+        if (!this.config.nfs_path) {
+          throw new Error('NFS path not configured');
+        }
+        const sourcePath = path.join(this.config.nfs_path, folder);
         const destPath = path.join(this.config.local_path, folder);
 
         // Check if folder already exists and get its size

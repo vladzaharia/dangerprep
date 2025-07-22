@@ -15,7 +15,7 @@ import {
   ContentTypeConfig,
 } from './types';
 
-const execAsync = promisify(exec);
+const _execAsync = promisify(exec);
 
 export class SyncEngine extends EventEmitter {
   private config: OfflineSyncConfig['offline_sync'];
@@ -399,7 +399,7 @@ export class SyncEngine extends EventEmitter {
           }
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore errors for individual directories
     }
 
@@ -419,7 +419,7 @@ export class SyncEngine extends EventEmitter {
     };
 
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([A-Z]+)$/i);
-    if (!match || !match[1] || !match[2]) return 1024 * 1024; // Default 1MB
+    if (!match?.[1] || !match[2]) return 1024 * 1024; // Default 1MB
 
     const value = parseFloat(match[1]);
     const unit = match[2].toUpperCase();

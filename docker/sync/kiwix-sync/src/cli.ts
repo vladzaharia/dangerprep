@@ -76,7 +76,7 @@ program
   .command('download <package>')
   .description('Download a ZIM package')
   .option('--force', 'Force download even if package exists')
-  .action(async (packageName, options) => {
+  .action(async (packageName, _options) => {
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
       await manager.initialize();

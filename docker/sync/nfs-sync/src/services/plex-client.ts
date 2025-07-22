@@ -1,6 +1,15 @@
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { PlexMovie, PlexTVShow, PlexEpisode } from '../types';
+
+import {
+  PlexMovie,
+  PlexTVShow,
+  PlexEpisode,
+  PlexVideoXML,
+  PlexEpisodeXML,
+  PlexGenreXML,
+  PlexMediaXML,
+} from '../types';
 import { Logger } from '../utils/logger';
 
 export class PlexClient {
@@ -32,17 +41,17 @@ export class PlexClient {
       const parsed = this.parser.parse(response.data);
       const container = parsed.MediaContainer;
 
-      if (!container || !container.Video) {
+      if (!container?.Video) {
         this.logger.warn('No movies found in Plex response');
         return [];
       }
 
       const videos = Array.isArray(container.Video) ? container.Video : [container.Video];
 
-      const movies: PlexMovie[] = videos.map((video: any) => ({
+      const movies: PlexMovie[] = videos.map((video: PlexVideoXML) => ({
         title: video['@_title'],
-        year: parseInt(video['@_year']) || 0,
-        rating: parseFloat(video['@_rating']) || 0,
+        year: parseInt(video['@_year'] || '0') || 0,
+        rating: parseFloat(video['@_rating'] || '0') || 0,
         genres: this.parseGenres(video.Genre),
         resolution: this.getResolution(video.Media),
         size: this.getTotalSize(video.Media),
@@ -72,7 +81,7 @@ export class PlexClient {
       const parsed = this.parser.parse(response.data);
       const container = parsed.MediaContainer;
 
-      if (!container || !container.Directory) {
+      if (!container?.Directory) {
         this.logger.warn('No TV shows found in Plex response');
         return [];
       }
@@ -119,16 +128,16 @@ export class PlexClient {
       const parsed = this.parser.parse(response.data);
       const container = parsed.MediaContainer;
 
-      if (!container || !container.Video) {
+      if (!container?.Video) {
         return [];
       }
 
       const videos = Array.isArray(container.Video) ? container.Video : [container.Video];
 
-      return videos.map((video: any) => ({
+      return videos.map((video: PlexEpisodeXML) => ({
         title: video['@_title'],
-        season: parseInt(video['@_parentIndex']) || 0,
-        episode: parseInt(video['@_index']) || 0,
+        season: parseInt(video['@_parentIndex'] || '0') || 0,
+        episode: parseInt(video['@_index'] || '0') || 0,
         size: this.getTotalSize(video.Media),
         path: this.getFilePath(video.Media),
       }));
@@ -138,18 +147,19 @@ export class PlexClient {
     }
   }
 
-  private parseGenres(genreData: any): string[] {
+  private parseGenres(genreData: PlexGenreXML | PlexGenreXML[] | undefined): string[] {
     if (!genreData) return [];
 
     const genres = Array.isArray(genreData) ? genreData : [genreData];
-    return genres.map((genre: any) => genre['@_tag']).filter(Boolean);
+    return genres.map((genre: PlexGenreXML) => genre['@_tag']).filter(Boolean);
   }
 
-  private getResolution(mediaData: any): string {
+  private getResolution(mediaData: PlexMediaXML | PlexMediaXML[] | undefined): string {
     if (!mediaData) return 'unknown';
 
     const media = Array.isArray(mediaData) ? mediaData[0] : mediaData;
-    const height = parseInt(media['@_height']) || 0;
+    if (!media) return 'unknown';
+    const height = parseInt(media['@_height'] || '0') || 0;
 
     if (height >= 2160) return '4K';
     if (height >= 1080) return '1080p';
@@ -159,7 +169,7 @@ export class PlexClient {
     return 'SD';
   }
 
-  private getTotalSize(mediaData: any): number {
+  private getTotalSize(mediaData: PlexMediaXML | PlexMediaXML[] | undefined): number {
     if (!mediaData) return 0;
 
     const media = Array.isArray(mediaData) ? mediaData : [mediaData];
@@ -169,7 +179,7 @@ export class PlexClient {
       if (item.Part) {
         const parts = Array.isArray(item.Part) ? item.Part : [item.Part];
         for (const part of parts) {
-          totalSize += parseInt(part['@_size']) || 0;
+          totalSize += parseInt(part['@_size'] || '0') || 0;
         }
       }
     }
@@ -177,13 +187,13 @@ export class PlexClient {
     return totalSize;
   }
 
-  private getFilePath(mediaData: any): string {
+  private getFilePath(mediaData: PlexMediaXML | PlexMediaXML[] | undefined): string {
     if (!mediaData) return '';
 
     const media = Array.isArray(mediaData) ? mediaData[0] : mediaData;
-    if (media.Part) {
+    if (media?.Part) {
       const part = Array.isArray(media.Part) ? media.Part[0] : media.Part;
-      return part['@_file'] || '';
+      return part?.['@_file'] || '';
     }
 
     return '';

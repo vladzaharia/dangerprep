@@ -1,6 +1,7 @@
-import { BaseHandler } from './base';
 import { ContentTypeConfig } from '../types';
 import { Logger } from '../utils/logger';
+
+import { BaseHandler } from './base';
 
 export class BooksHandler extends BaseHandler {
   constructor(config: ContentTypeConfig, logger: Logger) {

@@ -152,13 +152,13 @@ export class OfflineSync extends EventEmitter {
     // Check file system access
     try {
       if (this.config) {
-        const contentDir = this.config.offline_sync.storage.content_directory;
-        const mountBase = this.config.offline_sync.storage.mount_base;
+        const _contentDir = this.config.offline_sync.storage.content_directory;
+        const _mountBase = this.config.offline_sync.storage.mount_base;
 
         // These would be actual file system checks in a real implementation
         // For now, we'll assume they're accessible
       }
-    } catch (error) {
+    } catch (_error) {
       health.status = 'degraded';
       health.warnings.push('File system access issues detected');
     }
@@ -369,7 +369,7 @@ export class OfflineSync extends EventEmitter {
       }
 
       // Start sync operation
-      const operationId = await this.syncEngine.startSync(device, analysis);
+      const _operationId = await this.syncEngine.startSync(device, analysis);
       this.stats.totalOperations++;
 
       this.sendNotification({

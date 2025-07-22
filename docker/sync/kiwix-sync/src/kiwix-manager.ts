@@ -149,7 +149,7 @@ export class KiwixManager {
     }
   }
 
-  async healthCheck(): Promise<{ status: string; details: any }> {
+  async healthCheck(): Promise<{ status: string; details: Record<string, unknown> }> {
     try {
       const stats = await this.getLibraryStats();
       const libraryValid = await this.libraryManager.validateLibrary();

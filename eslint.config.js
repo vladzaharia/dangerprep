@@ -45,12 +45,26 @@ export default [
       node: nodePlugin,
     },
     rules: {
+      // Disable base rules that have TypeScript equivalents
+      'no-unused-vars': 'off',
+      'no-undef': 'off', // TypeScript handles this
+      'no-redeclare': 'off', // TypeScript handles this
+      'no-use-before-define': 'off', // TypeScript handles this
+
       // TypeScript-specific rules (more lenient for existing code)
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-non-null-assertion': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_'
+        }
+      ],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'error',
       '@typescript-eslint/prefer-nullish-coalescing': 'off',
-      '@typescript-eslint/prefer-optional-chain': 'warn',
+      '@typescript-eslint/prefer-optional-chain': 'error',
       '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
       '@typescript-eslint/no-floating-promises': 'off',
       '@typescript-eslint/await-thenable': 'warn',

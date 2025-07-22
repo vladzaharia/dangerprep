@@ -1,8 +1,10 @@
-import { BaseHandler } from './base';
+import path from 'path';
+
+import { PlexClient } from '../services/plex-client';
 import { ContentTypeConfig, PlexTVShow } from '../types';
 import { Logger } from '../utils/logger';
-import { PlexClient } from '../services/plex-client';
-import path from 'path';
+
+import { BaseHandler } from './base';
 
 export class TVHandler extends BaseHandler {
   private plexClient: PlexClient;
@@ -61,10 +63,11 @@ export class TVHandler extends BaseHandler {
       return shows;
     }
 
-    const filtered = shows.filter(show =>
-      this.config.include_folders!.some(folder =>
-        show.title.toLowerCase().includes(folder.toLowerCase())
-      )
+    const filtered = shows.filter(
+      show =>
+        this.config.include_folders?.some(folder =>
+          show.title.toLowerCase().includes(folder.toLowerCase())
+        ) ?? true
     );
 
     this.logProgress(`Filtered ${filtered.length} shows from ${shows.length} total`);
@@ -193,7 +196,7 @@ export class TVHandler extends BaseHandler {
       if (!grouped.has(season)) {
         grouped.set(season, []);
       }
-      grouped.get(season)!.push(episode);
+      grouped.get(season)?.push(episode);
     }
 
     return grouped;
@@ -215,7 +218,7 @@ export class TVHandler extends BaseHandler {
 
   private convertPlexPathToNFS(plexPath: string): string {
     // This would need to be customized based on your Plex/NFS path mapping
-    return plexPath.replace('/mnt/data/polaris/', this.config.nfs_path + '/');
+    return plexPath.replace('/mnt/data/polaris/', `${this.config.nfs_path}/`);
   }
 
   private sanitizeShowName(showName: string): string {
