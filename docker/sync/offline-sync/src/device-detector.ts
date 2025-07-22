@@ -1,16 +1,18 @@
-import { EventEmitter } from 'events';
-import { usb } from 'usb';
-import * as fs from 'fs-extra';
-import * as path from 'path';
 import { exec } from 'child_process';
+import { EventEmitter } from 'events';
+import * as path from 'path';
 import { promisify } from 'util';
+
+import * as fs from 'fs-extra';
+import { usb } from 'usb';
+
 import {
   DetectedDevice,
   OfflineSyncConfig,
   USBDevice,
   LsblkOutput,
   DiskSpaceInfo,
-  ExecResult
+  ExecResult,
 } from './types';
 
 const execAsync = promisify(exec);
@@ -78,7 +80,7 @@ export class DeviceDetector extends EventEmitter {
     this.isMonitoring = false;
     usb.removeAllListeners('attach');
     usb.removeAllListeners('detach');
-    
+
     this.log('USB device monitoring stopped');
   }
 
@@ -101,7 +103,9 @@ export class DeviceDetector extends EventEmitter {
    */
   private async handleDeviceAttach(device: USBLibDevice): Promise<void> {
     try {
-      this.log(`USB device attached: VID=${device.deviceDescriptor?.idVendor?.toString(16)}, PID=${device.deviceDescriptor?.idProduct?.toString(16)}`);
+      this.log(
+        `USB device attached: VID=${device.deviceDescriptor?.idVendor?.toString(16)}, PID=${device.deviceDescriptor?.idProduct?.toString(16)}`
+      );
 
       // Check if this is a mass storage device
       if (!this.isMassStorageDevice(device)) {
@@ -113,10 +117,10 @@ export class DeviceDetector extends EventEmitter {
 
       // Find the corresponding block device
       const blockDevices = await this.findBlockDevices(device);
-      
+
       for (const blockDevice of blockDevices) {
         const detectedDevice = await this.analyzeDevice(device, blockDevice);
-        
+
         if (detectedDevice && this.isValidDevice(detectedDevice)) {
           this.detectedDevices.set(detectedDevice.devicePath, detectedDevice);
           this.emit('device_detected', detectedDevice);
@@ -133,13 +137,16 @@ export class DeviceDetector extends EventEmitter {
    */
   private handleDeviceDetach(device: USBLibDevice): void {
     try {
-      this.log(`USB device detached: VID=${device.deviceDescriptor?.idVendor?.toString(16)}, PID=${device.deviceDescriptor?.idProduct?.toString(16)}`);
+      this.log(
+        `USB device detached: VID=${device.deviceDescriptor?.idVendor?.toString(16)}, PID=${device.deviceDescriptor?.idProduct?.toString(16)}`
+      );
 
       // Find and remove the corresponding detected device
       for (const [devicePath, detectedDevice] of this.detectedDevices.entries()) {
-        if (detectedDevice.deviceInfo.vendorId === device.deviceDescriptor?.idVendor &&
-            detectedDevice.deviceInfo.productId === device.deviceDescriptor?.idProduct) {
-          
+        if (
+          detectedDevice.deviceInfo.vendorId === device.deviceDescriptor?.idVendor &&
+          detectedDevice.deviceInfo.productId === device.deviceDescriptor?.idProduct
+        ) {
           this.detectedDevices.delete(devicePath);
           this.emit('device_removed', detectedDevice);
           this.log(`Storage device removed: ${devicePath}`);
@@ -157,15 +164,15 @@ export class DeviceDetector extends EventEmitter {
   private async scanExistingDevices(): Promise<void> {
     try {
       this.log('Scanning for existing USB storage devices...');
-      
+
       const devices = usb.getDeviceList();
-      
+
       for (const device of devices) {
         if (this.isMassStorageDevice(device)) {
           await this.handleDeviceAttach(device);
         }
       }
-      
+
       this.log(`Found ${this.detectedDevices.size} existing storage devices`);
     } catch (error) {
       this.logError('Error scanning existing devices', error);
@@ -216,7 +223,7 @@ export class DeviceDetector extends EventEmitter {
           blockDevices.push(`/dev/${blockDevice.name}`);
         }
       }
-      
+
       return blockDevices;
     } catch (error) {
       this.logError('Error finding block devices', error);
@@ -227,13 +234,16 @@ export class DeviceDetector extends EventEmitter {
   /**
    * Analyze a detected device to gather information
    */
-  private async analyzeDevice(usbDevice: USBLibDevice, blockDevice: string): Promise<DetectedDevice | null> {
+  private async analyzeDevice(
+    usbDevice: USBLibDevice,
+    blockDevice: string
+  ): Promise<DetectedDevice | null> {
     try {
       const descriptor = usbDevice.deviceDescriptor;
-      
+
       // Get device size and filesystem info
       const deviceInfo = await this.getDeviceInfo(blockDevice);
-      
+
       const detectedDevice: DetectedDevice = {
         devicePath: blockDevice,
         deviceInfo: {
@@ -242,12 +252,12 @@ export class DeviceDetector extends EventEmitter {
           manufacturer: await this.getStringDescriptor(usbDevice, descriptor?.iManufacturer),
           product: await this.getStringDescriptor(usbDevice, descriptor?.iProduct),
           serialNumber: await this.getStringDescriptor(usbDevice, descriptor?.iSerialNumber),
-          size: deviceInfo.size
+          size: deviceInfo.size,
         },
         fileSystem: deviceInfo.fstype,
         isMounted: deviceInfo.mounted,
         mountPath: deviceInfo.mountpoint,
-        isReady: true
+        isReady: true,
       };
 
       return detectedDevice;
@@ -270,14 +280,14 @@ export class DeviceDetector extends EventEmitter {
         size: parseInt(device?.size ?? '0') || 0,
         fstype: device?.fstype ?? 'unknown',
         mounted: !!device?.mountpoint,
-        mountpoint: device?.mountpoint
+        mountpoint: device?.mountpoint,
       };
     } catch (error) {
       return {
         size: 0,
         fstype: 'unknown',
         mounted: false,
-        mountpoint: undefined
+        mountpoint: undefined,
       };
     }
   }
@@ -285,9 +295,12 @@ export class DeviceDetector extends EventEmitter {
   /**
    * Get string descriptor from USB device
    */
-  private async getStringDescriptor(device: USBLibDevice, index?: number): Promise<string | undefined> {
+  private async getStringDescriptor(
+    device: USBLibDevice,
+    index?: number
+  ): Promise<string | undefined> {
     if (!index) return undefined;
-    
+
     try {
       // This would require opening the device, which needs proper permissions
       // For now, return undefined - this can be enhanced later
@@ -322,11 +335,11 @@ export class DeviceDetector extends EventEmitter {
    */
   private parseSize(sizeStr: string): number {
     const units: { [key: string]: number } = {
-      'B': 1,
-      'KB': 1024,
-      'MB': 1024 * 1024,
-      'GB': 1024 * 1024 * 1024,
-      'TB': 1024 * 1024 * 1024 * 1024
+      B: 1,
+      KB: 1024,
+      MB: 1024 * 1024,
+      GB: 1024 * 1024 * 1024,
+      TB: 1024 * 1024 * 1024 * 1024,
     };
 
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([A-Z]+)$/i);

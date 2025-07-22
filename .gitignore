@@ -31,11 +31,39 @@ Thumbs.db
 *.swo
 *~
 
-# Node.js
+# Node.js and Package Managers
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
+
+# Yarn v4
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+
+# TypeScript
+*.tsbuildinfo
+.tsbuildinfo
+
+# Turborepo
+.turbo/
+
+# Testing
+coverage/
+.nyc_output/
+junit.xml
 
 # Docker
 .dockerignore

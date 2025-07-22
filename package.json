@@ -1,0 +1,69 @@
+{
+  "name": "dangerprep",
+  "version": "1.0.0",
+  "description": "DangerPrep Infrastructure Management System - Turborepo Monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "yarn@4.5.3",
+  "workspaces": [
+    "cli",
+    "docker/sync/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "build:changed": "turbo run build --filter='[HEAD^1]'",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "format": "turbo run format",
+    "format:check": "turbo run format:check",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rimraf node_modules/.cache",
+    "clean:all": "turbo run clean && rimraf node_modules .turbo",
+    "workspace:info": "yarn workspaces list --verbose",
+    "workspace:add": "yarn workspace",
+    "deps:check": "turbo run deps:check",
+    "deps:update": "turbo run deps:update",
+    "graph": "turbo run build --graph",
+    "cache:clear": "turbo daemon clean",
+    "postinstall": "turbo run postinstall || true"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/node-cron": "^3.0.11",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "prettier": "^3.3.3",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "yarn": ">=4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vladzaharia/dangerprep.git"
+  },
+  "keywords": [
+    "infrastructure",
+    "docker",
+    "networking",
+    "monorepo",
+    "typescript",
+    "cli",
+    "turborepo"
+  ],
+  "author": "Vlad Zaharia <hey@vlad.gg>",
+  "license": "MIT"
+}

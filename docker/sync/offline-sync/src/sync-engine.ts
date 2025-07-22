@@ -1,16 +1,18 @@
-import { EventEmitter } from 'events';
-import * as fs from 'fs-extra';
-import * as path from 'path';
 import { exec } from 'child_process';
-import { promisify } from 'util';
 import * as crypto from 'crypto';
-import { 
-  DetectedDevice, 
-  OfflineSyncConfig, 
-  SyncOperation, 
-  FileTransfer, 
+import { EventEmitter } from 'events';
+import * as path from 'path';
+import { promisify } from 'util';
+
+import * as fs from 'fs-extra';
+
+import {
+  DetectedDevice,
+  OfflineSyncConfig,
+  SyncOperation,
+  FileTransfer,
   CardAnalysis,
-  ContentTypeConfig 
+  ContentTypeConfig,
 } from './types';
 
 const execAsync = promisify(exec);
@@ -30,7 +32,7 @@ export class SyncEngine extends EventEmitter {
    */
   public async startSync(device: DetectedDevice, analysis: CardAnalysis): Promise<string> {
     const operationId = this.generateOperationId();
-    
+
     const operation: SyncOperation = {
       id: operationId,
       device,
@@ -41,7 +43,7 @@ export class SyncEngine extends EventEmitter {
       totalFiles: 0,
       processedFiles: 0,
       totalSize: 0,
-      processedSize: 0
+      processedSize: 0,
     };
 
     this.activeOperations.set(operationId, operation);
@@ -49,7 +51,7 @@ export class SyncEngine extends EventEmitter {
 
     try {
       operation.status = 'in_progress';
-      
+
       // Process each detected content type
       for (const contentType of analysis.detectedContentTypes) {
         await this.syncContentType(operation, contentType);
@@ -58,7 +60,6 @@ export class SyncEngine extends EventEmitter {
       operation.status = 'completed';
       operation.endTime = new Date();
       this.emit('sync_completed', operation);
-
     } catch (error) {
       operation.status = 'failed';
       operation.endTime = new Date();
@@ -145,9 +146,9 @@ export class SyncEngine extends EventEmitter {
    * Sync files from local storage to card
    */
   private async syncToCard(
-    operation: SyncOperation, 
-    contentConfig: ContentTypeConfig, 
-    localPath: string, 
+    operation: SyncOperation,
+    contentConfig: ContentTypeConfig,
+    localPath: string,
     cardPath: string
   ): Promise<void> {
     this.log(`Syncing to card: ${localPath} -> ${cardPath}`);
@@ -179,7 +180,7 @@ export class SyncEngine extends EventEmitter {
         // Check if local file is newer
         const localStats = await fs.stat(localFile);
         const cardStats = await fs.stat(existingCardFile);
-        
+
         if (localStats.mtime > cardStats.mtime) {
           shouldCopy = true;
         }
@@ -195,9 +196,9 @@ export class SyncEngine extends EventEmitter {
    * Sync files from card to local storage
    */
   private async syncFromCard(
-    operation: SyncOperation, 
-    contentConfig: ContentTypeConfig, 
-    cardPath: string, 
+    operation: SyncOperation,
+    contentConfig: ContentTypeConfig,
+    cardPath: string,
     localPath: string
   ): Promise<void> {
     this.log(`Syncing from card: ${cardPath} -> ${localPath}`);
@@ -229,7 +230,7 @@ export class SyncEngine extends EventEmitter {
         // Check if card file is newer
         const cardStats = await fs.stat(cardFile);
         const localStats = await fs.stat(existingLocalFile);
-        
+
         if (cardStats.mtime > localStats.mtime) {
           shouldCopy = true;
         }
@@ -244,12 +245,16 @@ export class SyncEngine extends EventEmitter {
   /**
    * Transfer a single file with progress tracking
    */
-  private async transferFile(operation: SyncOperation, sourcePath: string, targetPath: string): Promise<void> {
+  private async transferFile(
+    operation: SyncOperation,
+    sourcePath: string,
+    targetPath: string
+  ): Promise<void> {
     const transferId = `${operation.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     try {
       const sourceStats = await fs.stat(sourcePath);
-      
+
       const transfer: FileTransfer = {
         id: transferId,
         sourcePath,
@@ -257,7 +262,7 @@ export class SyncEngine extends EventEmitter {
         size: sourceStats.size,
         transferred: 0,
         status: 'pending',
-        startTime: new Date()
+        startTime: new Date(),
       };
 
       this.activeTransfers.set(transferId, transfer);
@@ -281,14 +286,13 @@ export class SyncEngine extends EventEmitter {
 
       transfer.status = 'completed';
       transfer.endTime = new Date();
-      
+
       operation.processedFiles++;
       operation.processedSize += transfer.size;
       operation.currentFile = path.basename(sourcePath);
 
       this.emit('file_transferred', transfer);
       this.log(`Transferred: ${sourcePath} -> ${targetPath}`);
-
     } catch (error) {
       const transfer = this.activeTransfers.get(transferId);
       if (transfer) {
@@ -296,7 +300,7 @@ export class SyncEngine extends EventEmitter {
         transfer.error = error instanceof Error ? error.message : String(error);
         transfer.endTime = new Date();
       }
-      
+
       this.logError(`Failed to transfer ${sourcePath}`, error);
       throw error;
     } finally {
@@ -309,13 +313,14 @@ export class SyncEngine extends EventEmitter {
    */
   private async copyFileWithProgress(transfer: FileTransfer): Promise<void> {
     const chunkSize = this.parseSize(this.config.sync.transfer_chunk_size);
-    
+
     const readStream = fs.createReadStream(transfer.sourcePath, { highWaterMark: chunkSize });
     const writeStream = fs.createWriteStream(transfer.destinationPath);
 
     return new Promise((resolve, reject) => {
-      readStream.on('data', (chunk: Buffer) => {
-        transfer.transferred += chunk.length;
+      readStream.on('data', (chunk: string | Buffer) => {
+        const length = typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
+        transfer.transferred += length;
       });
 
       readStream.on('error', reject);
@@ -348,7 +353,13 @@ export class SyncEngine extends EventEmitter {
       const hash = crypto.createHash('sha256');
       const stream = fs.createReadStream(filePath);
 
-      stream.on('data', (data: Buffer) => hash.update(data));
+      stream.on('data', (data: string | Buffer) => {
+        if (typeof data === 'string') {
+          hash.update(data, 'utf8');
+        } else {
+          hash.update(data);
+        }
+      });
       stream.on('end', () => resolve(hash.digest('hex')));
       stream.on('error', reject);
     });
@@ -368,16 +379,16 @@ export class SyncEngine extends EventEmitter {
    */
   private async getFilesRecursively(dirPath: string, extensions: string[]): Promise<string[]> {
     const files: string[] = [];
-    
+
     try {
       const entries = await fs.readdir(dirPath);
-      
+
       for (const entry of entries) {
         // Sanitize entry name to prevent path traversal
         const sanitizedEntry = this.sanitizePath(entry);
         const fullPath = path.join(dirPath, sanitizedEntry);
         const stats = await fs.stat(fullPath);
-        
+
         if (stats.isDirectory()) {
           const subFiles = await this.getFilesRecursively(fullPath, extensions);
           files.push(...subFiles);
@@ -391,7 +402,7 @@ export class SyncEngine extends EventEmitter {
     } catch (error) {
       // Ignore errors for individual directories
     }
-    
+
     return files;
   }
 
@@ -400,11 +411,11 @@ export class SyncEngine extends EventEmitter {
    */
   private parseSize(sizeStr: string): number {
     const units: Record<string, number> = {
-      'B': 1,
-      'KB': 1024,
-      'MB': 1024 * 1024,
-      'GB': 1024 * 1024 * 1024,
-      'TB': 1024 * 1024 * 1024 * 1024
+      B: 1,
+      KB: 1024,
+      MB: 1024 * 1024,
+      GB: 1024 * 1024 * 1024,
+      TB: 1024 * 1024 * 1024 * 1024,
     };
 
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([A-Z]+)$/i);
@@ -412,7 +423,7 @@ export class SyncEngine extends EventEmitter {
 
     const value = parseFloat(match[1]);
     const unit = match[2].toUpperCase();
-    
+
     return Math.floor(value * (units[unit] ?? 1));
   }
 

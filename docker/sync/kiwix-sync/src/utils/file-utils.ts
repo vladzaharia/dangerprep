@@ -7,11 +7,11 @@ export class FileUtils {
 
     try {
       const items = await fs.readdir(dirPath);
-      
+
       for (const item of items) {
         const itemPath = path.join(dirPath, item);
         const stats = await fs.stat(itemPath);
-        
+
         if (stats.isDirectory()) {
           totalSize += await this.getDirectorySize(itemPath);
         } else {
@@ -28,21 +28,21 @@ export class FileUtils {
 
   static parseSize(sizeStr: string): number {
     const units: { [key: string]: number } = {
-      'B': 1,
-      'KB': 1024,
-      'MB': 1024 * 1024,
-      'GB': 1024 * 1024 * 1024,
-      'TB': 1024 * 1024 * 1024 * 1024
+      B: 1,
+      KB: 1024,
+      MB: 1024 * 1024,
+      GB: 1024 * 1024 * 1024,
+      TB: 1024 * 1024 * 1024 * 1024,
     };
 
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([KMGT]?B)$/i);
-    if (!match) {
+    if (!match?.[1] || !match[2]) {
       throw new Error(`Invalid size format: ${sizeStr}`);
     }
 
     const value = parseFloat(match[1]);
     const unit = match[2].toUpperCase();
-    
+
     return value * (units[unit] || 1);
   }
 

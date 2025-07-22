@@ -8,11 +8,11 @@ export class FileUtils {
 
     try {
       const items = await fs.readdir(dirPath);
-      
+
       for (const item of items) {
         const itemPath = path.join(dirPath, item);
         const stats = await fs.stat(itemPath);
-        
+
         if (stats.isDirectory()) {
           totalSize += await this.getDirectorySize(itemPath);
         } else {
@@ -29,21 +29,21 @@ export class FileUtils {
 
   static parseSize(sizeStr: string): number {
     const units: { [key: string]: number } = {
-      'B': 1,
-      'KB': 1024,
-      'MB': 1024 * 1024,
-      'GB': 1024 * 1024 * 1024,
-      'TB': 1024 * 1024 * 1024 * 1024
+      B: 1,
+      KB: 1024,
+      MB: 1024 * 1024,
+      GB: 1024 * 1024 * 1024,
+      TB: 1024 * 1024 * 1024 * 1024,
     };
 
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([KMGT]?B)$/i);
-    if (!match) {
+    if (!match || !match[1] || !match[2]) {
       throw new Error(`Invalid size format: ${sizeStr}`);
     }
 
     const value = parseFloat(match[1]);
     const unit = match[2].toUpperCase();
-    
+
     return value * (units[unit] || 1);
   }
 
@@ -78,20 +78,16 @@ export class FileUtils {
   }
 
   static async rsyncDirectory(
-    sourcePath: string, 
-    destPath: string, 
+    sourcePath: string,
+    destPath: string,
     options: {
       exclude?: string[];
       bandwidthLimit?: string;
       dryRun?: boolean;
     } = {}
   ): Promise<boolean> {
-    return new Promise((resolve) => {
-      const args = [
-        '-avz',
-        '--progress',
-        '--stats'
-      ];
+    return new Promise(resolve => {
+      const args = ['-avz', '--progress', '--stats'];
 
       // Add exclusions
       if (options.exclude) {
@@ -114,20 +110,20 @@ export class FileUtils {
 
       const rsyncProcess = spawn('rsync', args);
 
-      rsyncProcess.stdout.on('data', (data) => {
+      rsyncProcess.stdout.on('data', data => {
         // Log progress information
         console.log(data.toString());
       });
 
-      rsyncProcess.stderr.on('data', (data) => {
+      rsyncProcess.stderr.on('data', data => {
         console.error(`rsync stderr: ${data.toString()}`);
       });
 
-      rsyncProcess.on('close', (code) => {
+      rsyncProcess.on('close', code => {
         resolve(code === 0);
       });
 
-      rsyncProcess.on('error', (error) => {
+      rsyncProcess.on('error', error => {
         console.error(`Failed to start rsync: ${error}`);
         resolve(false);
       });

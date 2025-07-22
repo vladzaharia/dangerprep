@@ -1,6 +1,8 @@
+import * as path from 'path';
+
 import * as fs from 'fs-extra';
 import * as yaml from 'js-yaml';
-import * as path from 'path';
+
 import { OfflineSyncConfig } from './types';
 
 export class ConfigManager {
@@ -16,7 +18,7 @@ export class ConfigManager {
    */
   public async loadConfig(): Promise<OfflineSyncConfig> {
     try {
-      if (!await fs.pathExists(this.configPath)) {
+      if (!(await fs.pathExists(this.configPath))) {
         throw new Error(`Configuration file not found: ${this.configPath}`);
       }
 
@@ -28,7 +30,7 @@ export class ConfigManager {
 
       this.config = parsedConfig;
       this.log(`Configuration loaded from: ${this.configPath}`);
-      
+
       return parsedConfig;
     } catch (error) {
       this.logError('Failed to load configuration', error);
@@ -60,16 +62,16 @@ export class ConfigManager {
   public async saveConfig(config: OfflineSyncConfig): Promise<void> {
     try {
       this.validateConfig(config);
-      
+
       const yamlContent = yaml.dump(config, {
         indent: 2,
         lineWidth: 120,
-        noRefs: true
+        noRefs: true,
       });
 
       await fs.ensureDir(path.dirname(this.configPath));
       await fs.writeFile(this.configPath, yamlContent, 'utf8');
-      
+
       this.config = config;
       this.log(`Configuration saved to: ${this.configPath}`);
     } catch (error) {
@@ -87,7 +89,7 @@ export class ConfigManager {
       '/app/data/config.yaml',
       '/app/config.yaml',
       './config.yaml',
-      './config.yaml.example'
+      './config.yaml.example',
     ];
 
     for (const configPath of possiblePaths) {
@@ -152,7 +154,7 @@ export class ConfigManager {
 
       const config = contentConfig as Record<string, unknown>;
       const requiredFields = ['local_path', 'card_path', 'sync_direction', 'file_extensions'];
-      
+
       for (const field of requiredFields) {
         if (!config[field]) {
           throw new Error(`Content type ${contentType} missing required field: ${field}`);
@@ -165,7 +167,9 @@ export class ConfigManager {
 
       const validDirections = ['bidirectional', 'to_card', 'from_card'];
       if (!validDirections.includes(config.sync_direction as string)) {
-        throw new Error(`Content type ${contentType} has invalid sync_direction: ${config.sync_direction}`);
+        throw new Error(
+          `Content type ${contentType} has invalid sync_direction: ${config.sync_direction}`
+        );
       }
     }
 
@@ -225,12 +229,12 @@ export class ConfigManager {
 
     const parts = path.split('.');
     const lastPart = parts.pop();
-    
+
     if (!lastPart) {
       throw new Error('Invalid configuration path');
     }
 
-    let current: Record<string, unknown> = this.config as Record<string, unknown>;
+    let current: Record<string, unknown> = this.config as unknown as Record<string, unknown>;
 
     for (const part of parts) {
       if (!current[part] || typeof current[part] !== 'object') {
@@ -252,14 +256,14 @@ export class ConfigManager {
           content_directory: '/content',
           mount_base: '/mnt/microsd',
           temp_directory: '/tmp/offline-sync',
-          max_card_size: '2TB'
+          max_card_size: '2TB',
         },
         device_detection: {
           monitor_device_types: ['mass_storage', 'sd_card'],
           min_device_size: '1GB',
           mount_timeout: 30,
           mount_retry_attempts: 3,
-          mount_retry_delay: 5
+          mount_retry_delay: 5,
         },
         content_types: {
           movies: {
@@ -267,15 +271,15 @@ export class ConfigManager {
             card_path: 'movies',
             sync_direction: 'bidirectional',
             max_size: '800GB',
-            file_extensions: ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm']
+            file_extensions: ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm'],
           },
           books: {
             local_path: '/content/books',
             card_path: 'books',
             sync_direction: 'bidirectional',
             max_size: '20GB',
-            file_extensions: ['.epub', '.pdf', '.mobi', '.azw', '.azw3', '.fb2', '.txt']
-          }
+            file_extensions: ['.epub', '.pdf', '.mobi', '.azw', '.azw3', '.fb2', '.txt'],
+          },
         },
         sync: {
           check_interval: 30,
@@ -283,19 +287,19 @@ export class ConfigManager {
           transfer_chunk_size: '10MB',
           verify_transfers: true,
           delete_after_sync: false,
-          create_completion_markers: true
+          create_completion_markers: true,
         },
         logging: {
           level: 'INFO',
           file: '/app/data/logs/offline-sync.log',
           max_size: '50MB',
-          backup_count: 3
+          backup_count: 3,
         },
         notifications: {
           enabled: false,
-          events: ['card_inserted', 'card_removed', 'sync_completed', 'sync_failed']
-        }
-      }
+          events: ['card_inserted', 'card_removed', 'sync_completed', 'sync_failed'],
+        },
+      },
     };
 
     await this.saveConfig(defaultConfig);

@@ -1,8 +1,9 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { KiwixConfig, ZimPackage, LibraryEntry } from '../types';
-import { Logger } from '../utils/logger';
+
+import type { KiwixConfig, ZimPackage, LibraryEntry } from '../types';
 import { FileUtils } from '../utils/file-utils';
+import type { Logger } from '../utils/logger';
 
 export class LibraryManager {
   private config: KiwixConfig['kiwix_manager'];
@@ -32,7 +33,7 @@ export class LibraryManager {
           description: `Local ZIM file: ${file}`,
           size: FileUtils.formatSize(stats.size),
           date: stats.mtime.toISOString(),
-          path: filePath
+          path: filePath,
         });
       }
 
@@ -84,28 +85,28 @@ export class LibraryManager {
     // Extract metadata from filename (basic implementation)
     // In a real implementation, you might want to read ZIM file headers
     const parts = pkg.name.split('_');
-    const language = parts.length > 1 ? parts[1] : 'en';
-    
+    const language = parts.length > 1 && parts[1] ? parts[1] : 'en';
+
     return {
       id: pkg.name,
       path: pkg.path,
       url: fileName,
       title: pkg.title,
       description: pkg.description,
-      language: language,
+      language,
       creator: 'Kiwix',
       publisher: 'Kiwix',
       date: pkg.date,
       tags: this.generateTags(pkg.name),
       articleCount: 0, // Would need to read from ZIM file
-      mediaCount: 0,   // Would need to read from ZIM file
-      size: stats.size
+      mediaCount: 0, // Would need to read from ZIM file
+      size: stats.size,
     };
   }
 
   private generateTags(packageName: string): string {
     const tags = [];
-    
+
     if (packageName.includes('wikipedia')) tags.push('wikipedia');
     if (packageName.includes('wiktionary')) tags.push('wiktionary');
     if (packageName.includes('wikivoyage')) tags.push('wikivoyage');
@@ -113,7 +114,7 @@ export class LibraryManager {
     if (packageName.includes('gutenberg')) tags.push('gutenberg');
     if (packageName.includes('medicine')) tags.push('medicine');
     if (packageName.includes('_en_')) tags.push('english');
-    
+
     return tags.join(';');
   }
 
@@ -122,8 +123,9 @@ export class LibraryManager {
     const libraryOpen = '<library version="20110515">\n';
     const libraryClose = '</library>\n';
 
-    const bookEntries = entries.map(entry => {
-      return `  <book id="${this.escapeXml(entry.id)}"
+    const bookEntries = entries
+      .map(entry => {
+        return `  <book id="${this.escapeXml(entry.id)}"
         url="${this.escapeXml(entry.url)}"
         title="${this.escapeXml(entry.title)}"
         description="${this.escapeXml(entry.description)}"
@@ -135,9 +137,10 @@ export class LibraryManager {
         articleCount="${entry.articleCount}"
         mediaCount="${entry.mediaCount}"
         size="${entry.size}" />`;
-    }).join('\n');
+      })
+      .join('\n');
 
-    return xmlHeader + libraryOpen + bookEntries + '\n' + libraryClose;
+    return `${xmlHeader + libraryOpen + bookEntries}\n${libraryClose}`;
   }
 
   private escapeXml(text: string): string {
@@ -158,7 +161,7 @@ export class LibraryManager {
       }
 
       const libraryContent = await fs.readFile(this.config.storage.library_file, 'utf8');
-      
+
       // Basic XML validation
       if (!libraryContent.includes('<?xml') || !libraryContent.includes('<library')) {
         this.logger.error('Library file is not valid XML');
@@ -173,11 +176,15 @@ export class LibraryManager {
     }
   }
 
-  async getLibraryStats(): Promise<{ totalPackages: number; totalSize: string; lastUpdated: Date | null }> {
+  async getLibraryStats(): Promise<{
+    totalPackages: number;
+    totalSize: string;
+    lastUpdated: Date | null;
+  }> {
     try {
       const packages = await this.listInstalledPackages();
       const totalSize = await FileUtils.getDirectorySize(this.config.storage.zim_directory);
-      
+
       let lastUpdated: Date | null = null;
       if (await FileUtils.fileExists(this.config.storage.library_file)) {
         const stats = await fs.stat(this.config.storage.library_file);
@@ -187,14 +194,14 @@ export class LibraryManager {
       return {
         totalPackages: packages.length,
         totalSize: FileUtils.formatSize(totalSize),
-        lastUpdated
+        lastUpdated,
       };
     } catch (error) {
       this.logger.error(`Error getting library stats: ${error}`);
       return {
         totalPackages: 0,
         totalSize: '0 B',
-        lastUpdated: null
+        lastUpdated: null,
       };
     }
   }

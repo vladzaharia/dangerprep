@@ -92,7 +92,7 @@ export interface SyncOperation {
   id: string;
   device: DetectedDevice;
   contentType: string;
-  direction: 'to_card' | 'from_card';
+  direction: 'to_card' | 'from_card' | 'bidirectional';
   status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
   startTime: Date;
   endTime?: Date;
@@ -156,7 +156,13 @@ export interface HealthStatus {
 }
 
 export interface NotificationEvent {
-  type: 'card_inserted' | 'card_removed' | 'sync_started' | 'sync_completed' | 'sync_failed' | 'error';
+  type:
+    | 'card_inserted'
+    | 'card_removed'
+    | 'sync_started'
+    | 'sync_completed'
+    | 'sync_failed'
+    | 'error';
   timestamp: Date;
   device?: DetectedDevice;
   operation?: SyncOperation;

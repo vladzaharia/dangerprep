@@ -32,14 +32,14 @@ export class Logger {
 
   private async writeLog(level: string, message: string): Promise<void> {
     const formattedMessage = this.formatMessage(level, message);
-    
+
     // Always log to console
     console.log(formattedMessage);
 
     // Log to file if configured
     if (this.logFile) {
       try {
-        await fs.appendFile(this.logFile, formattedMessage + '\n');
+        await fs.appendFile(this.logFile, `${formattedMessage}\n`);
       } catch (error) {
         console.error(`Failed to write to log file: ${error}`);
       }

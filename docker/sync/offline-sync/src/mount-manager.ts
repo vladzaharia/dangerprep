@@ -1,8 +1,10 @@
-import { EventEmitter } from 'events';
-import * as fs from 'fs-extra';
-import * as path from 'path';
 import { exec } from 'child_process';
+import { EventEmitter } from 'events';
+import * as path from 'path';
 import { promisify } from 'util';
+
+import * as fs from 'fs-extra';
+
 import { DetectedDevice, OfflineSyncConfig } from './types';
 
 const execAsync = promisify(exec);
@@ -189,22 +191,22 @@ export class MountManager extends EventEmitter {
   private async mountWithUdisks2(devicePath: string, mountPath: string): Promise<void> {
     // udisks2 typically mounts to /media/username/label, but we want our custom path
     // First mount with udisks2, then bind mount to our desired location
-    
+
     try {
       // Mount with udisks2
       const { stdout } = await execAsync(`udisksctl mount -b ${devicePath}`);
-      
+
       // Extract the actual mount path from udisks2 output
       const mountMatch = stdout.match(/Mounted .+ at (.+)/);
-      if (!mountMatch) {
+      if (!mountMatch || !mountMatch[1]) {
         throw new Error('Could not determine udisks2 mount path');
       }
 
       const udisksMountPath = mountMatch[1].trim();
-      
+
       // Bind mount to our desired location
       await execAsync(`mount --bind "${udisksMountPath}" "${mountPath}"`);
-      
+
       this.log(`Bind mounted ${udisksMountPath} to ${mountPath}`);
     } catch (error) {
       throw new Error(`udisks2 mount failed: ${error}`);
@@ -217,7 +219,7 @@ export class MountManager extends EventEmitter {
   private async mountWithSystemMount(device: DetectedDevice, mountPath: string): Promise<void> {
     try {
       let mountOptions = 'rw,user,exec';
-      
+
       // Add filesystem-specific options
       if (device.fileSystem) {
         switch (device.fileSystem.toLowerCase()) {
@@ -236,7 +238,7 @@ export class MountManager extends EventEmitter {
 
       const mountCommand = `mount -o ${mountOptions} ${device.devicePath} ${mountPath}`;
       await execAsync(mountCommand);
-      
+
       this.log(`Mounted ${device.devicePath} at ${mountPath} with options: ${mountOptions}`);
     } catch (error) {
       throw new Error(`System mount failed: ${error}`);
@@ -285,7 +287,7 @@ export class MountManager extends EventEmitter {
 
       // Try to read the directory to ensure it's properly mounted
       await fs.readdir(mountPath);
-      
+
       // Check if it appears in /proc/mounts
       const { stdout } = await execAsync('cat /proc/mounts');
       return stdout.includes(mountPath);
@@ -339,20 +341,20 @@ export class MountManager extends EventEmitter {
    */
   private async cleanupStaleMounts(): Promise<void> {
     try {
-      if (!await fs.pathExists(this.config.storage.mount_base)) {
+      if (!(await fs.pathExists(this.config.storage.mount_base))) {
         return;
       }
 
       const entries = await fs.readdir(this.config.storage.mount_base);
-      
+
       for (const entry of entries) {
         const mountPath = path.join(this.config.storage.mount_base, entry);
         const stats = await fs.stat(mountPath);
-        
+
         if (stats.isDirectory()) {
           // Check if this mount point is still active
           const isActive = await this.verifyMount(mountPath);
-          
+
           if (!isActive) {
             // Try to clean up
             await this.cleanupMountPoint(mountPath);

@@ -1,20 +1,22 @@
-import yaml from 'js-yaml';
-import cron from 'node-cron';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { KiwixConfig, ZimPackage } from './types';
-import { Logger } from './utils/logger';
-import { FileUtils } from './utils/file-utils';
-import { ZimUpdater } from './services/zim-updater';
-import { ZimDownloader } from './services/zim-downloader';
+
+import yaml from 'js-yaml';
+import cron from 'node-cron';
+
 import { LibraryManager } from './services/library-manager';
+import { ZimDownloader } from './services/zim-downloader';
+import { ZimUpdater } from './services/zim-updater';
+import type { KiwixConfig, ZimPackage } from './types';
+import { FileUtils } from './utils/file-utils';
+import { Logger } from './utils/logger';
 
 export class KiwixManager {
-  private config: KiwixConfig;
+  private config!: KiwixConfig;
   private logger: Logger;
-  private zimUpdater: ZimUpdater;
-  private zimDownloader: ZimDownloader;
-  private libraryManager: LibraryManager;
+  private zimUpdater!: ZimUpdater;
+  private zimDownloader!: ZimDownloader;
+  private libraryManager!: LibraryManager;
 
   constructor(private configPath: string) {
     this.logger = new Logger('KiwixManager');
@@ -102,7 +104,7 @@ export class KiwixManager {
   async downloadPackage(packageName: string): Promise<boolean> {
     try {
       this.logger.info(`Downloading package: ${packageName}`);
-      
+
       const success = await this.zimDownloader.downloadPackage(packageName);
       if (success) {
         await this.libraryManager.updateLibrary();
@@ -129,7 +131,11 @@ export class KiwixManager {
     return await this.zimUpdater.getUpdateStatus();
   }
 
-  async getLibraryStats(): Promise<{ totalPackages: number; totalSize: string; lastUpdated: Date | null }> {
+  async getLibraryStats(): Promise<{
+    totalPackages: number;
+    totalSize: string;
+    lastUpdated: Date | null;
+  }> {
     return await this.libraryManager.getLibraryStats();
   }
 
@@ -147,22 +153,22 @@ export class KiwixManager {
     try {
       const stats = await this.getLibraryStats();
       const libraryValid = await this.libraryManager.validateLibrary();
-      
+
       const status = libraryValid ? 'healthy' : 'unhealthy';
-      
+
       return {
         status,
         details: {
           totalPackages: stats.totalPackages,
           totalSize: stats.totalSize,
           lastUpdated: stats.lastUpdated,
-          libraryValid
-        }
+          libraryValid,
+        },
       };
     } catch (error) {
       return {
         status: 'error',
-        details: { error: error.toString() }
+        details: { error: error instanceof Error ? error.message : String(error) },
       };
     }
   }
@@ -171,10 +177,10 @@ export class KiwixManager {
     try {
       await this.initialize();
       this.scheduleUpdates();
-      
+
       // Initial library update
       await this.libraryManager.updateLibrary();
-      
+
       this.logger.info('Kiwix Manager started successfully');
 
       // Keep the process running
@@ -195,7 +201,6 @@ export class KiwixManager {
           this.logger.warn(`Health check failed: ${JSON.stringify(health.details)}`);
         }
       }, 300000); // Every 5 minutes
-
     } catch (error) {
       this.logger.error(`Failed to start Kiwix Manager: ${error}`);
       process.exit(1);
@@ -207,7 +212,7 @@ export class KiwixManager {
 if (require.main === module) {
   const configPath = process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml';
   const manager = new KiwixManager(configPath);
-  
+
   manager.run().catch(error => {
     console.error('Failed to start Kiwix Manager:', error);
     process.exit(1);

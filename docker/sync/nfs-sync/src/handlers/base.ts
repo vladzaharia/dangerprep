@@ -29,8 +29,8 @@ export abstract class BaseHandler {
   }
 
   protected async rsyncDirectory(
-    sourcePath: string, 
-    destPath: string, 
+    sourcePath: string,
+    destPath: string,
     options: {
       exclude?: string[];
       bandwidthLimit?: string;
@@ -50,7 +50,9 @@ export abstract class BaseHandler {
 
   protected logSyncComplete(success: boolean, details?: string): void {
     if (success) {
-      this.logger.info(`${this.contentType} sync completed successfully${details ? ': ' + details : ''}`);
+      this.logger.info(
+        `${this.contentType} sync completed successfully${details ? ': ' + details : ''}`
+      );
     } else {
       this.logger.error(`${this.contentType} sync failed${details ? ': ' + details : ''}`);
     }
@@ -68,12 +70,14 @@ export abstract class BaseHandler {
     try {
       const currentSize = await this.getDirectorySize(this.config.local_path);
       const maxSize = this.parseSize(this.config.max_size);
-      
+
       if (currentSize + requiredSize > maxSize) {
-        this.logError(`Storage limit exceeded: ${this.formatSize(currentSize + requiredSize)} > ${this.config.max_size}`);
+        this.logError(
+          `Storage limit exceeded: ${this.formatSize(currentSize + requiredSize)} > ${this.config.max_size}`
+        );
         return false;
       }
-      
+
       return true;
     } catch (error) {
       this.logError('Failed to check storage space', error);
@@ -85,7 +89,7 @@ export abstract class BaseHandler {
     try {
       // Ensure local path exists
       await this.ensureDirectory(this.config.local_path);
-      
+
       // Check if NFS path exists (if configured)
       if (this.config.nfs_path) {
         const nfsExists = await this.fileExists(this.config.nfs_path);
@@ -94,7 +98,7 @@ export abstract class BaseHandler {
           return false;
         }
       }
-      
+
       return true;
     } catch (error) {
       this.logError('Path validation failed', error);
@@ -111,7 +115,7 @@ export abstract class BaseHandler {
       '*.nfo',
       '*.srt.bak',
       '@eaDir',
-      '.@__thumb'
+      '.@__thumb',
     ];
   }
 }

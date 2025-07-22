@@ -32,7 +32,7 @@ export class Logger {
 
   private async writeLog(level: string, message: string): Promise<void> {
     const formattedMessage = this.formatMessage(level, message);
-    
+
     // Always log to console
     console.log(formattedMessage);
 
