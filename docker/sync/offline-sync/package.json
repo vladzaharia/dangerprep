@@ -1,0 +1,27 @@
+{
+  "name": "dangerprep-offline-sync",
+  "version": "1.0.0",
+  "description": "DangerPrep Offline MicroSD Card Synchronization Service",
+  "main": "dist/offline-sync.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/offline-sync.js",
+    "dev": "ts-node src/offline-sync.ts",
+    "cli": "node dist/cli.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "node-cron": "^3.0.2",
+    "usb": "^2.16.0",
+    "fs-extra": "^11.2.0",
+    "chokidar": "^3.6.0",
+    "commander": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/js-yaml": "^4.0.5",
+    "@types/fs-extra": "^11.0.4",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  }
+}

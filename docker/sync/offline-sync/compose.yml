@@ -1,0 +1,31 @@
+services:
+  offline-sync:
+    build: .
+    restart: unless-stopped
+    privileged: true  # Required for USB device access and mounting
+    volumes:
+      - ${INSTALL_ROOT}/data/offline-sync:/app/data
+      - ${INSTALL_ROOT}/content:/content
+      - /dev:/dev  # Device access for USB detection
+      - /run/udev:/run/udev:ro  # udev for device information
+      - /sys:/sys:ro  # System information for device detection
+      - /proc:/proc:ro  # Process information
+      - /run/dbus:/run/dbus  # D-Bus for udisks2 communication
+      - /var/run/dbus:/var/run/dbus  # Alternative D-Bus path
+    env_file:
+      - compose.env
+    labels:
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('./dist/offline-sync').OfflineSync.prototype.healthCheck().then(h => process.exit(h.status === 'healthy' ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  traefik:
+    external: true
