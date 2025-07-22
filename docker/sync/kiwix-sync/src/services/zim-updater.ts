@@ -1,8 +1,10 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { KiwixConfig, ZimPackage } from '../types';
-import { Logger } from '../utils/logger';
+
+import type { KiwixConfig, ZimPackage } from '../types';
 import { FileUtils } from '../utils/file-utils';
+import type { Logger } from '../utils/logger';
+
 import { ZimDownloader } from './zim-downloader';
 
 export class ZimUpdater {
@@ -21,18 +23,18 @@ export class ZimUpdater {
       this.logger.info(`Checking for updates: ${packageName}`);
 
       const needsUpdate = await this.downloader.checkForUpdates(packageName);
-      
+
       if (!needsUpdate) {
         this.logger.info(`Package ${packageName} is up to date`);
         return true;
       }
 
       this.logger.info(`Updating package: ${packageName}`);
-      
+
       // Backup existing file if it exists
       const existingPath = path.join(this.config.storage.zim_directory, `${packageName}.zim`);
       const backupPath = path.join(this.config.storage.zim_directory, `${packageName}.zim.backup`);
-      
+
       if (await FileUtils.fileExists(existingPath)) {
         await FileUtils.moveFile(existingPath, backupPath);
         this.logger.debug(`Backed up existing file to ${backupPath}`);
@@ -40,7 +42,7 @@ export class ZimUpdater {
 
       // Download new version
       const success = await this.downloader.downloadPackage(packageName);
-      
+
       if (success) {
         // Remove backup on successful update
         if (await FileUtils.fileExists(backupPath)) {
@@ -111,7 +113,7 @@ export class ZimUpdater {
           description: `Local ZIM file: ${file}`,
           size: FileUtils.formatSize(stats.size),
           date: stats.mtime.toISOString(),
-          path: filePath
+          path: filePath,
         });
       }
 
@@ -138,10 +140,10 @@ export class ZimUpdater {
 
       const zimDir = this.config.storage.zim_directory;
       const files = await fs.readdir(zimDir);
-      
+
       // Find backup files and old versions
       const backupFiles = files.filter(file => file.endsWith('.backup') || file.includes('.old.'));
-      
+
       for (const backupFile of backupFiles) {
         const filePath = path.join(zimDir, backupFile);
         try {
@@ -183,14 +185,14 @@ export class ZimUpdater {
         status.push({
           package: zimPackage.name,
           needsUpdate,
-          lastChecked: new Date()
+          lastChecked: new Date(),
         });
       } catch (error) {
         this.logger.error(`Error checking status for ${zimPackage.name}: ${error}`);
         status.push({
           package: zimPackage.name,
           needsUpdate: false,
-          lastChecked: new Date()
+          lastChecked: new Date(),
         });
       }
     }

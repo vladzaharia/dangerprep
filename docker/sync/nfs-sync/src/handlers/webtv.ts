@@ -15,7 +15,7 @@ export class WebTVHandler extends BaseHandler {
 
     try {
       // Validate paths
-      if (!await this.validatePaths()) {
+      if (!(await this.validatePaths())) {
         return false;
       }
 
@@ -25,7 +25,7 @@ export class WebTVHandler extends BaseHandler {
       }
 
       // Check storage space
-      if (!await this.checkStorageSpace()) {
+      if (!(await this.checkStorageSpace())) {
         return false;
       }
 
@@ -49,7 +49,7 @@ export class WebTVHandler extends BaseHandler {
       return success;
     } catch (error) {
       this.logError('Sync operation failed', error);
-      this.logSyncComplete(false, error.toString());
+      this.logSyncComplete(false, error instanceof Error ? error.message : String(error));
       return false;
     }
   }
@@ -73,9 +73,10 @@ export class WebTVHandler extends BaseHandler {
     }
 
     const filtered = availableFolders.filter(folder =>
-      this.config.include_folders!.some(includePattern =>
-        folder.toLowerCase().includes(includePattern.toLowerCase()) ||
-        includePattern.toLowerCase().includes(folder.toLowerCase())
+      this.config.include_folders!.some(
+        includePattern =>
+          folder.toLowerCase().includes(includePattern.toLowerCase()) ||
+          includePattern.toLowerCase().includes(folder.toLowerCase())
       )
     );
 
@@ -107,13 +108,9 @@ export class WebTVHandler extends BaseHandler {
         }
 
         this.logProgress(`Syncing folder: ${folder}`);
-        const success = await this.rsyncDirectory(
-          sourcePath,
-          destPath,
-          {
-            exclude: this.getWebTVExcludePatterns()
-          }
-        );
+        const success = await this.rsyncDirectory(sourcePath, destPath, {
+          exclude: this.getWebTVExcludePatterns(),
+        });
 
         if (success) {
           const finalSize = await this.getDirectorySize(destPath);
@@ -146,7 +143,7 @@ export class WebTVHandler extends BaseHandler {
       'previews/',
       '*.part',
       '*.ytdl',
-      '*.temp'
+      '*.temp',
     ];
   }
 }

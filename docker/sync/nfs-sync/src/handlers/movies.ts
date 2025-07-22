@@ -22,11 +22,11 @@ export class MoviesHandler extends BaseHandler {
 
     try {
       // Validate paths and Plex connection
-      if (!await this.validatePaths()) {
+      if (!(await this.validatePaths())) {
         return false;
       }
 
-      if (!await this.plexClient.testConnection()) {
+      if (!(await this.plexClient.testConnection())) {
         this.logError('Failed to connect to Plex server');
         return false;
       }
@@ -54,7 +54,7 @@ export class MoviesHandler extends BaseHandler {
       return success;
     } catch (error) {
       this.logError('Sync operation failed', error);
-      this.logSyncComplete(false, error.toString());
+      this.logSyncComplete(false, error instanceof Error ? error.message : String(error));
       return false;
     }
   }
@@ -134,7 +134,7 @@ export class MoviesHandler extends BaseHandler {
 
     const moviesWithPriority = movies.map(movie => ({
       ...movie,
-      priorityScore: this.calculatePriorityScore(movie, this.config.priority_rules!)
+      priorityScore: this.calculatePriorityScore(movie, this.config.priority_rules!),
     }));
 
     return moviesWithPriority.sort((a, b) => b.priorityScore - a.priorityScore);
@@ -179,7 +179,9 @@ export class MoviesHandler extends BaseHandler {
 
     for (const movie of movies) {
       if (currentSize + movie.size > maxSize) {
-        this.logProgress(`Size limit reached, stopping sync. Synced: ${syncedCount}, Skipped: ${movies.length - syncedCount}`);
+        this.logProgress(
+          `Size limit reached, stopping sync. Synced: ${syncedCount}, Skipped: ${movies.length - syncedCount}`
+        );
         break;
       }
 
@@ -210,7 +212,10 @@ export class MoviesHandler extends BaseHandler {
 
     // Convert Plex path to NFS path
     const nfsMoviePath = this.convertPlexPathToNFS(movie.path);
-    const localMoviePath = path.join(this.config.local_path, path.basename(path.dirname(nfsMoviePath)));
+    const localMoviePath = path.join(
+      this.config.local_path,
+      path.basename(path.dirname(nfsMoviePath))
+    );
 
     // Check if movie already exists locally
     if (await this.fileExists(localMoviePath)) {
@@ -219,13 +224,9 @@ export class MoviesHandler extends BaseHandler {
     }
 
     // Sync the movie directory
-    return await this.rsyncDirectory(
-      path.dirname(nfsMoviePath),
-      localMoviePath,
-      {
-        exclude: this.getMovieExcludePatterns()
-      }
-    );
+    return await this.rsyncDirectory(path.dirname(nfsMoviePath), localMoviePath, {
+      exclude: this.getMovieExcludePatterns(),
+    });
   }
 
   private convertPlexPathToNFS(plexPath: string): string {
@@ -243,7 +244,7 @@ export class MoviesHandler extends BaseHandler {
       'extras/',
       'behind the scenes/',
       'deleted scenes/',
-      'featurettes/'
+      'featurettes/',
     ];
   }
 }

@@ -13,7 +13,7 @@ export class BooksHandler extends BaseHandler {
 
     try {
       // Validate paths
-      if (!await this.validatePaths()) {
+      if (!(await this.validatePaths())) {
         return false;
       }
 
@@ -23,18 +23,14 @@ export class BooksHandler extends BaseHandler {
       }
 
       // Check storage space
-      if (!await this.checkStorageSpace()) {
+      if (!(await this.checkStorageSpace())) {
         return false;
       }
 
       // Perform full sync of all books
-      const success = await this.rsyncDirectory(
-        this.config.nfs_path,
-        this.config.local_path,
-        {
-          exclude: this.getExcludePatterns()
-        }
-      );
+      const success = await this.rsyncDirectory(this.config.nfs_path, this.config.local_path, {
+        exclude: this.getExcludePatterns(),
+      });
 
       if (success) {
         const finalSize = await this.getDirectorySize(this.config.local_path);
@@ -46,18 +42,12 @@ export class BooksHandler extends BaseHandler {
       return success;
     } catch (error) {
       this.logError('Sync operation failed', error);
-      this.logSyncComplete(false, error.toString());
+      this.logSyncComplete(false, error instanceof Error ? error.message : String(error));
       return false;
     }
   }
 
-  protected getExcludePatterns(): string[] {
-    return [
-      ...super.getExcludePatterns(),
-      '*.opf.bak',
-      '*.epub.bak',
-      '*.mobi.bak',
-      '*.pdf.bak'
-    ];
+  protected override getExcludePatterns(): string[] {
+    return [...super.getExcludePatterns(), '*.opf.bak', '*.epub.bak', '*.mobi.bak', '*.pdf.bak'];
   }
 }

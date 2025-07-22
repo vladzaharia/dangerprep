@@ -105,10 +105,10 @@ export interface SyncResult {
 
 export interface SyncStatus {
   isRunning: boolean;
-  currentContentType?: string;
+  currentContentType?: string | undefined;
   progress: number;
-  startTime?: Date;
-  estimatedCompletion?: Date;
-  lastSync?: Date;
+  startTime?: Date | undefined;
+  estimatedCompletion?: Date | undefined;
+  lastSync?: Date | undefined;
   results: SyncResult[];
 }

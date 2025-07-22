@@ -1,12 +1,14 @@
-import * as fs from 'fs-extra';
 import * as path from 'path';
+
+import * as fs from 'fs-extra';
+
 import { OfflineSyncConfig } from './types';
 
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
   WARN = 2,
-  ERROR = 3
+  ERROR = 3,
 }
 
 export interface LogEntry {
@@ -14,8 +16,8 @@ export interface LogEntry {
   level: LogLevel;
   component: string;
   message: string;
-  data?: Record<string, unknown>;
-  error?: Error;
+  data?: Record<string, unknown> | undefined;
+  error?: Error | undefined;
 }
 
 export class Logger {
@@ -31,7 +33,7 @@ export class Logger {
     this.logFile = config.file;
     this.maxSize = this.parseSize(config.max_size);
     this.backupCount = config.backup_count;
-    
+
     this.ensureLogDirectory();
   }
 
@@ -59,7 +61,12 @@ export class Logger {
   /**
    * Log error message
    */
-  public error(component: string, message: string, error?: Error | unknown, data?: Record<string, unknown>): void {
+  public error(
+    component: string,
+    message: string,
+    error?: Error | unknown,
+    data?: Record<string, unknown>
+  ): void {
     const errorObj = error instanceof Error ? error : undefined;
     const entry: LogEntry = {
       timestamp: new Date(),
@@ -67,7 +74,7 @@ export class Logger {
       component,
       message,
       data,
-      error: errorObj
+      error: errorObj,
     };
 
     this.writeLog(entry);
@@ -76,7 +83,12 @@ export class Logger {
   /**
    * Log message with specified level
    */
-  private log(level: LogLevel, component: string, message: string, data?: Record<string, unknown>): void {
+  private log(
+    level: LogLevel,
+    component: string,
+    message: string,
+    data?: Record<string, unknown>
+  ): void {
     if (level < this.logLevel) {
       return;
     }
@@ -86,7 +98,7 @@ export class Logger {
       level,
       component,
       message,
-      data
+      data,
     };
 
     this.writeLog(entry);
@@ -97,10 +109,10 @@ export class Logger {
    */
   private async writeLog(entry: LogEntry): Promise<void> {
     const logLine = this.formatLogEntry(entry);
-    
+
     // Write to console
     this.writeToConsole(entry, logLine);
-    
+
     // Write to file
     try {
       await this.writeToFile(logLine);
@@ -116,20 +128,20 @@ export class Logger {
     const timestamp = entry.timestamp.toISOString();
     const level = LogLevel[entry.level].padEnd(5);
     const component = entry.component.padEnd(15);
-    
+
     let logLine = `${timestamp} [${level}] [${component}] ${entry.message}`;
-    
+
     if (entry.data && Object.keys(entry.data).length > 0) {
       logLine += ` | Data: ${JSON.stringify(entry.data)}`;
     }
-    
+
     if (entry.error) {
       logLine += ` | Error: ${entry.error.message}`;
       if (entry.error.stack) {
         logLine += `\nStack: ${entry.error.stack}`;
       }
     }
-    
+
     return logLine;
   }
 
@@ -163,7 +175,7 @@ export class Logger {
     }
 
     // Append to log file
-    await fs.appendFile(this.logFile, logLine + '\n');
+    await fs.appendFile(this.logFile, `${logLine}\n`);
   }
 
   /**
@@ -171,7 +183,7 @@ export class Logger {
    */
   private async needsRotation(): Promise<boolean> {
     try {
-      if (!await fs.pathExists(this.logFile)) {
+      if (!(await fs.pathExists(this.logFile))) {
         return false;
       }
 
@@ -197,7 +209,7 @@ export class Logger {
       for (let i = this.backupCount - 1; i >= 1; i--) {
         const currentBackup = `${this.logFile}.${i}`;
         const nextBackup = `${this.logFile}.${i + 1}`;
-        
+
         if (await fs.pathExists(currentBackup)) {
           await fs.move(currentBackup, nextBackup);
         }
@@ -248,11 +260,11 @@ export class Logger {
    */
   private parseSize(sizeStr: string): number {
     const units: Record<string, number> = {
-      'B': 1,
-      'KB': 1024,
-      'MB': 1024 * 1024,
-      'GB': 1024 * 1024 * 1024,
-      'TB': 1024 * 1024 * 1024 * 1024
+      B: 1,
+      KB: 1024,
+      MB: 1024 * 1024,
+      GB: 1024 * 1024 * 1024,
+      TB: 1024 * 1024 * 1024 * 1024,
     };
 
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([A-Z]+)$/i);
@@ -262,7 +274,7 @@ export class Logger {
 
     const value = parseFloat(match[1]);
     const unit = match[2].toUpperCase();
-    
+
     return Math.floor(value * (units[unit] ?? 1));
   }
 
@@ -271,13 +283,13 @@ export class Logger {
    */
   public async getRecentLogs(lines: number = 100): Promise<string[]> {
     try {
-      if (!await fs.pathExists(this.logFile)) {
+      if (!(await fs.pathExists(this.logFile))) {
         return [];
       }
 
       const content = await fs.readFile(this.logFile, 'utf8');
       const allLines = content.split('\n').filter(line => line.trim());
-      
+
       return allLines.slice(-lines);
     } catch (error) {
       console.error(`Failed to read log file: ${error}`);
@@ -303,7 +315,7 @@ export class Logger {
    */
   public async getLogStats(): Promise<{ size: number; lines: number; lastModified: Date } | null> {
     try {
-      if (!await fs.pathExists(this.logFile)) {
+      if (!(await fs.pathExists(this.logFile))) {
         return null;
       }
 
@@ -314,7 +326,7 @@ export class Logger {
       return {
         size: stats.size,
         lines,
-        lastModified: stats.mtime
+        lastModified: stats.mtime,
       };
     } catch (error) {
       console.error(`Failed to get log stats: ${error}`);

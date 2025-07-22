@@ -1,10 +1,13 @@
-import axios from 'axios';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { KiwixConfig, ZimPackage, DownloadProgress } from '../types';
-import { Logger } from '../utils/logger';
+
+import axios from 'axios';
+
+import type { KiwixConfig, ZimPackage } from '../types';
+import { DownloadProgress } from '../types';
 import { FileUtils } from '../utils/file-utils';
+import type { Logger } from '../utils/logger';
 
 export class ZimDownloader {
   private config: KiwixConfig['kiwix_manager'];
@@ -18,12 +21,12 @@ export class ZimDownloader {
   async listAvailablePackages(): Promise<ZimPackage[]> {
     try {
       this.logger.info('Fetching available ZIM packages from Kiwix library');
-      
+
       const response = await axios.get(this.config.api.catalog_url, {
         timeout: this.config.api.timeout,
         headers: {
-          'User-Agent': 'DangerPrep-Kiwix-Manager/1.0'
-        }
+          'User-Agent': 'DangerPrep-Kiwix-Manager/1.0',
+        },
       });
 
       const packages: ZimPackage[] = response.data.map((entry: any) => ({
@@ -32,7 +35,7 @@ export class ZimDownloader {
         description: entry.description,
         size: FileUtils.formatSize(entry.size || 0),
         date: entry.date,
-        url: entry.url
+        url: entry.url,
       }));
 
       this.logger.info(`Found ${packages.length} available ZIM packages`);
@@ -50,8 +53,8 @@ export class ZimDownloader {
       // Find package in catalog
       const availablePackages = await this.listAvailablePackages();
       const packageInfo = availablePackages.find(pkg => pkg.name === packageName);
-      
-      if (!packageInfo || !packageInfo.url) {
+
+      if (!packageInfo?.url) {
         this.logger.error(`Package not found or no download URL: ${packageName}`);
         return false;
       }
@@ -63,9 +66,11 @@ export class ZimDownloader {
       // Check available space
       const currentSize = await FileUtils.getDirectorySize(this.config.storage.zim_directory);
       const maxSize = FileUtils.parseSize(this.config.storage.max_total_size);
-      
+
       if (currentSize >= maxSize) {
-        this.logger.error(`Storage full: ${FileUtils.formatSize(currentSize)} >= ${this.config.storage.max_total_size}`);
+        this.logger.error(
+          `Storage full: ${FileUtils.formatSize(currentSize)} >= ${this.config.storage.max_total_size}`
+        );
         return false;
       }
 
@@ -74,7 +79,7 @@ export class ZimDownloader {
       const finalFilePath = path.join(this.config.storage.zim_directory, `${packageName}.zim`);
 
       const success = await this.downloadWithAria2(packageInfo.url, tempFilePath);
-      
+
       if (success) {
         // Move from temp to final location
         await FileUtils.moveFile(tempFilePath, finalFilePath);
@@ -91,18 +96,20 @@ export class ZimDownloader {
   }
 
   private async downloadWithAria2(url: string, outputPath: string): Promise<boolean> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const args = [
         url,
-        '--out', path.basename(outputPath),
-        '--dir', path.dirname(outputPath),
+        '--out',
+        path.basename(outputPath),
+        '--dir',
+        path.dirname(outputPath),
         '--max-connection-per-server=4',
         '--split=4',
         '--continue=true',
         '--max-tries=3',
         '--retry-wait=5',
         '--timeout=60',
-        '--connect-timeout=30'
+        '--connect-timeout=30',
       ];
 
       // Add bandwidth limit if configured
@@ -116,21 +123,25 @@ export class ZimDownloader {
       const aria2Process = spawn('aria2c', args);
       let lastProgress = '';
 
-      aria2Process.stdout.on('data', (data) => {
+      aria2Process.stdout.on('data', data => {
         const output = data.toString();
         // Parse progress information
-        const progressMatch = output.match(/\[#\w+\s+(\d+)%\((\d+[KMGT]?B)\/(\d+[KMGT]?B)\)\s+CN:(\d+)\s+DL:([^\s]+)\s+ETA:([^\]]+)\]/);
+        const progressMatch = output.match(
+          /\[#\w+\s+(\d+)%\((\d+[KMGT]?B)\/(\d+[KMGT]?B)\)\s+CN:(\d+)\s+DL:([^\s]+)\s+ETA:([^\]]+)\]/
+        );
         if (progressMatch && progressMatch[0] !== lastProgress) {
           lastProgress = progressMatch[0];
-          this.logger.info(`Download progress: ${progressMatch[1]}% (${progressMatch[2]}/${progressMatch[3]}) Speed: ${progressMatch[5]} ETA: ${progressMatch[6]}`);
+          this.logger.info(
+            `Download progress: ${progressMatch[1]}% (${progressMatch[2]}/${progressMatch[3]}) Speed: ${progressMatch[5]} ETA: ${progressMatch[6]}`
+          );
         }
       });
 
-      aria2Process.stderr.on('data', (data) => {
+      aria2Process.stderr.on('data', data => {
         this.logger.debug(`aria2c stderr: ${data.toString()}`);
       });
 
-      aria2Process.on('close', (code) => {
+      aria2Process.on('close', code => {
         if (code === 0) {
           this.logger.info('Download completed successfully');
           resolve(true);
@@ -140,7 +151,7 @@ export class ZimDownloader {
         }
       });
 
-      aria2Process.on('error', (error) => {
+      aria2Process.on('error', error => {
         this.logger.error(`Failed to start aria2c: ${error}`);
         resolve(false);
       });

@@ -1,23 +1,41 @@
 {
-  "name": "dangerprep-sync",
+  "name": "@dangerprep/nfs-sync",
   "version": "1.0.0",
   "description": "DangerPrep Content Synchronization Service",
+  "private": true,
   "main": "dist/sync-engine.js",
+  "types": "dist/sync-engine.d.ts",
   "scripts": {
     "build": "tsc",
     "start": "node dist/sync-engine.js",
-    "dev": "ts-node src/sync-engine.ts"
+    "dev": "ts-node src/sync-engine.ts",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write src/**/*.{ts,tsx,json}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0",
-    "node-cron": "^3.0.2",
     "axios": "^1.6.0",
-    "fast-xml-parser": "^4.3.0"
+    "fast-xml-parser": "^4.3.0",
+    "js-yaml": "^4.1.0",
+    "node-cron": "^3.0.2"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/jest": "^29.5.0",
     "@types/js-yaml": "^4.0.5",
-    "typescript": "^5.0.0",
-    "ts-node": "^10.9.0"
+    "@types/node": "^20.14.0",
+    "eslint": "^9.15.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.3.3",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

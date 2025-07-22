@@ -11,13 +11,13 @@ import { WebTVHandler } from './handlers/webtv';
 import axios from 'axios';
 
 export class SyncEngine {
-  private config: SyncConfig;
+  private config!: SyncConfig;
   private logger: Logger;
   private handlers: Map<string, any> = new Map();
   private syncStatus: SyncStatus = {
     isRunning: false,
     progress: 0,
-    results: []
+    results: [],
   };
 
   constructor(private configPath: string) {
@@ -131,7 +131,7 @@ export class SyncEngine {
         itemsProcessed: 0, // Would need to be tracked by handlers
         totalSize: 0, // Would need to be tracked by handlers
         duration,
-        errors: []
+        errors: [],
       };
 
       this.syncStatus.results.unshift(result);
@@ -165,14 +165,14 @@ export class SyncEngine {
     }
 
     const results: Record<string, boolean> = {};
-    
+
     for (const contentType of this.handlers.keys()) {
       results[contentType] = await this.syncContentType(contentType);
-      
+
       // Small delay between syncs
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
-    
+
     return results;
   }
 
@@ -198,7 +198,7 @@ export class SyncEngine {
           contentType: result.contentType,
           success: result.success,
           duration: result.duration,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       }
 
@@ -223,12 +223,12 @@ export class SyncEngine {
         const size = await this.getDirectorySize(config.local_path);
         stats[contentType] = {
           size: this.formatSize(size),
-          path: config.local_path
+          path: config.local_path,
         };
       } catch (error) {
         stats[contentType] = {
           size: 'Error',
-          path: config.local_path
+          path: config.local_path,
         };
       }
     }
@@ -241,11 +241,11 @@ export class SyncEngine {
 
     try {
       const items = await fs.readdir(dirPath);
-      
+
       for (const item of items) {
         const itemPath = path.join(dirPath, item);
         const stats = await fs.stat(itemPath);
-        
+
         if (stats.isDirectory()) {
           totalSize += await this.getDirectorySize(itemPath);
         } else {
@@ -276,20 +276,20 @@ export class SyncEngine {
     try {
       const stats = await this.getStorageStats();
       const status = this.syncStatus;
-      
+
       return {
         status: 'healthy',
         details: {
           isRunning: status.isRunning,
           lastSync: status.lastSync,
           storageStats: stats,
-          configuredHandlers: this.handlers.size
-        }
+          configuredHandlers: this.handlers.size,
+        },
       };
     } catch (error) {
       return {
         status: 'error',
-        details: { error: error.toString() }
+        details: { error: error instanceof Error ? error.message : String(error) },
       };
     }
   }
@@ -298,7 +298,7 @@ export class SyncEngine {
     try {
       await this.initialize();
       this.scheduleSync();
-      
+
       this.logger.info('Sync Engine started successfully');
 
       // Keep the process running
@@ -319,7 +319,6 @@ export class SyncEngine {
           this.logger.warn(`Health check failed: ${JSON.stringify(health.details)}`);
         }
       }, 300000); // Every 5 minutes
-
     } catch (error) {
       this.logger.error(`Failed to start Sync Engine: ${error}`);
       process.exit(1);
@@ -331,7 +330,7 @@ export class SyncEngine {
 if (require.main === module) {
   const configPath = process.env.SYNC_CONFIG_PATH || '/app/data/sync-config.yaml';
   const engine = new SyncEngine(configPath);
-  
+
   engine.run().catch(error => {
     console.error('Failed to start Sync Engine:', error);
     process.exit(1);

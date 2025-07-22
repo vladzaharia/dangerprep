@@ -1,7 +1,9 @@
-import * as fs from 'fs-extra';
-import * as path from 'path';
 import { exec } from 'child_process';
+import * as path from 'path';
 import { promisify } from 'util';
+
+import * as fs from 'fs-extra';
+
 import { DetectedDevice, CardAnalysis, OfflineSyncConfig, ContentTypeConfig } from './types';
 
 const execAsync = promisify(exec);
@@ -30,7 +32,7 @@ export class CardAnalyzer {
       missingContentTypes: [],
       fileSystemSupported: true,
       readOnly: false,
-      errors: []
+      errors: [],
     };
 
     try {
@@ -46,8 +48,9 @@ export class CardAnalyzer {
       // Determine missing content types
       this.determineMissingContentTypes(analysis);
 
-      this.log(`Card analysis complete for ${device.devicePath}: ${analysis.detectedContentTypes.length} content types found`);
-      
+      this.log(
+        `Card analysis complete for ${device.devicePath}: ${analysis.detectedContentTypes.length} content types found`
+      );
     } catch (error) {
       analysis.errors.push(`Analysis failed: ${error}`);
       this.logError(`Failed to analyze card ${device.devicePath}`, error);
@@ -76,8 +79,8 @@ export class CardAnalyzer {
         if (!contentConfig) continue;
 
         const cardPath = path.join(analysis.device.mountPath, contentConfig.card_path);
-        
-        if (!await fs.pathExists(cardPath)) {
+
+        if (!(await fs.pathExists(cardPath))) {
           await fs.ensureDir(cardPath);
           await this.createReadmeFile(cardPath, contentType, contentConfig);
           createdCount++;
@@ -94,7 +97,6 @@ export class CardAnalyzer {
 
       this.log(`Created ${createdCount} missing directories`);
       return true;
-
     } catch (error) {
       this.logError('Failed to create missing directories', error);
       return false;
@@ -108,7 +110,7 @@ export class CardAnalyzer {
     try {
       const { stdout } = await execAsync(`df -B1 "${mountPath}"`);
       const lines = stdout.trim().split('\n');
-      
+
       if (lines.length >= 2) {
         const fields = lines[1]?.split(/\s+/);
         if (fields && fields.length >= 4) {
@@ -129,24 +131,25 @@ export class CardAnalyzer {
     try {
       // Check if we can write to the filesystem
       const testFile = path.join(mountPath, '.write_test');
-      
+
       try {
         await fs.writeFile(testFile, 'test');
         await fs.unlink(testFile);
         analysis.readOnly = false;
-      } catch (writeError) {
+      } catch (_writeError) {
         analysis.readOnly = true;
         analysis.errors.push('Filesystem is read-only');
       }
 
       // Check filesystem type support
       const supportedFileSystems = ['ext4', 'ext3', 'ext2', 'ntfs', 'fat32', 'exfat', 'vfat'];
-      if (analysis.device.fileSystem && 
-          !supportedFileSystems.includes(analysis.device.fileSystem.toLowerCase())) {
+      if (
+        analysis.device.fileSystem &&
+        !supportedFileSystems.includes(analysis.device.fileSystem.toLowerCase())
+      ) {
         analysis.fileSystemSupported = false;
         analysis.errors.push(`Unsupported filesystem: ${analysis.device.fileSystem}`);
       }
-
     } catch (error) {
       analysis.errors.push(`Filesystem check failed: ${error}`);
     }
@@ -155,21 +158,24 @@ export class CardAnalyzer {
   /**
    * Analyze existing directory structure
    */
-  private async analyzeDirectoryStructure(mountPath: string, analysis: CardAnalysis): Promise<void> {
+  private async analyzeDirectoryStructure(
+    mountPath: string,
+    analysis: CardAnalysis
+  ): Promise<void> {
     try {
       const entries = await fs.readdir(mountPath);
-      
+
       for (const [contentType, contentConfig] of Object.entries(this.config.content_types)) {
         const cardPath = path.join(mountPath, contentConfig.card_path);
-        
+
         // Check if the content directory exists
         if (await fs.pathExists(cardPath)) {
           const stats = await fs.stat(cardPath);
-          
+
           if (stats.isDirectory()) {
             // Check if directory has content or is just empty
             const hasContent = await this.hasValidContent(cardPath, contentConfig);
-            
+
             if (hasContent) {
               analysis.detectedContentTypes.push(contentType);
               this.log(`Found content type: ${contentType} at ${contentConfig.card_path}`);
@@ -180,7 +186,6 @@ export class CardAnalyzer {
 
       // Also check for any unrecognized directories that might contain media
       await this.detectUnrecognizedContent(mountPath, entries, analysis);
-
     } catch (error) {
       analysis.errors.push(`Directory structure analysis failed: ${error}`);
     }
@@ -189,10 +194,13 @@ export class CardAnalyzer {
   /**
    * Check if a directory has valid content for the content type
    */
-  private async hasValidContent(dirPath: string, contentConfig: ContentTypeConfig): Promise<boolean> {
+  private async hasValidContent(
+    dirPath: string,
+    contentConfig: ContentTypeConfig
+  ): Promise<boolean> {
     try {
       const files = await this.getFilesRecursively(dirPath);
-      
+
       // Check if any files match the expected extensions
       const validFiles = files.filter(file => {
         const ext = path.extname(file).toLowerCase();
@@ -200,7 +208,7 @@ export class CardAnalyzer {
       });
 
       return validFiles.length > 0;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
@@ -210,14 +218,14 @@ export class CardAnalyzer {
    */
   private async getFilesRecursively(dirPath: string): Promise<string[]> {
     const files: string[] = [];
-    
+
     try {
       const entries = await fs.readdir(dirPath);
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dirPath, entry);
         const stats = await fs.stat(fullPath);
-        
+
         if (stats.isDirectory()) {
           const subFiles = await this.getFilesRecursively(fullPath);
           files.push(...subFiles);
@@ -225,40 +233,66 @@ export class CardAnalyzer {
           files.push(fullPath);
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore errors for individual directories
     }
-    
+
     return files;
   }
 
   /**
    * Detect unrecognized content that might be media
    */
-  private async detectUnrecognizedContent(mountPath: string, entries: string[], analysis: CardAnalysis): Promise<void> {
-    const recognizedPaths = Object.values(this.config.content_types).map(config => config.card_path);
-    
+  private async detectUnrecognizedContent(
+    mountPath: string,
+    entries: string[],
+    analysis: CardAnalysis
+  ): Promise<void> {
+    const recognizedPaths = Object.values(this.config.content_types).map(
+      config => config.card_path
+    );
+
     for (const entry of entries) {
       const entryPath = path.join(mountPath, entry);
-      
+
       try {
         const stats = await fs.stat(entryPath);
-        
+
         if (stats.isDirectory() && !recognizedPaths.includes(entry)) {
           // Check if this directory contains media files
           const files = await this.getFilesRecursively(entryPath);
           const mediaExtensions = [
-            '.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm',
-            '.mp3', '.flac', '.wav', '.aac', '.ogg', '.m4a',
-            '.epub', '.pdf', '.mobi', '.azw', '.azw3',
-            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'
+            '.mp4',
+            '.mkv',
+            '.avi',
+            '.mov',
+            '.wmv',
+            '.flv',
+            '.webm',
+            '.mp3',
+            '.flac',
+            '.wav',
+            '.aac',
+            '.ogg',
+            '.m4a',
+            '.epub',
+            '.pdf',
+            '.mobi',
+            '.azw',
+            '.azw3',
+            '.jpg',
+            '.jpeg',
+            '.png',
+            '.gif',
+            '.bmp',
+            '.tiff',
           ];
-          
+
           const hasMedia = files.some(file => {
             const ext = path.extname(file).toLowerCase();
             return mediaExtensions.includes(ext);
           });
-          
+
           if (hasMedia) {
             this.log(`Found unrecognized media directory: ${entry}`);
             // Could potentially suggest mapping this to a content type
@@ -283,10 +317,14 @@ export class CardAnalyzer {
   /**
    * Create a README file in a newly created directory
    */
-  private async createReadmeFile(dirPath: string, contentType: string, contentConfig: ContentTypeConfig): Promise<void> {
+  private async createReadmeFile(
+    dirPath: string,
+    contentType: string,
+    contentConfig: ContentTypeConfig
+  ): Promise<void> {
     try {
       const readmePath = path.join(dirPath, 'README.txt');
-      
+
       const readmeContent = `
 DangerPrep Offline Sync - ${contentType.toUpperCase()} Directory
 ================================================================
@@ -313,15 +351,18 @@ Generated: ${new Date().toISOString()}
   /**
    * Get content type statistics for a card
    */
-  public async getContentTypeStats(mountPath: string, contentType: string): Promise<{files: number, size: number}> {
+  public async getContentTypeStats(
+    mountPath: string,
+    contentType: string
+  ): Promise<{ files: number; size: number }> {
     const contentConfig = this.config.content_types[contentType];
     if (!contentConfig) {
       return { files: 0, size: 0 };
     }
 
     const cardPath = path.join(mountPath, contentConfig.card_path);
-    
-    if (!await fs.pathExists(cardPath)) {
+
+    if (!(await fs.pathExists(cardPath))) {
       return { files: 0, size: 0 };
     }
 

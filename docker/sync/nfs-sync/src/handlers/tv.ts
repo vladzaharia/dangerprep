@@ -22,11 +22,11 @@ export class TVHandler extends BaseHandler {
 
     try {
       // Validate paths and Plex connection
-      if (!await this.validatePaths()) {
+      if (!(await this.validatePaths())) {
         return false;
       }
 
-      if (!await this.plexClient.testConnection()) {
+      if (!(await this.plexClient.testConnection())) {
         this.logError('Failed to connect to Plex server');
         return false;
       }
@@ -51,7 +51,7 @@ export class TVHandler extends BaseHandler {
       return success;
     } catch (error) {
       this.logError('Sync operation failed', error);
-      this.logSyncComplete(false, error.toString());
+      this.logSyncComplete(false, error instanceof Error ? error.message : String(error));
       return false;
     }
   }
@@ -61,8 +61,8 @@ export class TVHandler extends BaseHandler {
       return shows;
     }
 
-    const filtered = shows.filter(show => 
-      this.config.include_folders!.some(folder => 
+    const filtered = shows.filter(show =>
+      this.config.include_folders!.some(folder =>
         show.title.toLowerCase().includes(folder.toLowerCase())
       )
     );
@@ -87,7 +87,9 @@ export class TVHandler extends BaseHandler {
         const showSize = this.calculateShowSize(episodesToSync);
 
         if (currentSize + showSize > maxSize) {
-          this.logProgress(`Size limit reached, stopping sync. Synced: ${syncedCount}, Skipped: ${shows.length - syncedCount}`);
+          this.logProgress(
+            `Size limit reached, stopping sync. Synced: ${syncedCount}, Skipped: ${shows.length - syncedCount}`
+          );
           break;
         }
 
@@ -95,7 +97,9 @@ export class TVHandler extends BaseHandler {
         if (success) {
           currentSize += showSize;
           syncedCount++;
-          this.logProgress(`Synced: ${show.title} (${episodesToSync.length} episodes, ${this.formatSize(showSize)})`);
+          this.logProgress(
+            `Synced: ${show.title} (${episodesToSync.length} episodes, ${this.formatSize(showSize)})`
+          );
         } else {
           skippedCount++;
           this.logProgress(`Skipped: ${show.title} (sync failed)`);
@@ -150,7 +154,7 @@ export class TVHandler extends BaseHandler {
       try {
         const seasonDir = `Season ${season.toString().padStart(2, '0')}`;
         const localSeasonPath = path.join(localShowPath, seasonDir);
-        
+
         // Convert Plex paths to NFS paths and sync
         for (const episode of seasonEpisodes) {
           if (episode.path) {
@@ -179,7 +183,9 @@ export class TVHandler extends BaseHandler {
     return syncedEpisodes > 0;
   }
 
-  private groupEpisodesBySeason(episodes: PlexTVShow['episodes']): Map<number, PlexTVShow['episodes']> {
+  private groupEpisodesBySeason(
+    episodes: PlexTVShow['episodes']
+  ): Map<number, PlexTVShow['episodes']> {
     const grouped = new Map<number, PlexTVShow['episodes']>();
 
     for (const episode of episodes) {
@@ -196,15 +202,11 @@ export class TVHandler extends BaseHandler {
   private async syncEpisodeFile(nfsPath: string, localPath: string): Promise<boolean> {
     try {
       await this.ensureDirectory(path.dirname(localPath));
-      
+
       // Use rsync for individual file with progress
-      return await this.rsyncDirectory(
-        nfsPath,
-        localPath,
-        {
-          exclude: this.getTVExcludePatterns()
-        }
-      );
+      return await this.rsyncDirectory(nfsPath, localPath, {
+        exclude: this.getTVExcludePatterns(),
+      });
     } catch (error) {
       this.logError(`Failed to sync episode file ${nfsPath}`, error);
       return false;
@@ -235,7 +237,7 @@ export class TVHandler extends BaseHandler {
       'deleted scenes/',
       'featurettes/',
       'season.nfo',
-      'tvshow.nfo'
+      'tvshow.nfo',
     ];
   }
 }

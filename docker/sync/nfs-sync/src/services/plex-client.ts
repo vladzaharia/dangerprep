@@ -13,32 +13,32 @@ export class PlexClient {
   ) {
     this.parser = new XMLParser({
       ignoreAttributes: false,
-      attributeNamePrefix: '@_'
+      attributeNamePrefix: '@_',
     });
   }
 
   async getMovies(): Promise<PlexMovie[]> {
     try {
       this.logger.debug('Fetching movies from Plex server');
-      
+
       const response = await axios.get(`http://${this.server}/library/sections/1/all`, {
         params: {
           'X-Plex-Token': this.token,
-          type: 1 // Movies
+          type: 1, // Movies
         },
-        timeout: 30000
+        timeout: 30000,
       });
 
       const parsed = this.parser.parse(response.data);
       const container = parsed.MediaContainer;
-      
+
       if (!container || !container.Video) {
         this.logger.warn('No movies found in Plex response');
         return [];
       }
 
       const videos = Array.isArray(container.Video) ? container.Video : [container.Video];
-      
+
       const movies: PlexMovie[] = videos.map((video: any) => ({
         title: video['@_title'],
         year: parseInt(video['@_year']) || 0,
@@ -46,7 +46,7 @@ export class PlexClient {
         genres: this.parseGenres(video.Genre),
         resolution: this.getResolution(video.Media),
         size: this.getTotalSize(video.Media),
-        path: this.getFilePath(video.Media)
+        path: this.getFilePath(video.Media),
       }));
 
       this.logger.info(`Retrieved ${movies.length} movies from Plex`);
@@ -60,37 +60,39 @@ export class PlexClient {
   async getTVShows(): Promise<PlexTVShow[]> {
     try {
       this.logger.debug('Fetching TV shows from Plex server');
-      
+
       const response = await axios.get(`http://${this.server}/library/sections/2/all`, {
         params: {
           'X-Plex-Token': this.token,
-          type: 2 // TV Shows
+          type: 2, // TV Shows
         },
-        timeout: 30000
+        timeout: 30000,
       });
 
       const parsed = this.parser.parse(response.data);
       const container = parsed.MediaContainer;
-      
+
       if (!container || !container.Directory) {
         this.logger.warn('No TV shows found in Plex response');
         return [];
       }
 
-      const directories = Array.isArray(container.Directory) ? container.Directory : [container.Directory];
-      
+      const directories = Array.isArray(container.Directory)
+        ? container.Directory
+        : [container.Directory];
+
       const shows: PlexTVShow[] = [];
-      
+
       for (const dir of directories) {
         const episodes = await this.getEpisodesForShow(dir['@_ratingKey']);
-        
+
         shows.push({
           title: dir['@_title'],
           year: parseInt(dir['@_year']) || 0,
           rating: parseFloat(dir['@_rating']) || 0,
           genres: this.parseGenres(dir.Genre),
           episodes,
-          path: dir['@_key']
+          path: dir['@_key'],
         });
       }
 
@@ -104,28 +106,31 @@ export class PlexClient {
 
   private async getEpisodesForShow(showKey: string): Promise<PlexEpisode[]> {
     try {
-      const response = await axios.get(`http://${this.server}/library/metadata/${showKey}/allLeaves`, {
-        params: {
-          'X-Plex-Token': this.token
-        },
-        timeout: 30000
-      });
+      const response = await axios.get(
+        `http://${this.server}/library/metadata/${showKey}/allLeaves`,
+        {
+          params: {
+            'X-Plex-Token': this.token,
+          },
+          timeout: 30000,
+        }
+      );
 
       const parsed = this.parser.parse(response.data);
       const container = parsed.MediaContainer;
-      
+
       if (!container || !container.Video) {
         return [];
       }
 
       const videos = Array.isArray(container.Video) ? container.Video : [container.Video];
-      
+
       return videos.map((video: any) => ({
         title: video['@_title'],
         season: parseInt(video['@_parentIndex']) || 0,
         episode: parseInt(video['@_index']) || 0,
         size: this.getTotalSize(video.Media),
-        path: this.getFilePath(video.Media)
+        path: this.getFilePath(video.Media),
       }));
     } catch (error) {
       this.logger.error(`Failed to fetch episodes for show ${showKey}: ${error}`);
@@ -135,31 +140,31 @@ export class PlexClient {
 
   private parseGenres(genreData: any): string[] {
     if (!genreData) return [];
-    
+
     const genres = Array.isArray(genreData) ? genreData : [genreData];
     return genres.map((genre: any) => genre['@_tag']).filter(Boolean);
   }
 
   private getResolution(mediaData: any): string {
     if (!mediaData) return 'unknown';
-    
+
     const media = Array.isArray(mediaData) ? mediaData[0] : mediaData;
     const height = parseInt(media['@_height']) || 0;
-    
+
     if (height >= 2160) return '4K';
     if (height >= 1080) return '1080p';
     if (height >= 720) return '720p';
     if (height >= 480) return '480p';
-    
+
     return 'SD';
   }
 
   private getTotalSize(mediaData: any): number {
     if (!mediaData) return 0;
-    
+
     const media = Array.isArray(mediaData) ? mediaData : [mediaData];
     let totalSize = 0;
-    
+
     for (const item of media) {
       if (item.Part) {
         const parts = Array.isArray(item.Part) ? item.Part : [item.Part];
@@ -168,19 +173,19 @@ export class PlexClient {
         }
       }
     }
-    
+
     return totalSize;
   }
 
   private getFilePath(mediaData: any): string {
     if (!mediaData) return '';
-    
+
     const media = Array.isArray(mediaData) ? mediaData[0] : mediaData;
     if (media.Part) {
       const part = Array.isArray(media.Part) ? media.Part[0] : media.Part;
       return part['@_file'] || '';
     }
-    
+
     return '';
   }
 
@@ -188,11 +193,11 @@ export class PlexClient {
     try {
       const response = await axios.get(`http://${this.server}/`, {
         params: {
-          'X-Plex-Token': this.token
+          'X-Plex-Token': this.token,
         },
-        timeout: 10000
+        timeout: 10000,
       });
-      
+
       return response.status === 200;
     } catch (error) {
       this.logger.error(`Plex connection test failed: ${error}`);
