@@ -5,7 +5,6 @@ import path from 'path';
 import axios from 'axios';
 
 import type { KiwixConfig, ZimPackage } from '../types';
-import { DownloadProgress } from '../types';
 import { FileUtils } from '../utils/file-utils';
 import type { Logger } from '../utils/logger';
 
@@ -29,13 +28,13 @@ export class ZimDownloader {
         },
       });
 
-      const packages: ZimPackage[] = response.data.map((entry: any) => ({
-        name: entry.name || entry.id,
-        title: entry.title,
-        description: entry.description,
-        size: FileUtils.formatSize(entry.size || 0),
-        date: entry.date,
-        url: entry.url,
+      const packages: ZimPackage[] = response.data.map((entry: Record<string, unknown>) => ({
+        name: (entry.name as string) || (entry.id as string),
+        title: entry.title as string,
+        description: entry.description as string,
+        size: FileUtils.formatSize(typeof entry.size === 'number' ? entry.size : 0),
+        date: entry.date as string,
+        url: entry.url as string,
       }));
 
       this.logger.info(`Found ${packages.length} available ZIM packages`);

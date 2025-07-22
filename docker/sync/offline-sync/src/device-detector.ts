@@ -1,19 +1,10 @@
 import { exec } from 'child_process';
 import { EventEmitter } from 'events';
-import * as path from 'path';
 import { promisify } from 'util';
 
-import * as fs from 'fs-extra';
 import { usb } from 'usb';
 
-import {
-  DetectedDevice,
-  OfflineSyncConfig,
-  USBDevice,
-  LsblkOutput,
-  DiskSpaceInfo,
-  ExecResult,
-} from './types';
+import { DetectedDevice, OfflineSyncConfig, LsblkOutput, DiskSpaceInfo } from './types';
 
 const execAsync = promisify(exec);
 
@@ -200,7 +191,7 @@ export class DeviceDetector extends EventEmitter {
       }
 
       return false;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
@@ -208,7 +199,7 @@ export class DeviceDetector extends EventEmitter {
   /**
    * Find block devices associated with a USB device
    */
-  private async findBlockDevices(device: USBLibDevice): Promise<string[]> {
+  private async findBlockDevices(_device: USBLibDevice): Promise<string[]> {
     try {
       // Use lsblk to find block devices
       const { stdout } = await execAsync('lsblk -J -o NAME,TYPE,SIZE,MOUNTPOINT,FSTYPE');
@@ -282,7 +273,7 @@ export class DeviceDetector extends EventEmitter {
         mounted: !!device?.mountpoint,
         mountpoint: device?.mountpoint,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         size: 0,
         fstype: 'unknown',
@@ -305,7 +296,7 @@ export class DeviceDetector extends EventEmitter {
       // This would require opening the device, which needs proper permissions
       // For now, return undefined - this can be enhanced later
       return undefined;
-    } catch (error) {
+    } catch (_error) {
       return undefined;
     }
   }
@@ -343,7 +334,7 @@ export class DeviceDetector extends EventEmitter {
     };
 
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([A-Z]+)$/i);
-    if (!match || !match[1] || !match[2]) return 0;
+    if (!match?.[1] || !match[2]) return 0;
 
     const value = parseFloat(match[1]);
     const unit = match[2].toUpperCase();
@@ -368,7 +359,7 @@ export class DeviceDetector extends EventEmitter {
   /**
    * Log an error
    */
-  private logError(message: string, error: any): void {
+  private logError(message: string, error: unknown): void {
     console.error(`[DeviceDetector] ${new Date().toISOString()} - ${message}:`, error);
   }
 }

@@ -15,7 +15,10 @@ export class Logger {
     this.logFile = filePath;
     // Ensure log directory exists
     const logDir = path.dirname(filePath);
-    fs.mkdir(logDir, { recursive: true }).catch(console.error);
+    fs.mkdir(logDir, { recursive: true }).catch(error => {
+      // Write to stderr for critical logger initialization errors
+      process.stderr.write(`Failed to create log directory: ${error}\n`);
+    });
   }
 
   private shouldLog(level: string): boolean {
@@ -33,15 +36,16 @@ export class Logger {
   private async writeLog(level: string, message: string): Promise<void> {
     const formattedMessage = this.formatMessage(level, message);
 
-    // Always log to console
-    console.log(formattedMessage);
+    // Always log to stdout for service output
+    process.stdout.write(`${formattedMessage}\n`);
 
     // Log to file if configured
     if (this.logFile) {
       try {
-        await fs.appendFile(this.logFile, formattedMessage + '\n');
+        await fs.appendFile(this.logFile, `${formattedMessage}\n`);
       } catch (error) {
-        console.error(`Failed to write to log file: ${error}`);
+        // Write to stderr for log file errors
+        process.stderr.write(`Failed to write to log file: ${error}\n`);
       }
     }
   }

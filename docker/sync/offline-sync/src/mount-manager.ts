@@ -198,7 +198,7 @@ export class MountManager extends EventEmitter {
 
       // Extract the actual mount path from udisks2 output
       const mountMatch = stdout.match(/Mounted .+ at (.+)/);
-      if (!mountMatch || !mountMatch[1]) {
+      if (!mountMatch?.[1]) {
         throw new Error('Could not determine udisks2 mount path');
       }
 

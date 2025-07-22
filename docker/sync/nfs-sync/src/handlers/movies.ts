@@ -1,8 +1,10 @@
-import { BaseHandler } from './base';
+import path from 'path';
+
+import { PlexClient } from '../services/plex-client';
 import { ContentTypeConfig, PlexMovie, FilterRule, PriorityRule } from '../types';
 import { Logger } from '../utils/logger';
-import { PlexClient } from '../services/plex-client';
-import path from 'path';
+
+import { BaseHandler } from './base';
 
 export class MoviesHandler extends BaseHandler {
   private plexClient: PlexClient;
@@ -64,7 +66,9 @@ export class MoviesHandler extends BaseHandler {
       return movies;
     }
 
-    const filtered = movies.filter(movie => this.movieMatchesFilters(movie, this.config.filters!));
+    const filtered = movies.filter(movie =>
+      this.config.filters ? this.movieMatchesFilters(movie, this.config.filters) : true
+    );
     this.logProgress(`Filtered ${filtered.length} movies from ${movies.length} total`);
     return filtered;
   }
@@ -81,23 +85,26 @@ export class MoviesHandler extends BaseHandler {
   private applyFilter(movie: PlexMovie, filter: FilterRule): boolean {
     const { type, operator, value } = filter;
 
-    let movieValue: any;
     switch (type) {
       case 'year':
-        movieValue = movie.year;
-        break;
+        return this.compareValue(movie.year, operator, value);
       case 'rating':
-        movieValue = movie.rating;
-        break;
+        return this.compareValue(movie.rating, operator, value);
       case 'genre':
-        movieValue = movie.genres;
-        break;
+        return this.compareArrayValue(movie.genres, operator, value);
       case 'resolution':
-        movieValue = movie.resolution;
-        break;
+        return this.compareValue(movie.resolution, operator, value);
       default:
         return true; // Unknown filter type, pass through
     }
+  }
+
+  private compareValue(
+    movieValue: string | number | undefined,
+    operator: string,
+    value: string | number
+  ): boolean {
+    if (movieValue === undefined) return false;
 
     switch (operator) {
       case '>=':
@@ -113,15 +120,34 @@ export class MoviesHandler extends BaseHandler {
       case '!=':
         return movieValue !== value;
       case 'in':
-        if (Array.isArray(movieValue)) {
-          return movieValue.some(item => value.includes(item));
-        }
-        return value.includes(movieValue);
+        return (
+          typeof value === 'string' && typeof movieValue === 'string' && value.includes(movieValue)
+        );
       case 'not_in':
-        if (Array.isArray(movieValue)) {
-          return !movieValue.some(item => value.includes(item));
-        }
-        return !value.includes(movieValue);
+        return (
+          typeof value === 'string' && typeof movieValue === 'string' && !value.includes(movieValue)
+        );
+      default:
+        return true;
+    }
+  }
+
+  private compareArrayValue(
+    movieValue: string[],
+    operator: string,
+    value: string | number
+  ): boolean {
+    const valueStr = String(value);
+
+    switch (operator) {
+      case 'in':
+        return movieValue.some(item => valueStr.includes(item));
+      case 'not_in':
+        return !movieValue.some(item => valueStr.includes(item));
+      case '==':
+        return movieValue.includes(valueStr);
+      case '!=':
+        return !movieValue.includes(valueStr);
       default:
         return true;
     }
@@ -134,7 +160,9 @@ export class MoviesHandler extends BaseHandler {
 
     const moviesWithPriority = movies.map(movie => ({
       ...movie,
-      priorityScore: this.calculatePriorityScore(movie, this.config.priority_rules!),
+      priorityScore: this.config.priority_rules
+        ? this.calculatePriorityScore(movie, this.config.priority_rules)
+        : 0,
     }));
 
     return moviesWithPriority.sort((a, b) => b.priorityScore - a.priorityScore);
@@ -232,7 +260,7 @@ export class MoviesHandler extends BaseHandler {
   private convertPlexPathToNFS(plexPath: string): string {
     // This would need to be customized based on your Plex/NFS path mapping
     // For now, assume direct mapping
-    return plexPath.replace('/mnt/data/polaris/', this.config.nfs_path + '/');
+    return plexPath.replace('/mnt/data/polaris/', `${this.config.nfs_path}/`);
   }
 
   private getMovieExcludePatterns(): string[] {

@@ -1,6 +1,6 @@
 import { ContentTypeConfig } from '../types';
-import { Logger } from '../utils/logger';
 import { FileUtils } from '../utils/file-utils';
+import { Logger } from '../utils/logger';
 
 export abstract class BaseHandler {
   protected contentType: string = '';
@@ -37,7 +37,10 @@ export abstract class BaseHandler {
       dryRun?: boolean;
     } = {}
   ): Promise<boolean> {
-    return await FileUtils.rsyncDirectory(sourcePath, destPath, options);
+    return await FileUtils.rsyncDirectory(sourcePath, destPath, {
+      ...options,
+      logger: this.logger,
+    });
   }
 
   protected async fileExists(filePath: string): Promise<boolean> {
@@ -51,10 +54,10 @@ export abstract class BaseHandler {
   protected logSyncComplete(success: boolean, details?: string): void {
     if (success) {
       this.logger.info(
-        `${this.contentType} sync completed successfully${details ? ': ' + details : ''}`
+        `${this.contentType} sync completed successfully${details ? `: ${details}` : ''}`
       );
     } else {
-      this.logger.error(`${this.contentType} sync failed${details ? ': ' + details : ''}`);
+      this.logger.error(`${this.contentType} sync failed${details ? `: ${details}` : ''}`);
     }
   }
 
@@ -62,8 +65,8 @@ export abstract class BaseHandler {
     this.logger.info(`[${this.contentType}] ${message}`);
   }
 
-  protected logError(message: string, error?: any): void {
-    this.logger.error(`[${this.contentType}] ${message}${error ? ': ' + error : ''}`);
+  protected logError(message: string, error?: unknown): void {
+    this.logger.error(`[${this.contentType}] ${message}${error ? `: ${error}` : ''}`);
   }
 
   protected async checkStorageSpace(requiredSize: number = 0): Promise<boolean> {

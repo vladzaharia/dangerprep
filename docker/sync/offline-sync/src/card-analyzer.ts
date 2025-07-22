@@ -246,7 +246,7 @@ export class CardAnalyzer {
   private async detectUnrecognizedContent(
     mountPath: string,
     entries: string[],
-    analysis: CardAnalysis
+    _analysis: CardAnalysis
   ): Promise<void> {
     const recognizedPaths = Object.values(this.config.content_types).map(
       config => config.card_path
@@ -298,7 +298,7 @@ export class CardAnalyzer {
             // Could potentially suggest mapping this to a content type
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // Ignore errors for individual entries
       }
     }
@@ -378,13 +378,13 @@ Generated: ${new Date().toISOString()}
         try {
           const stats = await fs.stat(file);
           totalSize += stats.size;
-        } catch (error) {
+        } catch (_error) {
           // Ignore individual file errors
         }
       }
 
       return { files: validFiles.length, size: totalSize };
-    } catch (error) {
+    } catch (_error) {
       return { files: 0, size: 0 };
     }
   }

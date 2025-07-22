@@ -189,7 +189,7 @@ export class Logger {
 
       const stats = await fs.stat(this.logFile);
       return stats.size >= this.maxSize;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
@@ -268,7 +268,7 @@ export class Logger {
     };
 
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([A-Z]+)$/i);
-    if (!match || !match[1] || !match[2]) {
+    if (!match?.[1] || !match[2]) {
       return 50 * 1024 * 1024; // Default 50MB
     }
 
