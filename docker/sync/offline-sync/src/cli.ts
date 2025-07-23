@@ -28,18 +28,11 @@ program
         cliLogger.info('Starting offline sync service in daemon mode...');
       }
 
-      // Handle graceful shutdown
-      process.on('SIGINT', async () => {
-        cliLogger.info('Received SIGINT, shutting down gracefully...');
-        await service.stop();
-        process.exit(0);
-      });
-
-      process.on('SIGTERM', async () => {
-        cliLogger.info('Received SIGTERM, shutting down gracefully...');
-        await service.stop();
-        process.exit(0);
-      });
+      // Initialize and start the service using BaseService pattern
+      const initResult = await service.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
 
       await service.start();
 
@@ -66,15 +59,24 @@ program
   .action(async options => {
     try {
       const service = new OfflineSync(options.config);
+
+      // Initialize the service to get health check
+      const initResult = await service.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
+
       const health = await service.healthCheck();
-      const stats = service.getStats();
 
       cliLogger.info('=== Offline Sync Service Status ===');
       cliLogger.info(`Status: ${health.status}`);
       cliLogger.info(`Timestamp: ${health.timestamp.toISOString()}`);
-      cliLogger.info(`Active Operations: ${health.activeOperations}`);
-      cliLogger.info(`Connected Devices: ${health.connectedDevices}`);
-      cliLogger.info(`Uptime: ${Math.floor(stats.uptime / 1000)}s`);
+      cliLogger.info(`Service: ${health.service}`);
+      cliLogger.info(`Components: ${health.components.length}`);
+      if (health.uptime) {
+        cliLogger.info(`Uptime: ${Math.floor(health.uptime / 1000)}s`);
+      }
+      cliLogger.info(`Duration: ${health.duration}ms`);
 
       if (health.errors.length > 0) {
         cliLogger.info('\nErrors:');
@@ -87,11 +89,12 @@ program
       }
 
       cliLogger.info('\n=== Statistics ===');
-      cliLogger.info(`Total Operations: ${stats.totalOperations}`);
-      cliLogger.info(`Successful: ${stats.successfulOperations}`);
-      cliLogger.info(`Failed: ${stats.failedOperations}`);
-      cliLogger.info(`Files Transferred: ${stats.totalFilesTransferred}`);
-      cliLogger.info(`Bytes Transferred: ${formatBytes(stats.totalBytesTransferred)}`);
+      const syncStats = service.getSyncStats();
+      cliLogger.info(`Total Operations: ${syncStats.totalOperations}`);
+      cliLogger.info(`Successful: ${syncStats.successfulOperations}`);
+      cliLogger.info(`Failed: ${syncStats.failedOperations}`);
+      cliLogger.info(`Files Transferred: ${syncStats.totalFilesTransferred}`);
+      cliLogger.info(`Bytes Transferred: ${formatBytes(syncStats.totalBytesTransferred)}`);
     } catch (error) {
       cliLogger.error('Failed to get status:', error);
       process.exit(1);

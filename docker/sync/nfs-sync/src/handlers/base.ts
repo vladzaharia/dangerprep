@@ -4,11 +4,11 @@ import type { Logger } from '@dangerprep/shared/logging';
 import { ContentTypeConfig } from '../types';
 
 export abstract class BaseHandler {
-  protected contentType: string = '';
+  protected contentType = '';
 
   constructor(
-    protected config: ContentTypeConfig,
-    protected logger: Logger
+    protected readonly config: ContentTypeConfig,
+    protected readonly logger: Logger
   ) {}
 
   abstract sync(): Promise<boolean>;
@@ -33,15 +33,26 @@ export abstract class BaseHandler {
     sourcePath: string,
     destPath: string,
     options: {
-      exclude?: string[];
-      bandwidthLimit?: string;
-      dryRun?: boolean;
+      readonly exclude?: readonly string[];
+      readonly bandwidthLimit?: string;
+      readonly dryRun?: boolean;
     } = {}
   ): Promise<boolean> {
-    return await FileUtils.rsyncDirectory(sourcePath, destPath, {
-      ...options,
+    const rsyncOptions: any = {
       logger: this.logger,
-    });
+    };
+
+    if (options.exclude) {
+      rsyncOptions.exclude = [...options.exclude];
+    }
+    if (options.bandwidthLimit) {
+      rsyncOptions.bandwidthLimit = options.bandwidthLimit;
+    }
+    if (options.dryRun !== undefined) {
+      rsyncOptions.dryRun = options.dryRun;
+    }
+
+    return await FileUtils.rsyncDirectory(sourcePath, destPath, rsyncOptions);
   }
 
   protected async fileExists(filePath: string): Promise<boolean> {

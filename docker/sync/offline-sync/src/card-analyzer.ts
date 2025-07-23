@@ -3,6 +3,7 @@ import * as path from 'path';
 import { promisify } from 'util';
 
 import { FileUtils } from '@dangerprep/shared/file-utils';
+import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
 import * as fs from 'fs-extra';
 
 import { DetectedDevice, CardAnalysis, OfflineSyncConfig, ContentTypeConfig } from './types';
@@ -11,9 +12,11 @@ const execAsync = promisify(exec);
 
 export class CardAnalyzer {
   private config: OfflineSyncConfig['offline_sync'];
+  private logger: Logger;
 
   constructor(config: OfflineSyncConfig['offline_sync']) {
     this.config = config;
+    this.logger = LoggerFactory.createConsoleLogger('CardAnalyzer');
   }
 
   /**
@@ -367,15 +370,13 @@ Generated: ${new Date().toISOString()}
    * Log a message
    */
   private log(message: string): void {
-    // Use process.stdout.write for internal logging to avoid circular dependencies
-    process.stdout.write(`[CardAnalyzer] ${new Date().toISOString()} - ${message}\n`);
+    this.logger.debug(message);
   }
 
   /**
    * Log an error
    */
   private logError(message: string, error: unknown): void {
-    // Use process.stderr.write for internal logging to avoid circular dependencies
-    process.stderr.write(`[CardAnalyzer] ${new Date().toISOString()} - ${message}: ${error}\n`);
+    this.logger.error(message, { error: error instanceof Error ? error.message : String(error) });
   }
 }

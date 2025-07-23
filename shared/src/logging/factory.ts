@@ -1,7 +1,17 @@
 import { Logger } from './logger.js';
 import { ConsoleTransport } from './transports/console-transport.js';
 import { FileTransport } from './transports/file-transport.js';
-import { LogLevel, LogTransport } from './types.js';
+import { LogLevel, LogTransport, type LogLevelString, isLogLevel } from './types.js';
+
+/**
+ * Convert string level to LogLevel enum
+ */
+const normalizeLogLevel = (level: LogLevel | string): LogLevel | LogLevelString => {
+  if (typeof level === 'string' && isLogLevel(level)) {
+    return level as LogLevelString;
+  }
+  return level as LogLevel;
+};
 
 /**
  * Factory for creating loggers with common configurations
@@ -13,7 +23,7 @@ export class LoggerFactory {
   static createConsoleLogger(component: string, level: LogLevel | string = LogLevel.INFO): Logger {
     return new Logger({
       component,
-      level,
+      level: normalizeLogLevel(level),
       transports: [new ConsoleTransport({ format: 'text', colors: true })],
     });
   }
@@ -28,7 +38,7 @@ export class LoggerFactory {
   ): Logger {
     return new Logger({
       component,
-      level,
+      level: normalizeLogLevel(level),
       transports: [new FileTransport({ filename, format: 'text' })],
     });
   }
@@ -43,7 +53,7 @@ export class LoggerFactory {
   ): Logger {
     return new Logger({
       component,
-      level,
+      level: normalizeLogLevel(level),
       transports: [
         new ConsoleTransport({ format: 'text', colors: true }),
         new FileTransport({ filename, format: 'text' }),
@@ -78,7 +88,7 @@ export class LoggerFactory {
 
     return new Logger({
       component,
-      level: config.level,
+      level: normalizeLogLevel(config.level),
       transports,
     });
   }
@@ -93,7 +103,7 @@ export class LoggerFactory {
   ): Logger {
     return new Logger({
       component,
-      level,
+      level: normalizeLogLevel(level),
       transports: [
         new ConsoleTransport({ format: 'json', colors: false }),
         new FileTransport({ filename, format: 'json' }),

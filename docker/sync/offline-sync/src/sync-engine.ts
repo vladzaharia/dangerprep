@@ -5,6 +5,7 @@ import * as path from 'path';
 import { promisify } from 'util';
 
 import { FileUtils } from '@dangerprep/shared/file-utils';
+import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
 import * as fs from 'fs-extra';
 
 import {
@@ -22,10 +23,12 @@ export class SyncEngine extends EventEmitter {
   private config: OfflineSyncConfig['offline_sync'];
   private activeOperations: Map<string, SyncOperation> = new Map();
   private activeTransfers: Map<string, FileTransfer> = new Map();
+  private logger: Logger;
 
   constructor(config: OfflineSyncConfig['offline_sync']) {
     super();
     this.config = config;
+    this.logger = LoggerFactory.createConsoleLogger('SyncEngine');
   }
 
   /**
@@ -156,9 +159,9 @@ export class SyncEngine extends EventEmitter {
 
     const localFiles = await FileUtils.getFilesRecursively(
       localPath,
-      contentConfig.file_extensions
+      [...contentConfig.file_extensions]
     );
-    const cardFiles = await FileUtils.getFilesRecursively(cardPath, contentConfig.file_extensions);
+    const cardFiles = await FileUtils.getFilesRecursively(cardPath, [...contentConfig.file_extensions]);
 
     // Create a map of card files for quick lookup
     const cardFileMap = new Map<string, string>();
@@ -207,10 +210,10 @@ export class SyncEngine extends EventEmitter {
   ): Promise<void> {
     this.log(`Syncing from card: ${cardPath} -> ${localPath}`);
 
-    const cardFiles = await FileUtils.getFilesRecursively(cardPath, contentConfig.file_extensions);
+    const cardFiles = await FileUtils.getFilesRecursively(cardPath, [...contentConfig.file_extensions]);
     const localFiles = await FileUtils.getFilesRecursively(
       localPath,
-      contentConfig.file_extensions
+      [...contentConfig.file_extensions]
     );
 
     // Create a map of local files for quick lookup
@@ -413,17 +416,13 @@ export class SyncEngine extends EventEmitter {
    * Log a message
    */
   private log(message: string): void {
-    // Use process.stdout.write for internal logging to avoid circular dependencies
-    process.stdout.write(`[SyncEngine] ${new Date().toISOString()} - ${message}\n`);
+    this.logger.debug(message);
   }
 
   /**
    * Log an error
    */
   private logError(message: string, error: unknown): void {
-    const timestamp = new Date().toISOString();
-    const logPrefix = '[SyncEngine]';
-    // Use process.stderr.write for internal logging to avoid circular dependencies
-    process.stderr.write(`${logPrefix} ${timestamp} - ${message}: ${error}\n`);
+    this.logger.error(message, { error: error instanceof Error ? error.message : String(error) });
   }
 }
