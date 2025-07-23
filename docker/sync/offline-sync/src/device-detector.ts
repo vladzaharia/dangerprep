@@ -353,13 +353,15 @@ export class DeviceDetector extends EventEmitter {
    * Log a message
    */
   private log(message: string): void {
-    console.log(`[DeviceDetector] ${new Date().toISOString()} - ${message}`);
+    // Use process.stdout.write for internal logging to avoid circular dependencies
+    process.stdout.write(`[DeviceDetector] ${new Date().toISOString()} - ${message}\n`);
   }
 
   /**
    * Log an error
    */
   private logError(message: string, error: unknown): void {
-    console.error(`[DeviceDetector] ${new Date().toISOString()} - ${message}:`, error);
+    // Use process.stderr.write for internal logging to avoid circular dependencies
+    process.stderr.write(`[DeviceDetector] ${new Date().toISOString()} - ${message}: ${error}\n`);
   }
 }

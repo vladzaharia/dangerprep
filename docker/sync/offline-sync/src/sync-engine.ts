@@ -4,6 +4,7 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 import { promisify } from 'util';
 
+import { FileUtils } from '@dangerprep/shared/file-utils';
 import * as fs from 'fs-extra';
 
 import {
@@ -122,13 +123,13 @@ export class SyncEngine extends EventEmitter {
 
     const localPath = contentConfig.local_path;
     // Sanitize paths to prevent path traversal
-    const sanitizedCardPath = this.sanitizePath(contentConfig.card_path);
-    const sanitizedMountPath = this.sanitizePath(operation.device.mountPath);
+    const sanitizedCardPath = FileUtils.sanitizePath(contentConfig.card_path);
+    const sanitizedMountPath = FileUtils.sanitizePath(operation.device.mountPath);
     const cardPath = path.join(sanitizedMountPath, sanitizedCardPath);
 
     // Ensure both directories exist
-    await fs.ensureDir(localPath);
-    await fs.ensureDir(cardPath);
+    await FileUtils.ensureDirectory(localPath);
+    await FileUtils.ensureDirectory(cardPath);
 
     // Determine sync direction
     const syncDirection = contentConfig.sync_direction;
@@ -153,8 +154,11 @@ export class SyncEngine extends EventEmitter {
   ): Promise<void> {
     this.log(`Syncing to card: ${localPath} -> ${cardPath}`);
 
-    const localFiles = await this.getFilesRecursively(localPath, contentConfig.file_extensions);
-    const cardFiles = await this.getFilesRecursively(cardPath, contentConfig.file_extensions);
+    const localFiles = await FileUtils.getFilesRecursively(
+      localPath,
+      contentConfig.file_extensions
+    );
+    const cardFiles = await FileUtils.getFilesRecursively(cardPath, contentConfig.file_extensions);
 
     // Create a map of card files for quick lookup
     const cardFileMap = new Map<string, string>();
@@ -167,7 +171,7 @@ export class SyncEngine extends EventEmitter {
     for (const localFile of localFiles) {
       const relativePath = path.relative(localPath, localFile);
       // Sanitize relative path to prevent path traversal
-      const sanitizedRelativePath = this.sanitizePath(relativePath);
+      const sanitizedRelativePath = FileUtils.sanitizePath(relativePath);
       const targetPath = path.join(cardPath, sanitizedRelativePath);
       const existingCardFile = cardFileMap.get(relativePath);
 
@@ -203,8 +207,11 @@ export class SyncEngine extends EventEmitter {
   ): Promise<void> {
     this.log(`Syncing from card: ${cardPath} -> ${localPath}`);
 
-    const cardFiles = await this.getFilesRecursively(cardPath, contentConfig.file_extensions);
-    const localFiles = await this.getFilesRecursively(localPath, contentConfig.file_extensions);
+    const cardFiles = await FileUtils.getFilesRecursively(cardPath, contentConfig.file_extensions);
+    const localFiles = await FileUtils.getFilesRecursively(
+      localPath,
+      contentConfig.file_extensions
+    );
 
     // Create a map of local files for quick lookup
     const localFileMap = new Map<string, string>();
@@ -217,7 +224,7 @@ export class SyncEngine extends EventEmitter {
     for (const cardFile of cardFiles) {
       const relativePath = path.relative(cardPath, cardFile);
       // Sanitize relative path to prevent path traversal
-      const sanitizedRelativePath = this.sanitizePath(relativePath);
+      const sanitizedRelativePath = FileUtils.sanitizePath(relativePath);
       const targetPath = path.join(localPath, sanitizedRelativePath);
       const existingLocalFile = localFileMap.get(relativePath);
 
@@ -269,7 +276,7 @@ export class SyncEngine extends EventEmitter {
       transfer.status = 'in_progress';
 
       // Ensure target directory exists
-      await fs.ensureDir(path.dirname(targetPath));
+      await FileUtils.ensureDirectory(path.dirname(targetPath));
 
       // Copy file with progress tracking
       await this.copyFileWithProgress(transfer);
@@ -375,38 +382,6 @@ export class SyncEngine extends EventEmitter {
   }
 
   /**
-   * Get files recursively with extension filtering
-   */
-  private async getFilesRecursively(dirPath: string, extensions: string[]): Promise<string[]> {
-    const files: string[] = [];
-
-    try {
-      const entries = await fs.readdir(dirPath);
-
-      for (const entry of entries) {
-        // Sanitize entry name to prevent path traversal
-        const sanitizedEntry = this.sanitizePath(entry);
-        const fullPath = path.join(dirPath, sanitizedEntry);
-        const stats = await fs.stat(fullPath);
-
-        if (stats.isDirectory()) {
-          const subFiles = await this.getFilesRecursively(fullPath, extensions);
-          files.push(...subFiles);
-        } else {
-          const ext = path.extname(fullPath).toLowerCase();
-          if (extensions.includes(ext)) {
-            files.push(fullPath);
-          }
-        }
-      }
-    } catch (_error) {
-      // Ignore errors for individual directories
-    }
-
-    return files;
-  }
-
-  /**
    * Parse size string to bytes
    */
   private parseSize(sizeStr: string): number {
@@ -435,29 +410,11 @@ export class SyncEngine extends EventEmitter {
   }
 
   /**
-   * Sanitize path to prevent path traversal attacks
-   */
-  private sanitizePath(inputPath: string): string {
-    // Remove any path traversal attempts
-    const sanitized = inputPath
-      .replace(/\.\./g, '') // Remove ..
-      .replace(/\/+/g, '/') // Replace multiple slashes with single slash
-      .replace(/^\/+/, '') // Remove leading slashes
-      .replace(/\/+$/, ''); // Remove trailing slashes
-
-    // Ensure the path doesn't start with dangerous characters
-    if (sanitized.startsWith('.') || sanitized.includes('~')) {
-      throw new Error(`Invalid path detected: ${inputPath}`);
-    }
-
-    return sanitized;
-  }
-
-  /**
    * Log a message
    */
   private log(message: string): void {
-    console.log(`[SyncEngine] ${new Date().toISOString()} - ${message}`);
+    // Use process.stdout.write for internal logging to avoid circular dependencies
+    process.stdout.write(`[SyncEngine] ${new Date().toISOString()} - ${message}\n`);
   }
 
   /**
@@ -466,6 +423,7 @@ export class SyncEngine extends EventEmitter {
   private logError(message: string, error: unknown): void {
     const timestamp = new Date().toISOString();
     const logPrefix = '[SyncEngine]';
-    console.error(`${logPrefix} ${timestamp} - ${message}:`, error);
+    // Use process.stderr.write for internal logging to avoid circular dependencies
+    process.stderr.write(`${logPrefix} ${timestamp} - ${message}: ${error}\n`);
   }
 }

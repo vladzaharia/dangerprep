@@ -1,5 +1,6 @@
+import type { Logger } from '@dangerprep/shared/logging';
+
 import { ContentTypeConfig } from '../types';
-import { Logger } from '../utils/logger';
 
 import { BaseHandler } from './base';
 

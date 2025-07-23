@@ -58,6 +58,8 @@
     "paths": {
       "@dangerprep/cli": ["./cli/src"],
       "@dangerprep/cli/*": ["./cli/src/*"],
+      "@dangerprep/shared": ["./shared/src"],
+      "@dangerprep/shared/*": ["./shared/src/*"],
       "@dangerprep/kiwix-sync": ["./docker/sync/kiwix-sync/src"],
       "@dangerprep/kiwix-sync/*": ["./docker/sync/kiwix-sync/src/*"],
       "@dangerprep/nfs-sync": ["./docker/sync/nfs-sync/src"],

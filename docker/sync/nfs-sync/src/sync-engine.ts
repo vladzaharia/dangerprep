@@ -1,20 +1,21 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+import { ConfigManager } from '@dangerprep/shared/config';
+import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
+import { Scheduler } from '@dangerprep/shared/scheduling';
 import axios from 'axios';
-import yaml from 'js-yaml';
-import cron from 'node-cron';
 
 import { BooksHandler } from './handlers/books';
 import { MoviesHandler } from './handlers/movies';
 import { TVHandler } from './handlers/tv';
 import { WebTVHandler } from './handlers/webtv';
-import { SyncConfig, SyncStatus, SyncResult } from './types';
-import { Logger } from './utils/logger';
+import { SyncConfig, SyncStatus, SyncResult, SyncConfigSchema, ContentTypeConfig } from './types';
 
 export class SyncEngine {
-  private config!: SyncConfig;
+  private configManager: ConfigManager<SyncConfig>;
   private logger: Logger;
+  private scheduler: Scheduler;
   private handlers: Map<string, BooksHandler | MoviesHandler | TVHandler | WebTVHandler> =
     new Map();
   private syncStatus: SyncStatus = {
@@ -24,7 +25,11 @@ export class SyncEngine {
   };
 
   constructor(private configPath: string) {
-    this.logger = new Logger('SyncEngine');
+    this.logger = LoggerFactory.createConsoleLogger('SyncEngine');
+    this.configManager = new ConfigManager(configPath, SyncConfigSchema, {
+      logger: this.logger,
+    });
+    this.scheduler = new Scheduler({ logger: this.logger });
   }
 
   async initialize(): Promise<void> {
@@ -36,36 +41,39 @@ export class SyncEngine {
 
   private async loadConfig(): Promise<void> {
     try {
-      const configFile = await fs.readFile(this.configPath, 'utf8');
-      this.config = yaml.load(configFile) as SyncConfig;
+      await this.configManager.loadConfig();
     } catch (error) {
       throw new Error(`Failed to load config: ${error}`);
     }
   }
 
   private setupLogging(): void {
-    const logConfig = this.config.sync_config.logging;
-    this.logger.setLevel(logConfig.level);
-    this.logger.setLogFile(logConfig.file);
+    const config = this.configManager.getConfig();
+    const logConfig = config.sync_config.logging;
+    // Create a new logger with both console and file transports
+    this.logger = LoggerFactory.createCombinedLogger('SyncEngine', logConfig.file, logConfig.level);
   }
 
   private async initializeHandlers(): Promise<void> {
-    const contentTypes = this.config.sync_config.content_types;
-    const plexConfig = this.config.sync_config.plex;
+    const config = this.configManager.getConfig();
+    const contentTypes = config.sync_config.content_types;
+    const plexConfig = config.sync_config.plex;
 
-    for (const [contentType, config] of Object.entries(contentTypes)) {
+    for (const [contentType, contentConfig] of Object.entries(contentTypes)) {
+      // Cast to the interface type for handler compatibility
+      const typedConfig = contentConfig as ContentTypeConfig;
       switch (contentType) {
         case 'books':
-          this.handlers.set(contentType, new BooksHandler(config, this.logger));
+          this.handlers.set(contentType, new BooksHandler(typedConfig, this.logger));
           break;
         case 'movies':
-          this.handlers.set(contentType, new MoviesHandler(config, this.logger, plexConfig));
+          this.handlers.set(contentType, new MoviesHandler(typedConfig, this.logger, plexConfig));
           break;
         case 'tv':
-          this.handlers.set(contentType, new TVHandler(config, this.logger, plexConfig));
+          this.handlers.set(contentType, new TVHandler(typedConfig, this.logger, plexConfig));
           break;
         case 'webtv':
-          this.handlers.set(contentType, new WebTVHandler(config, this.logger));
+          this.handlers.set(contentType, new WebTVHandler(typedConfig, this.logger));
           break;
         case 'kiwix':
           // Kiwix is handled by separate kiwix-manager service
@@ -77,28 +85,35 @@ export class SyncEngine {
   }
 
   private async ensureDirectories(): Promise<void> {
-    const baseStorage = this.config.sync_config.local_storage.base_path;
+    const config = this.configManager.getConfig();
+    const baseStorage = config.sync_config.local_storage.base_path;
     await fs.mkdir(baseStorage, { recursive: true });
-    await fs.mkdir(path.dirname(this.config.sync_config.logging.file), { recursive: true });
+    await fs.mkdir(path.dirname(config.sync_config.logging.file), { recursive: true });
 
     // Ensure content type directories exist
-    for (const config of Object.values(this.config.sync_config.content_types)) {
-      await fs.mkdir(config.local_path, { recursive: true });
+    for (const contentConfig of Object.values(config.sync_config.content_types)) {
+      await fs.mkdir(contentConfig.local_path, { recursive: true });
     }
   }
 
   scheduleSync(): void {
-    const contentTypes = this.config.sync_config.content_types;
+    const config = this.configManager.getConfig();
+    const contentTypes = config.sync_config.content_types;
 
-    for (const [contentType, config] of Object.entries(contentTypes)) {
-      if (config.schedule && this.handlers.has(contentType)) {
-        if (cron.validate(config.schedule)) {
-          cron.schedule(config.schedule, () => {
-            this.syncContentType(contentType);
-          });
-          this.logger.info(`Scheduled ${contentType} sync: ${config.schedule}`);
-        } else {
-          this.logger.error(`Invalid schedule for ${contentType}: ${config.schedule}`);
+    for (const [contentType, contentConfig] of Object.entries(contentTypes)) {
+      if (contentConfig.schedule && this.handlers.has(contentType)) {
+        try {
+          this.scheduler.schedule(
+            `sync-${contentType}`,
+            contentConfig.schedule,
+            () => {
+              this.syncContentType(contentType);
+            },
+            { name: `${contentType} sync` }
+          );
+          this.logger.info(`Scheduled ${contentType} sync: ${contentConfig.schedule}`);
+        } catch (error) {
+          this.logger.error(`Failed to schedule ${contentType} sync: ${error}`);
         }
       }
     }
@@ -190,7 +205,8 @@ export class SyncEngine {
   }
 
   private async sendNotification(result: SyncResult): Promise<void> {
-    const notifications = this.config.sync_config.notifications;
+    const config = this.configManager.getConfig();
+    const notifications = config.sync_config.notifications;
     if (!notifications?.enabled) {
       return;
     }
@@ -220,18 +236,19 @@ export class SyncEngine {
 
   async getStorageStats(): Promise<{ [contentType: string]: { size: string; path: string } }> {
     const stats: { [contentType: string]: { size: string; path: string } } = {};
+    const config = this.configManager.getConfig();
 
-    for (const [contentType, config] of Object.entries(this.config.sync_config.content_types)) {
+    for (const [contentType, contentConfig] of Object.entries(config.sync_config.content_types)) {
       try {
-        const size = await this.getDirectorySize(config.local_path);
+        const size = await this.getDirectorySize(contentConfig.local_path);
         stats[contentType] = {
           size: this.formatSize(size),
-          path: config.local_path,
+          path: contentConfig.local_path,
         };
       } catch (_error) {
         stats[contentType] = {
           size: 'Error',
-          path: config.local_path,
+          path: contentConfig.local_path,
         };
       }
     }
@@ -297,6 +314,14 @@ export class SyncEngine {
     }
   }
 
+  /**
+   * Shutdown the engine and clean up resources
+   */
+  shutdown(): void {
+    this.logger.info('Shutting down scheduled tasks...');
+    this.scheduler.destroyAll();
+  }
+
   async run(): Promise<void> {
     try {
       await this.initialize();
@@ -307,11 +332,13 @@ export class SyncEngine {
       // Keep the process running
       process.on('SIGINT', () => {
         this.logger.info('Sync Engine shutting down...');
+        this.shutdown();
         process.exit(0);
       });
 
       process.on('SIGTERM', () => {
         this.logger.info('Sync Engine received SIGTERM, shutting down...');
+        this.shutdown();
         process.exit(0);
       });
 

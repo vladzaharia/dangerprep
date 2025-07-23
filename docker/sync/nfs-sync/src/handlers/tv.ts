@@ -1,8 +1,9 @@
 import path from 'path';
 
+import type { Logger } from '@dangerprep/shared/logging';
+
 import { PlexClient } from '../services/plex-client';
 import { ContentTypeConfig, PlexTVShow } from '../types';
-import { Logger } from '../utils/logger';
 
 import { BaseHandler } from './base';
 

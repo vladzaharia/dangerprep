@@ -2,10 +2,11 @@ import { EventEmitter } from 'events';
 
 // import * as cron from 'node-cron'; // TODO: Implement cron scheduling
 
+import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
+
 import { CardAnalyzer } from './card-analyzer';
 import { ConfigManager } from './config-manager';
 import { DeviceDetector } from './device-detector';
-import { Logger } from './logger';
 import { MountManager } from './mount-manager';
 import { SyncEngine } from './sync-engine';
 import {
@@ -59,8 +60,13 @@ export class OfflineSync extends EventEmitter {
       this.config = await this.configManager.loadConfig();
 
       // Initialize logger
-      this.logger = new Logger(this.config.offline_sync.logging);
-      this.logger.info('OfflineSync', 'Starting offline sync service...');
+      const logConfig = this.config.offline_sync.logging;
+      this.logger = LoggerFactory.createCombinedLogger(
+        'OfflineSync',
+        logConfig.file,
+        logConfig.level
+      );
+      this.logger.info('Starting offline sync service...');
 
       // Initialize components
       await this.initializeComponents();
@@ -74,10 +80,10 @@ export class OfflineSync extends EventEmitter {
       this.isRunning = true;
       this.startTime = new Date();
 
-      this.logger.info('OfflineSync', 'Offline sync service started successfully');
+      this.logger.info('Offline sync service started successfully');
       this.emit('service_started');
     } catch (error) {
-      this.logger?.error('OfflineSync', 'Failed to start service', error);
+      this.logger?.error('Failed to start service', error);
       throw error;
     }
   }
@@ -91,7 +97,7 @@ export class OfflineSync extends EventEmitter {
         return;
       }
 
-      this.logger?.info('OfflineSync', 'Stopping offline sync service...');
+      this.logger?.info('Stopping offline sync service...');
 
       // Stop periodic checks
       if (this.checkInterval) {
@@ -110,10 +116,10 @@ export class OfflineSync extends EventEmitter {
 
       this.isRunning = false;
 
-      this.logger?.info('OfflineSync', 'Offline sync service stopped');
+      this.logger?.info('Offline sync service stopped');
       this.emit('service_stopped');
     } catch (error) {
-      this.logger?.error('OfflineSync', 'Error stopping service', error);
+      this.logger?.error('Error stopping service', error);
       throw error;
     }
   }
@@ -258,22 +264,22 @@ export class OfflineSync extends EventEmitter {
     if (!this.deviceDetector) return;
 
     this.deviceDetector.on('device_detected', async (device: DetectedDevice) => {
-      this.logger?.info('OfflineSync', `Device detected: ${device.devicePath}`);
+      this.logger?.info(`Device detected: ${device.devicePath}`);
 
       try {
         // Attempt to mount the device
         const mountPath = await this.mountManager?.mountDevice(device);
         if (mountPath) {
-          this.logger?.info('OfflineSync', `Device mounted: ${device.devicePath} at ${mountPath}`);
+          this.logger?.info(`Device mounted: ${device.devicePath} at ${mountPath}`);
           await this.handleDeviceReady(device);
         }
       } catch (error) {
-        this.logger?.error('OfflineSync', `Failed to mount device ${device.devicePath}`, error);
+        this.logger?.error(`Failed to mount device ${device.devicePath}`, error);
       }
     });
 
     this.deviceDetector.on('device_removed', async (device: DetectedDevice) => {
-      this.logger?.info('OfflineSync', `Device removed: ${device.devicePath}`);
+      this.logger?.info(`Device removed: ${device.devicePath}`);
 
       // Cancel any active sync operations for this device
       const activeOperations = this.syncEngine?.getActiveOperations() ?? [];
@@ -299,12 +305,12 @@ export class OfflineSync extends EventEmitter {
     if (!this.mountManager) return;
 
     this.mountManager.on('device_mounted', async (device: DetectedDevice, mountPath: string) => {
-      this.logger?.info('OfflineSync', `Device mounted: ${device.devicePath} at ${mountPath}`);
+      this.logger?.info(`Device mounted: ${device.devicePath} at ${mountPath}`);
       await this.handleDeviceReady(device);
     });
 
     this.mountManager.on('device_unmounted', (device: DetectedDevice) => {
-      this.logger?.info('OfflineSync', `Device unmounted: ${device.devicePath}`);
+      this.logger?.info(`Device unmounted: ${device.devicePath}`);
     });
   }
 
@@ -315,7 +321,7 @@ export class OfflineSync extends EventEmitter {
     if (!this.syncEngine) return;
 
     this.syncEngine.on('sync_started', (operation: SyncOperation) => {
-      this.logger?.info('OfflineSync', `Sync started: ${operation.id}`);
+      this.logger?.info(`Sync started: ${operation.id}`);
       this.sendNotification({
         type: 'sync_started',
         timestamp: new Date(),
@@ -325,7 +331,7 @@ export class OfflineSync extends EventEmitter {
     });
 
     this.syncEngine.on('sync_completed', (operation: SyncOperation) => {
-      this.logger?.info('OfflineSync', `Sync completed: ${operation.id}`);
+      this.logger?.info(`Sync completed: ${operation.id}`);
       this.stats.successfulOperations++;
       this.stats.totalFilesTransferred += operation.processedFiles;
       this.stats.totalBytesTransferred += operation.processedSize;
@@ -339,7 +345,7 @@ export class OfflineSync extends EventEmitter {
     });
 
     this.syncEngine.on('sync_failed', (operation: SyncOperation, error: unknown) => {
-      this.logger?.error('OfflineSync', `Sync failed: ${operation.id}`, error);
+      this.logger?.error(`Sync failed: ${operation.id}`, error);
       this.stats.failedOperations++;
 
       this.sendNotification({
@@ -379,11 +385,7 @@ export class OfflineSync extends EventEmitter {
         message: `MicroSD card inserted and sync started: ${device.devicePath}`,
       });
     } catch (error) {
-      this.logger?.error(
-        'OfflineSync',
-        `Failed to handle device ready: ${device.devicePath}`,
-        error
-      );
+      this.logger?.error(`Failed to handle device ready: ${device.devicePath}`, error);
     }
   }
 
@@ -400,7 +402,7 @@ export class OfflineSync extends EventEmitter {
         // Perform periodic health checks and maintenance
         await this.performPeriodicMaintenance();
       } catch (error) {
-        this.logger?.error('OfflineSync', 'Error during periodic maintenance', error);
+        this.logger?.error('Error during periodic maintenance', error);
       }
     }, interval);
   }
@@ -418,7 +420,7 @@ export class OfflineSync extends EventEmitter {
       const timeout = 30 * 60 * 1000; // 30 minutes
 
       if (elapsed > timeout && operation.status === 'in_progress') {
-        this.logger?.warn('OfflineSync', `Stale operation detected: ${operation.id}`);
+        this.logger?.warn(`Stale operation detected: ${operation.id}`);
         await this.syncEngine?.cancelSync(operation.id);
       }
     }
@@ -440,23 +442,24 @@ export class OfflineSync extends EventEmitter {
 // Main entry point when run directly
 if (require.main === module) {
   const service = new OfflineSync();
+  const startupLogger = LoggerFactory.createConsoleLogger('Startup');
 
   // Handle graceful shutdown
   process.on('SIGINT', async () => {
-    console.log('Received SIGINT, shutting down gracefully...');
+    startupLogger.info('Received SIGINT, shutting down gracefully...');
     await service.stop();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
-    console.log('Received SIGTERM, shutting down gracefully...');
+    startupLogger.info('Received SIGTERM, shutting down gracefully...');
     await service.stop();
     process.exit(0);
   });
 
   // Start the service
   service.start().catch(error => {
-    console.error('Failed to start offline sync service:', error);
+    startupLogger.error('Failed to start offline sync service:', error);
     process.exit(1);
   });
 }

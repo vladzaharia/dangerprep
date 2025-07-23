@@ -1,8 +1,31 @@
 #!/usr/bin/env node
 
+import { LoggerFactory } from '@dangerprep/shared/logging';
 import { Command } from 'commander';
 
 import { KiwixManager } from './kiwix-manager';
+
+// Create a CLI logger for all output
+const cliLogger = LoggerFactory.createConsoleLogger('CLI');
+
+// Helper function to output structured data
+const outputData = (data: unknown, asJson = false): void => {
+  if (asJson) {
+    cliLogger.info(JSON.stringify(data, null, 2));
+  } else {
+    cliLogger.info(String(data));
+  }
+};
+
+// Helper function to output success messages
+const outputSuccess = (message: string): void => {
+  cliLogger.info(`✅ ${message}`);
+};
+
+// Helper function to output progress messages
+const outputProgress = (message: string): void => {
+  cliLogger.info(`🔄 ${message}`);
+};
 
 const program = new Command();
 
@@ -24,20 +47,18 @@ program
         : packages;
 
       if (options.json) {
-        console.log(JSON.stringify(filtered, null, 2));
+        outputData(filtered, true);
       } else {
-        console.table(
-          filtered.map(pkg => ({
-            Name: pkg.name,
-            Title: pkg.title.substring(0, 50) + (pkg.title.length > 50 ? '...' : ''),
-            Size: pkg.size,
-            Date: pkg.date,
-          }))
-        );
-        console.log(`\nTotal: ${filtered.length} packages`);
+        // For table output, we'll format it as structured text since logger doesn't support console.table
+        cliLogger.info('\n📦 Available Packages:');
+        filtered.forEach(pkg => {
+          const title = pkg.title.substring(0, 50) + (pkg.title.length > 50 ? '...' : '');
+          cliLogger.info(`   ${pkg.name} - ${title} (${pkg.size}) [${pkg.date}]`);
+        });
+        cliLogger.info(`\nTotal: ${filtered.length} packages`);
       }
     } catch (error) {
-      console.error(`Error: ${error}`);
+      cliLogger.error(`Error: ${error}`);
       process.exit(1);
     }
   });
@@ -54,20 +75,18 @@ program
       const packages = await manager.listInstalledPackages();
 
       if (options.json) {
-        console.log(JSON.stringify(packages, null, 2));
+        outputData(packages, true);
       } else {
-        console.table(
-          packages.map(pkg => ({
-            Name: pkg.name,
-            Title: pkg.title.substring(0, 50) + (pkg.title.length > 50 ? '...' : ''),
-            Size: pkg.size,
-            Date: new Date(pkg.date).toLocaleDateString(),
-          }))
-        );
-        console.log(`\nTotal: ${packages.length} packages installed`);
+        cliLogger.info('\n📦 Installed Packages:');
+        packages.forEach(pkg => {
+          const title = pkg.title.substring(0, 50) + (pkg.title.length > 50 ? '...' : '');
+          const date = new Date(pkg.date).toLocaleDateString();
+          cliLogger.info(`   ${pkg.name} - ${title} (${pkg.size}) [${date}]`);
+        });
+        cliLogger.info(`\nTotal: ${packages.length} packages installed`);
       }
     } catch (error) {
-      console.error(`Error: ${error}`);
+      cliLogger.error(`Error: ${error}`);
       process.exit(1);
     }
   });
@@ -81,17 +100,17 @@ program
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
       await manager.initialize();
 
-      console.log(`Downloading ${packageName}...`);
+      outputProgress(`Downloading ${packageName}...`);
       const success = await manager.downloadPackage(packageName);
 
       if (success) {
-        console.log(`✅ Successfully downloaded ${packageName}`);
+        outputSuccess(`Successfully downloaded ${packageName}`);
       } else {
-        console.error(`❌ Failed to download ${packageName}`);
+        cliLogger.error(`❌ Failed to download ${packageName}`);
         process.exit(1);
       }
     } catch (error) {
-      console.error(`Error: ${error}`);
+      cliLogger.error(`Error: ${error}`);
       process.exit(1);
     }
   });
@@ -104,17 +123,17 @@ program
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
       await manager.initialize();
 
-      console.log('🔄 Scanning and updating existing ZIM packages...');
+      outputProgress('Scanning and updating existing ZIM packages...');
       const success = await manager.updateAllZimPackages();
 
       if (success) {
-        console.log('✅ Update completed successfully');
+        outputSuccess('Update completed successfully');
       } else {
-        console.error('❌ Update failed');
+        cliLogger.error('❌ Update failed');
         process.exit(1);
       }
     } catch (error) {
-      console.error(`Error: ${error}`);
+      cliLogger.error(`Error: ${error}`);
       process.exit(1);
     }
   });
@@ -131,22 +150,23 @@ program
       const status = await manager.getUpdateStatus();
 
       if (options.json) {
-        console.log(JSON.stringify(status, null, 2));
+        outputData(status, true);
       } else {
         if (status.length === 0) {
-          console.log('No ZIM packages found in the directory');
+          cliLogger.info('No ZIM packages found in the directory');
         } else {
-          console.table(
-            status.map(item => ({
-              Package: item.package,
-              'Needs Update': item.needsUpdate ? '🔄 Yes' : '✅ No',
-              'Last Checked': item.lastChecked.toLocaleString(),
-            }))
-          );
+          cliLogger.info('\n📊 Update Status:');
+          status.forEach(item => {
+            const updateStatus = item.needsUpdate ? '🔄 Yes' : '✅ No';
+            const lastChecked = item.lastChecked.toLocaleString();
+            cliLogger.info(
+              `   ${item.package} - Needs Update: ${updateStatus} (Last Checked: ${lastChecked})`
+            );
+          });
         }
       }
     } catch (error) {
-      console.error(`Error: ${error}`);
+      cliLogger.error(`Error: ${error}`);
       process.exit(1);
     }
   });
@@ -163,17 +183,17 @@ program
       const stats = await manager.getLibraryStats();
 
       if (options.json) {
-        console.log(JSON.stringify(stats, null, 2));
+        outputData(stats, true);
       } else {
-        console.log('📊 Library Statistics:');
-        console.log(`   Total Packages: ${stats.totalPackages}`);
-        console.log(`   Total Size: ${stats.totalSize}`);
-        console.log(
+        cliLogger.info('📊 Library Statistics:');
+        cliLogger.info(`   Total Packages: ${stats.totalPackages}`);
+        cliLogger.info(`   Total Size: ${stats.totalSize}`);
+        cliLogger.info(
           `   Last Updated: ${stats.lastUpdated ? stats.lastUpdated.toLocaleString() : 'Never'}`
         );
       }
     } catch (error) {
-      console.error(`Error: ${error}`);
+      cliLogger.error(`Error: ${error}`);
       process.exit(1);
     }
   });
@@ -190,13 +210,13 @@ program
       const health = await manager.healthCheck();
 
       if (options.json) {
-        console.log(JSON.stringify(health, null, 2));
+        outputData(health, true);
       } else {
         const statusIcon = health.status === 'healthy' ? '✅' : '❌';
-        console.log(`${statusIcon} Service Status: ${health.status.toUpperCase()}`);
-        console.log('Details:');
+        cliLogger.info(`${statusIcon} Service Status: ${health.status.toUpperCase()}`);
+        cliLogger.info('Details:');
         Object.entries(health.details).forEach(([key, value]) => {
-          console.log(`   ${key}: ${value}`);
+          cliLogger.info(`   ${key}: ${value}`);
         });
       }
 
@@ -204,7 +224,7 @@ program
         process.exit(1);
       }
     } catch (error) {
-      console.error(`Error: ${error}`);
+      cliLogger.error(`Error: ${error}`);
       process.exit(1);
     }
   });
@@ -227,24 +247,20 @@ program
       );
 
       if (options.json) {
-        console.log(JSON.stringify(filtered, null, 2));
+        outputData(filtered, true);
       } else {
         if (filtered.length === 0) {
-          console.log(`No packages found matching "${query}"`);
+          cliLogger.info(`No packages found matching "${query}"`);
         } else {
-          console.log(`Found ${filtered.length} packages matching "${query}":`);
-          console.table(
-            filtered.map(pkg => ({
-              Name: pkg.name,
-              Title: pkg.title.substring(0, 50) + (pkg.title.length > 50 ? '...' : ''),
-              Size: pkg.size,
-              Date: pkg.date,
-            }))
-          );
+          cliLogger.info(`Found ${filtered.length} packages matching "${query}":`);
+          filtered.forEach(pkg => {
+            const title = pkg.title.substring(0, 50) + (pkg.title.length > 50 ? '...' : '');
+            cliLogger.info(`   ${pkg.name} - ${title} (${pkg.size}) [${pkg.date}]`);
+          });
         }
       }
     } catch (error) {
-      console.error(`Error: ${error}`);
+      cliLogger.error(`Error: ${error}`);
       process.exit(1);
     }
   });

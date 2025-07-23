@@ -1,0 +1,53 @@
+{
+  "name": "@dangerprep/shared",
+  "version": "1.0.0",
+  "description": "Shared utilities and libraries for DangerPrep sync services",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write src/**/*.{ts,tsx,json}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "node-cron": "^3.0.2",
+    "winston": "^3.11.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.5",
+    "@types/node": "^20.0.0",
+    "@types/node-cron": "^3.0.8",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./logging": {
+      "types": "./dist/logging/index.d.ts",
+      "import": "./dist/logging/index.js",
+      "require": "./dist/logging/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ]
+}

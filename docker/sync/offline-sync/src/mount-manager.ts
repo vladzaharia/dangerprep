@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 import { promisify } from 'util';
 
+import { FileUtils } from '@dangerprep/shared/file-utils';
 import * as fs from 'fs-extra';
 
 import { DetectedDevice, OfflineSyncConfig } from './types';
@@ -174,7 +175,7 @@ export class MountManager extends EventEmitter {
       const timestamp = Date.now();
       const mountPath = path.join(this.config.storage.mount_base, `${baseName}_${timestamp}`);
 
-      await fs.ensureDir(mountPath);
+      await FileUtils.ensureDirectory(mountPath);
       await fs.chmod(mountPath, 0o755);
 
       this.log(`Created mount point: ${mountPath}`);
@@ -302,7 +303,7 @@ export class MountManager extends EventEmitter {
    */
   private async cleanupMountPoint(mountPath: string): Promise<void> {
     try {
-      if (await fs.pathExists(mountPath)) {
+      if (await FileUtils.fileExists(mountPath)) {
         // Check if directory is empty before removing
         const files = await fs.readdir(mountPath);
         if (files.length === 0) {
@@ -323,7 +324,7 @@ export class MountManager extends EventEmitter {
   public async initialize(): Promise<void> {
     try {
       // Ensure mount base directory exists
-      await fs.ensureDir(this.config.storage.mount_base);
+      await FileUtils.ensureDirectory(this.config.storage.mount_base);
       await fs.chmod(this.config.storage.mount_base, 0o755);
 
       // Clean up any stale mount points
@@ -341,7 +342,7 @@ export class MountManager extends EventEmitter {
    */
   private async cleanupStaleMounts(): Promise<void> {
     try {
-      if (!(await fs.pathExists(this.config.storage.mount_base))) {
+      if (!(await FileUtils.fileExists(this.config.storage.mount_base))) {
         return;
       }
 
@@ -370,13 +371,15 @@ export class MountManager extends EventEmitter {
    * Log a message
    */
   private log(message: string): void {
-    console.log(`[MountManager] ${new Date().toISOString()} - ${message}`);
+    // Use process.stdout.write for internal logging to avoid circular dependencies
+    process.stdout.write(`[MountManager] ${new Date().toISOString()} - ${message}\n`);
   }
 
   /**
    * Log an error
    */
   private logError(message: string, error: unknown): void {
-    console.error(`[MountManager] ${new Date().toISOString()} - ${message}:`, error);
+    // Use process.stderr.write for internal logging to avoid circular dependencies
+    process.stderr.write(`[MountManager] ${new Date().toISOString()} - ${message}: ${error}\n`);
   }
 }

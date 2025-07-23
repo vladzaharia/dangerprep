@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import * as path from 'path';
 import { promisify } from 'util';
 
+import { FileUtils } from '@dangerprep/shared/file-utils';
 import * as fs from 'fs-extra';
 
 import { DetectedDevice, CardAnalysis, OfflineSyncConfig, ContentTypeConfig } from './types';
@@ -80,8 +81,8 @@ export class CardAnalyzer {
 
         const cardPath = path.join(analysis.device.mountPath, contentConfig.card_path);
 
-        if (!(await fs.pathExists(cardPath))) {
-          await fs.ensureDir(cardPath);
+        if (!(await FileUtils.fileExists(cardPath))) {
+          await FileUtils.ensureDirectory(cardPath);
           await this.createReadmeFile(cardPath, contentType, contentConfig);
           createdCount++;
           this.log(`Created directory: ${cardPath}`);
@@ -199,10 +200,10 @@ export class CardAnalyzer {
     contentConfig: ContentTypeConfig
   ): Promise<boolean> {
     try {
-      const files = await this.getFilesRecursively(dirPath);
+      const files = await FileUtils.getFilesRecursively(dirPath);
 
       // Check if any files match the expected extensions
-      const validFiles = files.filter(file => {
+      const validFiles = files.filter((file: string) => {
         const ext = path.extname(file).toLowerCase();
         return contentConfig.file_extensions.includes(ext);
       });
@@ -211,33 +212,6 @@ export class CardAnalyzer {
     } catch (_error) {
       return false;
     }
-  }
-
-  /**
-   * Get all files recursively from a directory
-   */
-  private async getFilesRecursively(dirPath: string): Promise<string[]> {
-    const files: string[] = [];
-
-    try {
-      const entries = await fs.readdir(dirPath);
-
-      for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry);
-        const stats = await fs.stat(fullPath);
-
-        if (stats.isDirectory()) {
-          const subFiles = await this.getFilesRecursively(fullPath);
-          files.push(...subFiles);
-        } else {
-          files.push(fullPath);
-        }
-      }
-    } catch (_error) {
-      // Ignore errors for individual directories
-    }
-
-    return files;
   }
 
   /**
@@ -260,7 +234,7 @@ export class CardAnalyzer {
 
         if (stats.isDirectory() && !recognizedPaths.includes(entry)) {
           // Check if this directory contains media files
-          const files = await this.getFilesRecursively(entryPath);
+          const files = await FileUtils.getFilesRecursively(entryPath);
           const mediaExtensions = [
             '.mp4',
             '.mkv',
@@ -288,7 +262,7 @@ export class CardAnalyzer {
             '.tiff',
           ];
 
-          const hasMedia = files.some(file => {
+          const hasMedia = files.some((file: string) => {
             const ext = path.extname(file).toLowerCase();
             return mediaExtensions.includes(ext);
           });
@@ -362,12 +336,12 @@ Generated: ${new Date().toISOString()}
 
     const cardPath = path.join(mountPath, contentConfig.card_path);
 
-    if (!(await fs.pathExists(cardPath))) {
+    if (!(await FileUtils.fileExists(cardPath))) {
       return { files: 0, size: 0 };
     }
 
     try {
-      const files = await this.getFilesRecursively(cardPath);
+      const files = await FileUtils.getFilesRecursively(cardPath);
       const validFiles = files.filter(file => {
         const ext = path.extname(file).toLowerCase();
         return contentConfig.file_extensions.includes(ext);
@@ -393,13 +367,15 @@ Generated: ${new Date().toISOString()}
    * Log a message
    */
   private log(message: string): void {
-    console.log(`[CardAnalyzer] ${new Date().toISOString()} - ${message}`);
+    // Use process.stdout.write for internal logging to avoid circular dependencies
+    process.stdout.write(`[CardAnalyzer] ${new Date().toISOString()} - ${message}\n`);
   }
 
   /**
    * Log an error
    */
   private logError(message: string, error: unknown): void {
-    console.error(`[CardAnalyzer] ${new Date().toISOString()} - ${message}:`, error);
+    // Use process.stderr.write for internal logging to avoid circular dependencies
+    process.stderr.write(`[CardAnalyzer] ${new Date().toISOString()} - ${message}: ${error}\n`);
   }
 }

@@ -1,25 +1,30 @@
-import { promises as fs } from 'fs';
 import path from 'path';
 
-import yaml from 'js-yaml';
-import cron from 'node-cron';
+import { ConfigManager } from '@dangerprep/shared/config';
+import { FileUtils } from '@dangerprep/shared/file-utils';
+import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
+import { Scheduler } from '@dangerprep/shared/scheduling';
 
 import { LibraryManager } from './services/library-manager';
 import { ZimDownloader } from './services/zim-downloader';
 import { ZimUpdater } from './services/zim-updater';
 import type { KiwixConfig, ZimPackage } from './types';
-import { FileUtils } from './utils/file-utils';
-import { Logger } from './utils/logger';
+import { KiwixConfigSchema } from './types';
 
 export class KiwixManager {
-  private config!: KiwixConfig;
+  private configManager: ConfigManager<KiwixConfig>;
   private logger: Logger;
+  private scheduler: Scheduler;
   private zimUpdater!: ZimUpdater;
   private zimDownloader!: ZimDownloader;
   private libraryManager!: LibraryManager;
 
   constructor(private configPath: string) {
-    this.logger = new Logger('KiwixManager');
+    this.logger = LoggerFactory.createConsoleLogger('KiwixManager');
+    this.configManager = new ConfigManager(configPath, KiwixConfigSchema, {
+      logger: this.logger,
+    });
+    this.scheduler = new Scheduler({ logger: this.logger });
   }
 
   async initialize(): Promise<void> {
@@ -31,56 +36,73 @@ export class KiwixManager {
 
   private async loadConfig(): Promise<void> {
     try {
-      const configFile = await fs.readFile(this.configPath, 'utf8');
-      this.config = yaml.load(configFile) as KiwixConfig;
+      await this.configManager.loadConfig();
     } catch (error) {
       throw new Error(`Failed to load config: ${error}`);
     }
   }
 
   private setupLogging(): void {
-    const logConfig = this.config.kiwix_manager.logging;
-    this.logger.setLevel(logConfig.level);
-    this.logger.setLogFile(logConfig.file);
+    const config = this.configManager.getConfig();
+    const logConfig = config.kiwix_manager.logging;
+    // Create a new logger with both console and file transports
+    this.logger = LoggerFactory.createCombinedLogger(
+      'KiwixManager',
+      logConfig.file,
+      logConfig.level
+    );
   }
 
   private async initializeServices(): Promise<void> {
-    this.zimUpdater = new ZimUpdater(this.config, this.logger);
-    this.zimDownloader = new ZimDownloader(this.config, this.logger);
-    this.libraryManager = new LibraryManager(this.config, this.logger);
+    const config = this.configManager.getConfig();
+    this.zimUpdater = new ZimUpdater(config, this.logger);
+    this.zimDownloader = new ZimDownloader(config, this.logger);
+    this.libraryManager = new LibraryManager(config, this.logger);
   }
 
   private async ensureDirectories(): Promise<void> {
-    const storage = this.config.kiwix_manager.storage;
+    const config = this.configManager.getConfig();
+    const storage = config.kiwix_manager.storage;
     await FileUtils.ensureDirectory(storage.zim_directory);
     await FileUtils.ensureDirectory(storage.temp_directory);
     await FileUtils.ensureDirectory(path.dirname(storage.library_file));
-    await FileUtils.ensureDirectory(path.dirname(this.config.kiwix_manager.logging.file));
+    await FileUtils.ensureDirectory(path.dirname(config.kiwix_manager.logging.file));
   }
 
   scheduleUpdates(): void {
-    const scheduler = this.config.kiwix_manager.scheduler;
+    const config = this.configManager.getConfig();
+    const schedulerConfig = config.kiwix_manager.scheduler;
 
-    // Schedule daily updates
-    if (cron.validate(scheduler.update_schedule)) {
-      cron.schedule(scheduler.update_schedule, async () => {
-        this.logger.info('Starting scheduled ZIM updates');
-        await this.updateAllZimPackages();
-      });
-      this.logger.info(`Scheduled updates: ${scheduler.update_schedule}`);
-    } else {
-      this.logger.error(`Invalid update schedule: ${scheduler.update_schedule}`);
+    try {
+      // Schedule daily updates
+      this.scheduler.schedule(
+        'zim-updates',
+        schedulerConfig.update_schedule,
+        async () => {
+          this.logger.info('Starting scheduled ZIM updates');
+          await this.updateAllZimPackages();
+        },
+        { name: 'ZIM Updates' }
+      );
+      this.logger.info(`Scheduled updates: ${schedulerConfig.update_schedule}`);
+    } catch (error) {
+      this.logger.error(`Failed to schedule updates: ${error}`);
     }
 
-    // Schedule weekly cleanup
-    if (cron.validate(scheduler.cleanup_schedule)) {
-      cron.schedule(scheduler.cleanup_schedule, async () => {
-        this.logger.info('Starting scheduled cleanup');
-        await this.cleanupOldFiles();
-      });
-      this.logger.info(`Scheduled cleanup: ${scheduler.cleanup_schedule}`);
-    } else {
-      this.logger.error(`Invalid cleanup schedule: ${scheduler.cleanup_schedule}`);
+    try {
+      // Schedule weekly cleanup
+      this.scheduler.schedule(
+        'cleanup',
+        schedulerConfig.cleanup_schedule,
+        async () => {
+          this.logger.info('Starting scheduled cleanup');
+          await this.cleanupOldFiles();
+        },
+        { name: 'Cleanup' }
+      );
+      this.logger.info(`Scheduled cleanup: ${schedulerConfig.cleanup_schedule}`);
+    } catch (error) {
+      this.logger.error(`Failed to schedule cleanup: ${error}`);
     }
   }
 
@@ -173,6 +195,14 @@ export class KiwixManager {
     }
   }
 
+  /**
+   * Shutdown the manager and clean up resources
+   */
+  shutdown(): void {
+    this.logger.info('Shutting down scheduled tasks...');
+    this.scheduler.destroyAll();
+  }
+
   async run(): Promise<void> {
     try {
       await this.initialize();
@@ -186,11 +216,13 @@ export class KiwixManager {
       // Keep the process running
       process.on('SIGINT', () => {
         this.logger.info('Kiwix Manager shutting down...');
+        this.shutdown();
         process.exit(0);
       });
 
       process.on('SIGTERM', () => {
         this.logger.info('Kiwix Manager received SIGTERM, shutting down...');
+        this.shutdown();
         process.exit(0);
       });
 
@@ -214,7 +246,9 @@ if (require.main === module) {
   const manager = new KiwixManager(configPath);
 
   manager.run().catch(error => {
-    console.error('Failed to start Kiwix Manager:', error);
+    // Create a simple logger for startup errors
+    const startupLogger = LoggerFactory.createConsoleLogger('Startup');
+    startupLogger.error('Failed to start Kiwix Manager:', error);
     process.exit(1);
   });
 }

@@ -1,47 +1,84 @@
-export interface SyncConfig {
-  sync_config: {
-    central_nas: {
-      host: string;
-      nfs_shares: Record<string, string>;
-    };
-    plex: {
-      server: string;
-      token: string;
-    };
-    local_storage: {
-      base_path: string;
-      max_total_size: string;
-    };
-    content_types: {
-      [key: string]: ContentTypeConfig;
-    };
-    performance: {
-      max_concurrent_transfers: number;
-      bandwidth_limit: string;
-      retry_attempts: number;
-      retry_delay: number;
-    };
-    logging: {
-      level: string;
-      file: string;
-      max_size: string;
-      backup_count: number;
-    };
-    notifications?: {
-      enabled: boolean;
-      webhook_url?: string;
-      email?: {
-        enabled: boolean;
-        smtp_server: string;
-        smtp_port: number;
-        username: string;
-        password: string;
-        to: string;
-      };
-    };
-  };
-}
+import { z } from '@dangerprep/shared/config';
 
+// Zod schema for SyncConfig
+export const SyncConfigSchema = z.object({
+  sync_config: z.object({
+    central_nas: z.object({
+      host: z.string(),
+      nfs_shares: z.record(z.string()),
+    }),
+    plex: z.object({
+      server: z.string(),
+      token: z.string(),
+    }),
+    local_storage: z.object({
+      base_path: z.string(),
+      max_total_size: z.string(),
+    }),
+    content_types: z.record(
+      z.object({
+        type: z.enum(['full_sync', 'metadata_filtered', 'folder_filtered', 'kiwix_updater']),
+        schedule: z.string(),
+        local_path: z.string(),
+        nfs_path: z.string().optional(),
+        max_size: z.string(),
+        filters: z
+          .array(
+            z.object({
+              type: z.string(),
+              operator: z.string(),
+              value: z.union([z.string(), z.number()]),
+            })
+          )
+          .optional(),
+        priority_rules: z
+          .array(
+            z.object({
+              type: z.string(),
+              weight: z.number(),
+            })
+          )
+          .optional(),
+        include_folders: z.array(z.string()).optional(),
+        max_episodes_per_show: z.number().optional(),
+        zim_files: z.array(z.string()).optional(),
+      })
+    ),
+    performance: z.object({
+      max_concurrent_transfers: z.number().positive(),
+      bandwidth_limit: z.string(),
+      retry_attempts: z.number().nonnegative(),
+      retry_delay: z.number().positive(),
+    }),
+    logging: z.object({
+      level: z.string(),
+      file: z.string(),
+      max_size: z.string(),
+      backup_count: z.number().positive(),
+    }),
+    notifications: z
+      .object({
+        enabled: z.boolean(),
+        webhook_url: z.string().url().optional(),
+        email: z
+          .object({
+            enabled: z.boolean(),
+            smtp_server: z.string(),
+            smtp_port: z.number().positive(),
+            username: z.string(),
+            password: z.string(),
+            to: z.string(),
+          })
+          .optional(),
+      })
+      .optional(),
+  }),
+});
+
+// TypeScript type inferred from Zod schema
+export type SyncConfig = z.infer<typeof SyncConfigSchema>;
+
+// Keep the original interface for backward compatibility
 export interface ContentTypeConfig {
   type: 'full_sync' | 'metadata_filtered' | 'folder_filtered' | 'kiwix_updater';
   schedule: string;
