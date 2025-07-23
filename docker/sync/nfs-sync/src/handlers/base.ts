@@ -1,6 +1,7 @@
+import { FileUtils } from '@dangerprep/shared/file-utils';
+import type { Logger } from '@dangerprep/shared/logging';
+
 import { ContentTypeConfig } from '../types';
-import { FileUtils } from '../utils/file-utils';
-import { Logger } from '../utils/logger';
 
 export abstract class BaseHandler {
   protected contentType: string = '';

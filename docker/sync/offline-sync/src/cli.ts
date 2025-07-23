@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 
+import { LoggerFactory } from '@dangerprep/shared/logging';
 import { Command } from 'commander';
 import * as fs from 'fs-extra';
 
 import { ConfigManager } from './config-manager';
 import { OfflineSync } from './offline-sync';
+
+// Create a CLI logger for all output
+const cliLogger = LoggerFactory.createConsoleLogger('CLI');
 
 const program = new Command();
 
@@ -21,18 +25,18 @@ program
 
       if (options.daemon) {
         // Detach from terminal for daemon mode
-        process.stdout.write('Starting offline sync service in daemon mode...\n');
+        cliLogger.info('Starting offline sync service in daemon mode...');
       }
 
       // Handle graceful shutdown
       process.on('SIGINT', async () => {
-        console.log('Received SIGINT, shutting down gracefully...');
+        cliLogger.info('Received SIGINT, shutting down gracefully...');
         await service.stop();
         process.exit(0);
       });
 
       process.on('SIGTERM', async () => {
-        console.log('Received SIGTERM, shutting down gracefully...');
+        cliLogger.info('Received SIGTERM, shutting down gracefully...');
         await service.stop();
         process.exit(0);
       });
@@ -40,10 +44,10 @@ program
       await service.start();
 
       if (!options.daemon) {
-        console.log('Offline sync service started. Press Ctrl+C to stop.');
+        cliLogger.info('Offline sync service started. Press Ctrl+C to stop.');
       }
     } catch (error) {
-      console.error('Failed to start service:', error);
+      cliLogger.error('Failed to start service:', error);
       process.exit(1);
     }
   });
@@ -52,7 +56,7 @@ program
   .command('stop')
   .description('Stop the offline sync service')
   .action(async () => {
-    console.log('Stop command not implemented - use SIGTERM to stop running service');
+    cliLogger.info('Stop command not implemented - use SIGTERM to stop running service');
   });
 
 program
@@ -65,31 +69,31 @@ program
       const health = await service.healthCheck();
       const stats = service.getStats();
 
-      console.log('=== Offline Sync Service Status ===');
-      console.log(`Status: ${health.status}`);
-      console.log(`Timestamp: ${health.timestamp.toISOString()}`);
-      console.log(`Active Operations: ${health.activeOperations}`);
-      console.log(`Connected Devices: ${health.connectedDevices}`);
-      console.log(`Uptime: ${Math.floor(stats.uptime / 1000)}s`);
+      cliLogger.info('=== Offline Sync Service Status ===');
+      cliLogger.info(`Status: ${health.status}`);
+      cliLogger.info(`Timestamp: ${health.timestamp.toISOString()}`);
+      cliLogger.info(`Active Operations: ${health.activeOperations}`);
+      cliLogger.info(`Connected Devices: ${health.connectedDevices}`);
+      cliLogger.info(`Uptime: ${Math.floor(stats.uptime / 1000)}s`);
 
       if (health.errors.length > 0) {
-        console.log('\nErrors:');
-        health.errors.forEach(error => console.log(`  - ${error}`));
+        cliLogger.info('\nErrors:');
+        health.errors.forEach(error => cliLogger.info(`  - ${error}`));
       }
 
       if (health.warnings.length > 0) {
-        console.log('\nWarnings:');
-        health.warnings.forEach(warning => console.log(`  - ${warning}`));
+        cliLogger.info('\nWarnings:');
+        health.warnings.forEach(warning => cliLogger.info(`  - ${warning}`));
       }
 
-      console.log('\n=== Statistics ===');
-      console.log(`Total Operations: ${stats.totalOperations}`);
-      console.log(`Successful: ${stats.successfulOperations}`);
-      console.log(`Failed: ${stats.failedOperations}`);
-      console.log(`Files Transferred: ${stats.totalFilesTransferred}`);
-      console.log(`Bytes Transferred: ${formatBytes(stats.totalBytesTransferred)}`);
+      cliLogger.info('\n=== Statistics ===');
+      cliLogger.info(`Total Operations: ${stats.totalOperations}`);
+      cliLogger.info(`Successful: ${stats.successfulOperations}`);
+      cliLogger.info(`Failed: ${stats.failedOperations}`);
+      cliLogger.info(`Files Transferred: ${stats.totalFilesTransferred}`);
+      cliLogger.info(`Bytes Transferred: ${formatBytes(stats.totalBytesTransferred)}`);
     } catch (error) {
-      console.error('Failed to get status:', error);
+      cliLogger.error('Failed to get status:', error);
       process.exit(1);
     }
   });
@@ -103,35 +107,35 @@ program
       const service = new OfflineSync(options.config);
       const devices = service.getDetectedDevices();
 
-      console.log('=== Detected Devices ===');
+      cliLogger.info('=== Detected Devices ===');
 
       if (devices.length === 0) {
-        console.log('No devices detected');
+        cliLogger.info('No devices detected');
         return;
       }
 
       devices.forEach((device, index) => {
-        console.log(`\nDevice ${index + 1}:`);
-        console.log(`  Path: ${device.devicePath}`);
-        console.log(`  Mounted: ${device.isMounted ? 'Yes' : 'No'}`);
+        cliLogger.info(`\nDevice ${index + 1}:`);
+        cliLogger.info(`  Path: ${device.devicePath}`);
+        cliLogger.info(`  Mounted: ${device.isMounted ? 'Yes' : 'No'}`);
         if (device.mountPath) {
-          console.log(`  Mount Path: ${device.mountPath}`);
+          cliLogger.info(`  Mount Path: ${device.mountPath}`);
         }
-        console.log(`  File System: ${device.fileSystem ?? 'Unknown'}`);
-        console.log(`  Vendor ID: 0x${device.deviceInfo.vendorId.toString(16)}`);
-        console.log(`  Product ID: 0x${device.deviceInfo.productId.toString(16)}`);
+        cliLogger.info(`  File System: ${device.fileSystem ?? 'Unknown'}`);
+        cliLogger.info(`  Vendor ID: 0x${device.deviceInfo.vendorId.toString(16)}`);
+        cliLogger.info(`  Product ID: 0x${device.deviceInfo.productId.toString(16)}`);
         if (device.deviceInfo.manufacturer) {
-          console.log(`  Manufacturer: ${device.deviceInfo.manufacturer}`);
+          cliLogger.info(`  Manufacturer: ${device.deviceInfo.manufacturer}`);
         }
         if (device.deviceInfo.product) {
-          console.log(`  Product: ${device.deviceInfo.product}`);
+          cliLogger.info(`  Product: ${device.deviceInfo.product}`);
         }
         if (device.deviceInfo.size) {
-          console.log(`  Size: ${formatBytes(device.deviceInfo.size)}`);
+          cliLogger.info(`  Size: ${formatBytes(device.deviceInfo.size)}`);
         }
       });
     } catch (error) {
-      console.error('Failed to list devices:', error);
+      cliLogger.error('Failed to list devices:', error);
       process.exit(1);
     }
   });
@@ -147,12 +151,12 @@ program
       const operationId = await service.triggerSync(devicePath);
 
       if (operationId) {
-        console.log(`Sync started with operation ID: ${operationId}`);
+        cliLogger.info(`Sync started with operation ID: ${operationId}`);
       } else {
-        console.log('Failed to start sync operation');
+        cliLogger.info('Failed to start sync operation');
       }
     } catch (error) {
-      console.error('Failed to trigger sync:', error);
+      cliLogger.error('Failed to trigger sync:', error);
       process.exit(1);
     }
   });
@@ -170,26 +174,26 @@ program
 
       if (options.createDefault) {
         await configManager.createDefaultConfig();
-        console.log('Default configuration created');
+        cliLogger.info('Default configuration created');
         return;
       }
 
       if (options.validate) {
         await configManager.loadConfig();
-        console.log('Configuration is valid');
+        cliLogger.info('Configuration is valid');
         return;
       }
 
       if (options.show) {
         const config = await configManager.loadConfig();
-        console.log('=== Current Configuration ===');
-        console.log(JSON.stringify(config, null, 2));
+        cliLogger.info('=== Current Configuration ===');
+        cliLogger.info(JSON.stringify(config, null, 2));
         return;
       }
 
-      console.log('Please specify an action: --create-default, --validate, or --show');
+      cliLogger.info('Please specify an action: --create-default, --validate, or --show');
     } catch (error) {
-      console.error('Configuration error:', error);
+      cliLogger.error('Configuration error:', error);
       process.exit(1);
     }
   });
@@ -206,7 +210,7 @@ program
       const logFile = config.offline_sync.logging.file;
 
       if (!(await fs.pathExists(logFile))) {
-        console.log('Log file not found');
+        cliLogger.info('Log file not found');
         return;
       }
 
@@ -214,10 +218,10 @@ program
       const lines = content.split('\n').filter(line => line.trim());
       const recentLines = lines.slice(-parseInt(options.lines));
 
-      console.log('=== Recent Log Entries ===');
-      recentLines.forEach(line => console.log(line));
+      cliLogger.info('=== Recent Log Entries ===');
+      recentLines.forEach(line => cliLogger.info(line));
     } catch (error) {
-      console.error('Failed to read logs:', error);
+      cliLogger.error('Failed to read logs:', error);
       process.exit(1);
     }
   });

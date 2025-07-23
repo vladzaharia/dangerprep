@@ -19,6 +19,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@dangerprep/shared": "workspace:*",
     "axios": "^1.6.0",
     "fast-xml-parser": "^4.3.0",
     "js-yaml": "^4.1.0",

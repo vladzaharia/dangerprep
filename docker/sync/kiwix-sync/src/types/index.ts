@@ -1,34 +1,40 @@
-export interface KiwixConfig {
-  kiwix_manager: {
-    storage: {
-      zim_directory: string;
-      library_file: string;
-      temp_directory: string;
-      max_total_size: string;
-    };
-    scheduler: {
-      update_schedule: string;
-      cleanup_schedule: string;
-    };
-    download: {
-      concurrent_downloads: number;
-      retry_attempts: number;
-      retry_delay: number;
-      bandwidth_limit: string;
-    };
-    logging: {
-      level: string;
-      file: string;
-      max_size: string;
-      backup_count: number;
-    };
-    api: {
-      base_url: string;
-      catalog_url: string;
-      timeout: number;
-    };
-  };
-}
+import { z } from '@dangerprep/shared/config';
+
+// Zod schema for KiwixConfig
+export const KiwixConfigSchema = z.object({
+  kiwix_manager: z.object({
+    storage: z.object({
+      zim_directory: z.string(),
+      library_file: z.string(),
+      temp_directory: z.string(),
+      max_total_size: z.string(),
+    }),
+    scheduler: z.object({
+      update_schedule: z.string(),
+      cleanup_schedule: z.string(),
+    }),
+    download: z.object({
+      concurrent_downloads: z.number().positive(),
+      retry_attempts: z.number().nonnegative(),
+      retry_delay: z.number().positive(),
+      bandwidth_limit: z.string(),
+    }),
+    logging: z.object({
+      level: z.string(),
+      file: z.string(),
+      max_size: z.string(),
+      backup_count: z.number().positive(),
+    }),
+    api: z.object({
+      base_url: z.string().url(),
+      catalog_url: z.string().url(),
+      timeout: z.number().positive(),
+    }),
+  }),
+});
+
+// TypeScript type inferred from Zod schema
+export type KiwixConfig = z.infer<typeof KiwixConfigSchema>;
 
 export interface ZimPackage {
   name: string;

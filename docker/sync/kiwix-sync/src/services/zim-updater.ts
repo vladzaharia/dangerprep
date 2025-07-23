@@ -1,9 +1,10 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+import { FileUtils } from '@dangerprep/shared/file-utils';
+import type { Logger } from '@dangerprep/shared/logging';
+
 import type { KiwixConfig, ZimPackage } from '../types';
-import { FileUtils } from '../utils/file-utils';
-import type { Logger } from '../utils/logger';
 
 import { ZimDownloader } from './zim-downloader';
 

@@ -1,43 +1,58 @@
-export interface OfflineSyncConfig {
-  offline_sync: {
-    storage: {
-      content_directory: string;
-      mount_base: string;
-      temp_directory: string;
-      max_card_size: string;
-    };
-    device_detection: {
-      monitor_device_types: string[];
-      min_device_size: string;
-      mount_timeout: number;
-      mount_retry_attempts: number;
-      mount_retry_delay: number;
-    };
-    content_types: {
-      [key: string]: ContentTypeConfig;
-    };
-    sync: {
-      check_interval: number;
-      max_concurrent_transfers: number;
-      transfer_chunk_size: string;
-      verify_transfers: boolean;
-      delete_after_sync: boolean;
-      create_completion_markers: boolean;
-    };
-    logging: {
-      level: string;
-      file: string;
-      max_size: string;
-      backup_count: number;
-    };
-    notifications?: {
-      enabled: boolean;
-      webhook_url?: string;
-      events: string[];
-    };
-  };
-}
+import { z } from '@dangerprep/shared/config';
 
+// Zod schema for OfflineSyncConfig
+export const OfflineSyncConfigSchema = z.object({
+  offline_sync: z.object({
+    storage: z.object({
+      content_directory: z.string(),
+      mount_base: z.string(),
+      temp_directory: z.string(),
+      max_card_size: z.string(),
+    }),
+    device_detection: z.object({
+      monitor_device_types: z.array(z.string()),
+      min_device_size: z.string(),
+      mount_timeout: z.number().positive(),
+      mount_retry_attempts: z.number().nonnegative(),
+      mount_retry_delay: z.number().positive(),
+    }),
+    content_types: z.record(
+      z.object({
+        local_path: z.string(),
+        card_path: z.string(),
+        sync_direction: z.enum(['bidirectional', 'to_card', 'from_card']),
+        max_size: z.string(),
+        file_extensions: z.array(z.string()),
+      })
+    ),
+    sync: z.object({
+      check_interval: z.number().positive(),
+      max_concurrent_transfers: z.number().positive(),
+      transfer_chunk_size: z.string(),
+      verify_transfers: z.boolean(),
+      delete_after_sync: z.boolean(),
+      create_completion_markers: z.boolean(),
+    }),
+    logging: z.object({
+      level: z.string(),
+      file: z.string(),
+      max_size: z.string(),
+      backup_count: z.number().positive(),
+    }),
+    notifications: z
+      .object({
+        enabled: z.boolean(),
+        webhook_url: z.string().url().optional(),
+        events: z.array(z.string()),
+      })
+      .optional(),
+  }),
+});
+
+// TypeScript type inferred from Zod schema
+export type OfflineSyncConfig = z.infer<typeof OfflineSyncConfigSchema>;
+
+// Keep the original interface for backward compatibility
 export interface ContentTypeConfig {
   local_path: string;
   card_path: string;

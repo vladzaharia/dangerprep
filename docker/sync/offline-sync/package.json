@@ -20,6 +20,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@dangerprep/shared": "workspace:*",
     "chokidar": "^3.6.0",
     "commander": "^11.0.0",
     "fs-extra": "^11.2.0",

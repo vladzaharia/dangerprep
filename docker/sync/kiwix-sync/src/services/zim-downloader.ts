@@ -2,11 +2,11 @@ import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 
+import { FileUtils } from '@dangerprep/shared/file-utils';
+import type { Logger } from '@dangerprep/shared/logging';
 import axios from 'axios';
 
 import type { KiwixConfig, ZimPackage } from '../types';
-import { FileUtils } from '../utils/file-utils';
-import type { Logger } from '../utils/logger';
 
 export class ZimDownloader {
   private config: KiwixConfig['kiwix_manager'];

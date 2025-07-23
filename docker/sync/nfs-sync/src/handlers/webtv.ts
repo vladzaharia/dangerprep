@@ -1,8 +1,9 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+import type { Logger } from '@dangerprep/shared/logging';
+
 import { ContentTypeConfig } from '../types';
-import { Logger } from '../utils/logger';
 
 import { BaseHandler } from './base';
 

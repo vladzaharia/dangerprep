@@ -1,83 +1,46 @@
-import * as path from 'path';
+import { ConfigManager as SharedConfigManager } from '@dangerprep/shared/config';
+import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
 
-import * as fs from 'fs-extra';
-import * as yaml from 'js-yaml';
-
-import { OfflineSyncConfig } from './types';
+import { OfflineSyncConfig, OfflineSyncConfigSchema } from './types';
 
 export class ConfigManager {
-  private config: OfflineSyncConfig | null = null;
-  private configPath: string;
+  private sharedConfigManager: SharedConfigManager<OfflineSyncConfig>;
+  private logger: Logger;
 
   constructor(configPath?: string) {
-    this.configPath = configPath || this.getDefaultConfigPath();
+    const finalConfigPath = configPath || this.getDefaultConfigPath();
+    this.logger = LoggerFactory.createConsoleLogger('ConfigManager');
+    this.sharedConfigManager = new SharedConfigManager(finalConfigPath, OfflineSyncConfigSchema, {
+      logger: this.logger,
+    });
   }
 
   /**
    * Load configuration from file
    */
   public async loadConfig(): Promise<OfflineSyncConfig> {
-    try {
-      if (!(await fs.pathExists(this.configPath))) {
-        throw new Error(`Configuration file not found: ${this.configPath}`);
-      }
-
-      const configContent = await fs.readFile(this.configPath, 'utf8');
-      const parsedConfig = yaml.load(configContent) as OfflineSyncConfig;
-
-      // Validate configuration
-      this.validateConfig(parsedConfig);
-
-      this.config = parsedConfig;
-      this.log(`Configuration loaded from: ${this.configPath}`);
-
-      return parsedConfig;
-    } catch (error) {
-      this.logError('Failed to load configuration', error);
-      throw error;
-    }
+    return this.sharedConfigManager.loadConfig();
   }
 
   /**
    * Get current configuration
    */
   public getConfig(): OfflineSyncConfig {
-    if (!this.config) {
-      throw new Error('Configuration not loaded. Call loadConfig() first.');
-    }
-    return this.config;
+    return this.sharedConfigManager.getConfig();
   }
 
   /**
    * Reload configuration from file
    */
   public async reloadConfig(): Promise<OfflineSyncConfig> {
-    this.config = null;
-    return await this.loadConfig();
+    return this.sharedConfigManager.reloadConfig();
   }
 
   /**
    * Save configuration to file
    */
   public async saveConfig(config: OfflineSyncConfig): Promise<void> {
-    try {
-      this.validateConfig(config);
-
-      const yamlContent = yaml.dump(config, {
-        indent: 2,
-        lineWidth: 120,
-        noRefs: true,
-      });
-
-      await fs.ensureDir(path.dirname(this.configPath));
-      await fs.writeFile(this.configPath, yamlContent, 'utf8');
-
-      this.config = config;
-      this.log(`Configuration saved to: ${this.configPath}`);
-    } catch (error) {
-      this.logError('Failed to save configuration', error);
-      throw error;
-    }
+    return this.sharedConfigManager.saveConfig(config);
   }
 
   /**
@@ -92,6 +55,8 @@ export class ConfigManager {
       './config.yaml.example',
     ];
 
+    // Use synchronous fs for this check since it's in constructor
+    const fs = require('fs');
     for (const configPath of possiblePaths) {
       if (fs.existsSync(configPath)) {
         return configPath;
@@ -103,147 +68,24 @@ export class ConfigManager {
   }
 
   /**
-   * Validate configuration structure
+   * Check if configuration file exists
    */
-  private validateConfig(config: unknown): asserts config is OfflineSyncConfig {
-    if (!config || typeof config !== 'object') {
-      throw new Error('Configuration must be an object');
-    }
-
-    const typedConfig = config as Record<string, unknown>;
-
-    if (!typedConfig.offline_sync || typeof typedConfig.offline_sync !== 'object') {
-      throw new Error('Configuration must have offline_sync section');
-    }
-
-    const offlineSync = typedConfig.offline_sync as Record<string, unknown>;
-
-    // Validate required sections
-    const requiredSections = ['storage', 'device_detection', 'content_types', 'sync', 'logging'];
-    for (const section of requiredSections) {
-      if (!offlineSync[section] || typeof offlineSync[section] !== 'object') {
-        throw new Error(`Configuration missing required section: ${section}`);
-      }
-    }
-
-    // Validate storage section
-    const storage = offlineSync.storage as Record<string, unknown>;
-    const requiredStorageFields = ['content_directory', 'mount_base', 'temp_directory'];
-    for (const field of requiredStorageFields) {
-      if (!storage[field] || typeof storage[field] !== 'string') {
-        throw new Error(`Storage section missing required field: ${field}`);
-      }
-    }
-
-    // Validate device_detection section
-    const deviceDetection = offlineSync.device_detection as Record<string, unknown>;
-    if (!Array.isArray(deviceDetection.monitor_device_types)) {
-      throw new Error('device_detection.monitor_device_types must be an array');
-    }
-
-    // Validate content_types section
-    const contentTypes = offlineSync.content_types as Record<string, unknown>;
-    if (Object.keys(contentTypes).length === 0) {
-      throw new Error('At least one content type must be configured');
-    }
-
-    for (const [contentType, contentConfig] of Object.entries(contentTypes)) {
-      if (!contentConfig || typeof contentConfig !== 'object') {
-        throw new Error(`Invalid configuration for content type: ${contentType}`);
-      }
-
-      const config = contentConfig as Record<string, unknown>;
-      const requiredFields = ['local_path', 'card_path', 'sync_direction', 'file_extensions'];
-
-      for (const field of requiredFields) {
-        if (!config[field]) {
-          throw new Error(`Content type ${contentType} missing required field: ${field}`);
-        }
-      }
-
-      if (!Array.isArray(config.file_extensions)) {
-        throw new Error(`Content type ${contentType} file_extensions must be an array`);
-      }
-
-      const validDirections = ['bidirectional', 'to_card', 'from_card'];
-      if (!validDirections.includes(config.sync_direction as string)) {
-        throw new Error(
-          `Content type ${contentType} has invalid sync_direction: ${config.sync_direction}`
-        );
-      }
-    }
-
-    // Validate sync section
-    const sync = offlineSync.sync as Record<string, unknown>;
-    const requiredSyncFields = ['check_interval', 'max_concurrent_transfers'];
-    for (const field of requiredSyncFields) {
-      if (typeof sync[field] !== 'number') {
-        throw new Error(`Sync section field ${field} must be a number`);
-      }
-    }
-
-    // Validate logging section
-    const logging = offlineSync.logging as Record<string, unknown>;
-    const requiredLoggingFields = ['level', 'file'];
-    for (const field of requiredLoggingFields) {
-      if (!logging[field] || typeof logging[field] !== 'string') {
-        throw new Error(`Logging section missing required field: ${field}`);
-      }
-    }
-
-    const validLogLevels = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
-    if (!validLogLevels.includes(logging.level as string)) {
-      throw new Error(`Invalid log level: ${logging.level}`);
-    }
+  public async configExists(): Promise<boolean> {
+    return this.sharedConfigManager.configExists();
   }
 
   /**
    * Get configuration value by path
    */
   public getConfigValue<T>(path: string): T | undefined {
-    if (!this.config) {
-      return undefined;
-    }
-
-    const parts = path.split('.');
-    let current: unknown = this.config;
-
-    for (const part of parts) {
-      if (current && typeof current === 'object' && part in current) {
-        current = (current as Record<string, unknown>)[part];
-      } else {
-        return undefined;
-      }
-    }
-
-    return current as T;
+    return this.sharedConfigManager.getConfigValue<T>(path);
   }
 
   /**
    * Set configuration value by path
    */
   public setConfigValue(path: string, value: unknown): void {
-    if (!this.config) {
-      throw new Error('Configuration not loaded');
-    }
-
-    const parts = path.split('.');
-    const lastPart = parts.pop();
-
-    if (!lastPart) {
-      throw new Error('Invalid configuration path');
-    }
-
-    let current: Record<string, unknown> = this.config as unknown as Record<string, unknown>;
-
-    for (const part of parts) {
-      if (!current[part] || typeof current[part] !== 'object') {
-        current[part] = {};
-      }
-      current = current[part] as Record<string, unknown>;
-    }
-
-    current[lastPart] = value;
+    return this.sharedConfigManager.setConfigValue(path, value);
   }
 
   /**
@@ -302,20 +144,6 @@ export class ConfigManager {
       },
     };
 
-    await this.saveConfig(defaultConfig);
-  }
-
-  /**
-   * Log a message
-   */
-  private log(message: string): void {
-    console.log(`[ConfigManager] ${new Date().toISOString()} - ${message}`);
-  }
-
-  /**
-   * Log an error
-   */
-  private logError(message: string, error: unknown): void {
-    console.error(`[ConfigManager] ${new Date().toISOString()} - ${message}:`, error);
+    return this.sharedConfigManager.createDefaultConfig(defaultConfig);
   }
 }
