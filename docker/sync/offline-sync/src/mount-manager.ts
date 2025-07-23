@@ -3,7 +3,18 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 import { promisify } from 'util';
 
+import {
+  ErrorFactory,
+  FileSystemError,
+  SystemError,
+  safeAsync,
+  wrapError,
+  ErrorCategory,
+  ErrorSeverity,
+} from '@dangerprep/shared/errors';
 import { FileUtils } from '@dangerprep/shared/file-utils';
+import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
+import { RetryUtils, DEFAULT_RETRY_CONFIGS } from '@dangerprep/shared/retry';
 import * as fs from 'fs-extra';
 
 import { DetectedDevice, OfflineSyncConfig } from './types';
@@ -13,10 +24,12 @@ const execAsync = promisify(exec);
 export class MountManager extends EventEmitter {
   private config: OfflineSyncConfig['offline_sync'];
   private mountedDevices: Map<string, string> = new Map(); // devicePath -> mountPath
+  private logger: Logger;
 
   constructor(config: OfflineSyncConfig['offline_sync']) {
     super();
     this.config = config;
+    this.logger = LoggerFactory.createConsoleLogger('MountManager');
   }
 
   /**
@@ -41,38 +54,58 @@ export class MountManager extends EventEmitter {
       let success = false;
       let error: Error | null = null;
 
-      // First try udisks2 (preferred for user-space mounting)
-      try {
-        await this.mountWithUdisks2(device.devicePath, mountPath);
+      // First try udisks2 (preferred for user-space mounting) with retry
+      const udisksResult = await RetryUtils.executeWithRetry(
+        () => this.mountWithUdisks2(device.devicePath, mountPath),
+        DEFAULT_RETRY_CONFIGS.FILE_OPERATIONS
+      );
+
+      if (udisksResult.success) {
         success = true;
         this.log(`Successfully mounted ${device.devicePath} at ${mountPath} using udisks2`);
-      } catch (udisksError) {
-        this.log(`udisks2 mount failed for ${device.devicePath}: ${udisksError}`);
-        error = udisksError instanceof Error ? udisksError : new Error(String(udisksError));
+      } else {
+        this.log(`udisks2 mount failed for ${device.devicePath}: ${udisksResult.error}`);
+        error = wrapError(udisksResult.error, 'udisks2 mount failed', {
+          category: ErrorCategory.FILESYSTEM,
+          severity: ErrorSeverity.HIGH,
+        });
       }
 
-      // Fallback to direct mount command
+      // Fallback to direct mount command with retry
       if (!success) {
-        try {
-          await this.mountWithSystemMount(device, mountPath);
+        const mountResult = await RetryUtils.executeWithRetry(
+          () => this.mountWithSystemMount(device, mountPath),
+          DEFAULT_RETRY_CONFIGS.FILE_OPERATIONS
+        );
+
+        if (mountResult.success) {
           success = true;
           this.log(`Successfully mounted ${device.devicePath} at ${mountPath} using system mount`);
-        } catch (mountError) {
-          this.log(`System mount failed for ${device.devicePath}: ${mountError}`);
-          error = mountError instanceof Error ? mountError : new Error(String(mountError));
+        } else {
+          this.log(`System mount failed for ${device.devicePath}: ${mountResult.error}`);
+          error = wrapError(mountResult.error, 'System mount failed', {
+            category: ErrorCategory.FILESYSTEM,
+            severity: ErrorSeverity.HIGH,
+          });
         }
       }
 
       if (!success) {
         await this.cleanupMountPoint(mountPath);
-        throw error || new Error('All mounting methods failed');
+        throw error || ErrorFactory.filesystem('All mounting methods failed', {
+          data: { devicePath: device.devicePath, mountPath },
+          context: { operation: 'mountDevice', component: 'mount-manager' }
+        });
       }
 
       // Verify mount was successful
       const isMounted = await this.verifyMount(mountPath);
       if (!isMounted) {
         await this.cleanupMountPoint(mountPath);
-        throw new Error('Mount verification failed');
+        throw ErrorFactory.filesystem('Mount verification failed', {
+          data: { devicePath: device.devicePath, mountPath },
+          context: { operation: 'mountDevice', component: 'mount-verification' }
+        });
       }
 
       // Update device info
@@ -85,8 +118,14 @@ export class MountManager extends EventEmitter {
 
       return mountPath;
     } catch (error) {
-      this.logError(`Failed to mount device ${device.devicePath}`, error);
-      this.emit('mount_failed', device, error);
+      const wrappedError = wrapError(error, `Failed to mount device ${device.devicePath}`, {
+        category: ErrorCategory.FILESYSTEM,
+        severity: ErrorSeverity.HIGH,
+        context: { operation: 'mountDevice', component: 'mount-manager' }
+      });
+
+      this.logError(`Failed to mount device ${device.devicePath}`, wrappedError);
+      this.emit('mount_failed', device, wrappedError);
       return null;
     }
   }
@@ -130,7 +169,7 @@ export class MountManager extends EventEmitter {
 
         // Update device info
         device.isMounted = false;
-        device.mountPath = undefined;
+        delete (device as any).mountPath;
         device.isReady = false;
 
         this.mountedDevices.delete(device.devicePath);
@@ -371,15 +410,13 @@ export class MountManager extends EventEmitter {
    * Log a message
    */
   private log(message: string): void {
-    // Use process.stdout.write for internal logging to avoid circular dependencies
-    process.stdout.write(`[MountManager] ${new Date().toISOString()} - ${message}\n`);
+    this.logger.debug(message);
   }
 
   /**
    * Log an error
    */
   private logError(message: string, error: unknown): void {
-    // Use process.stderr.write for internal logging to avoid circular dependencies
-    process.stderr.write(`[MountManager] ${new Date().toISOString()} - ${message}: ${error}\n`);
+    this.logger.error(message, { error: error instanceof Error ? error.message : String(error) });
   }
 }

@@ -2,9 +2,21 @@ import { promises as fs } from 'fs';
 import path from 'path';
 
 import { ConfigManager } from '@dangerprep/shared/config';
-import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
+import { ComponentStatus } from '@dangerprep/shared/health';
+import { LoggerFactory } from '@dangerprep/shared/logging';
+import {
+  NotificationManager,
+  NotificationType,
+  NotificationLevel,
+  WebhookChannel,
+} from '@dangerprep/shared/notifications';
 import { Scheduler } from '@dangerprep/shared/scheduling';
-import axios from 'axios';
+import {
+  BaseService,
+  ServiceConfig,
+  ServiceUtils,
+  ServicePatterns,
+} from '@dangerprep/shared/service';
 
 import { BooksHandler } from './handlers/books';
 import { MoviesHandler } from './handlers/movies';
@@ -12,46 +24,83 @@ import { TVHandler } from './handlers/tv';
 import { WebTVHandler } from './handlers/webtv';
 import { SyncConfig, SyncStatus, SyncResult, SyncConfigSchema, ContentTypeConfig } from './types';
 
-export class SyncEngine {
+export class SyncEngine extends BaseService {
   private configManager: ConfigManager<SyncConfig>;
-  private logger: Logger;
-  private scheduler: Scheduler;
-  private handlers: Map<string, BooksHandler | MoviesHandler | TVHandler | WebTVHandler> =
-    new Map();
-  private syncStatus: SyncStatus = {
+  private readonly scheduler: Scheduler;
+  private readonly handlers = new Map<string, BooksHandler | MoviesHandler | TVHandler | WebTVHandler>();
+  private readonly syncStatus: SyncStatus = {
     isRunning: false,
     progress: 0,
     results: [],
   };
 
-  constructor(private configPath: string) {
-    this.logger = LoggerFactory.createConsoleLogger('SyncEngine');
+  constructor(configPath: string) {
+    const serviceConfig: ServiceConfig = ServiceUtils.createServiceConfig(
+      'nfs-sync',
+      '1.0.0',
+      configPath,
+      {
+        enablePeriodicHealthChecks: true,
+        healthCheckIntervalMinutes: 5,
+        handleProcessSignals: true,
+        shutdownTimeoutMs: 30000,
+      }
+    );
+
+    // Add lifecycle hooks for NFS sync operations
+    const hooks = {
+      beforeInitialize: async () => {
+        this.components.logger.debug('Preparing NFS sync initialization...');
+      },
+      afterInitialize: async () => {
+        this.components.logger.info('NFS sync handlers and directories ready');
+      },
+      beforeStart: async () => {
+        this.components.logger.debug('Starting NFS sync scheduling...');
+      },
+      afterStart: async () => {
+        this.components.logger.info('NFS sync service operational with scheduled tasks');
+      },
+    };
+
+    super(serviceConfig, hooks);
+
     this.configManager = new ConfigManager(configPath, SyncConfigSchema, {
-      logger: this.logger,
+      logger: this.components.logger,
     });
-    this.scheduler = new Scheduler({ logger: this.logger });
+    this.scheduler = new Scheduler({ logger: this.components.logger });
   }
 
-  async initialize(): Promise<void> {
-    await this.loadConfig();
-    this.setupLogging();
-    await this.initializeHandlers();
-    await this.ensureDirectories();
+  // BaseService abstract method implementations
+  protected override async loadConfiguration(): Promise<void> {
+    await this.loadConfigurationWithManager(this.configManager);
   }
 
-  private async loadConfig(): Promise<void> {
-    try {
-      await this.configManager.loadConfig();
-    } catch (error) {
-      throw new Error(`Failed to load config: ${error}`);
-    }
-  }
-
-  private setupLogging(): void {
+  protected override async setupLogging(): Promise<void> {
     const config = this.configManager.getConfig();
     const logConfig = config.sync_config.logging;
     // Create a new logger with both console and file transports
-    this.logger = LoggerFactory.createCombinedLogger('SyncEngine', logConfig.file, logConfig.level);
+    const logger = LoggerFactory.createCombinedLogger(
+      'SyncEngine',
+      logConfig.file,
+      logConfig.level
+    );
+
+    // Update the logger in components
+    this.components.logger = logger;
+
+    // Update the config manager logger
+    this.configManager = this.updateConfigManagerLogger(this.config.configPath, SyncConfigSchema);
+  }
+
+  protected override async setupHealthChecks(): Promise<void> {
+    // Register component-specific health checks
+    this.registerComponentHealthChecks();
+  }
+
+  protected override async initializeServiceComponents(): Promise<void> {
+    await this.initializeHandlers();
+    await this.ensureDirectories();
   }
 
   private async initializeHandlers(): Promise<void> {
@@ -64,20 +113,26 @@ export class SyncEngine {
       const typedConfig = contentConfig as ContentTypeConfig;
       switch (contentType) {
         case 'books':
-          this.handlers.set(contentType, new BooksHandler(typedConfig, this.logger));
+          this.handlers.set(contentType, new BooksHandler(typedConfig, this.components.logger));
           break;
         case 'movies':
-          this.handlers.set(contentType, new MoviesHandler(typedConfig, this.logger, plexConfig));
+          this.handlers.set(
+            contentType,
+            new MoviesHandler(typedConfig, this.components.logger, plexConfig)
+          );
           break;
         case 'tv':
-          this.handlers.set(contentType, new TVHandler(typedConfig, this.logger, plexConfig));
+          this.handlers.set(
+            contentType,
+            new TVHandler(typedConfig, this.components.logger, plexConfig)
+          );
           break;
         case 'webtv':
-          this.handlers.set(contentType, new WebTVHandler(typedConfig, this.logger));
+          this.handlers.set(contentType, new WebTVHandler(typedConfig, this.components.logger));
           break;
         case 'kiwix':
           // Kiwix is handled by separate kiwix-manager service
-          this.logger.info('Kiwix sync delegated to kiwix-manager service');
+          this.components.logger.info('Kiwix sync delegated to kiwix-manager service');
           await this.triggerKiwixUpdate();
           break;
       }
@@ -102,32 +157,29 @@ export class SyncEngine {
 
     for (const [contentType, contentConfig] of Object.entries(contentTypes)) {
       if (contentConfig.schedule && this.handlers.has(contentType)) {
-        try {
-          this.scheduler.schedule(
-            `sync-${contentType}`,
-            contentConfig.schedule,
-            () => {
-              this.syncContentType(contentType);
-            },
-            { name: `${contentType} sync` }
-          );
-          this.logger.info(`Scheduled ${contentType} sync: ${contentConfig.schedule}`);
-        } catch (error) {
-          this.logger.error(`Failed to schedule ${contentType} sync: ${error}`);
-        }
+        ServicePatterns.scheduleTask(
+          this.scheduler,
+          `sync-${contentType}`,
+          contentConfig.schedule,
+          async () => {
+            await this.syncContentType(contentType);
+          },
+          `${contentType} sync`,
+          this.components.logger
+        );
       }
     }
   }
 
   async syncContentType(contentType: string): Promise<boolean> {
     if (this.syncStatus.isRunning) {
-      this.logger.warn(`Sync already running, skipping ${contentType} sync`);
+      this.components.logger.warn(`Sync already running, skipping ${contentType} sync`);
       return false;
     }
 
     const handler = this.handlers.get(contentType);
     if (!handler) {
-      this.logger.error(`No handler for content type: ${contentType}`);
+      this.components.logger.error(`No handler for content type: ${contentType}`);
       return false;
     }
 
@@ -136,7 +188,17 @@ export class SyncEngine {
     this.syncStatus.progress = 0;
     this.syncStatus.startTime = new Date();
 
-    this.logger.info(`Starting ${contentType} sync`);
+    // Sync started notification (business event)
+    await this.components.notificationManager.notify(
+      NotificationType.SYNC_STARTED,
+      `Starting ${contentType} sync`,
+      {
+        source: 'nfs-sync',
+        level: NotificationLevel.INFO,
+        data: { contentType, startTime: this.syncStatus.startTime.toISOString() },
+      }
+    );
+    this.components.logger.debug(`Starting ${contentType} sync`); // Technical detail
     const startTime = Date.now();
 
     try {
@@ -156,17 +218,48 @@ export class SyncEngine {
       this.syncStatus.results = this.syncStatus.results.slice(0, 10); // Keep last 10 results
 
       if (success) {
-        this.logger.info(`${contentType} sync completed successfully in ${duration}ms`);
+        // Sync completed notification (business event)
+        await this.components.notificationManager.notify(
+          NotificationType.SYNC_COMPLETED,
+          `${contentType} sync completed successfully`,
+          {
+            source: 'nfs-sync',
+            level: NotificationLevel.INFO,
+            data: { contentType, duration, success: true },
+          }
+        );
+        this.components.logger.debug(`${contentType} sync completed successfully in ${duration}ms`); // Technical detail
       } else {
-        this.logger.error(`${contentType} sync failed after ${duration}ms`);
+        // Sync failed notification (business event)
+        await this.components.notificationManager.notify(
+          NotificationType.SYNC_FAILED,
+          `${contentType} sync failed`,
+          {
+            source: 'nfs-sync',
+            level: NotificationLevel.ERROR,
+            data: { contentType, duration, success: false },
+          }
+        );
+        this.components.logger.error(`${contentType} sync failed after ${duration}ms`); // Technical detail
       }
 
-      // Send notification if configured
+      // Send notification using new system (replaces old webhook-only system)
       await this.sendNotification(result);
 
       return success;
     } catch (error) {
-      this.logger.error(`${contentType} sync error: ${error}`);
+      // Sync error notification (business event)
+      await this.components.notificationManager.notify(
+        NotificationType.SYNC_FAILED,
+        `${contentType} sync encountered an error`,
+        {
+          source: 'nfs-sync',
+          level: NotificationLevel.ERROR,
+          error: error instanceof Error ? error : new Error(String(error)),
+          data: { contentType },
+        }
+      );
+      this.components.logger.error(`${contentType} sync error: ${error}`); // Technical detail
       return false;
     } finally {
       this.syncStatus.isRunning = false;
@@ -178,7 +271,7 @@ export class SyncEngine {
 
   async syncAll(): Promise<Record<string, boolean>> {
     if (this.syncStatus.isRunning) {
-      this.logger.warn('Sync already running, cannot start full sync');
+      this.components.logger.warn('Sync already running, cannot start full sync');
       return {};
     }
 
@@ -198,35 +291,60 @@ export class SyncEngine {
     try {
       // Try to trigger kiwix-manager update via HTTP API or container exec
       // This is a placeholder - would need actual implementation
-      this.logger.info('Triggering kiwix-manager update');
+      this.components.logger.info('Triggering kiwix-manager update');
     } catch (error) {
-      this.logger.error(`Failed to trigger kiwix update: ${error}`);
+      this.components.logger.error(`Failed to trigger kiwix update: ${error}`);
     }
   }
 
   private async sendNotification(result: SyncResult): Promise<void> {
     const config = this.configManager.getConfig();
     const notifications = config.sync_config.notifications;
-    if (!notifications?.enabled) {
-      return;
+
+    // Legacy webhook support - if configured, add webhook channel to notification manager
+    if (notifications?.enabled && notifications.webhook_url) {
+      try {
+        // Create a temporary webhook channel for this notification
+        const webhookChannel = new WebhookChannel(
+          {
+            url: notifications.webhook_url,
+            timeout: 10000,
+          },
+          this.components.logger
+        );
+
+        // Add channel temporarily
+        this.components.notificationManager.addChannel(webhookChannel);
+
+        // Send notification through the new system
+        const notificationType = result.success
+          ? NotificationType.SYNC_COMPLETED
+          : NotificationType.SYNC_FAILED;
+        await this.components.notificationManager.notify(
+          notificationType,
+          `${result.contentType} sync ${result.success ? 'completed' : 'failed'}`,
+          {
+            source: 'nfs-sync',
+            level: result.success ? NotificationLevel.INFO : NotificationLevel.ERROR,
+            data: {
+              contentType: result.contentType,
+              success: result.success,
+              duration: result.duration,
+              timestamp: new Date().toISOString(),
+            },
+          }
+        );
+
+        // Remove the temporary channel
+        await this.components.notificationManager.removeChannel('webhook');
+      } catch (error) {
+        this.components.logger.error(`Failed to send notification: ${error}`);
+      }
     }
 
-    try {
-      if (notifications.webhook_url) {
-        await axios.post(notifications.webhook_url, {
-          contentType: result.contentType,
-          success: result.success,
-          duration: result.duration,
-          timestamp: new Date().toISOString(),
-        });
-      }
-
-      // Email notifications would be implemented here if configured
-      if (notifications.email?.enabled) {
-        this.logger.info('Email notifications not yet implemented');
-      }
-    } catch (error) {
-      this.logger.error(`Failed to send notification: ${error}`);
+    // Email notifications would be implemented here if configured
+    if (notifications?.email?.enabled) {
+      this.components.logger.debug('Email notifications not yet implemented'); // Technical detail
     }
   }
 
@@ -292,67 +410,101 @@ export class SyncEngine {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 
-  async healthCheck(): Promise<{ status: string; details: Record<string, unknown> }> {
-    try {
-      const stats = await this.getStorageStats();
-      const status = this.syncStatus;
+  /**
+   * Setup health check components
+   */
+  private registerComponentHealthChecks(): void {
+    // Configuration check
+    this.components.healthChecker.registerComponent({
+      name: 'configuration',
+      critical: true,
+      check: async () => {
+        try {
+          const config = this.configManager.getConfig();
+          return {
+            status: ComponentStatus.UP,
+            message: 'Configuration loaded successfully',
+            details: {
+              contentTypes: Object.keys(config.sync_config.content_types),
+              notificationsEnabled: config.sync_config.notifications?.enabled ?? false,
+            },
+          };
+        } catch (error) {
+          return {
+            status: ComponentStatus.DOWN,
+            message: 'Configuration failed to load',
+            error: {
+              message: error instanceof Error ? error.message : String(error),
+              code: 'CONFIG_LOAD_FAILED',
+            },
+          };
+        }
+      },
+    });
 
-      return {
-        status: 'healthy',
-        details: {
-          isRunning: status.isRunning,
-          lastSync: status.lastSync,
-          storageStats: stats,
-          configuredHandlers: this.handlers.size,
-        },
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        details: { error: error instanceof Error ? error.message : String(error) },
-      };
-    }
+    // Storage check
+    this.components.healthChecker.registerComponent({
+      name: 'storage',
+      critical: false,
+      check: async () => {
+        try {
+          const stats = await this.getStorageStats();
+          return {
+            status: ComponentStatus.UP,
+            message: 'Storage accessible',
+            details: {
+              storageStats: stats,
+            },
+          };
+        } catch (error) {
+          return {
+            status: ComponentStatus.DEGRADED,
+            message: 'Storage check failed',
+            error: {
+              message: error instanceof Error ? error.message : String(error),
+              code: 'STORAGE_CHECK_FAILED',
+            },
+          };
+        }
+      },
+    });
+
+    // Handlers check
+    this.components.healthChecker.registerComponent({
+      name: 'handlers',
+      critical: true,
+      check: async () => {
+        const handlerCount = this.handlers.size;
+        return {
+          status: handlerCount > 0 ? ComponentStatus.UP : ComponentStatus.DOWN,
+          message:
+            handlerCount > 0 ? 'Content handlers initialized' : 'No content handlers available',
+          details: {
+            configuredHandlers: handlerCount,
+            handlerTypes: Array.from(this.handlers.keys()),
+          },
+        };
+      },
+    });
   }
 
   /**
    * Shutdown the engine and clean up resources
    */
-  shutdown(): void {
-    this.logger.info('Shutting down scheduled tasks...');
-    this.scheduler.destroyAll();
+  private shutdown(): void {
+    ServicePatterns.shutdownScheduler(this.scheduler, this.components.logger);
   }
 
-  async run(): Promise<void> {
-    try {
-      await this.initialize();
-      this.scheduleSync();
+  protected override async startService(): Promise<void> {
+    this.syncStatus.isRunning = true;
+    this.scheduleSync();
+    this.components.logger.info('NFS sync service started successfully');
+  }
 
-      this.logger.info('Sync Engine started successfully');
-
-      // Keep the process running
-      process.on('SIGINT', () => {
-        this.logger.info('Sync Engine shutting down...');
-        this.shutdown();
-        process.exit(0);
-      });
-
-      process.on('SIGTERM', () => {
-        this.logger.info('Sync Engine received SIGTERM, shutting down...');
-        this.shutdown();
-        process.exit(0);
-      });
-
-      // Keep alive with periodic health checks
-      setInterval(async () => {
-        const health = await this.healthCheck();
-        if (health.status !== 'healthy') {
-          this.logger.warn(`Health check failed: ${JSON.stringify(health.details)}`);
-        }
-      }, 300000); // Every 5 minutes
-    } catch (error) {
-      this.logger.error(`Failed to start Sync Engine: ${error}`);
-      process.exit(1);
-    }
+  protected override async stopService(): Promise<void> {
+    this.syncStatus.isRunning = false;
+    this.shutdown();
+    this.components.logger.info('NFS sync service stopped');
   }
 }
 
@@ -361,9 +513,19 @@ if (require.main === module) {
   const configPath = process.env.SYNC_CONFIG_PATH || '/app/data/sync-config.yaml';
   const engine = new SyncEngine(configPath);
 
-  engine.run().catch(error => {
-    // Use stderr for critical startup errors
-    process.stderr.write(`Failed to start Sync Engine: ${error}\n`);
-    process.exit(1);
-  });
+  // Use BaseService pattern
+  engine
+    .initialize()
+    .then(async initResult => {
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
+
+      await engine.start();
+    })
+    .catch(error => {
+      // Use stderr for critical startup errors
+      process.stderr.write(`Failed to start Sync Engine: ${error}\n`);
+      process.exit(1);
+    });
 }

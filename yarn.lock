@@ -494,6 +494,7 @@ __metadata:
     "@types/node-cron": "npm:^3.0.8"
     "@typescript-eslint/eslint-plugin": "npm:^6.0.0"
     "@typescript-eslint/parser": "npm:^6.0.0"
+    axios: "npm:^1.6.0"
     eslint: "npm:^8.0.0"
     js-yaml: "npm:^4.1.0"
     node-cron: "npm:^3.0.2"

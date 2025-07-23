@@ -52,68 +52,76 @@ export const OfflineSyncConfigSchema = z.object({
 // TypeScript type inferred from Zod schema
 export type OfflineSyncConfig = z.infer<typeof OfflineSyncConfigSchema>;
 
+// Sync direction types with const assertion
+export const SYNC_DIRECTIONS = ['bidirectional', 'to_card', 'from_card'] as const;
+export type SyncDirection = typeof SYNC_DIRECTIONS[number];
+
 // Keep the original interface for backward compatibility
 export interface ContentTypeConfig {
-  local_path: string;
-  card_path: string;
-  sync_direction: 'bidirectional' | 'to_card' | 'from_card';
-  max_size: string;
-  file_extensions: string[];
+  readonly local_path: string;
+  readonly card_path: string;
+  readonly sync_direction: SyncDirection;
+  readonly max_size: string;
+  readonly file_extensions: readonly string[];
 }
 
 export interface USBDeviceDescriptor {
-  bLength: number;
-  bDescriptorType: number;
-  bcdUSB: number;
-  bDeviceClass: number;
-  bDeviceSubClass: number;
-  bDeviceProtocol: number;
-  bMaxPacketSize0: number;
-  idVendor: number;
-  idProduct: number;
-  bcdDevice: number;
-  iManufacturer: number;
-  iProduct: number;
-  iSerialNumber: number;
-  bNumConfigurations: number;
+  readonly bLength: number;
+  readonly bDescriptorType: number;
+  readonly bcdUSB: number;
+  readonly bDeviceClass: number;
+  readonly bDeviceSubClass: number;
+  readonly bDeviceProtocol: number;
+  readonly bMaxPacketSize0: number;
+  readonly idVendor: number;
+  readonly idProduct: number;
+  readonly bcdDevice: number;
+  readonly iManufacturer: number;
+  readonly iProduct: number;
+  readonly iSerialNumber: number;
+  readonly bNumConfigurations: number;
 }
 
 export interface USBDevice {
-  deviceDescriptor: USBDeviceDescriptor;
-  busNumber: number;
-  deviceAddress: number;
-  portNumbers?: number[];
+  readonly deviceDescriptor: USBDeviceDescriptor;
+  readonly busNumber: number;
+  readonly deviceAddress: number;
+  readonly portNumbers?: readonly number[];
 }
 
 export interface DeviceInfo {
-  vendorId: number;
-  productId: number;
-  manufacturer?: string | undefined;
-  product?: string | undefined;
-  serialNumber?: string | undefined;
-  size?: number | undefined;
+  readonly vendorId: number;
+  readonly productId: number;
+  readonly manufacturer?: string;
+  readonly product?: string;
+  readonly serialNumber?: string;
+  readonly size?: number;
 }
 
 export interface DetectedDevice {
-  devicePath: string;
-  mountPath?: string | undefined;
-  deviceInfo: DeviceInfo;
-  fileSystem?: string | undefined;
+  readonly devicePath: string;
+  mountPath?: string;
+  readonly deviceInfo: DeviceInfo;
+  readonly fileSystem?: string;
   isMounted: boolean;
   isReady: boolean;
 }
 
+// Operation status types with const assertion
+export const OPERATION_STATUSES = ['pending', 'in_progress', 'completed', 'failed', 'cancelled'] as const;
+export type OperationStatus = typeof OPERATION_STATUSES[number];
+
 export interface SyncOperation {
-  id: string;
-  device: DetectedDevice;
-  contentType: string;
-  direction: 'to_card' | 'from_card' | 'bidirectional';
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
-  startTime: Date;
+  readonly id: string;
+  readonly device: DetectedDevice;
+  readonly contentType: string;
+  readonly direction: SyncDirection;
+  status: OperationStatus;
+  readonly startTime: Date;
   endTime?: Date;
-  totalFiles: number;
+  readonly totalFiles: number;
   processedFiles: number;
-  totalSize: number;
+  readonly totalSize: number;
   processedSize: number;
   currentFile?: string;
   error?: string;

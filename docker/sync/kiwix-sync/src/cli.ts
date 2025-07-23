@@ -39,7 +39,12 @@ program
   .action(async options => {
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
-      await manager.initialize();
+
+      // Initialize the service
+      const initResult = await manager.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
 
       const packages = await manager.listAvailablePackages();
       const filtered = options.filter
@@ -70,7 +75,12 @@ program
   .action(async options => {
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
-      await manager.initialize();
+
+      // Initialize the service
+      const initResult = await manager.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
 
       const packages = await manager.listInstalledPackages();
 
@@ -98,7 +108,12 @@ program
   .action(async (packageName, _options) => {
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
-      await manager.initialize();
+
+      // Initialize the service
+      const initResult = await manager.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
 
       outputProgress(`Downloading ${packageName}...`);
       const success = await manager.downloadPackage(packageName);
@@ -121,7 +136,12 @@ program
   .action(async () => {
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
-      await manager.initialize();
+
+      // Initialize the service
+      const initResult = await manager.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
 
       outputProgress('Scanning and updating existing ZIM packages...');
       const success = await manager.updateAllZimPackages();
@@ -145,7 +165,12 @@ program
   .action(async options => {
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
-      await manager.initialize();
+
+      // Initialize the service
+      const initResult = await manager.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
 
       const status = await manager.getUpdateStatus();
 
@@ -178,7 +203,12 @@ program
   .action(async options => {
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
-      await manager.initialize();
+
+      // Initialize the service
+      const initResult = await manager.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
 
       const stats = await manager.getLibraryStats();
 
@@ -205,7 +235,12 @@ program
   .action(async options => {
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
-      await manager.initialize();
+
+      // Initialize the service
+      const initResult = await manager.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
 
       const health = await manager.healthCheck();
 
@@ -214,10 +249,20 @@ program
       } else {
         const statusIcon = health.status === 'healthy' ? '✅' : '❌';
         cliLogger.info(`${statusIcon} Service Status: ${health.status.toUpperCase()}`);
-        cliLogger.info('Details:');
-        Object.entries(health.details).forEach(([key, value]) => {
-          cliLogger.info(`   ${key}: ${value}`);
-        });
+        cliLogger.info(`Service: ${health.service}`);
+        cliLogger.info(`Timestamp: ${health.timestamp.toISOString()}`);
+        cliLogger.info(`Components: ${health.components.length}`);
+        cliLogger.info(`Duration: ${health.duration}ms`);
+
+        if (health.errors.length > 0) {
+          cliLogger.info('Errors:');
+          health.errors.forEach(error => cliLogger.info(`   - ${error}`));
+        }
+
+        if (health.warnings.length > 0) {
+          cliLogger.info('Warnings:');
+          health.warnings.forEach(warning => cliLogger.info(`   - ${warning}`));
+        }
       }
 
       if (health.status !== 'healthy') {
@@ -236,7 +281,12 @@ program
   .action(async (query, options) => {
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
-      await manager.initialize();
+
+      // Initialize the service
+      const initResult = await manager.initialize();
+      if (!initResult.success) {
+        throw initResult.error || new Error('Service initialization failed');
+      }
 
       const packages = await manager.listAvailablePackages();
       const filtered = packages.filter(

@@ -78,29 +78,33 @@ export const SyncConfigSchema = z.object({
 // TypeScript type inferred from Zod schema
 export type SyncConfig = z.infer<typeof SyncConfigSchema>;
 
+// Sync types with const assertion
+export const SYNC_TYPES = ['full_sync', 'metadata_filtered', 'folder_filtered', 'kiwix_updater'] as const;
+export type SyncType = typeof SYNC_TYPES[number];
+
 // Keep the original interface for backward compatibility
 export interface ContentTypeConfig {
-  type: 'full_sync' | 'metadata_filtered' | 'folder_filtered' | 'kiwix_updater';
-  schedule: string;
-  local_path: string;
-  nfs_path?: string;
-  max_size: string;
-  filters?: FilterRule[];
-  priority_rules?: PriorityRule[];
-  include_folders?: string[];
-  max_episodes_per_show?: number;
-  zim_files?: string[];
+  readonly type: SyncType;
+  readonly schedule: string;
+  readonly local_path: string;
+  readonly nfs_path?: string;
+  readonly max_size: string;
+  readonly filters?: readonly FilterRule[];
+  readonly priority_rules?: readonly PriorityRule[];
+  readonly include_folders?: readonly string[];
+  readonly max_episodes_per_show?: number;
+  readonly zim_files?: readonly string[];
 }
 
 export interface FilterRule {
-  type: string;
-  operator: string;
-  value: string | number;
+  readonly type: string;
+  readonly operator: string;
+  readonly value: string | number;
 }
 
 export interface PriorityRule {
-  type: string;
-  weight: number;
+  readonly type: string;
+  readonly weight: number;
 }
 
 // Plex XML API response interfaces

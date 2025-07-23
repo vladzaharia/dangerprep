@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import { EventEmitter } from 'events';
 import { promisify } from 'util';
 
+import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
 import { usb } from 'usb';
 
 import { DetectedDevice, OfflineSyncConfig, LsblkOutput, DiskSpaceInfo } from './types';
@@ -27,10 +28,12 @@ export class DeviceDetector extends EventEmitter {
   private config: OfflineSyncConfig['offline_sync'];
   private detectedDevices: Map<string, DetectedDevice> = new Map();
   private isMonitoring = false;
+  private logger: Logger;
 
   constructor(config: OfflineSyncConfig['offline_sync']) {
     super();
     this.config = config;
+    this.logger = LoggerFactory.createConsoleLogger('DeviceDetector');
   }
 
   /**
@@ -235,19 +238,23 @@ export class DeviceDetector extends EventEmitter {
       // Get device size and filesystem info
       const deviceInfo = await this.getDeviceInfo(blockDevice);
 
+      const manufacturer = await this.getStringDescriptor(usbDevice, descriptor?.iManufacturer);
+      const product = await this.getStringDescriptor(usbDevice, descriptor?.iProduct);
+      const serialNumber = await this.getStringDescriptor(usbDevice, descriptor?.iSerialNumber);
+
       const detectedDevice: DetectedDevice = {
         devicePath: blockDevice,
         deviceInfo: {
           vendorId: descriptor?.idVendor || 0,
           productId: descriptor?.idProduct || 0,
-          manufacturer: await this.getStringDescriptor(usbDevice, descriptor?.iManufacturer),
-          product: await this.getStringDescriptor(usbDevice, descriptor?.iProduct),
-          serialNumber: await this.getStringDescriptor(usbDevice, descriptor?.iSerialNumber),
+          ...(manufacturer && { manufacturer }),
+          ...(product && { product }),
+          ...(serialNumber && { serialNumber }),
           size: deviceInfo.size,
         },
         fileSystem: deviceInfo.fstype,
         isMounted: deviceInfo.mounted,
-        mountPath: deviceInfo.mountpoint,
+        ...(deviceInfo.mountpoint && { mountPath: deviceInfo.mountpoint }),
         isReady: true,
       };
 
@@ -287,7 +294,7 @@ export class DeviceDetector extends EventEmitter {
    * Get string descriptor from USB device
    */
   private async getStringDescriptor(
-    device: USBLibDevice,
+    _device: USBLibDevice,
     index?: number
   ): Promise<string | undefined> {
     if (!index) return undefined;
@@ -353,15 +360,13 @@ export class DeviceDetector extends EventEmitter {
    * Log a message
    */
   private log(message: string): void {
-    // Use process.stdout.write for internal logging to avoid circular dependencies
-    process.stdout.write(`[DeviceDetector] ${new Date().toISOString()} - ${message}\n`);
+    this.logger.debug(message);
   }
 
   /**
    * Log an error
    */
   private logError(message: string, error: unknown): void {
-    // Use process.stderr.write for internal logging to avoid circular dependencies
-    process.stderr.write(`[DeviceDetector] ${new Date().toISOString()} - ${message}: ${error}\n`);
+    this.logger.error(message, { error: error instanceof Error ? error.message : String(error) });
   }
 }

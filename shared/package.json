@@ -18,6 +18,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "axios": "^1.6.0",
     "js-yaml": "^4.1.0",
     "node-cron": "^3.0.2",
     "winston": "^3.11.0",
@@ -44,6 +45,36 @@
       "types": "./dist/logging/index.d.ts",
       "import": "./dist/logging/index.js",
       "require": "./dist/logging/index.js"
+    },
+    "./file-utils": {
+      "types": "./dist/file-utils/index.d.ts",
+      "import": "./dist/file-utils/index.js",
+      "require": "./dist/file-utils/index.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.js",
+      "require": "./dist/config/index.js"
+    },
+    "./scheduling": {
+      "types": "./dist/scheduling/index.d.ts",
+      "import": "./dist/scheduling/index.js",
+      "require": "./dist/scheduling/index.js"
+    },
+    "./notifications": {
+      "types": "./dist/notifications/index.d.ts",
+      "import": "./dist/notifications/index.js",
+      "require": "./dist/notifications/index.js"
+    },
+    "./health": {
+      "types": "./dist/health/index.d.ts",
+      "import": "./dist/health/index.js",
+      "require": "./dist/health/index.js"
+    },
+    "./service": {
+      "types": "./dist/service/index.d.ts",
+      "import": "./dist/service/index.js",
+      "require": "./dist/service/index.js"
     }
   },
   "files": [

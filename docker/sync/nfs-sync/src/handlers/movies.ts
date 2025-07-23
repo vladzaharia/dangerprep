@@ -74,7 +74,7 @@ export class MoviesHandler extends BaseHandler {
     return filtered;
   }
 
-  private movieMatchesFilters(movie: PlexMovie, filters: FilterRule[]): boolean {
+  private movieMatchesFilters(movie: PlexMovie, filters: readonly FilterRule[]): boolean {
     for (const filter of filters) {
       if (!this.applyFilter(movie, filter)) {
         return false;
@@ -169,7 +169,7 @@ export class MoviesHandler extends BaseHandler {
     return moviesWithPriority.sort((a, b) => b.priorityScore - a.priorityScore);
   }
 
-  private calculatePriorityScore(movie: PlexMovie, rules: PriorityRule[]): number {
+  private calculatePriorityScore(movie: PlexMovie, rules: readonly PriorityRule[]): number {
     let score = 0;
 
     for (const rule of rules) {

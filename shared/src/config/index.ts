@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { FileUtils } from '../file-utils';
 import type { Logger } from '../logging';
+import { ConfigUtils } from './config-utils.js';
 
 /**
  * Options for configuration management
@@ -15,6 +16,14 @@ export interface ConfigOptions {
   logger?: Logger;
   /** Whether to create parent directories if they don't exist */
   createDirs?: boolean;
+  /** Whether to enable environment variable substitution */
+  enableEnvSubstitution?: boolean;
+  /** Whether to enable automatic transformations */
+  enableTransformations?: boolean;
+  /** Default configuration to merge with loaded config */
+  defaults?: any;
+  /** Environment variable prefix for automatic env loading */
+  envPrefix?: string;
   /** YAML dump options */
   yamlOptions?: {
     indent?: number;
@@ -62,6 +71,10 @@ export class ConfigManager<T> {
   private readonly options: {
     logger?: Logger;
     createDirs: boolean;
+    enableEnvSubstitution: boolean;
+    enableTransformations: boolean;
+    defaults?: any;
+    envPrefix: string | undefined;
     yamlOptions: {
       indent: number;
       lineWidth: number;
@@ -78,6 +91,10 @@ export class ConfigManager<T> {
     this.options = {
       ...(options.logger && { logger: options.logger }),
       createDirs: options.createDirs ?? true,
+      enableEnvSubstitution: options.enableEnvSubstitution ?? false,
+      enableTransformations: options.enableTransformations ?? false,
+      defaults: options.defaults,
+      envPrefix: options.envPrefix,
       yamlOptions: {
         indent: 2,
         lineWidth: 120,
@@ -97,7 +114,17 @@ export class ConfigManager<T> {
       }
 
       const configContent = await fs.readFile(this.configPath, 'utf8');
-      const parsedConfig = yamlLoad(configContent);
+      let parsedConfig = yamlLoad(configContent);
+
+      // Apply environment variable substitution if enabled
+      if (this.options.enableEnvSubstitution) {
+        parsedConfig = ConfigUtils.processEnvVars(parsedConfig);
+      }
+
+      // Merge with defaults if provided
+      if (this.options.defaults) {
+        parsedConfig = ConfigUtils.mergeConfigs(this.options.defaults, parsedConfig as any);
+      }
 
       // Validate configuration using Zod schema
       const result = this.schema.safeParse(parsedConfig);
@@ -185,6 +212,51 @@ export class ConfigManager<T> {
 
     if (!result.success) {
       throw new ConfigValidationError('Configuration validation failed', result.error);
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Load configuration with defaults
+   * @param defaults Default configuration to merge
+   * @returns Parsed and validated configuration
+   */
+  async loadWithDefaults(defaults: Partial<T>): Promise<T> {
+    const originalDefaults = this.options.defaults;
+    this.options.defaults = defaults;
+
+    try {
+      return await this.loadConfig();
+    } finally {
+      this.options.defaults = originalDefaults;
+    }
+  }
+
+  /**
+   * Validate and transform configuration object
+   * @param config Configuration object to validate
+   * @returns Validated and transformed configuration
+   */
+  validateAndTransform(config: unknown): T {
+    let processedConfig = config;
+
+    // Apply environment variable substitution if enabled
+    if (this.options.enableEnvSubstitution) {
+      processedConfig = ConfigUtils.processEnvVars(processedConfig);
+    }
+
+    // Merge with defaults if provided
+    if (this.options.defaults) {
+      processedConfig = ConfigUtils.mergeConfigs(this.options.defaults, processedConfig as any);
+    }
+
+    const result = this.schema.safeParse(processedConfig);
+    if (!result.success) {
+      throw new ConfigValidationError(
+        'Configuration validation failed',
+        result.error
+      );
     }
 
     return result.data;
@@ -292,3 +364,8 @@ export function createConfigManager<T>(
 
 // Re-export Zod for schema creation
 export { z } from 'zod';
+
+// Export configuration utilities and standard schemas
+export { ConfigUtils } from './config-utils.js';
+export * from './standard-schemas.js';
+export { ConfigFactory } from './config-factory.js';
