@@ -8,7 +8,7 @@ import type { NotificationManager } from '../notifications/index.js';
 
 // Service states with const assertion for better type inference
 export const SERVICE_STATES = ['stopped', 'starting', 'running', 'stopping', 'error'] as const;
-export type ServiceStateString = typeof SERVICE_STATES[number];
+export type ServiceStateString = (typeof SERVICE_STATES)[number];
 
 export enum ServiceState {
   STOPPED = 'stopped',

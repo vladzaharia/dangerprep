@@ -3,14 +3,13 @@
  */
 
 import { Logger } from '../logging/logger.js';
-import { NotificationManager, NotificationLevel, NotificationType } from '../notifications/index.js';
-import { 
-  DangerPrepError, 
-  ErrorSeverity, 
-  ErrorCategory,
-  type ErrorContext,
-  extractErrorInfo,
-} from './index.js';
+import {
+  NotificationManager,
+  NotificationLevel,
+  NotificationType,
+} from '../notifications/index.js';
+
+import { DangerPrepError, ErrorSeverity, ErrorCategory, extractErrorInfo } from './index.js';
 
 /**
  * Error logging and notification patterns
@@ -32,9 +31,9 @@ export class ErrorPatterns {
   ): Promise<void> {
     const errorInfo = extractErrorInfo(error);
     const isDangerPrepError = error instanceof DangerPrepError;
-    
+
     // Determine log level based on error severity
-    const logLevel = isDangerPrepError 
+    const logLevel = isDangerPrepError
       ? ErrorPatterns.getLogLevelFromSeverity(error.metadata.severity)
       : 'error';
 
@@ -51,8 +50,8 @@ export class ErrorPatterns {
 
     // Handle notifications if notification manager is provided
     if (notificationManager && !options.suppressNotification) {
-      const shouldNotify = options.forceNotification || 
-        (isDangerPrepError ? error.shouldTriggerNotification() : true);
+      const shouldNotify =
+        options.forceNotification || (isDangerPrepError ? error.shouldTriggerNotification() : true);
 
       if (shouldNotify) {
         await ErrorPatterns.sendErrorNotification(
@@ -75,7 +74,7 @@ export class ErrorPatterns {
     component?: string
   ): Promise<void> {
     const isDangerPrepError = error instanceof DangerPrepError;
-    
+
     // Determine notification level and type
     const notificationLevel = isDangerPrepError
       ? ErrorPatterns.getNotificationLevelFromSeverity(error.metadata.severity)
@@ -109,27 +108,17 @@ export class ErrorPatterns {
       notificationOptions.error = error;
     }
 
-    await notificationManager.notify(
-      notificationType,
-      message,
-      notificationOptions
-    );
+    await notificationManager.notify(notificationType, message, notificationOptions);
   }
 
   /**
    * Format error message for notifications
    */
-  static formatErrorMessage(
-    error: unknown,
-    operation?: string,
-    component?: string
-  ): string {
+  static formatErrorMessage(error: unknown, operation?: string, component?: string): string {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const context = [operation, component].filter(Boolean).join(' > ');
-    
-    return context 
-      ? `${context}: ${errorMessage}`
-      : errorMessage;
+
+    return context ? `${context}: ${errorMessage}` : errorMessage;
   }
 
   /**
@@ -194,22 +183,18 @@ export class ErrorPatterns {
     if (error instanceof DangerPrepError) {
       return `${error.code}:${error.metadata.category}:${operation || 'unknown'}`;
     }
-    
+
     if (error instanceof Error) {
       return `${error.name}:${operation || 'unknown'}`;
     }
-    
+
     return `unknown_error:${operation || 'unknown'}`;
   }
 
   /**
    * Determine if error should be retried based on patterns
    */
-  static shouldRetryError(
-    error: unknown,
-    attempt: number,
-    maxAttempts: number = 3
-  ): boolean {
+  static shouldRetryError(error: unknown, attempt: number, maxAttempts: number = 3): boolean {
     if (attempt >= maxAttempts) {
       return false;
     }
@@ -222,7 +207,7 @@ export class ErrorPatterns {
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
       const name = error.name.toLowerCase();
-      
+
       // Network-related errors are usually retryable
       if (
         message.includes('timeout') ||
@@ -261,7 +246,7 @@ export class ErrorPatterns {
     // Default recovery suggestions based on error patterns
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
-      
+
       if (message.includes('network') || message.includes('connection')) {
         return [
           'Check network connectivity',
@@ -280,11 +265,7 @@ export class ErrorPatterns {
       }
 
       if (message.includes('space') || message.includes('disk')) {
-        return [
-          'Check available disk space',
-          'Clean up temporary files',
-          'Check storage quotas',
-        ];
+        return ['Check available disk space', 'Clean up temporary files', 'Check storage quotas'];
       }
     }
 
@@ -296,12 +277,15 @@ export class ErrorPatterns {
  * Error aggregation for tracking and reporting
  */
 export class ErrorAggregator {
-  private errorCounts = new Map<string, {
-    count: number;
-    firstSeen: Date;
-    lastSeen: Date;
-    errors: unknown[];
-  }>();
+  private errorCounts = new Map<
+    string,
+    {
+      count: number;
+      firstSeen: Date;
+      lastSeen: Date;
+      errors: unknown[];
+    }
+  >();
 
   /**
    * Add error to aggregation
@@ -309,12 +293,12 @@ export class ErrorAggregator {
   addError(error: unknown, operation?: string): void {
     const key = ErrorPatterns.createAggregationKey(error, operation);
     const existing = this.errorCounts.get(key);
-    
+
     if (existing) {
       existing.count++;
       existing.lastSeen = new Date();
       existing.errors.push(error);
-      
+
       // Keep only last 10 errors to prevent memory issues
       if (existing.errors.length > 10) {
         existing.errors = existing.errors.slice(-10);
@@ -380,7 +364,7 @@ export class ErrorAggregator {
    */
   clearOldErrors(olderThanMs: number): void {
     const cutoff = new Date(Date.now() - olderThanMs);
-    
+
     for (const [key, data] of this.errorCounts.entries()) {
       if (data.lastSeen < cutoff) {
         this.errorCounts.delete(key);

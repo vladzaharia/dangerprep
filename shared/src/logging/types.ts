@@ -4,7 +4,7 @@
 
 // Use const assertion for better type inference
 export const LOG_LEVELS = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;
-export type LogLevelString = typeof LOG_LEVELS[number];
+export type LogLevelString = (typeof LOG_LEVELS)[number];
 
 export enum LogLevel {
   DEBUG = 0,
@@ -15,7 +15,7 @@ export enum LogLevel {
 
 // Use const assertion for format types
 export const LOG_FORMATS = ['json', 'text'] as const;
-export type LogFormat = typeof LOG_FORMATS[number];
+export type LogFormat = (typeof LOG_FORMATS)[number];
 
 export interface LogEntry {
   readonly timestamp: Date;

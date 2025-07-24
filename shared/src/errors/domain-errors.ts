@@ -176,12 +176,7 @@ export class ValidationError extends DangerPrepError {
       severity?: ErrorSeverity;
     } = {}
   ) {
-    const {
-      code = 'VALIDATION_ERROR',
-      cause,
-      data,
-      severity = ErrorSeverity.MEDIUM,
-    } = options;
+    const { code = 'VALIDATION_ERROR', cause, data, severity = ErrorSeverity.MEDIUM } = options;
 
     const metadata: Partial<ErrorMetadata> & {
       severity: ErrorSeverity;
@@ -286,12 +281,7 @@ export class AuthenticationError extends DangerPrepError {
       severity?: ErrorSeverity;
     } = {}
   ) {
-    const {
-      code = 'AUTHENTICATION_ERROR',
-      cause,
-      data,
-      severity = ErrorSeverity.HIGH,
-    } = options;
+    const { code = 'AUTHENTICATION_ERROR', cause, data, severity = ErrorSeverity.HIGH } = options;
 
     const metadata: Partial<ErrorMetadata> & {
       severity: ErrorSeverity;
@@ -336,12 +326,7 @@ export class BusinessLogicError extends DangerPrepError {
       severity?: ErrorSeverity;
     } = {}
   ) {
-    const {
-      code = 'BUSINESS_LOGIC_ERROR',
-      cause,
-      data,
-      severity = ErrorSeverity.MEDIUM,
-    } = options;
+    const { code = 'BUSINESS_LOGIC_ERROR', cause, data, severity = ErrorSeverity.MEDIUM } = options;
 
     const metadata: Partial<ErrorMetadata> & {
       severity: ErrorSeverity;

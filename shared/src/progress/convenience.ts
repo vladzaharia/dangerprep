@@ -2,14 +2,13 @@
  * Convenience functions for common progress tracking patterns
  */
 
+import { globalProgressManager } from './progress-manager.js';
 import {
   type ProgressConfig,
   type ProgressPhase,
   type IProgressTracker,
   type ProgressListener,
-  ProgressStatus,
 } from './types.js';
-import { globalProgressManager } from './progress-manager.js';
 
 /**
  * Create a progress tracker with sensible defaults
@@ -67,8 +66,8 @@ export function withProgressTracking(options: {
   }>;
   updateInterval?: number;
 }) {
-  return function <T extends (...args: any[]) => Promise<any>>(
-    target: any,
+  return function <T extends (...args: unknown[]) => Promise<unknown>>(
+    target: object,
     propertyKey: string | symbol,
     descriptor: TypedPropertyDescriptor<T>
   ): TypedPropertyDescriptor<T> {
@@ -78,9 +77,13 @@ export function withProgressTracking(options: {
       throw new Error('withProgressTracking can only be applied to methods');
     }
 
-    descriptor.value = async function (this: any, ...args: any[]) {
+    descriptor.value = async function (
+      this: { __progressTracker?: IProgressTracker },
+      ...args: unknown[]
+    ) {
       const operationId = `${target.constructor.name}.${String(propertyKey)}_${Date.now()}`;
-      const operationName = options.operationName || `${target.constructor.name}.${String(propertyKey)}`;
+      const operationName =
+        options.operationName || `${target.constructor.name}.${String(propertyKey)}`;
 
       const config: ProgressConfig = {
         operationId,
@@ -99,7 +102,7 @@ export function withProgressTracking(options: {
         tracker.start();
 
         // Bind tracker to method context for access within the method
-        (this as any).__progressTracker = tracker;
+        this.__progressTracker = tracker;
 
         const result = await originalMethod.apply(this, args);
 
@@ -109,7 +112,7 @@ export function withProgressTracking(options: {
         tracker.fail(error instanceof Error ? error.message : String(error));
         throw error;
       } finally {
-        delete (this as any).__progressTracker;
+        delete this.__progressTracker;
       }
     } as T;
 
@@ -120,7 +123,9 @@ export function withProgressTracking(options: {
 /**
  * Helper function to get the current progress tracker from within a decorated method
  */
-export function getCurrentProgressTracker(context: any): IProgressTracker | null {
+export function getCurrentProgressTracker(context: {
+  __progressTracker?: IProgressTracker;
+}): IProgressTracker | null {
   return context.__progressTracker || null;
 }
 
@@ -212,15 +217,18 @@ export async function trackArrayProgress<T, R>(
 
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
-      
+
       for (let j = 0; j < batch.length; j++) {
         const itemIndex = i + j;
         const item = batch[j];
-        
+
         tracker.updateCurrentOperation('Processing item', `${itemIndex + 1}/${items.length}`);
-        
+
         try {
-          const result = await processor(item!, itemIndex, tracker);
+          if (item === undefined) {
+            throw new Error(`Item at index ${itemIndex} is undefined`);
+          }
+          const result = await processor(item, itemIndex, tracker);
           results.push(result);
           tracker.updateProgress(results.length);
         } catch (error) {
@@ -287,32 +295,33 @@ export function createCallbackProgressTracker(
   const originalStart = tracker.start.bind(tracker);
   tracker.start = () => {
     originalStart();
-    
+
     const updateFromCallback = () => {
       try {
         const progress = getProgress();
         tracker.updateProgress(progress.completed);
-        
+
         if (progress.current) {
           tracker.updateCurrentOperation('Processing', progress.current);
         }
-        
+
         // Update total if it changed
         const currentProgress = tracker.getCurrentProgress();
         if (currentProgress.metrics.totalItems !== progress.total) {
           currentProgress.metrics.totalItems = progress.total;
         }
-      } catch (error) {
-        console.error('Error updating progress from callback:', error);
+      } catch (_error) {
+        // Silently ignore callback errors to avoid console pollution
+        // In a production environment, this could be logged to a proper logger
       }
     };
 
     // Initial update
     updateFromCallback();
-    
+
     // Set up interval
     const interval = setInterval(updateFromCallback, updateInterval);
-    
+
     // Clean up interval when tracker is disposed
     const originalDispose = tracker.dispose.bind(tracker);
     tracker.dispose = () => {

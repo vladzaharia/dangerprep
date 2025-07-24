@@ -9,7 +9,7 @@ export enum ErrorSeverity {
   /** Low severity - informational errors that don't affect operation */
   LOW = 'low',
   /** Medium severity - errors that may affect some functionality */
-  MEDIUM = 'medium', 
+  MEDIUM = 'medium',
   /** High severity - errors that significantly impact functionality */
   HIGH = 'high',
   /** Critical severity - errors that prevent core functionality */
@@ -104,7 +104,7 @@ export abstract class DangerPrepError extends Error {
   constructor(
     message: string,
     code: string,
-    metadata: Partial<ErrorMetadata> & { 
+    metadata: Partial<ErrorMetadata> & {
       severity: ErrorSeverity;
       category: ErrorCategory;
       context: ErrorContext;
@@ -113,7 +113,7 @@ export abstract class DangerPrepError extends Error {
     super(message);
     this.name = this.constructor.name;
     this.code = code;
-    
+
     // Set default metadata values
     this.metadata = {
       retryClassification: RetryClassification.NON_RETRYABLE,

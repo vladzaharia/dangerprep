@@ -7,6 +7,7 @@ import {
   runWithErrorContext,
   safeAsync,
 } from '@dangerprep/shared/errors';
+// Advanced file utils available for future use
 import { HealthChecker, ComponentStatus } from '@dangerprep/shared/health';
 import { LoggerFactory } from '@dangerprep/shared/logging';
 import { NotificationType, NotificationLevel } from '@dangerprep/shared/notifications';
@@ -294,61 +295,74 @@ export class OfflineSync extends BaseService {
    * Manually trigger sync for a specific device
    */
   public async triggerSync(devicePath: string): Promise<string | null> {
-    return runWithErrorContext(async () => {
-      if (!this.syncEngine || !this.cardAnalyzer) {
-        throw ErrorFactory.businessLogic(
-          'Service not properly initialized',
-          {
-            context: { operation: 'triggerSync', service: 'offline-sync', component: 'sync-trigger' }
-          }
-        );
-      }
+    return runWithErrorContext(
+      async () => {
+        if (!this.syncEngine || !this.cardAnalyzer) {
+          throw ErrorFactory.businessLogic('Service not properly initialized', {
+            context: {
+              operation: 'triggerSync',
+              service: 'offline-sync',
+              component: 'sync-trigger',
+            },
+          });
+        }
 
-      const device = this.deviceDetector?.getDevice(devicePath);
-      if (!device) {
-        throw ErrorFactory.businessLogic(
-          `Device not found: ${devicePath}`,
-          {
+        const device = this.deviceDetector?.getDevice(devicePath);
+        if (!device) {
+          throw ErrorFactory.businessLogic(`Device not found: ${devicePath}`, {
             data: { devicePath },
-            context: { operation: 'triggerSync', service: 'offline-sync', component: 'device-lookup' }
-          }
-        );
-      }
+            context: {
+              operation: 'triggerSync',
+              service: 'offline-sync',
+              component: 'device-lookup',
+            },
+          });
+        }
 
-      if (!device.isMounted || !device.mountPath) {
-        throw ErrorFactory.filesystem(
-          `Device not mounted: ${devicePath}`,
-          {
+        if (!device.isMounted || !device.mountPath) {
+          throw ErrorFactory.filesystem(`Device not mounted: ${devicePath}`, {
             data: { devicePath, isMounted: device.isMounted, mountPath: device.mountPath },
-            context: { operation: 'triggerSync', service: 'offline-sync', component: 'mount-check' }
+            context: {
+              operation: 'triggerSync',
+              service: 'offline-sync',
+              component: 'mount-check',
+            },
+          });
+        }
+
+        const result = await safeAsync(async () => {
+          if (!this.cardAnalyzer) {
+            throw new Error('Card analyzer not initialized');
           }
-        );
-      }
+          if (!this.syncEngine) {
+            throw new Error('Sync engine not initialized');
+          }
 
-      const result = await safeAsync(async () => {
-        const analysis = await this.cardAnalyzer!.analyzeCard(device);
-        const operationId = await this.syncEngine!.startSync(device, analysis);
-        this.syncStats.totalOperations++;
-        return operationId;
-      });
+          const analysis = await this.cardAnalyzer.analyzeCard(device);
+          const operationId = await this.syncEngine.startSync(device, analysis);
+          this.syncStats.totalOperations++;
+          return operationId;
+        });
 
-      if (result.success) {
-        return result.data;
-      } else {
-        this.syncStats.failedOperations++;
-        await ErrorPatterns.logAndNotifyError(
-          result.error,
-          this.components.logger,
-          this.components.notificationManager,
-          { operation: 'triggerSync', component: 'sync-execution' }
-        );
-        throw result.error;
+        if (result.success) {
+          return result.data;
+        } else {
+          this.syncStats.failedOperations++;
+          await ErrorPatterns.logAndNotifyError(
+            result.error,
+            this.components.logger,
+            this.components.notificationManager,
+            { operation: 'triggerSync', component: 'sync-execution' }
+          );
+          throw result.error;
+        }
+      },
+      {
+        operation: 'triggerSync',
+        service: 'offline-sync',
+        component: 'sync-trigger',
       }
-    }, {
-      operation: 'triggerSync',
-      service: 'offline-sync',
-      component: 'sync-trigger',
-    });
+    );
   }
 
   /**
@@ -467,16 +481,23 @@ export class OfflineSync extends BaseService {
     }
 
     const deviceReadyResult = await safeAsync(async () => {
+      if (!this.cardAnalyzer) {
+        throw new Error('Card analyzer not initialized');
+      }
+
       // Analyze the card
-      const analysis = await this.cardAnalyzer!.analyzeCard(device);
+      const analysis = await this.cardAnalyzer.analyzeCard(device);
 
       // Create missing directories if needed
       if (analysis.missingContentTypes.length > 0) {
-        await this.cardAnalyzer!.createMissingDirectories(analysis);
+        await this.cardAnalyzer.createMissingDirectories(analysis);
       }
 
       // Start sync operation
-      await this.syncEngine!.startSync(device, analysis);
+      if (!this.syncEngine) {
+        throw new Error('Sync engine not initialized');
+      }
+      await this.syncEngine.startSync(device, analysis);
       this.syncStats.totalOperations++;
 
       await this.sendNotification({

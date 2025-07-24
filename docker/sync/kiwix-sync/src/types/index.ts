@@ -49,7 +49,7 @@ export interface ZimPackage {
 
 // Download status types with const assertion
 export const DOWNLOAD_STATUSES = ['downloading', 'completed', 'failed', 'paused'] as const;
-export type DownloadStatus = typeof DOWNLOAD_STATUSES[number];
+export type DownloadStatus = (typeof DOWNLOAD_STATUSES)[number];
 
 export interface DownloadProgress {
   readonly packageName: string;
@@ -76,8 +76,13 @@ export interface LibraryEntry {
 }
 
 // Define sync types locally for Kiwix service
-export const KIWIX_SYNC_TYPES = ['full_sync', 'metadata_filtered', 'folder_filtered', 'kiwix_updater'] as const;
-export type SyncType = typeof KIWIX_SYNC_TYPES[number];
+export const KIWIX_SYNC_TYPES = [
+  'full_sync',
+  'metadata_filtered',
+  'folder_filtered',
+  'kiwix_updater',
+] as const;
+export type SyncType = (typeof KIWIX_SYNC_TYPES)[number];
 
 // Type guards for runtime validation
 export const isSyncType = (value: string): value is SyncType =>

@@ -2,7 +2,6 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 
 import type { Logger } from '../../logging';
 import { NotificationChannel, NotificationEvent, WebhookChannelConfig } from '../types.js';
-import type { NotificationFilter } from '../types.js';
 
 /**
  * Webhook notification channel for sending events to HTTP endpoints

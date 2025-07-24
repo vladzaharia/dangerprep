@@ -4,7 +4,10 @@
 
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { type IProgressPersistence, type ProgressUpdate } from './types.js';
+
+import type { Logger } from '../logging';
+
+import { type IProgressPersistence, type ProgressUpdate, type IProgressTracker } from './types.js';
 
 export class FileProgressPersistence implements IProgressPersistence {
   private readonly storageDir: string;
@@ -15,10 +18,10 @@ export class FileProgressPersistence implements IProgressPersistence {
 
   async saveProgress(operationId: string, progress: ProgressUpdate): Promise<void> {
     await this.ensureStorageDir();
-    
+
     const filePath = this.getProgressFilePath(operationId);
     const data = JSON.stringify(progress, null, 2);
-    
+
     await fs.writeFile(filePath, data, 'utf8');
   }
 
@@ -27,7 +30,7 @@ export class FileProgressPersistence implements IProgressPersistence {
       const filePath = this.getProgressFilePath(operationId);
       const data = await fs.readFile(filePath, 'utf8');
       const progress = JSON.parse(data) as ProgressUpdate;
-      
+
       // Convert date strings back to Date objects
       progress.timestamp = new Date(progress.timestamp);
       if (progress.currentPhase?.startTime) {
@@ -46,7 +49,7 @@ export class FileProgressPersistence implements IProgressPersistence {
           }
         }
       }
-      
+
       return progress;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -72,10 +75,8 @@ export class FileProgressPersistence implements IProgressPersistence {
     try {
       await this.ensureStorageDir();
       const files = await fs.readdir(this.storageDir);
-      
-      return files
-        .filter(file => file.endsWith('.json'))
-        .map(file => path.basename(file, '.json'));
+
+      return files.filter(file => file.endsWith('.json')).map(file => path.basename(file, '.json'));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return []; // Directory doesn't exist
@@ -89,15 +90,15 @@ export class FileProgressPersistence implements IProgressPersistence {
       await this.ensureStorageDir();
       const files = await fs.readdir(this.storageDir);
       const cutoffTime = Date.now() - olderThanMs;
-      
+
       for (const file of files) {
         if (!file.endsWith('.json')) {
           continue;
         }
-        
+
         const filePath = path.join(this.storageDir, file);
         const stats = await fs.stat(filePath);
-        
+
         if (stats.mtime.getTime() < cutoffTime) {
           await fs.unlink(filePath);
         }
@@ -143,11 +144,11 @@ export class MemoryProgressPersistence implements IProgressPersistence {
     if (!progress) {
       return null;
     }
-    
+
     // Deep clone and restore dates
     const cloned = JSON.parse(JSON.stringify(progress)) as ProgressUpdate;
     cloned.timestamp = new Date(cloned.timestamp);
-    
+
     if (cloned.currentPhase?.startTime) {
       cloned.currentPhase.startTime = new Date(cloned.currentPhase.startTime);
     }
@@ -164,7 +165,7 @@ export class MemoryProgressPersistence implements IProgressPersistence {
         }
       }
     }
-    
+
     return cloned;
   }
 
@@ -178,7 +179,7 @@ export class MemoryProgressPersistence implements IProgressPersistence {
 
   async cleanup(olderThanMs: number): Promise<void> {
     const cutoffTime = Date.now() - olderThanMs;
-    
+
     for (const [operationId, progress] of this.storage.entries()) {
       if (new Date(progress.timestamp).getTime() < cutoffTime) {
         this.storage.delete(operationId);
@@ -201,37 +202,40 @@ export class PersistentProgressManager {
   private persistence: IProgressPersistence;
   private autoSaveInterval: number;
   private autoSaveTimer: NodeJS.Timeout | null = null;
-  private trackers = new Map<string, { tracker: any; lastSaved: Date }>();
+  private trackers = new Map<string, { tracker: IProgressTracker; lastSaved: Date }>();
+  private logger: Logger | undefined;
 
   constructor(
     persistence: IProgressPersistence,
-    autoSaveInterval: number = 5000 // 5 seconds
+    autoSaveInterval: number = 5000, // 5 seconds
+    logger?: Logger
   ) {
     this.persistence = persistence;
+    this.logger = logger;
     this.autoSaveInterval = autoSaveInterval;
-    
+
     if (autoSaveInterval > 0) {
       this.startAutoSave();
     }
   }
 
-  async registerTracker(tracker: any): Promise<void> {
+  async registerTracker(tracker: IProgressTracker): Promise<void> {
     const operationId = tracker.getCurrentProgress().operationId;
-    
+
     // Try to restore previous state
     const savedProgress = await this.persistence.loadProgress(operationId);
     if (savedProgress) {
       // TODO: Implement progress restoration logic
       // This would involve setting the tracker state based on saved progress
     }
-    
+
     this.trackers.set(operationId, {
       tracker,
       lastSaved: new Date(0), // Force initial save
     });
 
     // Listen for progress updates
-    tracker.addListener(async (update: ProgressUpdate) => {
+    tracker.addProgressListener(async (update: ProgressUpdate) => {
       await this.saveProgress(operationId, update);
     });
   }
@@ -242,9 +246,9 @@ export class PersistentProgressManager {
       // Save final state
       const progress = entry.tracker.getCurrentProgress();
       await this.persistence.saveProgress(operationId, progress);
-      
+
       this.trackers.delete(operationId);
-      
+
       // Clean up saved progress for completed operations
       if (
         progress.status === 'completed' ||
@@ -261,23 +265,23 @@ export class PersistentProgressManager {
   private async saveProgress(operationId: string, update: ProgressUpdate): Promise<void> {
     try {
       await this.persistence.saveProgress(operationId, update);
-      
+
       const entry = this.trackers.get(operationId);
       if (entry) {
         entry.lastSaved = new Date();
       }
     } catch (error) {
-      console.error(`Failed to save progress for ${operationId}:`, error);
+      this.logger?.error(`Failed to save progress for ${operationId}:`, error);
     }
   }
 
   private startAutoSave(): void {
     this.autoSaveTimer = setInterval(async () => {
       const now = new Date();
-      
+
       for (const [operationId, entry] of this.trackers.entries()) {
         const timeSinceLastSave = now.getTime() - entry.lastSaved.getTime();
-        
+
         if (timeSinceLastSave >= this.autoSaveInterval) {
           const progress = entry.tracker.getCurrentProgress();
           await this.saveProgress(operationId, progress);

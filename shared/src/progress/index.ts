@@ -30,8 +30,4 @@ export {
 export { ProgressUtils } from './progress-utils.js';
 
 // Convenience functions for common use cases
-export {
-  createProgressTracker,
-  createPhaseConfig,
-  withProgressTracking,
-} from './convenience.js';
+export { createProgressTracker, createPhaseConfig, withProgressTracking } from './convenience.js';

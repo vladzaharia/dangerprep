@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 
+import { Result, safeAsync } from '../errors/utils.js';
 import type { Logger } from '../logging';
 
 import {
@@ -10,6 +11,62 @@ import {
   NotificationLevel,
   NotificationType,
 } from './types.js';
+
+// Branded types for notifications
+export type NotificationId = string & { readonly __brand: 'NotificationId' };
+export type ChannelName = string & { readonly __brand: 'ChannelName' };
+export type NotificationTag = string & { readonly __brand: 'NotificationTag' };
+
+// Type guards
+export function isNotificationId(value: string): value is NotificationId {
+  return (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
+export function isChannelName(value: string): value is ChannelName {
+  return typeof value === 'string' && value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value);
+}
+
+export function isNotificationTag(value: string): value is NotificationTag {
+  return typeof value === 'string' && value.length > 0 && value.length <= 50;
+}
+
+// Factory functions
+export function createNotificationId(): NotificationId {
+  return randomUUID() as NotificationId;
+}
+
+export function createChannelName(name: string): ChannelName {
+  if (!isChannelName(name)) {
+    throw new Error(
+      `Invalid channel name: ${name}. Must be alphanumeric with hyphens/underscores only.`
+    );
+  }
+  return name;
+}
+
+export function createNotificationTag(tag: string): NotificationTag {
+  if (!isNotificationTag(tag)) {
+    throw new Error(`Invalid notification tag: ${tag}. Must be 1-50 characters.`);
+  }
+  return tag;
+}
+
+// Enhanced notification event with immutable patterns
+interface EnhancedNotificationEvent extends NotificationEvent {
+  readonly id: NotificationId;
+  readonly createdAt: Date;
+  readonly processedAt?: Date;
+  readonly deliveryStatus: 'pending' | 'delivered' | 'failed' | 'retrying';
+  readonly deliveryAttempts: number;
+  readonly channelResults: ReadonlyMap<
+    ChannelName,
+    { success: boolean; error?: string; deliveredAt?: Date }
+  >;
+  readonly metadata: Record<string, unknown>;
+}
 
 /**
  * Central notification manager for handling events across services
@@ -246,7 +303,10 @@ export class NotificationManager extends EventEmitter {
 
   private addEvent(event: NotificationEvent): void {
     this.events.push(event);
+    this.trimEvents();
+  }
 
+  private trimEvents(): void {
     // Trim events if we exceed the maximum
     if (this.events.length > this.config.maxEvents) {
       this.events = this.events.slice(-this.config.maxEvents);
@@ -269,5 +329,242 @@ export class NotificationManager extends EventEmitter {
       default:
         return 'info';
     }
+  }
+
+  /**
+   * Send notification with Result pattern and enhanced tracking
+   */
+  async notifyAdvanced(
+    type: NotificationType,
+    message: string,
+    options: {
+      level?: NotificationLevel;
+      source?: string;
+      data?: Record<string, unknown>;
+      tags?: readonly NotificationTag[];
+      targetChannels?: readonly ChannelName[];
+      retryAttempts?: number;
+      timeout?: number;
+    } = {}
+  ): Promise<Result<EnhancedNotificationEvent>> {
+    return safeAsync(async () => {
+      const {
+        level = this.config.defaultLevel,
+        source = 'unknown',
+        data = {},
+        tags = [],
+        targetChannels,
+        retryAttempts = 3,
+        timeout = 10000,
+      } = options;
+
+      const notificationId = createNotificationId();
+      const createdAt = new Date();
+
+      const enhancedEvent: EnhancedNotificationEvent = {
+        id: notificationId,
+        type,
+        level,
+        message,
+        source,
+        timestamp: createdAt,
+        data,
+        tags: [...this.config.defaultTags, ...tags],
+        createdAt,
+        deliveryStatus: 'pending',
+        deliveryAttempts: 0,
+        channelResults: new Map(),
+        metadata: {
+          retryAttempts,
+          timeout,
+          targetChannels: targetChannels ? [...targetChannels] : undefined,
+        },
+      };
+
+      // Store the enhanced event
+      this.events.push(enhancedEvent);
+      this.trimEvents();
+
+      // Determine which channels to use
+      const channelsToUse = targetChannels
+        ? Array.from(this.channels.entries()).filter(([name]) =>
+            targetChannels.includes(name as ChannelName)
+          )
+        : Array.from(this.channels.entries());
+
+      if (channelsToUse.length === 0) {
+        this.logger?.warn('No notification channels available');
+        return {
+          ...enhancedEvent,
+          deliveryStatus: 'failed',
+          processedAt: new Date(),
+        };
+      }
+
+      // Send to channels with timeout and retry logic
+      const channelResults = new Map<
+        ChannelName,
+        { success: boolean; error?: string; deliveredAt?: Date }
+      >();
+
+      for (const [channelName, channel] of channelsToUse) {
+        const channelNameBranded = channelName as ChannelName;
+        let attempts = 0;
+        let success = false;
+        let lastError: string | undefined;
+
+        while (attempts < retryAttempts && !success) {
+          attempts++;
+
+          try {
+            await Promise.race([
+              channel.send(enhancedEvent),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Channel send timeout')), timeout)
+              ),
+            ]);
+
+            success = true;
+            channelResults.set(channelNameBranded, {
+              success: true,
+              deliveredAt: new Date(),
+            });
+
+            this.logger?.debug(`Notification sent successfully to channel: ${channelName}`);
+          } catch (error) {
+            lastError = error instanceof Error ? error.message : String(error);
+            this.logger?.warn(
+              `Notification failed on channel ${channelName} (attempt ${attempts}/${retryAttempts}): ${lastError}`
+            );
+
+            if (attempts < retryAttempts) {
+              // Wait before retry with exponential backoff
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+            }
+          }
+        }
+
+        if (!success) {
+          channelResults.set(channelNameBranded, {
+            success: false,
+            error: lastError || 'Unknown error',
+          });
+        }
+      }
+
+      // Update the event with results
+      const finalEvent: EnhancedNotificationEvent = {
+        ...enhancedEvent,
+        deliveryStatus:
+          channelResults.size > 0 && Array.from(channelResults.values()).some(r => r.success)
+            ? 'delivered'
+            : 'failed',
+        deliveryAttempts: Math.max(...Array.from(channelResults.values()).map(() => retryAttempts)),
+        channelResults,
+        processedAt: new Date(),
+      };
+
+      // Emit event for listeners
+      this.emit('notification_sent', finalEvent);
+
+      if (this.config.logNotifications) {
+        const successfulChannels = Array.from(channelResults.entries())
+          .filter(([, result]) => result.success)
+          .map(([name]) => name);
+
+        this.logger?.info(`Notification sent`, {
+          id: notificationId,
+          type,
+          level,
+          message: message.substring(0, 100),
+          successfulChannels,
+          totalChannels: channelResults.size,
+        });
+      }
+
+      return finalEvent;
+    });
+  }
+
+  /**
+   * Get notification statistics with Result pattern
+   */
+  async getNotificationStats(): Promise<
+    Result<{
+      totalNotifications: number;
+      notificationsByLevel: Record<NotificationLevel, number>;
+      notificationsByType: Record<NotificationType, number>;
+      channelStats: Record<string, { sent: number; failed: number; successRate: number }>;
+      recentNotifications: readonly EnhancedNotificationEvent[];
+    }>
+  > {
+    return safeAsync(async () => {
+      const enhancedEvents = this.events.filter(
+        (event): event is EnhancedNotificationEvent => 'id' in event && 'deliveryStatus' in event
+      );
+
+      const notificationsByLevel = {} as Record<NotificationLevel, number>;
+      const notificationsByType = {} as Record<NotificationType, number>;
+      const channelStats: Record<string, { sent: number; failed: number; successRate: number }> =
+        {};
+
+      // Initialize counters
+      (Object.values(NotificationLevel) as NotificationLevel[]).forEach(level => {
+        notificationsByLevel[level] = 0;
+      });
+      (Object.values(NotificationType) as NotificationType[]).forEach(type => {
+        notificationsByType[type] = 0;
+      });
+
+      // Process events
+      for (const event of enhancedEvents) {
+        notificationsByLevel[event.level]++;
+        notificationsByType[event.type]++;
+
+        // Process channel stats
+        for (const [channelName, result] of event.channelResults) {
+          if (!channelStats[channelName]) {
+            channelStats[channelName] = { sent: 0, failed: 0, successRate: 0 };
+          }
+
+          if (result.success) {
+            channelStats[channelName].sent++;
+          } else {
+            channelStats[channelName].failed++;
+          }
+        }
+      }
+
+      // Calculate success rates
+      for (const stats of Object.values(channelStats)) {
+        const total = stats.sent + stats.failed;
+        stats.successRate = total > 0 ? (stats.sent / total) * 100 : 0;
+      }
+
+      return {
+        totalNotifications: enhancedEvents.length,
+        notificationsByLevel,
+        notificationsByType,
+        channelStats,
+        recentNotifications: enhancedEvents.slice(-10), // Last 10 notifications
+      };
+    });
+  }
+
+  /**
+   * Get notification by ID with Result pattern
+   */
+  async getNotificationById(id: NotificationId): Promise<Result<EnhancedNotificationEvent>> {
+    return safeAsync(async () => {
+      const event = this.events.find(
+        (event): event is EnhancedNotificationEvent => 'id' in event && event.id === id
+      );
+
+      if (!event) {
+        throw new Error(`Notification with ID ${id} not found`);
+      }
+
+      return event;
+    });
   }
 }

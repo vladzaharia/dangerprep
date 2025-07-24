@@ -79,8 +79,13 @@ export const SyncConfigSchema = z.object({
 export type SyncConfig = z.infer<typeof SyncConfigSchema>;
 
 // Sync types with const assertion
-export const SYNC_TYPES = ['full_sync', 'metadata_filtered', 'folder_filtered', 'kiwix_updater'] as const;
-export type SyncType = typeof SYNC_TYPES[number];
+export const SYNC_TYPES = [
+  'full_sync',
+  'metadata_filtered',
+  'folder_filtered',
+  'kiwix_updater',
+] as const;
+export type SyncType = (typeof SYNC_TYPES)[number];
 
 // Keep the original interface for backward compatibility
 export interface ContentTypeConfig {

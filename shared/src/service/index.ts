@@ -12,7 +12,7 @@
 
 // Core exports
 export { BaseService } from './base-service.js';
-export { ServicePatterns } from './service-patterns.js';
+export { ServicePatterns, AdvancedAsyncPatterns } from './service-patterns.js';
 
 // Types and enums
 export { ServiceState } from './types.js';
