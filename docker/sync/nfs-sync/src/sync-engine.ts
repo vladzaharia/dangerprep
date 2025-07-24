@@ -1,11 +1,10 @@
-import { promises as fs } from 'fs';
 import path from 'path';
 
 import { ConfigManager } from '@dangerprep/shared/config';
+import { AdvancedFileUtils, createDirectoryPath } from '@dangerprep/shared/file-utils';
 import { ComponentStatus } from '@dangerprep/shared/health';
 import { LoggerFactory } from '@dangerprep/shared/logging';
 import {
-  NotificationManager,
   NotificationType,
   NotificationLevel,
   WebhookChannel,
@@ -16,6 +15,7 @@ import {
   ServiceConfig,
   ServiceUtils,
   ServicePatterns,
+  AdvancedAsyncPatterns,
 } from '@dangerprep/shared/service';
 
 import { BooksHandler } from './handlers/books';
@@ -27,7 +27,10 @@ import { SyncConfig, SyncStatus, SyncResult, SyncConfigSchema, ContentTypeConfig
 export class SyncEngine extends BaseService {
   private configManager: ConfigManager<SyncConfig>;
   private readonly scheduler: Scheduler;
-  private readonly handlers = new Map<string, BooksHandler | MoviesHandler | TVHandler | WebTVHandler>();
+  private readonly handlers = new Map<
+    string,
+    BooksHandler | MoviesHandler | TVHandler | WebTVHandler
+  >();
   private readonly syncStatus: SyncStatus = {
     isRunning: false,
     progress: 0,
@@ -141,14 +144,33 @@ export class SyncEngine extends BaseService {
 
   private async ensureDirectories(): Promise<void> {
     const config = this.configManager.getConfig();
-    const baseStorage = config.sync_config.local_storage.base_path;
-    await fs.mkdir(baseStorage, { recursive: true });
-    await fs.mkdir(path.dirname(config.sync_config.logging.file), { recursive: true });
 
-    // Ensure content type directories exist
-    for (const contentConfig of Object.values(config.sync_config.content_types)) {
-      await fs.mkdir(contentConfig.local_path, { recursive: true });
+    // Use advanced file utilities with Result pattern
+    const directoryOperations = [
+      () =>
+        AdvancedFileUtils.ensureDirectoryAdvanced(
+          createDirectoryPath(config.sync_config.local_storage.base_path)
+        ),
+      () =>
+        AdvancedFileUtils.ensureDirectoryAdvanced(
+          createDirectoryPath(path.dirname(config.sync_config.logging.file))
+        ),
+      ...Object.values(config.sync_config.content_types).map(
+        contentConfig => () =>
+          AdvancedFileUtils.ensureDirectoryAdvanced(createDirectoryPath(contentConfig.local_path))
+      ),
+    ];
+
+    const results = await AdvancedAsyncPatterns.sequential(directoryOperations, {
+      timeout: 10000,
+      logger: this.components.logger,
+    });
+
+    if (!results.success) {
+      throw new Error(`Failed to create directories: ${results.error?.message}`);
     }
+
+    this.components.logger.info('All required directories created successfully');
   }
 
   scheduleSync(): void {
@@ -199,11 +221,34 @@ export class SyncEngine extends BaseService {
       }
     );
     this.components.logger.debug(`Starting ${contentType} sync`); // Technical detail
-    const startTime = Date.now();
+
+    // Use advanced async patterns for the sync operation
+    const operationContext = AdvancedAsyncPatterns.createOperationContext(`sync-${contentType}`, {
+      contentType,
+      service: 'nfs-sync',
+    });
+
+    const syncResult = await AdvancedAsyncPatterns.executeWithMonitoring(
+      () => handler.sync(),
+      `${contentType}-sync`,
+      {
+        timeout: 300000, // 5 minutes timeout
+        retries: 2,
+        retryDelay: 5000,
+        backoffMultiplier: 2,
+        logger: this.components.logger,
+        context: { contentType, operationId: operationContext.operationId },
+      }
+    );
+
+    const duration = Date.now() - operationContext.startTime.getTime();
 
     try {
-      const success = await handler.sync();
-      const duration = Date.now() - startTime;
+      if (!syncResult.success) {
+        throw syncResult.error || new Error(`${contentType} sync failed`);
+      }
+
+      const success = syncResult.data;
 
       const result: SyncResult = {
         contentType,
@@ -356,14 +401,63 @@ export class SyncEngine extends BaseService {
     const stats: { [contentType: string]: { size: string; path: string } } = {};
     const config = this.configManager.getConfig();
 
-    for (const [contentType, contentConfig] of Object.entries(config.sync_config.content_types)) {
-      try {
-        const size = await this.getDirectorySize(contentConfig.local_path);
-        stats[contentType] = {
-          size: this.formatSize(size),
-          path: contentConfig.local_path,
+    // Use parallel processing for better performance
+    const storageOperations = Object.entries(config.sync_config.content_types).map(
+      async ([contentType, contentConfig]) => {
+        try {
+          const dirPath = createDirectoryPath(contentConfig.local_path);
+          const sizeResult = await AdvancedFileUtils.getDirectorySizeAdvanced(dirPath, {
+            timeout: 30000,
+            logger: this.components.logger,
+          });
+
+          if (sizeResult.success) {
+            return {
+              contentType,
+              size: this.formatSize(sizeResult.data),
+              path: contentConfig.local_path,
+            };
+          } else {
+            this.components.logger.warn(
+              `Failed to get size for ${contentType}: ${sizeResult.error?.message}`
+            );
+            return {
+              contentType,
+              size: 'Error',
+              path: contentConfig.local_path,
+            };
+          }
+        } catch (error) {
+          this.components.logger.error(`Error calculating size for ${contentType}: ${error}`);
+          return {
+            contentType,
+            size: 'Error',
+            path: contentConfig.local_path,
+          };
+        }
+      }
+    );
+
+    const results = await AdvancedAsyncPatterns.parallel(
+      storageOperations.map(op => () => op),
+      {
+        timeout: 60000,
+        logger: this.components.logger,
+        context: { operation: 'get-storage-stats' },
+      }
+    );
+
+    if (results.success) {
+      for (const result of results.data) {
+        stats[result.contentType] = {
+          size: result.size,
+          path: result.path,
         };
-      } catch (_error) {
+      }
+    } else {
+      this.components.logger.error(`Failed to get storage stats: ${results.error?.message}`);
+      // Fallback to error state for all content types
+      for (const [contentType, contentConfig] of Object.entries(config.sync_config.content_types)) {
         stats[contentType] = {
           size: 'Error',
           path: contentConfig.local_path,
@@ -372,29 +466,6 @@ export class SyncEngine extends BaseService {
     }
 
     return stats;
-  }
-
-  private async getDirectorySize(dirPath: string): Promise<number> {
-    let totalSize = 0;
-
-    try {
-      const items = await fs.readdir(dirPath);
-
-      for (const item of items) {
-        const itemPath = path.join(dirPath, item);
-        const stats = await fs.stat(itemPath);
-
-        if (stats.isDirectory()) {
-          totalSize += await this.getDirectorySize(itemPath);
-        } else {
-          totalSize += stats.size;
-        }
-      }
-    } catch (_error) {
-      return 0;
-    }
-
-    return totalSize;
   }
 
   private formatSize(bytes: number): string {

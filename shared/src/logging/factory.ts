@@ -8,7 +8,7 @@ import { LogLevel, LogTransport, type LogLevelString, isLogLevel } from './types
  */
 const normalizeLogLevel = (level: LogLevel | string): LogLevel | LogLevelString => {
   if (typeof level === 'string' && isLogLevel(level)) {
-    return level as LogLevelString;
+    return level;
   }
   return level as LogLevel;
 };

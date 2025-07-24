@@ -54,7 +54,7 @@ export type OfflineSyncConfig = z.infer<typeof OfflineSyncConfigSchema>;
 
 // Sync direction types with const assertion
 export const SYNC_DIRECTIONS = ['bidirectional', 'to_card', 'from_card'] as const;
-export type SyncDirection = typeof SYNC_DIRECTIONS[number];
+export type SyncDirection = (typeof SYNC_DIRECTIONS)[number];
 
 // Keep the original interface for backward compatibility
 export interface ContentTypeConfig {
@@ -108,8 +108,14 @@ export interface DetectedDevice {
 }
 
 // Operation status types with const assertion
-export const OPERATION_STATUSES = ['pending', 'in_progress', 'completed', 'failed', 'cancelled'] as const;
-export type OperationStatus = typeof OPERATION_STATUSES[number];
+export const OPERATION_STATUSES = [
+  'pending',
+  'in_progress',
+  'completed',
+  'failed',
+  'cancelled',
+] as const;
+export type OperationStatus = (typeof OPERATION_STATUSES)[number];
 
 export interface SyncOperation {
   readonly id: string;

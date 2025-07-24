@@ -4,6 +4,7 @@
 
 import { DangerPrepError, ErrorCategory, RetryClassification } from '../errors/types.js';
 import { isRetryableError } from '../errors/utils.js';
+
 import { RetryStrategy, JitterType, type RetryConfig } from './types.js';
 
 /**
@@ -23,7 +24,7 @@ export class RetryConditions {
       if (error instanceof DangerPrepError) {
         return error.metadata.category === ErrorCategory.NETWORK;
       }
-      
+
       // Fallback heuristics for non-DangerPrepError
       if (error instanceof Error) {
         const message = error.message.toLowerCase();
@@ -36,7 +37,7 @@ export class RetryConditions {
           name.includes('timeout')
         );
       }
-      
+
       return false;
     };
   }
@@ -44,17 +45,19 @@ export class RetryConditions {
   /**
    * Retry external service errors with specific status codes
    */
-  static externalServiceErrors(retryableStatusCodes: number[] = [429, 502, 503, 504]): RetryPredicate {
+  static externalServiceErrors(
+    retryableStatusCodes: number[] = [429, 502, 503, 504]
+  ): RetryPredicate {
     return (error: unknown) => {
       if (error instanceof DangerPrepError) {
         if (error.metadata.category !== ErrorCategory.EXTERNAL_SERVICE) {
           return false;
         }
-        
+
         const statusCode = error.metadata.data?.statusCode as number;
         return statusCode ? retryableStatusCodes.includes(statusCode) : true;
       }
-      
+
       // Check for HTTP status codes in error messages
       if (error instanceof Error) {
         const message = error.message;
@@ -64,7 +67,7 @@ export class RetryConditions {
           }
         }
       }
-      
+
       return false;
     };
   }
@@ -78,11 +81,11 @@ export class RetryConditions {
         if (error.metadata.category !== ErrorCategory.FILESYSTEM) {
           return false;
         }
-        
+
         // Only retry if marked as conditionally retryable
         return error.metadata.retryClassification === RetryClassification.CONDITIONALLY_RETRYABLE;
       }
-      
+
       // Fallback heuristics
       if (error instanceof Error) {
         const message = error.message.toLowerCase();
@@ -94,7 +97,7 @@ export class RetryConditions {
           message.includes('temporarily unavailable')
         );
       }
-      
+
       return false;
     };
   }
@@ -110,7 +113,7 @@ export class RetryConditions {
           error.metadata.retryClassification === RetryClassification.CONDITIONALLY_RETRYABLE
         );
       }
-      
+
       return isRetryableError(error);
     };
   }
@@ -123,11 +126,11 @@ export class RetryConditions {
       if (error instanceof DangerPrepError) {
         return retryableCodes.includes(error.code);
       }
-      
+
       if (error instanceof Error && 'code' in error) {
         return retryableCodes.includes(String(error.code));
       }
-      
+
       return false;
     };
   }
@@ -145,13 +148,13 @@ export class RetryConditions {
   static maxSeverity(maxSeverity: string): RetryPredicate {
     const severityOrder = ['low', 'medium', 'high', 'critical'];
     const maxIndex = severityOrder.indexOf(maxSeverity.toLowerCase());
-    
+
     return (error: unknown) => {
       if (error instanceof DangerPrepError) {
         const errorIndex = severityOrder.indexOf(error.metadata.severity);
         return errorIndex <= maxIndex;
       }
-      
+
       return true; // Retry unknown errors by default
     };
   }

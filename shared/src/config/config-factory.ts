@@ -3,9 +3,11 @@
  */
 
 import { z } from 'zod';
-import { ConfigManager, type ConfigOptions } from './index.js';
-import { StandardSchemas } from './standard-schemas.js';
+
 import { ConfigUtils } from './config-utils.js';
+import { StandardSchemas } from './standard-schemas.js';
+
+import { ConfigManager, type ConfigOptions } from './index.js';
 
 /**
  * Factory for creating standardized service configurations
@@ -24,7 +26,7 @@ export class ConfigFactory {
     options: ConfigOptions = {}
   ) {
     const schema = StandardSchemas.createSyncServiceSchema(customSchema);
-    
+
     return new ConfigManager(configPath, schema, {
       enableEnvSubstitution: true,
       enableTransformations: true,
@@ -45,7 +47,7 @@ export class ConfigFactory {
     options: ConfigOptions = {}
   ) {
     const schema = StandardSchemas.createNetworkServiceSchema(customSchema);
-    
+
     return new ConfigManager(configPath, schema, {
       enableEnvSubstitution: true,
       enableTransformations: true,
@@ -66,7 +68,7 @@ export class ConfigFactory {
     options: ConfigOptions = {}
   ) {
     const schema = StandardSchemas.createStorageServiceSchema(customSchema);
-    
+
     return new ConfigManager(configPath, schema, {
       enableEnvSubstitution: true,
       enableTransformations: true,
@@ -87,7 +89,7 @@ export class ConfigFactory {
     options: ConfigOptions = {}
   ) {
     const schema = StandardSchemas.createScheduledServiceSchema(customSchema);
-    
+
     return new ConfigManager(configPath, schema, {
       enableEnvSubstitution: true,
       enableTransformations: true,
@@ -228,8 +230,10 @@ export class ConfigFactory {
    * @param environment Target environment
    * @returns Environment-specific configuration overrides
    */
-  static createEnvironmentOverrides(environment: 'development' | 'staging' | 'production'): any {
-    const baseOverrides: any = {
+  static createEnvironmentOverrides(
+    environment: 'development' | 'staging' | 'production'
+  ): Record<string, unknown> {
+    const baseOverrides: Record<string, unknown> = {
       environment: {
         environment,
         debug: false,
@@ -316,7 +320,7 @@ export class ConfigFactory {
   ) {
     const baseDefaults = ConfigFactory.createSyncServiceDefaults(serviceName);
     const envOverrides = ConfigFactory.createEnvironmentOverrides(environment);
-    
+
     return ConfigUtils.mergeConfigs(baseDefaults, envOverrides, customDefaults);
   }
 
@@ -334,7 +338,7 @@ export class ConfigFactory {
     const pathParts = basePath.split('.');
     const extension = pathParts.pop();
     const nameWithoutExt = pathParts.join('.');
-    
+
     return `${nameWithoutExt}.${environment}.${extension}`;
   }
 }

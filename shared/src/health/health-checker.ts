@@ -1,3 +1,4 @@
+import { Result, safeAsync } from '../errors/utils.js';
 import type { Logger } from '../logging';
 import type { NotificationManager } from '../notifications';
 
@@ -10,6 +11,57 @@ import {
   ComponentCheck,
   HealthMetrics,
 } from './types.js';
+
+// Branded types for health checking
+export type ComponentName = string & { readonly __brand: 'ComponentName' };
+export type HealthCheckTimeout = number & { readonly __brand: 'HealthCheckTimeout' };
+export type HealthScore = number & { readonly __brand: 'HealthScore' };
+
+// Type guards
+export function isComponentName(value: string): value is ComponentName {
+  return typeof value === 'string' && value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value);
+}
+
+export function isHealthCheckTimeout(value: number): value is HealthCheckTimeout {
+  return typeof value === 'number' && value > 0 && value <= 300000; // Max 5 minutes
+}
+
+export function isHealthScore(value: number): value is HealthScore {
+  return typeof value === 'number' && value >= 0 && value <= 100;
+}
+
+// Factory functions
+export function createComponentName(name: string): ComponentName {
+  if (!isComponentName(name)) {
+    throw new Error(
+      `Invalid component name: ${name}. Must be alphanumeric with hyphens/underscores only.`
+    );
+  }
+  return name;
+}
+
+export function createHealthCheckTimeout(timeout: number): HealthCheckTimeout {
+  if (!isHealthCheckTimeout(timeout)) {
+    throw new Error(`Invalid health check timeout: ${timeout}. Must be between 1ms and 300000ms.`);
+  }
+  return timeout;
+}
+
+export function createHealthScore(score: number): HealthScore {
+  if (!isHealthScore(score)) {
+    throw new Error(`Invalid health score: ${score}. Must be between 0 and 100.`);
+  }
+  return score;
+}
+
+// Enhanced health check result with immutable patterns
+interface EnhancedHealthCheckResult extends HealthCheckResult {
+  readonly executionTimeMs: number;
+  readonly timestamp: Date;
+  readonly componentName: ComponentName;
+  readonly healthScore: HealthScore;
+  readonly metadata?: Record<string, unknown>;
+}
 
 /**
  * Standardized health checker for services
@@ -392,5 +444,237 @@ export class HealthChecker {
         }
       },
     };
+  }
+
+  /**
+   * Perform health check with Result pattern
+   */
+  async checkHealthAdvanced(): Promise<Result<EnhancedHealthCheckResult>> {
+    return safeAsync(async () => {
+      const basicResult = await this.check();
+
+      // Calculate health score based on component statuses
+      const healthScore = this.calculateHealthScore(basicResult.components);
+
+      const enhancedResult: EnhancedHealthCheckResult = {
+        status: basicResult.status,
+        timestamp: basicResult.timestamp,
+        service: basicResult.service,
+        ...(basicResult.version && { version: basicResult.version }),
+        ...(basicResult.uptime !== undefined && { uptime: basicResult.uptime }),
+        components: basicResult.components,
+        duration: basicResult.duration,
+        ...(basicResult.details && { details: basicResult.details }),
+        errors: basicResult.errors || [],
+        warnings: basicResult.warnings || [],
+        executionTimeMs: basicResult.duration,
+        componentName: createComponentName(basicResult.service),
+        healthScore,
+        metadata: {
+          totalComponents: basicResult.components.length,
+          healthyComponents: basicResult.components.filter(
+            (c: HealthCheckComponent) => c.status === ComponentStatus.UP
+          ).length,
+          degradedComponents: basicResult.components.filter(
+            (c: HealthCheckComponent) => c.status === ComponentStatus.DEGRADED
+          ).length,
+          downComponents: basicResult.components.filter(
+            (c: HealthCheckComponent) => c.status === ComponentStatus.DOWN
+          ).length,
+        },
+      };
+
+      return enhancedResult;
+    });
+  }
+
+  /**
+   * Check specific component with Result pattern
+   */
+  async checkComponentAdvanced(
+    componentName: ComponentName
+  ): Promise<Result<EnhancedHealthCheckResult>> {
+    return safeAsync(async () => {
+      const component = this.components.get(componentName);
+      if (!component) {
+        throw new Error(`Component '${componentName}' not found`);
+      }
+
+      const startTime = Date.now();
+      const timestamp = new Date();
+
+      try {
+        const result = await Promise.race([
+          component.check(),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Component check timeout')),
+              this.config.componentTimeout
+            )
+          ),
+        ]);
+
+        const executionTimeMs = Date.now() - startTime;
+        const healthScore = createHealthScore(this.calculateComponentHealthScore(result.status));
+
+        const enhancedResult: EnhancedHealthCheckResult = {
+          status: this.mapComponentStatusToHealthStatus(result.status),
+          timestamp,
+          service: this.config.serviceName,
+          components: [
+            {
+              name: componentName,
+              status: result.status,
+              lastChecked: timestamp,
+              duration: executionTimeMs,
+              ...(result.message && { message: result.message }),
+              ...(result.details && { details: result.details }),
+              ...(result.error && { error: result.error }),
+            },
+          ],
+          duration: executionTimeMs,
+          executionTimeMs,
+          componentName,
+          healthScore,
+          errors: result.error ? [result.error.message] : [],
+          warnings: [],
+          metadata: {
+            componentType: component.critical ? 'critical' : 'non-critical',
+            timeout: this.config.componentTimeout,
+          },
+        };
+
+        return enhancedResult;
+      } catch (error) {
+        const executionTimeMs = Date.now() - startTime;
+        const healthScore = createHealthScore(0);
+
+        const enhancedResult: EnhancedHealthCheckResult = {
+          status: HealthStatus.UNHEALTHY,
+          timestamp,
+          service: this.config.serviceName,
+          components: [
+            {
+              name: componentName,
+              status: ComponentStatus.DOWN,
+              lastChecked: timestamp,
+              duration: executionTimeMs,
+              message: 'Component check failed',
+              error: {
+                message: error instanceof Error ? error.message : String(error),
+                code: 'COMPONENT_CHECK_FAILED',
+              },
+            },
+          ],
+          duration: executionTimeMs,
+          executionTimeMs,
+          componentName,
+          healthScore,
+          errors: [error instanceof Error ? error.message : String(error)],
+          warnings: [],
+        };
+
+        return enhancedResult;
+      }
+    });
+  }
+
+  /**
+   * Calculate overall health score based on component statuses
+   */
+  private calculateHealthScore(components: HealthCheckComponent[]): HealthScore {
+    if (components.length === 0) {
+      return createHealthScore(100);
+    }
+
+    let totalScore = 0;
+    let totalWeight = 0;
+
+    for (const component of components) {
+      const componentScore = this.calculateComponentHealthScore(component.status);
+      const weight = this.getComponentWeight(component.name);
+
+      totalScore += componentScore * weight;
+      totalWeight += weight;
+    }
+
+    const averageScore = totalWeight > 0 ? totalScore / totalWeight : 100;
+    return createHealthScore(Math.round(Math.max(0, Math.min(100, averageScore))));
+  }
+
+  /**
+   * Calculate health score for individual component
+   */
+  private calculateComponentHealthScore(status: ComponentStatus): number {
+    switch (status) {
+      case ComponentStatus.UP:
+        return 100;
+      case ComponentStatus.DEGRADED:
+        return 50;
+      case ComponentStatus.DOWN:
+        return 0;
+      default:
+        return 25; // Unknown status
+    }
+  }
+
+  /**
+   * Get component weight for health score calculation
+   */
+  private getComponentWeight(componentName: string): number {
+    const component = this.components.get(componentName);
+    return component?.critical ? 2 : 1; // Critical components have double weight
+  }
+
+  /**
+   * Map component status to overall health status
+   */
+  private mapComponentStatusToHealthStatus(status: ComponentStatus): HealthStatus {
+    switch (status) {
+      case ComponentStatus.UP:
+        return HealthStatus.HEALTHY;
+      case ComponentStatus.DEGRADED:
+        return HealthStatus.DEGRADED;
+      case ComponentStatus.DOWN:
+        return HealthStatus.UNHEALTHY;
+      default:
+        return HealthStatus.UNKNOWN;
+    }
+  }
+
+  /**
+   * Get health trend analysis
+   */
+  async getHealthTrend(_periodMinutes: number = 60): Promise<
+    Result<{
+      trend: 'improving' | 'stable' | 'degrading';
+      averageScore: HealthScore;
+      scoreHistory: Array<{ timestamp: Date; score: HealthScore }>;
+    }>
+  > {
+    return safeAsync(async () => {
+      // This is a simplified implementation
+      // In a real system, you'd store historical health data
+      const currentResult = await this.checkHealthAdvanced();
+
+      if (!currentResult.success) {
+        throw currentResult.error || new Error('Failed to get current health status');
+      }
+
+      const currentScore = currentResult.data.healthScore;
+
+      // For now, return current state as stable trend
+      // This could be enhanced with actual historical data storage
+      return {
+        trend: 'stable' as const,
+        averageScore: currentScore,
+        scoreHistory: [
+          {
+            timestamp: new Date(),
+            score: currentScore,
+          },
+        ],
+      };
+    });
   }
 }

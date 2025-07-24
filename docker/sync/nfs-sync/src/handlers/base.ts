@@ -38,7 +38,12 @@ export abstract class BaseHandler {
       readonly dryRun?: boolean;
     } = {}
   ): Promise<boolean> {
-    const rsyncOptions: any = {
+    const rsyncOptions: {
+      logger: Logger;
+      exclude?: string[];
+      bandwidthLimit?: string;
+      dryRun?: boolean;
+    } = {
       logger: this.logger,
     };
 

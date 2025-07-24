@@ -3,6 +3,7 @@
  */
 
 import { randomUUID } from 'crypto';
+
 import type { ErrorContext } from './types.js';
 
 /**
@@ -164,16 +165,14 @@ export class ErrorContextManager {
 /**
  * Decorator for automatically managing error context in async operations
  */
-export function withErrorContext<T extends unknown[], R>(
-  contextOptions: {
-    operation?: string;
-    service?: string;
-    component?: string;
-    metadata?: Record<string, unknown>;
-  }
-) {
+export function withErrorContext<T extends unknown[], R>(contextOptions: {
+  operation?: string;
+  service?: string;
+  component?: string;
+  metadata?: Record<string, unknown>;
+}) {
   return function (
-    target: unknown,
+    _target: unknown,
     propertyKey: string | symbol,
     descriptor: TypedPropertyDescriptor<(...args: T) => Promise<R>>
   ) {
@@ -229,7 +228,7 @@ export async function runWithErrorContext<T>(
 ): Promise<T> {
   const contextManager = ErrorContextManager.getInstance();
   const context = ErrorContextManager.createContext(contextOptions);
-  
+
   contextManager.pushContext(context);
 
   try {
@@ -249,7 +248,7 @@ export function getCurrentErrorContext(fallbackOptions?: {
 }): ErrorContext {
   const contextManager = ErrorContextManager.getInstance();
   const currentContext = contextManager.getCurrentContext();
-  
+
   if (currentContext) {
     return currentContext;
   }
@@ -281,9 +280,13 @@ export function enhanceErrorWithContext(
   additionalContext?: Partial<ErrorContext>
 ): Error {
   const currentContext = getCurrentErrorContext();
-  
+
   // If it's already a DangerPrepError, we don't need to enhance it
-  if ('metadata' in error && 'context' in (error as any).metadata) {
+  if (
+    'metadata' in error &&
+    (error as { metadata?: { context?: unknown } }).metadata &&
+    'context' in (error as { metadata: { context?: unknown } }).metadata
+  ) {
     return error;
   }
 

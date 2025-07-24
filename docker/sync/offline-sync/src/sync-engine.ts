@@ -157,11 +157,12 @@ export class SyncEngine extends EventEmitter {
   ): Promise<void> {
     this.log(`Syncing to card: ${localPath} -> ${cardPath}`);
 
-    const localFiles = await FileUtils.getFilesRecursively(
-      localPath,
-      [...contentConfig.file_extensions]
-    );
-    const cardFiles = await FileUtils.getFilesRecursively(cardPath, [...contentConfig.file_extensions]);
+    const localFiles = await FileUtils.getFilesRecursively(localPath, [
+      ...contentConfig.file_extensions,
+    ]);
+    const cardFiles = await FileUtils.getFilesRecursively(cardPath, [
+      ...contentConfig.file_extensions,
+    ]);
 
     // Create a map of card files for quick lookup
     const cardFileMap = new Map<string, string>();
@@ -210,11 +211,12 @@ export class SyncEngine extends EventEmitter {
   ): Promise<void> {
     this.log(`Syncing from card: ${cardPath} -> ${localPath}`);
 
-    const cardFiles = await FileUtils.getFilesRecursively(cardPath, [...contentConfig.file_extensions]);
-    const localFiles = await FileUtils.getFilesRecursively(
-      localPath,
-      [...contentConfig.file_extensions]
-    );
+    const cardFiles = await FileUtils.getFilesRecursively(cardPath, [
+      ...contentConfig.file_extensions,
+    ]);
+    const localFiles = await FileUtils.getFilesRecursively(localPath, [
+      ...contentConfig.file_extensions,
+    ]);
 
     // Create a map of local files for quick lookup
     const localFileMap = new Map<string, string>();

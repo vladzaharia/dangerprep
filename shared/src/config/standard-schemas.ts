@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+
 import { ConfigUtils } from './config-utils.js';
 
 /**
@@ -18,9 +19,15 @@ export const StorageConfigSchema = z.object({
   /** Whether to create directories if they don't exist */
   create_directories: z.boolean().default(true),
   /** File permissions for created directories */
-  directory_permissions: z.string().regex(/^[0-7]{3,4}$/).default('755'),
+  directory_permissions: z
+    .string()
+    .regex(/^[0-7]{3,4}$/)
+    .default('755'),
   /** File permissions for created files */
-  file_permissions: z.string().regex(/^[0-7]{3,4}$/).default('644'),
+  file_permissions: z
+    .string()
+    .regex(/^[0-7]{3,4}$/)
+    .default('644'),
 });
 
 /**
@@ -124,19 +131,23 @@ export const NotificationConfigSchema = z.object({
   /** Webhook URL for notifications */
   webhook_url: z.string().url().optional(),
   /** Email configuration */
-  email: z.object({
-    smtp_host: z.string(),
-    smtp_port: z.number().int().min(1).max(65535).default(587),
-    username: z.string(),
-    password: z.string(),
-    from: z.string().email(),
-    to: z.array(z.string().email()),
-  }).optional(),
+  email: z
+    .object({
+      smtp_host: z.string(),
+      smtp_port: z.number().int().min(1).max(65535).default(587),
+      username: z.string(),
+      password: z.string(),
+      from: z.string().email(),
+      to: z.array(z.string().email()),
+    })
+    .optional(),
   /** Rate limiting for notifications */
-  rate_limit: z.object({
-    max_per_minute: z.number().int().min(1).default(10),
-    max_per_hour: z.number().int().min(1).default(100),
-  }).default({}),
+  rate_limit: z
+    .object({
+      max_per_minute: z.number().int().min(1).default(10),
+      max_per_hour: z.number().int().min(1).default(100),
+    })
+    .default({}),
 });
 
 /**

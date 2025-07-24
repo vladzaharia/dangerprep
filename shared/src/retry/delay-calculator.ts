@@ -19,7 +19,7 @@ export class DelayCalculator {
     const baseDelay = this.calculateBaseDelay(attempt);
     const cappedDelay = Math.min(baseDelay, this.config.maxDelayMs || Infinity);
     const jitteredDelay = this.applyJitter(cappedDelay, attempt);
-    
+
     this.previousDelay = jitteredDelay;
     return Math.max(0, Math.round(jitteredDelay));
   }
@@ -48,7 +48,7 @@ export class DelayCalculator {
   /**
    * Apply jitter to the calculated delay
    */
-  private applyJitter(delay: number, attempt: number): number {
+  private applyJitter(delay: number, _attempt: number): number {
     const { jitter } = this.config;
 
     switch (jitter) {
@@ -61,11 +61,12 @@ export class DelayCalculator {
       case JitterType.EQUAL:
         return delay * 0.5 + Math.random() * delay * 0.5;
 
-      case JitterType.DECORRELATED:
+      case JitterType.DECORRELATED: {
         // Decorrelated jitter: random between base delay and 3 * previous delay
         const min = this.config.baseDelayMs;
         const max = Math.max(min, this.previousDelay * 3);
         return min + Math.random() * (max - min);
+      }
 
       default:
         return delay;

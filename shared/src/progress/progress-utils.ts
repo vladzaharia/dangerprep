@@ -24,7 +24,7 @@ export class ProgressUtils {
     const totalWeight = phases.reduce((sum, phase) => sum + (phase.weight || 1), 0);
     const weightedProgress = phases.reduce((sum, phase) => {
       const weight = phase.weight || 1;
-      return sum + (phase.progress * weight);
+      return sum + phase.progress * weight;
     }, 0);
 
     return totalWeight > 0 ? weightedProgress / totalWeight : 0;
@@ -118,7 +118,7 @@ export class ProgressUtils {
   ): string {
     const filled = Math.round((progress / 100) * width);
     const empty = width - filled;
-    
+
     return fillChar.repeat(filled) + emptyChar.repeat(empty);
   }
 
@@ -173,23 +173,23 @@ export class ProgressUtils {
     const statusEmoji = ProgressUtils.getStatusEmoji(update.status);
     const progressText = ProgressUtils.formatProgress(update.progress);
     const progressBar = ProgressUtils.createProgressBar(update.progress, 15);
-    
+
     let summary = `${statusEmoji} ${progressText} ${progressBar}`;
-    
+
     if (update.metrics.totalItems > 0) {
       summary += ` (${update.metrics.completedItems}/${update.metrics.totalItems})`;
     }
-    
+
     if (update.metrics.itemsPerSecond && update.metrics.itemsPerSecond > 0) {
       const rate = ProgressUtils.formatRate(update.metrics.itemsPerSecond);
       summary += ` ${rate}`;
     }
-    
+
     if (update.metrics.estimatedTimeRemaining) {
       const eta = ProgressUtils.formatDuration(update.metrics.estimatedTimeRemaining);
       summary += ` ETA: ${eta}`;
     }
-    
+
     return summary;
   }
 
@@ -198,18 +198,18 @@ export class ProgressUtils {
    */
   static createDetailedReport(update: ProgressUpdate): string {
     const lines: string[] = [];
-    
+
     // Header
     lines.push(`Operation: ${update.operationId}`);
     lines.push(`Status: ${ProgressUtils.getStatusText(update.status)}`);
     lines.push(`Progress: ${ProgressUtils.formatProgress(update.progress)}`);
     lines.push('');
-    
+
     // Progress bar
     const progressBar = ProgressUtils.createProgressBar(update.progress, 40);
     lines.push(`[${progressBar}] ${ProgressUtils.formatProgress(update.progress)}`);
     lines.push('');
-    
+
     // Metrics
     const metrics = update.metrics;
     if (metrics.totalItems > 0) {
@@ -221,31 +221,31 @@ export class ProgressUtils {
         lines.push(`Skipped: ${metrics.skippedItems}`);
       }
     }
-    
+
     if (metrics.totalBytes && metrics.processedBytes !== undefined) {
       const totalBytes = ProgressUtils.formatBytes(metrics.totalBytes);
       const processedBytes = ProgressUtils.formatBytes(metrics.processedBytes);
       lines.push(`Data: ${processedBytes}/${totalBytes}`);
     }
-    
+
     // Rates
     if (metrics.itemsPerSecond && metrics.itemsPerSecond > 0) {
       lines.push(`Rate: ${ProgressUtils.formatRate(metrics.itemsPerSecond)}`);
     }
-    
+
     if (metrics.bytesPerSecond && metrics.bytesPerSecond > 0) {
       lines.push(`Throughput: ${ProgressUtils.formatRate(metrics.bytesPerSecond, 'bytes')}`);
     }
-    
+
     // Time information
     const elapsed = ProgressUtils.formatDuration(metrics.elapsedTime);
     lines.push(`Elapsed: ${elapsed}`);
-    
+
     if (metrics.estimatedTimeRemaining) {
       const eta = ProgressUtils.formatDuration(metrics.estimatedTimeRemaining);
       lines.push(`ETA: ${eta}`);
     }
-    
+
     // Current operation
     if (update.currentOperation) {
       lines.push('');
@@ -254,7 +254,7 @@ export class ProgressUtils {
         lines.push(`Item: ${update.currentItem}`);
       }
     }
-    
+
     // Phases
     if (update.phases && update.phases.length > 0) {
       lines.push('');
@@ -266,7 +266,7 @@ export class ProgressUtils {
         lines.push(`  ${phaseEmoji} ${phaseName}: ${phaseProgress}`);
       }
     }
-    
+
     return lines.join('\n');
   }
 
@@ -298,7 +298,7 @@ export class ProgressUtils {
     if (metrics.totalItems === 0) {
       return 0;
     }
-    
+
     return (metrics.completedItems / metrics.totalItems) * 100;
   }
 
@@ -310,7 +310,7 @@ export class ProgressUtils {
     if (totalProcessed === 0) {
       return 100; // No items processed yet, assume 100% success rate
     }
-    
+
     return (metrics.completedItems / totalProcessed) * 100;
   }
 

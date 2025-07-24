@@ -3,6 +3,7 @@
  */
 
 import { EventEmitter } from 'events';
+
 import {
   type IProgressTracker,
   type ProgressConfig,
@@ -34,7 +35,7 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
   constructor(config: ProgressConfig) {
     super();
     this.config = config;
-    
+
     this.metrics = {
       totalItems: config.totalItems || 0,
       completedItems: 0,
@@ -71,7 +72,7 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
 
   getCurrentProgress(): ProgressUpdate {
     this.updateMetrics();
-    
+
     return {
       operationId: this.config.operationId,
       progress: this.progress,
@@ -94,7 +95,7 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
     this.status = ProgressStatus.IN_PROGRESS;
     this.startTime = new Date();
     this.lastUpdateTime = this.startTime;
-    
+
     this.emitUpdate();
   }
 
@@ -104,7 +105,7 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
     }
 
     this.metrics.completedItems = Math.max(0, completedItems);
-    
+
     if (processedBytes !== undefined) {
       this.metrics.processedBytes = Math.max(0, processedBytes);
     }
@@ -124,8 +125,12 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
         // Calculate phase progress based on items or custom logic
         if (this.metrics.totalItems > 0) {
           const phaseWeight = phase.weight || 1;
-          const totalWeight = Array.from(this.phases.values()).reduce((sum, p) => sum + (p.weight || 1), 0);
-          const phaseItemsPercentage = (this.metrics.completedItems / this.metrics.totalItems) * 100;
+          const totalWeight = Array.from(this.phases.values()).reduce(
+            (sum, p) => sum + (p.weight || 1),
+            0
+          );
+          const phaseItemsPercentage =
+            (this.metrics.completedItems / this.metrics.totalItems) * 100;
           phase.progress = Math.min(100, phaseItemsPercentage * (phaseWeight / totalWeight));
         }
       }
@@ -172,10 +177,10 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
     }
 
     phase.progress = Math.max(0, Math.min(100, progress));
-    
+
     // Update overall progress based on phases
     this.progress = this.calculatePhaseProgress();
-    
+
     this.emitUpdate();
   }
 
@@ -245,10 +250,13 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
     this.status = ProgressStatus.COMPLETED;
     this.progress = 100;
     this.endTime = new Date();
-    
+
     // Complete any remaining phases
     for (const phase of this.phases.values()) {
-      if (phase.status === ProgressStatus.IN_PROGRESS || phase.status === ProgressStatus.NOT_STARTED) {
+      if (
+        phase.status === ProgressStatus.IN_PROGRESS ||
+        phase.status === ProgressStatus.NOT_STARTED
+      ) {
         phase.status = ProgressStatus.COMPLETED;
         phase.progress = 100;
         phase.endTime = this.endTime;
@@ -262,7 +270,7 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
   fail(error: string): void {
     this.status = ProgressStatus.FAILED;
     this.endTime = new Date();
-    
+
     // Fail current phase if any
     if (this.currentPhaseId) {
       this.failPhase(this.currentPhaseId, error);
@@ -275,7 +283,7 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
   cancel(): void {
     this.status = ProgressStatus.CANCELLED;
     this.endTime = new Date();
-    
+
     // Cancel any in-progress phases
     for (const phase of this.phases.values()) {
       if (phase.status === ProgressStatus.IN_PROGRESS) {
@@ -313,10 +321,13 @@ export class ProgressTracker extends EventEmitter implements IProgressTracker {
       return this.progress;
     }
 
-    const totalWeight = Array.from(this.phases.values()).reduce((sum, phase) => sum + (phase.weight || 1), 0);
+    const totalWeight = Array.from(this.phases.values()).reduce(
+      (sum, phase) => sum + (phase.weight || 1),
+      0
+    );
     const weightedProgress = Array.from(this.phases.values()).reduce((sum, phase) => {
       const weight = phase.weight || 1;
-      return sum + (phase.progress * weight);
+      return sum + phase.progress * weight;
     }, 0);
 
     return totalWeight > 0 ? weightedProgress / totalWeight : 0;

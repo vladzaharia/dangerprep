@@ -3,15 +3,7 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 import { promisify } from 'util';
 
-import {
-  ErrorFactory,
-  FileSystemError,
-  SystemError,
-  safeAsync,
-  wrapError,
-  ErrorCategory,
-  ErrorSeverity,
-} from '@dangerprep/shared/errors';
+import { ErrorFactory, wrapError, ErrorCategory, ErrorSeverity } from '@dangerprep/shared/errors';
 import { FileUtils } from '@dangerprep/shared/file-utils';
 import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
 import { RetryUtils, DEFAULT_RETRY_CONFIGS } from '@dangerprep/shared/retry';
@@ -92,10 +84,13 @@ export class MountManager extends EventEmitter {
 
       if (!success) {
         await this.cleanupMountPoint(mountPath);
-        throw error || ErrorFactory.filesystem('All mounting methods failed', {
-          data: { devicePath: device.devicePath, mountPath },
-          context: { operation: 'mountDevice', component: 'mount-manager' }
-        });
+        throw (
+          error ||
+          ErrorFactory.filesystem('All mounting methods failed', {
+            data: { devicePath: device.devicePath, mountPath },
+            context: { operation: 'mountDevice', component: 'mount-manager' },
+          })
+        );
       }
 
       // Verify mount was successful
@@ -104,7 +99,7 @@ export class MountManager extends EventEmitter {
         await this.cleanupMountPoint(mountPath);
         throw ErrorFactory.filesystem('Mount verification failed', {
           data: { devicePath: device.devicePath, mountPath },
-          context: { operation: 'mountDevice', component: 'mount-verification' }
+          context: { operation: 'mountDevice', component: 'mount-verification' },
         });
       }
 
@@ -121,7 +116,7 @@ export class MountManager extends EventEmitter {
       const wrappedError = wrapError(error, `Failed to mount device ${device.devicePath}`, {
         category: ErrorCategory.FILESYSTEM,
         severity: ErrorSeverity.HIGH,
-        context: { operation: 'mountDevice', component: 'mount-manager' }
+        context: { operation: 'mountDevice', component: 'mount-manager' },
       });
 
       this.logError(`Failed to mount device ${device.devicePath}`, wrappedError);
@@ -169,7 +164,9 @@ export class MountManager extends EventEmitter {
 
         // Update device info
         device.isMounted = false;
-        delete (device as any).mountPath;
+        if ('mountPath' in device) {
+          delete (device as { mountPath?: string }).mountPath;
+        }
         device.isReady = false;
 
         this.mountedDevices.delete(device.devicePath);

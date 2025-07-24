@@ -2,13 +2,7 @@
  * Error handling utilities and helper functions
  */
 
-import {
-  DangerPrepError,
-  ErrorSeverity,
-  ErrorCategory,
-  RetryClassification,
-  type ErrorContext,
-} from './types.js';
+import { getCurrentErrorContext } from './context.js';
 import {
   NetworkError,
   FileSystemError,
@@ -19,12 +13,18 @@ import {
   BusinessLogicError,
   SystemError,
 } from './domain-errors.js';
-import { getCurrentErrorContext } from './context.js';
+import {
+  DangerPrepError,
+  ErrorSeverity,
+  ErrorCategory,
+  RetryClassification,
+  type ErrorContext,
+} from './types.js';
 
 /**
  * Result type for operations that can fail
  */
-export type Result<T, E = Error> = 
+export type Result<T, E = Error> =
   | { success: true; data: T; error?: never }
   | { success: false; data?: never; error: E };
 
@@ -45,9 +45,7 @@ export function failure<E = Error>(error: E): Result<never, E> {
 /**
  * Wrap an async operation to return a Result instead of throwing
  */
-export async function safeAsync<T>(
-  operation: () => Promise<T>
-): Promise<Result<T, Error>> {
+export async function safeAsync<T>(operation: () => Promise<T>): Promise<Result<T, Error>> {
   try {
     const data = await operation();
     return success(data);
@@ -90,7 +88,7 @@ export class ErrorFactory {
       ...getCurrentErrorContext({ operation: 'network_operation' }),
       ...options.context,
     };
-    
+
     return new NetworkError(message, context, options);
   }
 
@@ -112,7 +110,7 @@ export class ErrorFactory {
       ...getCurrentErrorContext({ operation: 'filesystem_operation' }),
       ...options.context,
     };
-    
+
     return new FileSystemError(message, context, options);
   }
 
@@ -133,7 +131,7 @@ export class ErrorFactory {
       ...getCurrentErrorContext({ operation: 'configuration_operation' }),
       ...options.context,
     };
-    
+
     return new ConfigurationError(message, context, options);
   }
 
@@ -154,7 +152,7 @@ export class ErrorFactory {
       ...getCurrentErrorContext({ operation: 'validation_operation' }),
       ...options.context,
     };
-    
+
     return new ValidationError(message, context, options);
   }
 
@@ -178,7 +176,7 @@ export class ErrorFactory {
       ...getCurrentErrorContext({ operation: 'external_service_operation' }),
       ...options.context,
     };
-    
+
     return new ExternalServiceError(message, context, options);
   }
 
@@ -199,7 +197,7 @@ export class ErrorFactory {
       ...getCurrentErrorContext({ operation: 'authentication_operation' }),
       ...options.context,
     };
-    
+
     return new AuthenticationError(message, context, options);
   }
 
@@ -220,7 +218,7 @@ export class ErrorFactory {
       ...getCurrentErrorContext({ operation: 'business_logic_operation' }),
       ...options.context,
     };
-    
+
     return new BusinessLogicError(message, context, options);
   }
 
@@ -242,7 +240,7 @@ export class ErrorFactory {
       ...getCurrentErrorContext({ operation: 'system_operation' }),
       ...options.context,
     };
-    
+
     return new SystemError(message, context, options);
   }
 }
@@ -262,7 +260,7 @@ export function wrapError(
 ): DangerPrepError {
   const originalError = error instanceof Error ? error : new Error(String(error));
   const errorMessage = message || originalError.message;
-  
+
   const context = {
     ...getCurrentErrorContext({ operation: 'error_wrapping' }),
     ...options.context,
@@ -277,48 +275,48 @@ export function wrapError(
   // Create appropriate domain error based on category
   switch (category) {
     case ErrorCategory.NETWORK:
-      return new NetworkError(errorMessage, context, { 
-        cause: originalError, 
-        severity, 
-        retryClassification 
+      return new NetworkError(errorMessage, context, {
+        cause: originalError,
+        severity,
+        retryClassification,
       });
     case ErrorCategory.FILESYSTEM:
-      return new FileSystemError(errorMessage, context, { 
-        cause: originalError, 
-        severity, 
-        retryClassification 
+      return new FileSystemError(errorMessage, context, {
+        cause: originalError,
+        severity,
+        retryClassification,
       });
     case ErrorCategory.CONFIGURATION:
-      return new ConfigurationError(errorMessage, context, { 
-        cause: originalError, 
-        severity 
+      return new ConfigurationError(errorMessage, context, {
+        cause: originalError,
+        severity,
       });
     case ErrorCategory.VALIDATION:
-      return new ValidationError(errorMessage, context, { 
-        cause: originalError, 
-        severity 
+      return new ValidationError(errorMessage, context, {
+        cause: originalError,
+        severity,
       });
     case ErrorCategory.EXTERNAL_SERVICE:
-      return new ExternalServiceError(errorMessage, context, { 
-        cause: originalError, 
-        severity, 
-        retryClassification 
+      return new ExternalServiceError(errorMessage, context, {
+        cause: originalError,
+        severity,
+        retryClassification,
       });
     case ErrorCategory.AUTHENTICATION:
-      return new AuthenticationError(errorMessage, context, { 
-        cause: originalError, 
-        severity 
+      return new AuthenticationError(errorMessage, context, {
+        cause: originalError,
+        severity,
       });
     case ErrorCategory.BUSINESS_LOGIC:
-      return new BusinessLogicError(errorMessage, context, { 
-        cause: originalError, 
-        severity 
+      return new BusinessLogicError(errorMessage, context, {
+        cause: originalError,
+        severity,
       });
     case ErrorCategory.SYSTEM:
-      return new SystemError(errorMessage, context, { 
-        cause: originalError, 
-        severity, 
-        retryClassification 
+      return new SystemError(errorMessage, context, {
+        cause: originalError,
+        severity,
+        retryClassification,
       });
     default:
       // Create a generic DangerPrepError for unknown categories
@@ -339,12 +337,12 @@ export function isRetryableError(error: unknown): boolean {
   if (error instanceof DangerPrepError) {
     return error.isRetryable() || error.isConditionallyRetryable();
   }
-  
+
   // Default heuristics for non-DangerPrepError instances
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
     const name = error.name.toLowerCase();
-    
+
     // Network-related errors are usually retryable
     if (
       message.includes('timeout') ||
@@ -356,7 +354,7 @@ export function isRetryableError(error: unknown): boolean {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -367,7 +365,7 @@ export function extractErrorInfo(error: unknown): Record<string, unknown> {
   if (error instanceof DangerPrepError) {
     return error.toLogFormat();
   }
-  
+
   if (error instanceof Error) {
     return {
       name: error.name,
@@ -375,7 +373,7 @@ export function extractErrorInfo(error: unknown): Record<string, unknown> {
       stack: error.stack,
     };
   }
-  
+
   return {
     error: String(error),
   };

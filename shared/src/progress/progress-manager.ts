@@ -3,6 +3,11 @@
  */
 
 import { EventEmitter } from 'events';
+
+// Result types available for future use
+import type { Logger } from '../logging';
+
+import { ProgressTracker } from './progress-tracker.js';
 import {
   type IProgressManager,
   type IProgressTracker,
@@ -11,11 +16,16 @@ import {
   type ProgressListener,
   ProgressStatus,
 } from './types.js';
-import { ProgressTracker } from './progress-tracker.js';
 
 export class ProgressManager extends EventEmitter implements IProgressManager {
   private trackers = new Map<string, IProgressTracker>();
   private globalListeners: ProgressListener[] = [];
+  private logger: Logger | undefined;
+
+  constructor(logger?: Logger) {
+    super();
+    this.logger = logger;
+  }
 
   createTracker(config: ProgressConfig): IProgressTracker {
     // Remove existing tracker with same ID if it exists
@@ -36,11 +46,11 @@ export class ProgressManager extends EventEmitter implements IProgressManager {
           const result = listener(update);
           if (result instanceof Promise) {
             result.catch(error => {
-              console.error('Error in global progress listener:', error);
+              this.logger?.error('Error in global progress listener:', error);
             });
           }
         } catch (error) {
-          console.error('Error in global progress listener:', error);
+          this.logger?.error('Error in global progress listener:', error);
         }
       }
     });
@@ -105,7 +115,7 @@ export class ProgressManager extends EventEmitter implements IProgressManager {
 
     for (const tracker of trackers) {
       const progress = tracker.getCurrentProgress();
-      
+
       switch (progress.status) {
         case ProgressStatus.IN_PROGRESS:
         case ProgressStatus.PAUSED:
@@ -146,7 +156,10 @@ export class ProgressManager extends EventEmitter implements IProgressManager {
   cancelAllOperations(): void {
     for (const tracker of this.trackers.values()) {
       const progress = tracker.getCurrentProgress();
-      if (progress.status === ProgressStatus.IN_PROGRESS || progress.status === ProgressStatus.PAUSED) {
+      if (
+        progress.status === ProgressStatus.IN_PROGRESS ||
+        progress.status === ProgressStatus.PAUSED
+      ) {
         tracker.cancel();
       }
     }
@@ -181,7 +194,7 @@ export class ProgressManager extends EventEmitter implements IProgressManager {
    */
   cleanup(): void {
     const toRemove: string[] = [];
-    
+
     for (const [operationId, tracker] of this.trackers.entries()) {
       const progress = tracker.getCurrentProgress();
       if (

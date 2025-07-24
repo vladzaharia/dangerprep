@@ -3,7 +3,11 @@
  */
 
 import { CircuitBreaker } from './circuit-breaker.js';
-import { DEFAULT_CIRCUIT_BREAKER_CONFIGS, type CircuitBreakerConfig, type CircuitBreakerMetrics } from './types.js';
+import {
+  DEFAULT_CIRCUIT_BREAKER_CONFIGS,
+  type CircuitBreakerConfig,
+  type CircuitBreakerMetrics,
+} from './types.js';
 
 /**
  * Manager for multiple circuit breakers
@@ -28,8 +32,9 @@ export class CircuitBreakerManager {
    * Create or get a circuit breaker
    */
   getCircuitBreaker(name: string, config?: Partial<CircuitBreakerConfig>): CircuitBreaker {
-    if (this.circuitBreakers.has(name)) {
-      return this.circuitBreakers.get(name)!;
+    const existingBreaker = this.circuitBreakers.get(name);
+    if (existingBreaker) {
+      return existingBreaker;
     }
 
     // Create new circuit breaker with provided config or defaults
@@ -90,11 +95,11 @@ export class CircuitBreakerManager {
    */
   getAllMetrics(): Record<string, CircuitBreakerMetrics> {
     const metrics: Record<string, CircuitBreakerMetrics> = {};
-    
+
     for (const [name, circuitBreaker] of this.circuitBreakers) {
       metrics[name] = circuitBreaker.getMetrics();
     }
-    
+
     return metrics;
   }
 
@@ -198,10 +203,7 @@ export const CircuitBreakerUtils = {
   /**
    * Create a circuit breaker decorator for methods
    */
-  withCircuitBreaker(
-    name: string,
-    config?: Partial<CircuitBreakerConfig>
-  ) {
+  withCircuitBreaker(name: string, config?: Partial<CircuitBreakerConfig>) {
     return function <T extends unknown[], R>(
       target: unknown,
       propertyKey: string | symbol,
@@ -212,17 +214,13 @@ export const CircuitBreakerUtils = {
 
       descriptor.value = async function (...args: T): Promise<R> {
         const operation = () => originalMethod.apply(this, args);
-        const result = await CircuitBreakerUtils.executeWithCircuitBreaker(
-          name,
-          operation,
-          config
-        );
-        
-        if (result.success) {
-          return result.data!;
+        const result = await CircuitBreakerUtils.executeWithCircuitBreaker(name, operation, config);
+
+        if (result.success && result.data.success && result.data.data !== undefined) {
+          return result.data.data;
         }
-        
-        throw result.error;
+
+        throw result.data?.error || result.error || new Error('Circuit breaker operation failed');
       };
 
       return descriptor;
@@ -239,17 +237,13 @@ export const CircuitBreakerUtils = {
   ): (...args: T) => Promise<R> {
     return async (...args: T): Promise<R> => {
       const operation = () => fn(...args);
-      const result = await CircuitBreakerUtils.executeWithCircuitBreaker(
-        name,
-        operation,
-        config
-      );
-      
-      if (result.success) {
-        return result.data!;
+      const result = await CircuitBreakerUtils.executeWithCircuitBreaker(name, operation, config);
+
+      if (result.success && result.data.success && result.data.data !== undefined) {
+        return result.data.data;
       }
-      
-      throw result.error;
+
+      throw result.data?.error || result.error || new Error('Circuit breaker operation failed');
     };
   },
 };

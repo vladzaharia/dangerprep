@@ -2,8 +2,9 @@
  * Retry execution engine with configurable strategies
  */
 
-import { DelayCalculator, DelayUtils } from './delay-calculator.js';
 import { isRetryableError } from '../errors/utils.js';
+
+import { DelayCalculator, DelayUtils } from './delay-calculator.js';
 import type { RetryConfig, RetryAttempt, RetryResult } from './types.js';
 
 /**
@@ -39,7 +40,7 @@ export class RetryExecutor<T> {
       try {
         // Execute the operation
         const result = await operation();
-        
+
         // Success - return result with attempt information
         return {
           success: true,
@@ -63,9 +64,8 @@ export class RetryExecutor<T> {
         }
 
         // Calculate delay for next attempt
-        const delayMs = attempt < this.config.maxAttempts 
-          ? this.delayCalculator.calculateDelay(attempt + 1) 
-          : 0;
+        const delayMs =
+          attempt < this.config.maxAttempts ? this.delayCalculator.calculateDelay(attempt + 1) : 0;
 
         // Record this attempt
         const attemptInfo: RetryAttempt = {
@@ -156,16 +156,13 @@ export const RetryUtils = {
   /**
    * Execute an operation with retry and throw on failure
    */
-  async executeWithRetryOrThrow<T>(
-    operation: () => Promise<T>,
-    config: RetryConfig
-  ): Promise<T> {
+  async executeWithRetryOrThrow<T>(operation: () => Promise<T>, config: RetryConfig): Promise<T> {
     const result = await RetryUtils.executeWithRetry(operation, config);
-    
-    if (result.success) {
-      return result.data!;
+
+    if (result.success && result.data !== undefined) {
+      return result.data;
     }
-    
+
     throw result.error;
   },
 

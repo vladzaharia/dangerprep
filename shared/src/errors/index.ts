@@ -55,7 +55,4 @@ export {
 } from './utils.js';
 
 // Error patterns and standardized handling
-export {
-  ErrorPatterns,
-  ErrorAggregator,
-} from './error-patterns.js';
+export { ErrorPatterns, ErrorAggregator } from './error-patterns.js';

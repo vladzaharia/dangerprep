@@ -1,20 +1,17 @@
 import path from 'path';
 
 import { ConfigManager } from '@dangerprep/shared/config';
-import { FileUtils } from '@dangerprep/shared/file-utils';
+import { AdvancedFileUtils, createDirectoryPath } from '@dangerprep/shared/file-utils';
 import { ComponentStatus } from '@dangerprep/shared/health';
 import { LoggerFactory } from '@dangerprep/shared/logging';
-import {
-  NotificationManager,
-  NotificationType,
-  NotificationLevel,
-} from '@dangerprep/shared/notifications';
+import { NotificationType, NotificationLevel } from '@dangerprep/shared/notifications';
 import { Scheduler } from '@dangerprep/shared/scheduling';
 import {
   BaseService,
   ServiceConfig,
   ServiceUtils,
   ServicePatterns,
+  AdvancedAsyncPatterns,
 } from '@dangerprep/shared/service';
 
 import { LibraryManager } from './services/library-manager';
@@ -109,10 +106,31 @@ export class KiwixManager extends BaseService {
   private async ensureDirectories(): Promise<void> {
     const config = this.configManager.getConfig();
     const storage = config.kiwix_manager.storage;
-    await FileUtils.ensureDirectory(storage.zim_directory);
-    await FileUtils.ensureDirectory(storage.temp_directory);
-    await FileUtils.ensureDirectory(path.dirname(storage.library_file));
-    await FileUtils.ensureDirectory(path.dirname(config.kiwix_manager.logging.file));
+
+    // Use advanced file utilities with Result pattern and parallel execution
+    const directoryOperations = [
+      () => AdvancedFileUtils.ensureDirectoryAdvanced(createDirectoryPath(storage.zim_directory)),
+      () => AdvancedFileUtils.ensureDirectoryAdvanced(createDirectoryPath(storage.temp_directory)),
+      () =>
+        AdvancedFileUtils.ensureDirectoryAdvanced(
+          createDirectoryPath(path.dirname(storage.library_file))
+        ),
+      () =>
+        AdvancedFileUtils.ensureDirectoryAdvanced(
+          createDirectoryPath(path.dirname(config.kiwix_manager.logging.file))
+        ),
+    ];
+
+    const results = await AdvancedAsyncPatterns.parallel(directoryOperations, {
+      timeout: 10000,
+      logger: this.components.logger,
+    });
+
+    if (!results.success) {
+      throw new Error(`Failed to create Kiwix directories: ${results.error?.message}`);
+    }
+
+    this.components.logger.info('All Kiwix directories created successfully');
   }
 
   scheduleUpdates(): void {

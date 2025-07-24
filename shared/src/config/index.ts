@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { FileUtils } from '../file-utils';
 import type { Logger } from '../logging';
+
 import { ConfigUtils } from './config-utils.js';
 
 /**
@@ -21,7 +22,7 @@ export interface ConfigOptions {
   /** Whether to enable automatic transformations */
   enableTransformations?: boolean;
   /** Default configuration to merge with loaded config */
-  defaults?: any;
+  defaults?: Record<string, unknown>;
   /** Environment variable prefix for automatic env loading */
   envPrefix?: string;
   /** YAML dump options */
@@ -73,7 +74,7 @@ export class ConfigManager<T> {
     createDirs: boolean;
     enableEnvSubstitution: boolean;
     enableTransformations: boolean;
-    defaults?: any;
+    defaults?: Record<string, unknown>;
     envPrefix: string | undefined;
     yamlOptions: {
       indent: number;
@@ -93,7 +94,7 @@ export class ConfigManager<T> {
       createDirs: options.createDirs ?? true,
       enableEnvSubstitution: options.enableEnvSubstitution ?? false,
       enableTransformations: options.enableTransformations ?? false,
-      defaults: options.defaults,
+      ...(options.defaults && { defaults: options.defaults }),
       envPrefix: options.envPrefix,
       yamlOptions: {
         indent: 2,
@@ -123,7 +124,10 @@ export class ConfigManager<T> {
 
       // Merge with defaults if provided
       if (this.options.defaults) {
-        parsedConfig = ConfigUtils.mergeConfigs(this.options.defaults, parsedConfig as any);
+        parsedConfig = ConfigUtils.mergeConfigs(
+          this.options.defaults,
+          parsedConfig as Record<string, unknown>
+        );
       }
 
       // Validate configuration using Zod schema
@@ -223,14 +227,19 @@ export class ConfigManager<T> {
    * @returns Parsed and validated configuration
    */
   async loadWithDefaults(defaults: Partial<T>): Promise<T> {
-    const originalDefaults = this.options.defaults;
-    this.options.defaults = defaults;
+    // Create a temporary config manager with the merged defaults
+    const tempOptions: ConfigOptions = {
+      createDirs: this.options.createDirs,
+      enableEnvSubstitution: this.options.enableEnvSubstitution,
+      enableTransformations: this.options.enableTransformations,
+      defaults: { ...this.options.defaults, ...defaults } as Record<string, unknown>,
+      ...(this.options.envPrefix && { envPrefix: this.options.envPrefix }),
+      ...(this.options.logger && { logger: this.options.logger }),
+      yamlOptions: this.options.yamlOptions,
+    };
 
-    try {
-      return await this.loadConfig();
-    } finally {
-      this.options.defaults = originalDefaults;
-    }
+    const tempConfigManager = new ConfigManager(this.configPath, this.schema, tempOptions);
+    return await tempConfigManager.loadConfig();
   }
 
   /**
@@ -248,15 +257,15 @@ export class ConfigManager<T> {
 
     // Merge with defaults if provided
     if (this.options.defaults) {
-      processedConfig = ConfigUtils.mergeConfigs(this.options.defaults, processedConfig as any);
+      processedConfig = ConfigUtils.mergeConfigs(
+        this.options.defaults,
+        processedConfig as Record<string, unknown>
+      );
     }
 
     const result = this.schema.safeParse(processedConfig);
     if (!result.success) {
-      throw new ConfigValidationError(
-        'Configuration validation failed',
-        result.error
-      );
+      throw new ConfigValidationError('Configuration validation failed', result.error);
     }
 
     return result.data;
@@ -366,6 +375,6 @@ export function createConfigManager<T>(
 export { z } from 'zod';
 
 // Export configuration utilities and standard schemas
-export { ConfigUtils } from './config-utils.js';
+export { ConfigUtils, ConfigurationBuilder } from './config-utils.js';
 export * from './standard-schemas.js';
 export { ConfigFactory } from './config-factory.js';
