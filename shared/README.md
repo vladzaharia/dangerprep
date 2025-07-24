@@ -16,7 +16,7 @@ import { Logger, FileUtils, ConfigManager, Scheduler } from '@dangerprep/shared'
 
 // Or import specific modules
 import { Logger } from '@dangerprep/shared/logging';
-import { FileUtils } from '@dangerprep/shared/file-utils';
+import { FileUtils } from '@dangerprep/shared/files';
 ```
 
 ## Development

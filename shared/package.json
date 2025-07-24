@@ -46,10 +46,10 @@
       "import": "./dist/logging/index.js",
       "require": "./dist/logging/index.js"
     },
-    "./file-utils": {
-      "types": "./dist/file-utils/index.d.ts",
-      "import": "./dist/file-utils/index.js",
-      "require": "./dist/file-utils/index.js"
+    "./files": {
+      "types": "./dist/files/index.d.ts",
+      "import": "./dist/files/index.js",
+      "require": "./dist/files/index.js"
     },
     "./config": {
       "types": "./dist/config/index.d.ts",
@@ -86,10 +86,10 @@
       "import": "./dist/retry/index.js",
       "require": "./dist/retry/index.js"
     },
-    "./circuit-breaker": {
-      "types": "./dist/circuit-breaker/index.d.ts",
-      "import": "./dist/circuit-breaker/index.js",
-      "require": "./dist/circuit-breaker/index.js"
+    "./breaker": {
+      "types": "./dist/breaker/index.d.ts",
+      "import": "./dist/breaker/index.js",
+      "require": "./dist/breaker/index.js"
     },
     "./progress": {
       "types": "./dist/progress/index.d.ts",

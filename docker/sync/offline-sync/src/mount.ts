@@ -4,7 +4,7 @@ import * as path from 'path';
 import { promisify } from 'util';
 
 import { ErrorFactory, wrapError, ErrorCategory, ErrorSeverity } from '@dangerprep/shared/errors';
-import { FileUtils } from '@dangerprep/shared/file-utils';
+import { FileUtils } from '@dangerprep/shared/files';
 import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
 import { RetryUtils, DEFAULT_RETRY_CONFIGS } from '@dangerprep/shared/retry';
 import * as fs from 'fs-extra';

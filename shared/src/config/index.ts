@@ -4,7 +4,7 @@ import path from 'path';
 import { load as yamlLoad, dump as yamlDump } from 'js-yaml';
 import { z } from 'zod';
 
-import { FileUtils } from '../file-utils';
+import { FileUtils } from '../files';
 import type { Logger } from '../logging';
 
 import { ConfigUtils } from './utils.js';

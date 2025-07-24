@@ -16,7 +16,7 @@
 
 // Re-export implemented modules
 export * from './logging/index.js';
-export * from './file-utils/index.js';
+export * from './files/index.js';
 export * from './config/index.js';
 export * from './scheduling/index.js';
 export * from './notifications/index.js';
@@ -24,7 +24,7 @@ export * from './health/index.js';
 export * from './service/index.js';
 export * from './errors/index.js';
 export * from './retry/index.js';
-export * from './circuit-breaker/index.js';
+export * from './breaker/index.js';
 
 // Progress tracking
 export * from './progress/index.js';
