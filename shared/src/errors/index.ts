@@ -30,7 +30,7 @@ export {
   AuthenticationError,
   BusinessLogicError,
   SystemError,
-} from './domain-errors.js';
+} from './domain.js';
 
 // Error context management
 export {
@@ -55,4 +55,4 @@ export {
 } from './utils.js';
 
 // Error patterns and standardized handling
-export { ErrorPatterns, ErrorAggregator } from './error-patterns.js';
+export { ErrorPatterns, ErrorAggregator } from './patterns.js';

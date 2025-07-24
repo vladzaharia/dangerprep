@@ -75,6 +75,26 @@
       "types": "./dist/service/index.d.ts",
       "import": "./dist/service/index.js",
       "require": "./dist/service/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors/index.d.ts",
+      "import": "./dist/errors/index.js",
+      "require": "./dist/errors/index.js"
+    },
+    "./retry": {
+      "types": "./dist/retry/index.d.ts",
+      "import": "./dist/retry/index.js",
+      "require": "./dist/retry/index.js"
+    },
+    "./circuit-breaker": {
+      "types": "./dist/circuit-breaker/index.d.ts",
+      "import": "./dist/circuit-breaker/index.js",
+      "require": "./dist/circuit-breaker/index.js"
+    },
+    "./progress": {
+      "types": "./dist/progress/index.d.ts",
+      "import": "./dist/progress/index.js",
+      "require": "./dist/progress/index.js"
     }
   },
   "files": [

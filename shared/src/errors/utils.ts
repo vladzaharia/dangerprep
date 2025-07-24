@@ -12,7 +12,7 @@ import {
   AuthenticationError,
   BusinessLogicError,
   SystemError,
-} from './domain-errors.js';
+} from './domain.js';
 import {
   DangerPrepError,
   ErrorSeverity,

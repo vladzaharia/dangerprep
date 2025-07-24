@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { FileUtils } from '../file-utils';
 import type { Logger } from '../logging';
 
-import { ConfigUtils } from './config-utils.js';
+import { ConfigUtils } from './utils.js';
 
 /**
  * Options for configuration management
@@ -375,6 +375,6 @@ export function createConfigManager<T>(
 export { z } from 'zod';
 
 // Export configuration utilities and standard schemas
-export { ConfigUtils, ConfigurationBuilder } from './config-utils.js';
-export * from './standard-schemas.js';
-export { ConfigFactory } from './config-factory.js';
+export { ConfigUtils, ConfigurationBuilder } from './utils.js';
+export * from './schemas.js';
+export { ConfigFactory } from './factory.js';

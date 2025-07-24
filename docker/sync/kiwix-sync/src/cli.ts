@@ -3,7 +3,7 @@
 import { LoggerFactory } from '@dangerprep/shared/logging';
 import { Command } from 'commander';
 
-import { KiwixManager } from './kiwix-manager';
+import { KiwixManager } from './manager';
 
 // Create a CLI logger for all output
 const cliLogger = LoggerFactory.createConsoleLogger('CLI');

@@ -21,7 +21,7 @@ export {
 } from './types.js';
 
 // Circuit breaker implementation
-export { CircuitBreaker } from './circuit-breaker.js';
+export { CircuitBreaker } from './breaker.js';
 
 // Circuit breaker manager
-export { CircuitBreakerManager, CircuitBreakerUtils } from './circuit-breaker-manager.js';
+export { CircuitBreakerManager, CircuitBreakerUtils } from './manager.js';

@@ -2,7 +2,7 @@
  * Circuit breaker manager for managing multiple circuit breakers
  */
 
-import { CircuitBreaker } from './circuit-breaker.js';
+import { CircuitBreaker } from './breaker.js';
 import {
   DEFAULT_CIRCUIT_BREAKER_CONFIGS,
   type CircuitBreakerConfig,

@@ -6,7 +6,7 @@ import type { Logger } from '@dangerprep/shared/logging';
 
 import type { KiwixConfig, ZimPackage } from '../types';
 
-import { ZimDownloader } from './zim-downloader';
+import { ZimDownloader } from './downloader';
 
 export class ZimUpdater {
   private readonly config: KiwixConfig['kiwix_manager'];

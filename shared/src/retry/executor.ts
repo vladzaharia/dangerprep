@@ -4,7 +4,7 @@
 
 import { isRetryableError } from '../errors/utils.js';
 
-import { DelayCalculator, DelayUtils } from './delay-calculator.js';
+import { DelayCalculator, DelayUtils } from './calculator.js';
 import type { RetryConfig, RetryAttempt, RetryResult } from './types.js';
 
 /**

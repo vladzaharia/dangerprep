@@ -11,7 +11,7 @@
  */
 
 // Core exports
-export { NotificationManager } from './notification-manager.js';
+export { NotificationManager } from './manager.js';
 
 // Channel implementations
 export { WebhookChannel } from './channels/webhook-channel.js';
@@ -22,7 +22,7 @@ import type { Logger } from '../logging/index.js';
 
 import { ConsoleChannel } from './channels/console-channel.js';
 import { WebhookChannel } from './channels/webhook-channel.js';
-import { NotificationManager } from './notification-manager.js';
+import { NotificationManager } from './manager.js';
 import type { NotificationManagerConfig, WebhookChannelConfig } from './types.js';
 
 // Types and enums

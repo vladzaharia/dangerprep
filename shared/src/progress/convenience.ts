@@ -2,7 +2,7 @@
  * Convenience functions for common progress tracking patterns
  */
 
-import { globalProgressManager } from './progress-manager.js';
+import { globalProgressManager } from './manager.js';
 import {
   type ProgressConfig,
   type ProgressPhase,

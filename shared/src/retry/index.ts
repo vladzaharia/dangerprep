@@ -21,10 +21,10 @@ export {
 } from './types.js';
 
 // Delay calculation utilities
-export { DelayCalculator, DelayUtils } from './delay-calculator.js';
+export { DelayCalculator, DelayUtils } from './calculator.js';
 
 // Retry execution engine
-export { RetryExecutor, RetryUtils } from './retry-executor.js';
+export { RetryExecutor, RetryUtils } from './executor.js';
 
 // Conditional retry logic
 export {
@@ -32,4 +32,4 @@ export {
   RetryConditions,
   ConditionalRetryBuilder,
   ConditionalRetryUtils,
-} from './conditional-retry.js';
+} from './conditional.js';

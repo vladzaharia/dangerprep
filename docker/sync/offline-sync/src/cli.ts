@@ -4,8 +4,8 @@ import { LoggerFactory } from '@dangerprep/shared/logging';
 import { Command } from 'commander';
 import * as fs from 'fs-extra';
 
-import { ConfigManager } from './config-manager';
-import { OfflineSync } from './offline-sync';
+import { ConfigManager } from './config';
+import { OfflineSync } from './engine';
 
 // Create a CLI logger for all output
 const cliLogger = LoggerFactory.createConsoleLogger('CLI');
