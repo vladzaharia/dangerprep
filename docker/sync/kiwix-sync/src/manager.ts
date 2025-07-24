@@ -1,7 +1,7 @@
 import path from 'path';
 
 import { ConfigManager } from '@dangerprep/shared/config';
-import { AdvancedFileUtils, createDirectoryPath } from '@dangerprep/shared/file-utils';
+import { AdvancedFileUtils, createDirectoryPath } from '@dangerprep/shared/files';
 import { ComponentStatus } from '@dangerprep/shared/health';
 import { LoggerFactory } from '@dangerprep/shared/logging';
 import { NotificationType, NotificationLevel } from '@dangerprep/shared/notifications';

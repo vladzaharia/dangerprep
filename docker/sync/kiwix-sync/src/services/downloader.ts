@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import { FileUtils } from '@dangerprep/shared/file-utils';
+import { FileUtils } from '@dangerprep/shared/files';
 import type { Logger } from '@dangerprep/shared/logging';
 import axios from 'axios';
 
