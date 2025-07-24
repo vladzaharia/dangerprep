@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 // Result types available for future use
 import type { Logger } from '../logging';
 
-import { ProgressTracker } from './progress-tracker.js';
+import { ProgressTracker } from './tracker.js';
 import {
   type IProgressManager,
   type IProgressTracker,

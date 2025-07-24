@@ -14,9 +14,9 @@ import {
   AdvancedAsyncPatterns,
 } from '@dangerprep/shared/service';
 
-import { LibraryManager } from './services/library-manager';
-import { ZimDownloader } from './services/zim-downloader';
-import { ZimUpdater } from './services/zim-updater';
+import { ZimDownloader } from './services/downloader';
+import { LibraryManager } from './services/library';
+import { ZimUpdater } from './services/updater';
 import type { KiwixConfig, ZimPackage } from './types';
 import { KiwixConfigSchema } from './types';
 

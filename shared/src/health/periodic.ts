@@ -2,7 +2,7 @@ import type { Logger } from '../logging';
 import type { NotificationManager } from '../notifications';
 import { NotificationType, NotificationLevel } from '../notifications';
 
-import { HealthChecker } from './health-checker.js';
+import { HealthChecker } from './checker.js';
 import { HealthStatus, HealthCheckResult, PeriodicHealthCheckConfig } from './types.js';
 
 /**

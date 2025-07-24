@@ -11,8 +11,8 @@
  */
 
 // Core exports
-export { BaseService } from './base-service.js';
-export { ServicePatterns, AdvancedAsyncPatterns } from './service-patterns.js';
+export { BaseService } from './base.js';
+export { ServicePatterns, AdvancedAsyncPatterns } from './patterns.js';
 
 // Types and enums
 export { ServiceState } from './types.js';
@@ -36,7 +36,7 @@ export {
 } from './types.js';
 
 // Import for utility functions
-import { BaseService } from './base-service.js';
+import { BaseService } from './base.js';
 import type { ServiceConfig, ServiceLifecycleHooks } from './types.js';
 
 // Utility functions

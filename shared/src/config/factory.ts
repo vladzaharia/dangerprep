@@ -4,8 +4,8 @@
 
 import { z } from 'zod';
 
-import { ConfigUtils } from './config-utils.js';
-import { StandardSchemas } from './standard-schemas.js';
+import { StandardSchemas } from './schemas.js';
+import { ConfigUtils } from './utils.js';
 
 import { ConfigManager, type ConfigOptions } from './index.js';
 

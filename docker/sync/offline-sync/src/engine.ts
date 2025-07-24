@@ -18,10 +18,10 @@ import {
   ServicePatterns,
 } from '@dangerprep/shared/service';
 
-import { CardAnalyzer } from './card-analyzer';
-import { DeviceDetector } from './device-detector';
-import { MountManager } from './mount-manager';
-import { SyncEngine } from './sync-engine';
+import { CardAnalyzer } from './analyzer';
+import { DeviceDetector } from './detector';
+import { MountManager } from './mount';
+import { SyncEngine } from './sync';
 import {
   OfflineSyncConfig,
   OfflineSyncConfigSchema,

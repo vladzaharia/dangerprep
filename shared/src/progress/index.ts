@@ -16,18 +16,18 @@ export {
 } from './types.js';
 
 // Core implementations
-export { ProgressTracker } from './progress-tracker.js';
-export { ProgressManager, globalProgressManager } from './progress-manager.js';
+export { ProgressTracker } from './tracker.js';
+export { ProgressManager, globalProgressManager } from './manager.js';
 
 // Persistence implementations
 export {
   FileProgressPersistence,
   MemoryProgressPersistence,
   PersistentProgressManager,
-} from './progress-persistence.js';
+} from './persistence.js';
 
 // Utilities
-export { ProgressUtils } from './progress-utils.js';
+export { ProgressUtils } from './utils.js';
 
 // Convenience functions for common use cases
 export { createProgressTracker, createPhaseConfig, withProgressTracking } from './convenience.js';

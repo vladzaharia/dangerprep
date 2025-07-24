@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 
-import { ConfigUtils } from './config-utils.js';
+import { ConfigUtils } from './utils.js';
 
 /**
  * Standard storage configuration schema

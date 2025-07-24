@@ -10,8 +10,8 @@
  */
 
 // Core exports
-export { HealthChecker } from './health-checker.js';
-export { PeriodicHealthChecker } from './periodic-health-checker.js';
+export { HealthChecker } from './checker.js';
+export { PeriodicHealthChecker } from './periodic.js';
 
 // Types and enums
 export { HealthStatus, ComponentStatus } from './types.js';
@@ -29,8 +29,8 @@ export type {
 import type { Logger } from '../logging/index.js';
 import type { NotificationManager } from '../notifications/index.js';
 
-import { HealthChecker } from './health-checker.js';
-import { PeriodicHealthChecker } from './periodic-health-checker.js';
+import { HealthChecker } from './checker.js';
+import { PeriodicHealthChecker } from './periodic.js';
 import type { HealthCheckConfig, PeriodicHealthCheckConfig } from './types.js';
 
 // Utility functions
