@@ -4,8 +4,8 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 import { promisify } from 'util';
 
-import { FileUtils } from '@dangerprep/shared/files';
-import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
+import { FileUtils } from '@dangerprep/files';
+import { Logger, LoggerFactory } from '@dangerprep/logging';
 import * as fs from 'fs-extra';
 
 import {

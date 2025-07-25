@@ -1,5 +1,5 @@
-import { FileUtils } from '@dangerprep/shared/files';
-import type { Logger } from '@dangerprep/shared/logging';
+import { FileUtils } from '@dangerprep/files';
+import type { Logger } from '@dangerprep/logging';
 
 import { ContentTypeConfig } from '../types';
 

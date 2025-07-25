@@ -1,6 +1,6 @@
 import path from 'path';
 
-import type { Logger } from '@dangerprep/shared/logging';
+import type { Logger } from '@dangerprep/logging';
 
 import { PlexClient } from '../services/plex';
 import { ContentTypeConfig, PlexMovie, FilterRule, PriorityRule } from '../types';

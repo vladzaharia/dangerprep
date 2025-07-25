@@ -1,0 +1,49 @@
+{
+  "name": "@dangerprep/scheduling",
+  "version": "1.0.0",
+  "description": "Cron-based task scheduling with proper error handling for DangerPrep services",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write src/**/*.{ts,tsx,json}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "@dangerprep/logging": "workspace:*",
+    "node-cron": "^3.0.2"
+  },
+  "devDependencies": {
+    "@dangerprep/typescript-config": "workspace:*",
+    "@types/node": "^20.0.0",
+    "@types/node-cron": "^3.0.8",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "scheduling",
+    "cron",
+    "task-scheduler",
+    "typescript",
+    "dangerprep"
+  ]
+}

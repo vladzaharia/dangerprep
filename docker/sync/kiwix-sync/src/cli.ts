@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { LoggerFactory } from '@dangerprep/shared/logging';
+import { LoggerFactory } from '@dangerprep/logging';
 import { Command } from 'commander';
 
 import { KiwixManager } from './manager';

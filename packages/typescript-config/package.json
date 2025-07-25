@@ -1,0 +1,24 @@
+{
+  "name": "@dangerprep/typescript-config",
+  "version": "1.0.0",
+  "description": "Shared TypeScript configuration for DangerPrep projects",
+  "private": true,
+  "main": "src/base.json",
+  "exports": {
+    "./base.json": "./src/base.json",
+    "./nextjs.json": "./src/nextjs.json",
+    "./node.json": "./src/node.json"
+  },
+  "files": [
+    "src/**/*"
+  ],
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "typescript",
+    "config",
+    "tsconfig",
+    "dangerprep"
+  ]
+}

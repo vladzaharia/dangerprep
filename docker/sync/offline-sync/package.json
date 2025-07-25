@@ -20,7 +20,14 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@dangerprep/shared": "workspace:*",
+    "@dangerprep/configuration": "workspace:*",
+    "@dangerprep/errors": "workspace:*",
+    "@dangerprep/files": "workspace:*",
+    "@dangerprep/health": "workspace:*",
+    "@dangerprep/logging": "workspace:*",
+    "@dangerprep/notifications": "workspace:*",
+    "@dangerprep/retry": "workspace:*",
+    "@dangerprep/service": "workspace:*",
     "chokidar": "^3.6.0",
     "commander": "^11.0.0",
     "fs-extra": "^11.2.0",
@@ -29,6 +36,7 @@
     "usb": "^2.16.0"
   },
   "devDependencies": {
+    "@dangerprep/typescript-config": "workspace:*",
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^29.5.0",
     "@types/js-yaml": "^4.0.5",

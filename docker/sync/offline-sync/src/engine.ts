@@ -1,22 +1,12 @@
 // import * as cron from 'node-cron'; // TODO: Implement cron scheduling
 
-import { ConfigManager } from '@dangerprep/shared/config';
-import {
-  ErrorFactory,
-  ErrorPatterns,
-  runWithErrorContext,
-  safeAsync,
-} from '@dangerprep/shared/errors';
+import { ConfigManager } from '@dangerprep/configuration';
+import { ErrorFactory, runWithErrorContext, safeAsync } from '@dangerprep/errors';
+import { HealthChecker, ComponentStatus } from '@dangerprep/health';
+import { LoggerFactory } from '@dangerprep/logging';
+import { NotificationType, NotificationLevel } from '@dangerprep/notifications';
 // Advanced file utils available for future use
-import { HealthChecker, ComponentStatus } from '@dangerprep/shared/health';
-import { LoggerFactory } from '@dangerprep/shared/logging';
-import { NotificationType, NotificationLevel } from '@dangerprep/shared/notifications';
-import {
-  BaseService,
-  ServiceConfig,
-  ServiceUtils,
-  ServicePatterns,
-} from '@dangerprep/shared/service';
+import { BaseService, ServiceConfig, ServiceUtils, ServicePatterns } from '@dangerprep/service';
 
 import { CardAnalyzer } from './analyzer';
 import { DeviceDetector } from './detector';
@@ -348,11 +338,20 @@ export class OfflineSync extends BaseService {
           return result.data;
         } else {
           this.syncStats.failedOperations++;
-          await ErrorPatterns.logAndNotifyError(
-            result.error,
-            this.components.logger,
-            this.components.notificationManager,
-            { operation: 'triggerSync', component: 'sync-execution' }
+          this.components.logger.error('Sync operation failed', {
+            error: result.error,
+            operation: 'triggerSync',
+            component: 'sync-execution',
+          });
+
+          await this.components.notificationManager.notify(
+            NotificationType.SYNC_FAILED,
+            'Sync operation failed',
+            {
+              level: NotificationLevel.ERROR,
+              error: result.error instanceof Error ? result.error : new Error(String(result.error)),
+              data: { operation: 'triggerSync', component: 'sync-execution' },
+            }
           );
           throw result.error;
         }
@@ -384,11 +383,23 @@ export class OfflineSync extends BaseService {
       });
 
       if (!mountResult.success) {
-        await ErrorPatterns.logAndNotifyError(
-          mountResult.error,
-          this.components.logger,
-          this.components.notificationManager,
-          { operation: 'device_mount', component: 'mount-manager' }
+        this.components.logger.error('Device mount failed', {
+          error: mountResult.error,
+          operation: 'device_mount',
+          component: 'mount-manager',
+        });
+
+        await this.components.notificationManager.notify(
+          NotificationType.SYNC_FAILED,
+          'Device mount failed',
+          {
+            level: NotificationLevel.ERROR,
+            error:
+              mountResult.error instanceof Error
+                ? mountResult.error
+                : new Error(String(mountResult.error)),
+            data: { operation: 'device_mount', component: 'mount-manager' },
+          }
         );
       }
     });
@@ -509,11 +520,23 @@ export class OfflineSync extends BaseService {
     });
 
     if (!deviceReadyResult.success) {
-      await ErrorPatterns.logAndNotifyError(
-        deviceReadyResult.error,
-        this.components.logger,
-        this.components.notificationManager,
-        { operation: 'handleDeviceReady', component: 'device-ready-handler' }
+      this.components.logger.error('Device ready handling failed', {
+        error: deviceReadyResult.error,
+        operation: 'handleDeviceReady',
+        component: 'device-ready-handler',
+      });
+
+      await this.components.notificationManager.notify(
+        NotificationType.SYNC_FAILED,
+        'Device ready handling failed',
+        {
+          level: NotificationLevel.ERROR,
+          error:
+            deviceReadyResult.error instanceof Error
+              ? deviceReadyResult.error
+              : new Error(String(deviceReadyResult.error)),
+          data: { operation: 'handleDeviceReady', component: 'device-ready-handler' },
+        }
       );
     }
   }

@@ -1,4 +1,4 @@
-import { z } from '@dangerprep/shared/config';
+import { z } from '@dangerprep/configuration';
 
 // Zod schema for OfflineSyncConfig
 export const OfflineSyncConfigSchema = z.object({
