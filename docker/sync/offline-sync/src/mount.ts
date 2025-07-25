@@ -4,7 +4,7 @@ import * as path from 'path';
 import { promisify } from 'util';
 
 import { ErrorFactory, wrapError, ErrorCategory, ErrorSeverity } from '@dangerprep/errors';
-import { FileUtils } from '@dangerprep/files';
+import { ensureDirectory, fileExists } from '@dangerprep/files';
 import { Logger, LoggerFactory } from '@dangerprep/logging';
 import { RetryUtils, DEFAULT_RETRY_CONFIGS } from '@dangerprep/retry';
 import * as fs from 'fs-extra';
@@ -211,7 +211,7 @@ export class MountManager extends EventEmitter {
       const timestamp = Date.now();
       const mountPath = path.join(this.config.storage.mount_base, `${baseName}_${timestamp}`);
 
-      await FileUtils.ensureDirectory(mountPath);
+      await ensureDirectory(mountPath);
       await fs.chmod(mountPath, 0o755);
 
       this.log(`Created mount point: ${mountPath}`);
@@ -339,7 +339,7 @@ export class MountManager extends EventEmitter {
    */
   private async cleanupMountPoint(mountPath: string): Promise<void> {
     try {
-      if (await FileUtils.fileExists(mountPath)) {
+      if (await fileExists(mountPath)) {
         // Check if directory is empty before removing
         const files = await fs.readdir(mountPath);
         if (files.length === 0) {
@@ -360,7 +360,7 @@ export class MountManager extends EventEmitter {
   public async initialize(): Promise<void> {
     try {
       // Ensure mount base directory exists
-      await FileUtils.ensureDirectory(this.config.storage.mount_base);
+      await ensureDirectory(this.config.storage.mount_base);
       await fs.chmod(this.config.storage.mount_base, 0o755);
 
       // Clean up any stale mount points
@@ -378,7 +378,7 @@ export class MountManager extends EventEmitter {
    */
   private async cleanupStaleMounts(): Promise<void> {
     try {
-      if (!(await FileUtils.fileExists(this.config.storage.mount_base))) {
+      if (!(await fileExists(this.config.storage.mount_base))) {
         return;
       }
 

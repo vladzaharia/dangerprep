@@ -1,7 +1,14 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import { FileUtils } from '@dangerprep/files';
+import {
+  fileExists,
+  getFileStats,
+  ensureDirectory,
+  getFileName,
+  formatSize,
+  getDirectorySize,
+} from '@dangerprep/files';
 import type { Logger } from '@dangerprep/logging';
 
 import type { KiwixConfig, ZimPackage, LibraryEntry } from '../types';
@@ -26,13 +33,13 @@ export class LibraryManager {
       for (const file of zimFiles) {
         const filePath = path.join(zimDir, file);
         const stats = await fs.stat(filePath);
-        const packageName = FileUtils.getFileName(file);
+        const packageName = getFileName(file);
 
         packages.push({
           name: packageName,
           title: packageName.replace(/_/g, ' '),
           description: `Local ZIM file: ${file}`,
-          size: FileUtils.formatSize(stats.size),
+          size: formatSize(stats.size),
           date: stats.mtime.toISOString(),
           path: filePath,
         });
@@ -155,7 +162,7 @@ export class LibraryManager {
 
   async validateLibrary(): Promise<boolean> {
     try {
-      const libraryExists = await FileUtils.fileExists(this.config.storage.library_file);
+      const libraryExists = await fileExists(this.config.storage.library_file);
       if (!libraryExists) {
         this.logger.warn('Library file does not exist');
         return false;
@@ -184,17 +191,17 @@ export class LibraryManager {
   }> {
     try {
       const packages = await this.listInstalledPackages();
-      const totalSize = await FileUtils.getDirectorySize(this.config.storage.zim_directory);
+      const totalSize = await getDirectorySize(this.config.storage.zim_directory);
 
       let lastUpdated: Date | null = null;
-      if (await FileUtils.fileExists(this.config.storage.library_file)) {
+      if (await fileExists(this.config.storage.library_file)) {
         const stats = await fs.stat(this.config.storage.library_file);
         lastUpdated = stats.mtime;
       }
 
       return {
         totalPackages: packages.length,
-        totalSize: FileUtils.formatSize(totalSize),
+        totalSize: formatSize(totalSize),
         lastUpdated,
       };
     } catch (error) {

@@ -2,7 +2,12 @@ import { exec } from 'child_process';
 import * as path from 'path';
 import { promisify } from 'util';
 
-import { FileUtils } from '@dangerprep/files';
+import {
+  getFilesRecursively,
+  getDirectorySize,
+  fileExists,
+  ensureDirectory,
+} from '@dangerprep/files';
 import { Logger, LoggerFactory } from '@dangerprep/logging';
 import * as fs from 'fs-extra';
 
@@ -84,8 +89,8 @@ export class CardAnalyzer {
 
         const cardPath = path.join(analysis.device.mountPath, contentConfig.card_path);
 
-        if (!(await FileUtils.fileExists(cardPath))) {
-          await FileUtils.ensureDirectory(cardPath);
+        if (!(await fileExists(cardPath))) {
+          await ensureDirectory(cardPath);
           await this.createReadmeFile(cardPath, contentType, contentConfig);
           createdCount++;
           this.log(`Created directory: ${cardPath}`);
@@ -203,7 +208,7 @@ export class CardAnalyzer {
     contentConfig: ContentTypeConfig
   ): Promise<boolean> {
     try {
-      const files = await FileUtils.getFilesRecursively(dirPath);
+      const files = await getFilesRecursively(dirPath);
 
       // Check if any files match the expected extensions
       const validFiles = files.filter((file: string) => {
@@ -237,7 +242,7 @@ export class CardAnalyzer {
 
         if (stats.isDirectory() && !recognizedPaths.includes(entry)) {
           // Check if this directory contains media files
-          const files = await FileUtils.getFilesRecursively(entryPath);
+          const files = await getFilesRecursively(entryPath);
           const mediaExtensions = [
             '.mp4',
             '.mkv',
@@ -339,12 +344,12 @@ Generated: ${new Date().toISOString()}
 
     const cardPath = path.join(mountPath, contentConfig.card_path);
 
-    if (!(await FileUtils.fileExists(cardPath))) {
+    if (!(await fileExists(cardPath))) {
       return { files: 0, size: 0 };
     }
 
     try {
-      const files = await FileUtils.getFilesRecursively(cardPath);
+      const files = await getFilesRecursively(cardPath);
       const validFiles = files.filter(file => {
         const ext = path.extname(file).toLowerCase();
         return contentConfig.file_extensions.includes(ext);

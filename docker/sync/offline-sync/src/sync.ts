@@ -4,7 +4,7 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 import { promisify } from 'util';
 
-import { FileUtils } from '@dangerprep/files';
+import { getFilesRecursively, sanitizePath, ensureDirectory } from '@dangerprep/files';
 import { Logger, LoggerFactory } from '@dangerprep/logging';
 import * as fs from 'fs-extra';
 
@@ -126,13 +126,13 @@ export class SyncEngine extends EventEmitter {
 
     const localPath = contentConfig.local_path;
     // Sanitize paths to prevent path traversal
-    const sanitizedCardPath = FileUtils.sanitizePath(contentConfig.card_path);
-    const sanitizedMountPath = FileUtils.sanitizePath(operation.device.mountPath);
+    const sanitizedCardPath = sanitizePath(contentConfig.card_path);
+    const sanitizedMountPath = sanitizePath(operation.device.mountPath);
     const cardPath = path.join(sanitizedMountPath, sanitizedCardPath);
 
     // Ensure both directories exist
-    await FileUtils.ensureDirectory(localPath);
-    await FileUtils.ensureDirectory(cardPath);
+    await ensureDirectory(localPath);
+    await ensureDirectory(cardPath);
 
     // Determine sync direction
     const syncDirection = contentConfig.sync_direction;
@@ -157,12 +157,8 @@ export class SyncEngine extends EventEmitter {
   ): Promise<void> {
     this.log(`Syncing to card: ${localPath} -> ${cardPath}`);
 
-    const localFiles = await FileUtils.getFilesRecursively(localPath, [
-      ...contentConfig.file_extensions,
-    ]);
-    const cardFiles = await FileUtils.getFilesRecursively(cardPath, [
-      ...contentConfig.file_extensions,
-    ]);
+    const localFiles = await getFilesRecursively(localPath, [...contentConfig.file_extensions]);
+    const cardFiles = await getFilesRecursively(cardPath, [...contentConfig.file_extensions]);
 
     // Create a map of card files for quick lookup
     const cardFileMap = new Map<string, string>();
@@ -175,7 +171,7 @@ export class SyncEngine extends EventEmitter {
     for (const localFile of localFiles) {
       const relativePath = path.relative(localPath, localFile);
       // Sanitize relative path to prevent path traversal
-      const sanitizedRelativePath = FileUtils.sanitizePath(relativePath);
+      const sanitizedRelativePath = sanitizePath(relativePath);
       const targetPath = path.join(cardPath, sanitizedRelativePath);
       const existingCardFile = cardFileMap.get(relativePath);
 
@@ -211,12 +207,8 @@ export class SyncEngine extends EventEmitter {
   ): Promise<void> {
     this.log(`Syncing from card: ${cardPath} -> ${localPath}`);
 
-    const cardFiles = await FileUtils.getFilesRecursively(cardPath, [
-      ...contentConfig.file_extensions,
-    ]);
-    const localFiles = await FileUtils.getFilesRecursively(localPath, [
-      ...contentConfig.file_extensions,
-    ]);
+    const cardFiles = await getFilesRecursively(cardPath, [...contentConfig.file_extensions]);
+    const localFiles = await getFilesRecursively(localPath, [...contentConfig.file_extensions]);
 
     // Create a map of local files for quick lookup
     const localFileMap = new Map<string, string>();
@@ -229,7 +221,7 @@ export class SyncEngine extends EventEmitter {
     for (const cardFile of cardFiles) {
       const relativePath = path.relative(cardPath, cardFile);
       // Sanitize relative path to prevent path traversal
-      const sanitizedRelativePath = FileUtils.sanitizePath(relativePath);
+      const sanitizedRelativePath = sanitizePath(relativePath);
       const targetPath = path.join(localPath, sanitizedRelativePath);
       const existingLocalFile = localFileMap.get(relativePath);
 
@@ -281,7 +273,7 @@ export class SyncEngine extends EventEmitter {
       transfer.status = 'in_progress';
 
       // Ensure target directory exists
-      await FileUtils.ensureDirectory(path.dirname(targetPath));
+      await ensureDirectory(path.dirname(targetPath));
 
       // Copy file with progress tracking
       await this.copyFileWithProgress(transfer);

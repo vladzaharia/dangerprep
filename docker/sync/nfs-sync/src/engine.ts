@@ -1,7 +1,11 @@
 import path from 'path';
 
 import { ConfigManager } from '@dangerprep/configuration';
-import { AdvancedFileUtils, createDirectoryPath } from '@dangerprep/files';
+import {
+  ensureDirectoryAdvanced,
+  createDirectoryPath,
+  getDirectorySizeAdvanced,
+} from '@dangerprep/files';
 import { ComponentStatus } from '@dangerprep/health';
 import { LoggerFactory } from '@dangerprep/logging';
 import { NotificationType, NotificationLevel, WebhookChannel } from '@dangerprep/notifications';
@@ -144,16 +148,12 @@ export class SyncEngine extends BaseService {
     // Use advanced file utilities with Result pattern
     const directoryOperations = [
       () =>
-        AdvancedFileUtils.ensureDirectoryAdvanced(
-          createDirectoryPath(config.sync_config.local_storage.base_path)
-        ),
+        ensureDirectoryAdvanced(createDirectoryPath(config.sync_config.local_storage.base_path)),
       () =>
-        AdvancedFileUtils.ensureDirectoryAdvanced(
-          createDirectoryPath(path.dirname(config.sync_config.logging.file))
-        ),
+        ensureDirectoryAdvanced(createDirectoryPath(path.dirname(config.sync_config.logging.file))),
       ...Object.values(config.sync_config.content_types).map(
         contentConfig => () =>
-          AdvancedFileUtils.ensureDirectoryAdvanced(createDirectoryPath(contentConfig.local_path))
+          ensureDirectoryAdvanced(createDirectoryPath(contentConfig.local_path))
       ),
     ];
 
@@ -402,7 +402,7 @@ export class SyncEngine extends BaseService {
       async ([contentType, contentConfig]) => {
         try {
           const dirPath = createDirectoryPath(contentConfig.local_path);
-          const sizeResult = await AdvancedFileUtils.getDirectorySizeAdvanced(dirPath, {
+          const sizeResult = await getDirectorySizeAdvanced(dirPath, {
             timeout: 30000,
             logger: this.components.logger,
           });
