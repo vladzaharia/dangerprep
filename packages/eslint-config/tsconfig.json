@@ -1,14 +1,17 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@dangerprep/typescript-config/library.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }

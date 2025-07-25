@@ -6,8 +6,8 @@
   "main": "src/base.json",
   "exports": {
     "./base.json": "./src/base.json",
-    "./nextjs.json": "./src/nextjs.json",
-    "./node.json": "./src/node.json"
+    "./library.json": "./src/library.json",
+    "./service.json": "./src/service.json"
   },
   "files": [
     "src/**/*"
