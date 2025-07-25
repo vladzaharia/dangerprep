@@ -1,4 +1,4 @@
-import type { Logger } from '@dangerprep/shared/logging';
+import type { Logger } from '@dangerprep/logging';
 
 import { ContentTypeConfig } from '../types';
 

@@ -1,0 +1,32 @@
+{
+  "name": "@dangerprep/eslint-config",
+  "version": "1.0.0",
+  "description": "Shared ESLint configuration for DangerPrep projects",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src/**/*"
+  ],
+  "dependencies": {
+    "@eslint/js": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^5.0.0"
+  },
+  "peerDependencies": {
+    "eslint": "^8.0.0 || ^9.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "eslint",
+    "config",
+    "typescript",
+    "dangerprep"
+  ]
+}

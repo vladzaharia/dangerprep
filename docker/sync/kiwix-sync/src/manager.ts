@@ -1,18 +1,18 @@
 import path from 'path';
 
-import { ConfigManager } from '@dangerprep/shared/config';
-import { AdvancedFileUtils, createDirectoryPath } from '@dangerprep/shared/files';
-import { ComponentStatus } from '@dangerprep/shared/health';
-import { LoggerFactory } from '@dangerprep/shared/logging';
-import { NotificationType, NotificationLevel } from '@dangerprep/shared/notifications';
-import { Scheduler } from '@dangerprep/shared/scheduling';
+import { ConfigManager } from '@dangerprep/configuration';
+import { AdvancedFileUtils, createDirectoryPath } from '@dangerprep/files';
+import { ComponentStatus } from '@dangerprep/health';
+import { LoggerFactory } from '@dangerprep/logging';
+import { NotificationType, NotificationLevel } from '@dangerprep/notifications';
+import { Scheduler } from '@dangerprep/scheduling';
 import {
   BaseService,
   ServiceConfig,
   ServiceUtils,
   ServicePatterns,
   AdvancedAsyncPatterns,
-} from '@dangerprep/shared/service';
+} from '@dangerprep/service';
 
 import { ZimDownloader } from './services/downloader';
 import { LibraryManager } from './services/library';

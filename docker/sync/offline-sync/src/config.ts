@@ -1,5 +1,5 @@
-import { ConfigManager as SharedConfigManager } from '@dangerprep/shared/config';
-import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
+import { ConfigManager as SharedConfigManager } from '@dangerprep/configuration';
+import { Logger, LoggerFactory } from '@dangerprep/logging';
 
 import { OfflineSyncConfig, OfflineSyncConfigSchema } from './types';
 

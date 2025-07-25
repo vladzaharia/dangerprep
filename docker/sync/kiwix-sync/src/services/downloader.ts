@@ -2,8 +2,8 @@ import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import { FileUtils } from '@dangerprep/shared/files';
-import type { Logger } from '@dangerprep/shared/logging';
+import { FileUtils } from '@dangerprep/files';
+import type { Logger } from '@dangerprep/logging';
 import axios from 'axios';
 
 import type { KiwixConfig, ZimPackage } from '../types';

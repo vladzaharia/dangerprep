@@ -2,7 +2,7 @@ import { exec } from 'child_process';
 import { EventEmitter } from 'events';
 import { promisify } from 'util';
 
-import { Logger, LoggerFactory } from '@dangerprep/shared/logging';
+import { Logger, LoggerFactory } from '@dangerprep/logging';
 import { usb } from 'usb';
 
 import { DetectedDevice, OfflineSyncConfig, LsblkOutput, DiskSpaceInfo } from './types';

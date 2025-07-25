@@ -20,7 +20,13 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@dangerprep/shared": "workspace:*",
+    "@dangerprep/configuration": "workspace:*",
+    "@dangerprep/files": "workspace:*",
+    "@dangerprep/health": "workspace:*",
+    "@dangerprep/logging": "workspace:*",
+    "@dangerprep/notifications": "workspace:*",
+    "@dangerprep/scheduling": "workspace:*",
+    "@dangerprep/service": "workspace:*",
     "aria2": "^4.1.2",
     "axios": "^1.6.0",
     "commander": "^11.0.0",
@@ -28,6 +34,7 @@
     "node-cron": "^3.0.2"
   },
   "devDependencies": {
+    "@dangerprep/typescript-config": "workspace:*",
     "@types/jest": "^29.5.0",
     "@types/js-yaml": "^4.0.5",
     "@types/node": "^20.14.0",

@@ -7,7 +7,7 @@
   "packageManager": "yarn@4.5.3",
   "workspaces": [
     "cli",
-    "shared",
+    "packages/*",
     "docker/sync/*"
   ],
   "scripts": {
@@ -32,6 +32,9 @@
     "postinstall": "turbo run postinstall || true"
   },
   "devDependencies": {
+    "@dangerprep/eslint-config": "workspace:*",
+    "@dangerprep/prettier-config": "workspace:*",
+    "@dangerprep/typescript-config": "workspace:*",
     "@types/node": "^20.14.0",
     "@types/node-cron": "^3.0.11",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
