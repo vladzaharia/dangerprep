@@ -4,13 +4,10 @@
   "description": "Modern structured logging for DangerPrep services",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -28,14 +25,11 @@
     "test": "jest",
     "test:watch": "jest --watch"
   },
-  "dependencies": {
-    "winston": "^3.15.0"
-  },
   "devDependencies": {
     "@dangerprep/typescript": "workspace:*",
-    "@types/node": "^20.0.0",
+    "@types/node": "^24.0.0",
     "rimraf": "^6.0.1",
-    "typescript": "^5.0.0"
+    "typescript": "^5.8.3"
   },
   "keywords": [
     "logging",

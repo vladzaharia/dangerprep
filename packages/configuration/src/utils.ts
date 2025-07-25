@@ -34,6 +34,30 @@ const TIME_UNITS = {
 export type TimeUnit = keyof typeof TIME_UNITS;
 
 /**
+ * Readable size constants for use in configuration defaults
+ */
+export const SIZE = {
+  BYTE: SIZE_UNITS.B,
+  KB: SIZE_UNITS.KB,
+  MB: SIZE_UNITS.MB,
+  GB: SIZE_UNITS.GB,
+  TB: SIZE_UNITS.TB,
+  PB: SIZE_UNITS.PB,
+} as const;
+
+/**
+ * Readable time constants for use in configuration defaults
+ */
+export const TIME = {
+  MILLISECOND: TIME_UNITS.ms,
+  SECOND: TIME_UNITS.s,
+  MINUTE: TIME_UNITS.m,
+  HOUR: TIME_UNITS.h,
+  DAY: TIME_UNITS.d,
+  WEEK: TIME_UNITS.w,
+} as const;
+
+/**
  * Configuration parsing and transformation utilities
  */
 export class ConfigUtils {
@@ -530,7 +554,7 @@ export class ConfigurationBuilder<T extends Record<string, unknown>> {
       // Validate with schema
       const validationResult = this.schema.safeParse(config);
       if (!validationResult.success) {
-        const errors = validationResult.error.errors.map(err => ({
+        const errors = validationResult.error.issues.map(err => ({
           field: err.path.join('.'),
           message: err.message,
           value: undefined, // Zod doesn't provide input value in errors

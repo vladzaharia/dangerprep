@@ -4,13 +4,10 @@
   "description": "Cron-based task scheduling with proper error handling for DangerPrep services",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -30,14 +27,14 @@
   },
   "dependencies": {
     "@dangerprep/logging": "workspace:*",
-    "node-cron": "^3.0.2"
+    "node-cron": "^4.2.1"
   },
   "devDependencies": {
     "@dangerprep/typescript": "workspace:*",
-    "@types/node": "^20.0.0",
-    "@types/node-cron": "^3.0.8",
+    "@types/node": "^24.0.0",
+    "@types/node-cron": "^3.0.11",
     "rimraf": "^6.0.1",
-    "typescript": "^5.0.0"
+    "typescript": "^5.8.3"
   },
   "keywords": [
     "scheduling",

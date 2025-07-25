@@ -4,7 +4,7 @@ import { ConfigManager } from '@dangerprep/configuration';
 import { HealthUtils } from '@dangerprep/health';
 import { LoggerFactory } from '@dangerprep/logging';
 import { NotificationManager as NotificationManagerImpl } from '@dangerprep/notifications';
-import type { ZodType, ZodTypeDef } from 'zod';
+import type { ZodType } from 'zod';
 
 import {
   ServiceState,
@@ -345,10 +345,7 @@ export abstract class BaseService extends EventEmitter {
     }
   }
 
-  protected updateConfigManagerLogger<T>(
-    configPath: string,
-    schema: ZodType<T, ZodTypeDef, T>
-  ): ConfigManager<T> {
+  protected updateConfigManagerLogger<T>(configPath: string, schema: ZodType<T>): ConfigManager<T> {
     return new ConfigManager(configPath, schema, {
       logger: this.components.logger,
     });

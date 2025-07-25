@@ -1,0 +1,47 @@
+{
+  "source": [
+    "package.json",
+    "packages/*/package.json", 
+    "docker/sync/*/package.json"
+  ],
+
+  "semverGroups": [
+    {
+      "label": "Use workspace protocol for internal dependencies",
+      "packages": ["**"],
+      "dependencies": ["@dangerprep/**"],
+      "dependencyTypes": ["prod", "dev"],
+      "range": "workspace:*"
+    }
+  ],
+  "versionGroups": [
+    {
+      "label": "Use workspace protocol for internal dependencies",
+      "packages": ["**"],
+      "dependencies": ["@dangerprep/**"],
+      "dependencyTypes": ["prod", "dev"],
+      "policy": "sameRange"
+    },
+    {
+      "label": "Use consistent versions for core tooling",
+      "packages": ["**"],
+      "dependencies": ["typescript", "eslint", "prettier", "@typescript-eslint/eslint-plugin", "@typescript-eslint/parser"],
+      "dependencyTypes": ["dev", "peer"],
+      "policy": "sameRange"
+    },
+    {
+      "label": "Use consistent versions for shared dependencies",
+      "packages": ["**"],
+      "dependencies": ["@types/node", "@types/jest", "rimraf", "ts-node", "jest"],
+      "dependencyTypes": ["dev"],
+      "policy": "sameRange"
+    },
+    {
+      "label": "Use consistent versions for runtime dependencies",
+      "packages": ["**"],
+      "dependencies": ["axios", "commander", "node-cron", "js-yaml"],
+      "dependencyTypes": ["prod"],
+      "policy": "sameRange"
+    }
+  ]
+}
