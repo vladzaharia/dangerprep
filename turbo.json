@@ -47,6 +47,10 @@
     "deps:check": {
       "outputs": []
     },
+    "deps:fix": {
+      "cache": false,
+      "outputs": []
+    },
     "deps:update": {
       "cache": false,
       "outputs": []

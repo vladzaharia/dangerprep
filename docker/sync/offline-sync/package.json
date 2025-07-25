@@ -28,25 +28,24 @@
     "@dangerprep/notifications": "workspace:*",
     "@dangerprep/retry": "workspace:*",
     "@dangerprep/service": "workspace:*",
-    "chokidar": "^3.6.0",
-    "commander": "^11.0.0",
-    "fs-extra": "^11.2.0",
+    "commander": "^14.0.0",
+    "fs-extra": "^11.3.0",
     "js-yaml": "^4.1.0",
-    "node-cron": "^3.0.2",
+    "node-cron": "^4.2.1",
     "usb": "^2.16.0"
   },
   "devDependencies": {
     "@dangerprep/typescript": "workspace:*",
     "@types/fs-extra": "^11.0.4",
-    "@types/jest": "^29.5.0",
+    "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.5",
-    "@types/node": "^20.14.0",
-    "eslint": "^9.15.0",
-    "jest": "^29.7.0",
-    "prettier": "^3.3.3",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.32.0",
+    "jest": "^30.0.0",
+    "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.8.3"
   },
   "engines": {
     "node": ">=20.0.0"

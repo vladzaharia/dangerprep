@@ -17,6 +17,7 @@ export const OfflineSyncConfigSchema = z.object({
       mount_retry_delay: z.number().positive(),
     }),
     content_types: z.record(
+      z.string(),
       z.object({
         local_path: z.string(),
         card_path: z.string(),

@@ -5,7 +5,7 @@ export const SyncConfigSchema = z.object({
   sync_config: z.object({
     central_nas: z.object({
       host: z.string(),
-      nfs_shares: z.record(z.string()),
+      nfs_shares: z.record(z.string(), z.string()),
     }),
     plex: z.object({
       server: z.string(),
@@ -16,6 +16,7 @@ export const SyncConfigSchema = z.object({
       max_total_size: z.string(),
     }),
     content_types: z.record(
+      z.string(),
       z.object({
         type: z.enum(['full_sync', 'metadata_filtered', 'folder_filtered', 'kiwix_updater']),
         schedule: z.string(),

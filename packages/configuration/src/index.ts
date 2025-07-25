@@ -48,7 +48,7 @@ export class ConfigValidationError extends Error {
    * Get formatted error details
    */
   getFormattedErrors(): string[] {
-    return this.errors.errors.map(error => {
+    return this.errors.issues.map(error => {
       const path = error.path.join('.');
       return `${path}: ${error.message}`;
     });
@@ -374,6 +374,6 @@ export function createConfigManager<T>(
 export { z } from 'zod';
 
 // Export configuration utilities and standard schemas
-export { ConfigUtils, ConfigurationBuilder } from './utils.js';
+export { ConfigUtils, ConfigurationBuilder, SIZE, TIME } from './utils.js';
 export * from './schemas.js';
 export { ConfigFactory } from './factory.js';

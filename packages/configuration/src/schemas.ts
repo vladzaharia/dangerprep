@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 
-import { ConfigUtils } from './utils.js';
+import { ConfigUtils, SIZE, TIME } from './utils.js';
 
 /**
  * Standard storage configuration schema
@@ -39,7 +39,7 @@ export const LoggingConfigSchema = z.object({
   /** Log file path (optional for console-only logging) */
   file: z.string().optional(),
   /** Maximum log file size before rotation */
-  max_size: ConfigUtils.sizeTransformer().default('50MB'),
+  max_size: ConfigUtils.sizeTransformer().default(50 * SIZE.MB),
   /** Number of backup files to keep */
   backup_count: z.number().int().min(0).default(3),
   /** Log format */
@@ -63,7 +63,7 @@ export const SchedulingConfigSchema = z.object({
   /** Timezone for schedule interpretation */
   timezone: z.string().default('UTC'),
   /** Maximum execution time before timeout */
-  timeout: ConfigUtils.durationTransformer().default('1h'),
+  timeout: ConfigUtils.durationTransformer().default(1 * TIME.HOUR),
   /** Whether to run immediately on startup */
   run_on_startup: z.boolean().default(false),
 });
@@ -73,17 +73,17 @@ export const SchedulingConfigSchema = z.object({
  */
 export const NetworkConfigSchema = z.object({
   /** Request timeout */
-  timeout: ConfigUtils.durationTransformer().default('30s'),
+  timeout: ConfigUtils.durationTransformer().default(30 * TIME.SECOND),
   /** Number of retry attempts */
   retry_attempts: z.number().int().min(0).default(3),
   /** Delay between retry attempts */
-  retry_delay: ConfigUtils.durationTransformer().default('1s'),
+  retry_delay: ConfigUtils.durationTransformer().default(1 * TIME.SECOND),
   /** Maximum retry delay (for exponential backoff) */
-  max_retry_delay: ConfigUtils.durationTransformer().default('30s'),
+  max_retry_delay: ConfigUtils.durationTransformer().default(30 * TIME.SECOND),
   /** User agent string */
   user_agent: z.string().optional(),
   /** Custom headers */
-  headers: z.record(z.string()).default({}),
+  headers: z.record(z.string(), z.string()).default({}),
 });
 
 /**
@@ -93,9 +93,9 @@ export const PerformanceConfigSchema = z.object({
   /** Maximum number of concurrent operations */
   max_concurrent: z.number().int().min(1).default(3),
   /** Chunk size for file operations */
-  chunk_size: ConfigUtils.sizeTransformer().default('10MB'),
+  chunk_size: ConfigUtils.sizeTransformer().default(10 * SIZE.MB),
   /** Buffer size for streaming operations */
-  buffer_size: ConfigUtils.sizeTransformer().default('64KB'),
+  buffer_size: ConfigUtils.sizeTransformer().default(64 * SIZE.KB),
   /** Memory limit for operations */
   memory_limit: ConfigUtils.sizeTransformer().optional(),
   /** CPU limit (percentage) */
@@ -109,9 +109,9 @@ export const HealthCheckConfigSchema = z.object({
   /** Whether health checks are enabled */
   enabled: z.boolean().default(true),
   /** Health check interval */
-  interval: ConfigUtils.durationTransformer().default('5m'),
+  interval: ConfigUtils.durationTransformer().default(5 * TIME.MINUTE),
   /** Health check timeout */
-  timeout: ConfigUtils.durationTransformer().default('10s'),
+  timeout: ConfigUtils.durationTransformer().default(10 * TIME.SECOND),
   /** Endpoint for external health checks */
   endpoint: z.string().optional(),
   /** Port for health check server */
@@ -147,7 +147,10 @@ export const NotificationConfigSchema = z.object({
       max_per_minute: z.number().int().min(1).default(10),
       max_per_hour: z.number().int().min(1).default(100),
     })
-    .default({}),
+    .default({
+      max_per_minute: 10,
+      max_per_hour: 100,
+    }),
 });
 
 /**
@@ -254,7 +257,7 @@ export class StandardSchemas {
    */
   static createSyncServiceSchema<T extends z.ZodRawShape>(additionalFields: T) {
     return StandardSchemas.createStorageServiceSchema({
-      content_types: z.record(ContentTypeConfigSchema),
+      content_types: z.record(z.string(), ContentTypeConfigSchema),
       scheduling: SchedulingConfigSchema.optional(),
       ...additionalFields,
     });
