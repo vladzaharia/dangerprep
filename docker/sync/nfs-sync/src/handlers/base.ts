@@ -1,4 +1,11 @@
-import { FileUtils } from '@dangerprep/files';
+import {
+  getDirectorySize,
+  parseSize,
+  formatSize,
+  ensureDirectory,
+  rsyncDirectory,
+  fileExists,
+} from '@dangerprep/files';
 import type { Logger } from '@dangerprep/logging';
 
 import { ContentTypeConfig } from '../types';
@@ -14,19 +21,19 @@ export abstract class BaseHandler {
   abstract sync(): Promise<boolean>;
 
   protected async getDirectorySize(dirPath: string): Promise<number> {
-    return await FileUtils.getDirectorySize(dirPath);
+    return await getDirectorySize(dirPath);
   }
 
   protected parseSize(sizeStr: string): number {
-    return FileUtils.parseSize(sizeStr);
+    return parseSize(sizeStr);
   }
 
   protected formatSize(bytes: number): string {
-    return FileUtils.formatSize(bytes);
+    return formatSize(bytes);
   }
 
   protected async ensureDirectory(dirPath: string): Promise<void> {
-    return await FileUtils.ensureDirectory(dirPath);
+    return await ensureDirectory(dirPath);
   }
 
   protected async rsyncDirectory(
@@ -57,11 +64,11 @@ export abstract class BaseHandler {
       rsyncOptions.dryRun = options.dryRun;
     }
 
-    return await FileUtils.rsyncDirectory(sourcePath, destPath, rsyncOptions);
+    return await rsyncDirectory(sourcePath, destPath, rsyncOptions);
   }
 
   protected async fileExists(filePath: string): Promise<boolean> {
-    return await FileUtils.fileExists(filePath);
+    return await fileExists(filePath);
   }
 
   protected logSyncStart(): void {

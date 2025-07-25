@@ -1,7 +1,7 @@
 import path from 'path';
 
 import { ConfigManager } from '@dangerprep/configuration';
-import { AdvancedFileUtils, createDirectoryPath } from '@dangerprep/files';
+import { ensureDirectoryAdvanced, createDirectoryPath } from '@dangerprep/files';
 import { ComponentStatus } from '@dangerprep/health';
 import { LoggerFactory } from '@dangerprep/logging';
 import { NotificationType, NotificationLevel } from '@dangerprep/notifications';
@@ -109,14 +109,11 @@ export class KiwixManager extends BaseService {
 
     // Use advanced file utilities with Result pattern and parallel execution
     const directoryOperations = [
-      () => AdvancedFileUtils.ensureDirectoryAdvanced(createDirectoryPath(storage.zim_directory)),
-      () => AdvancedFileUtils.ensureDirectoryAdvanced(createDirectoryPath(storage.temp_directory)),
+      () => ensureDirectoryAdvanced(createDirectoryPath(storage.zim_directory)),
+      () => ensureDirectoryAdvanced(createDirectoryPath(storage.temp_directory)),
+      () => ensureDirectoryAdvanced(createDirectoryPath(path.dirname(storage.library_file))),
       () =>
-        AdvancedFileUtils.ensureDirectoryAdvanced(
-          createDirectoryPath(path.dirname(storage.library_file))
-        ),
-      () =>
-        AdvancedFileUtils.ensureDirectoryAdvanced(
+        ensureDirectoryAdvanced(
           createDirectoryPath(path.dirname(config.kiwix_manager.logging.file))
         ),
     ];

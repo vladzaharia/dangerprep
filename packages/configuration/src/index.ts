@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import { FileUtils } from '@dangerprep/files';
+import { fileExists, ensureDirectory } from '@dangerprep/files';
 import type { Logger } from '@dangerprep/logging';
 import { load as yamlLoad, dump as yamlDump } from 'js-yaml';
 import { z } from 'zod';
@@ -109,7 +109,7 @@ export class ConfigManager<T> {
    */
   async loadConfig(): Promise<T> {
     try {
-      if (!(await FileUtils.fileExists(this.configPath))) {
+      if (!(await fileExists(this.configPath))) {
         throw new Error(`Configuration file not found: ${this.configPath}`);
       }
 
@@ -172,7 +172,7 @@ export class ConfigManager<T> {
       const yamlContent = yamlDump(result.data, this.options.yamlOptions);
 
       if (this.options.createDirs) {
-        await FileUtils.ensureDirectory(path.dirname(this.configPath));
+        await ensureDirectory(path.dirname(this.configPath));
       }
 
       await fs.writeFile(this.configPath, yamlContent, 'utf8');
@@ -287,7 +287,7 @@ export class ConfigManager<T> {
    * Check if configuration file exists
    */
   async configExists(): Promise<boolean> {
-    return FileUtils.fileExists(this.configPath);
+    return fileExists(this.configPath);
   }
 
   /**

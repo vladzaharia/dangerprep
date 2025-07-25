@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import { FileUtils } from '@dangerprep/files';
+import { fileExists, moveFile, deleteFile, formatSize } from '@dangerprep/files';
 import type { Logger } from '@dangerprep/logging';
 
 import type { KiwixConfig, ZimPackage } from '../types';
@@ -36,8 +36,8 @@ export class ZimUpdater {
       const existingPath = path.join(this.config.storage.zim_directory, `${packageName}.zim`);
       const backupPath = path.join(this.config.storage.zim_directory, `${packageName}.zim.backup`);
 
-      if (await FileUtils.fileExists(existingPath)) {
-        await FileUtils.moveFile(existingPath, backupPath);
+      if (await fileExists(existingPath)) {
+        await moveFile(existingPath, backupPath);
         this.logger.debug(`Backed up existing file to ${backupPath}`);
       }
 
@@ -46,16 +46,16 @@ export class ZimUpdater {
 
       if (success) {
         // Remove backup on successful update
-        if (await FileUtils.fileExists(backupPath)) {
-          await FileUtils.deleteFile(backupPath);
+        if (await fileExists(backupPath)) {
+          await deleteFile(backupPath);
           this.logger.debug(`Removed backup file ${backupPath}`);
         }
         this.logger.info(`Successfully updated ${packageName}`);
         return true;
       } else {
         // Restore backup on failure
-        if (await FileUtils.fileExists(backupPath)) {
-          await FileUtils.moveFile(backupPath, existingPath);
+        if (await fileExists(backupPath)) {
+          await moveFile(backupPath, existingPath);
           this.logger.info(`Restored backup for ${packageName}`);
         }
         this.logger.error(`Failed to update ${packageName}`);
@@ -112,7 +112,7 @@ export class ZimUpdater {
           name: packageName,
           title: packageName.replace(/_/g, ' '),
           description: `Local ZIM file: ${file}`,
-          size: FileUtils.formatSize(stats.size),
+          size: formatSize(stats.size),
           date: stats.mtime.toISOString(),
           path: filePath,
         });
@@ -148,7 +148,7 @@ export class ZimUpdater {
       for (const backupFile of backupFiles) {
         const filePath = path.join(zimDir, backupFile);
         try {
-          await FileUtils.deleteFile(filePath);
+          await deleteFile(filePath);
           this.logger.debug(`Deleted old file: ${backupFile}`);
         } catch (error) {
           this.logger.warn(`Failed to delete ${backupFile}: ${error}`);
@@ -157,12 +157,12 @@ export class ZimUpdater {
 
       // Clean up temp directory
       const tempDir = this.config.storage.temp_directory;
-      if (await FileUtils.fileExists(tempDir)) {
+      if (await fileExists(tempDir)) {
         const tempFiles = await fs.readdir(tempDir);
         for (const tempFile of tempFiles) {
           const tempFilePath = path.join(tempDir, tempFile);
           try {
-            await FileUtils.deleteFile(tempFilePath);
+            await deleteFile(tempFilePath);
             this.logger.debug(`Deleted temp file: ${tempFile}`);
           } catch (error) {
             this.logger.warn(`Failed to delete temp file ${tempFile}: ${error}`);

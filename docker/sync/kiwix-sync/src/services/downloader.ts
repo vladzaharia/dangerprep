@@ -2,7 +2,15 @@ import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import { FileUtils } from '@dangerprep/files';
+import {
+  ensureDirectory,
+  fileExists,
+  getFileStats,
+  formatSize,
+  getDirectorySize,
+  parseSize,
+  moveFile,
+} from '@dangerprep/files';
 import type { Logger } from '@dangerprep/logging';
 import axios from 'axios';
 
@@ -32,7 +40,7 @@ export class ZimDownloader {
         name: (entry.name as string) || (entry.id as string),
         title: entry.title as string,
         description: entry.description as string,
-        size: FileUtils.formatSize(typeof entry.size === 'number' ? entry.size : 0),
+        size: formatSize(typeof entry.size === 'number' ? entry.size : 0),
         date: entry.date as string,
         url: entry.url as string,
       }));
@@ -59,16 +67,16 @@ export class ZimDownloader {
       }
 
       // Ensure directories exist
-      await FileUtils.ensureDirectory(this.config.storage.zim_directory);
-      await FileUtils.ensureDirectory(this.config.storage.temp_directory);
+      await ensureDirectory(this.config.storage.zim_directory);
+      await ensureDirectory(this.config.storage.temp_directory);
 
       // Check available space
-      const currentSize = await FileUtils.getDirectorySize(this.config.storage.zim_directory);
-      const maxSize = FileUtils.parseSize(this.config.storage.max_total_size);
+      const currentSize = await getDirectorySize(this.config.storage.zim_directory);
+      const maxSize = parseSize(this.config.storage.max_total_size);
 
       if (currentSize >= maxSize) {
         this.logger.error(
-          `Storage full: ${FileUtils.formatSize(currentSize)} >= ${this.config.storage.max_total_size}`
+          `Storage full: ${formatSize(currentSize)} >= ${this.config.storage.max_total_size}`
         );
         return false;
       }
@@ -81,7 +89,7 @@ export class ZimDownloader {
 
       if (success) {
         // Move from temp to final location
-        await FileUtils.moveFile(tempFilePath, finalFilePath);
+        await moveFile(tempFilePath, finalFilePath);
         this.logger.info(`Successfully downloaded ${packageName}`);
         return true;
       } else {
@@ -165,7 +173,7 @@ export class ZimDownloader {
   async checkForUpdates(packageName: string): Promise<boolean> {
     try {
       const localPath = path.join(this.config.storage.zim_directory, `${packageName}.zim`);
-      const packageExists = await FileUtils.fileExists(localPath);
+      const packageExists = await fileExists(localPath);
 
       if (!packageExists) {
         return true; // New package, needs download
