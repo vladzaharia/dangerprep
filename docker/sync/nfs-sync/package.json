@@ -32,7 +32,7 @@
     "node-cron": "^3.0.2"
   },
   "devDependencies": {
-    "@dangerprep/typescript-config": "workspace:*",
+    "@dangerprep/typescript": "workspace:*",
     "@types/jest": "^29.5.0",
     "@types/js-yaml": "^4.0.5",
     "@types/node": "^20.14.0",

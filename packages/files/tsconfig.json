@@ -1,9 +1,13 @@
 {
-  "extends": "@dangerprep/typescript-config/library.json",
+  "extends": "@dangerprep/typescript/library.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    "composite": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
   "include": [
     "src/**/*"

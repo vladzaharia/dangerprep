@@ -1,5 +1,5 @@
 {
-  "extends": "@dangerprep/typescript-config/library.json",
+  "extends": "@dangerprep/typescript/library.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",

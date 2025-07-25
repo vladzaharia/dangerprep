@@ -1,3 +1,3 @@
-import config from '@dangerprep/eslint-config';
+import config from '@dangerprep/eslint';
 
 export default config;

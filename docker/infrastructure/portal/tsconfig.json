@@ -1,5 +1,5 @@
 {
-  "extends": "@dangerprep/typescript-config/base.json",
+  "extends": "@dangerprep/typescript/base.json",
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["DOM", "DOM.Iterable", "ES2022"],

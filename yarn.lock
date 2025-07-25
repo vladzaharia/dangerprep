@@ -423,7 +423,7 @@ __metadata:
   resolution: "@dangerprep/breaker@workspace:packages/breaker"
   dependencies:
     "@dangerprep/errors": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.0.0"
@@ -436,7 +436,7 @@ __metadata:
   dependencies:
     "@dangerprep/files": "workspace:*"
     "@dangerprep/logging": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/js-yaml": "npm:^4.0.5"
     "@types/node": "npm:^20.0.0"
     js-yaml: "npm:^4.1.0"
@@ -450,16 +450,16 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@dangerprep/errors@workspace:packages/errors"
   dependencies:
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.0.0"
   languageName: unknown
   linkType: soft
 
-"@dangerprep/eslint-config@workspace:*, @dangerprep/eslint-config@workspace:packages/eslint-config":
+"@dangerprep/eslint@workspace:*, @dangerprep/eslint@workspace:packages/_development/eslint":
   version: 0.0.0-use.local
-  resolution: "@dangerprep/eslint-config@workspace:packages/eslint-config"
+  resolution: "@dangerprep/eslint@workspace:packages/_development/eslint"
   dependencies:
     "@eslint/js": "npm:^9.0.0"
     "@typescript-eslint/eslint-plugin": "npm:^6.0.0"
@@ -478,7 +478,7 @@ __metadata:
   resolution: "@dangerprep/files@workspace:packages/files"
   dependencies:
     "@dangerprep/logging": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.0.0"
@@ -491,7 +491,7 @@ __metadata:
   dependencies:
     "@dangerprep/logging": "workspace:*"
     "@dangerprep/notifications": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.0.0"
@@ -509,7 +509,7 @@ __metadata:
     "@dangerprep/notifications": "workspace:*"
     "@dangerprep/scheduling": "workspace:*"
     "@dangerprep/service": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/jest": "npm:^29.5.0"
     "@types/js-yaml": "npm:^4.0.5"
     "@types/node": "npm:^20.14.0"
@@ -531,7 +531,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@dangerprep/logging@workspace:packages/logging"
   dependencies:
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.0.0"
@@ -550,7 +550,7 @@ __metadata:
     "@dangerprep/notifications": "workspace:*"
     "@dangerprep/scheduling": "workspace:*"
     "@dangerprep/service": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/jest": "npm:^29.5.0"
     "@types/js-yaml": "npm:^4.0.5"
     "@types/node": "npm:^20.14.0"
@@ -572,7 +572,7 @@ __metadata:
   resolution: "@dangerprep/notifications@workspace:packages/notifications"
   dependencies:
     "@dangerprep/logging": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     axios: "npm:^1.6.0"
     rimraf: "npm:^6.0.1"
@@ -592,7 +592,7 @@ __metadata:
     "@dangerprep/notifications": "workspace:*"
     "@dangerprep/retry": "workspace:*"
     "@dangerprep/service": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/fs-extra": "npm:^11.0.4"
     "@types/jest": "npm:^29.5.0"
     "@types/js-yaml": "npm:^4.0.5"
@@ -612,9 +612,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@dangerprep/prettier-config@workspace:*, @dangerprep/prettier-config@workspace:packages/prettier-config":
+"@dangerprep/prettier@workspace:*, @dangerprep/prettier@workspace:packages/_development/prettier":
   version: 0.0.0-use.local
-  resolution: "@dangerprep/prettier-config@workspace:packages/prettier-config"
+  resolution: "@dangerprep/prettier@workspace:packages/_development/prettier"
   peerDependencies:
     prettier: ^3.0.0
   languageName: unknown
@@ -625,7 +625,7 @@ __metadata:
   resolution: "@dangerprep/progress@workspace:packages/progress"
   dependencies:
     "@dangerprep/logging": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.0.0"
@@ -637,7 +637,7 @@ __metadata:
   resolution: "@dangerprep/retry@workspace:packages/retry"
   dependencies:
     "@dangerprep/errors": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.0.0"
@@ -649,7 +649,7 @@ __metadata:
   resolution: "@dangerprep/scheduling@workspace:packages/scheduling"
   dependencies:
     "@dangerprep/logging": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     "@types/node-cron": "npm:^3.0.8"
     node-cron: "npm:^3.0.2"
@@ -667,7 +667,7 @@ __metadata:
     "@dangerprep/logging": "workspace:*"
     "@dangerprep/notifications": "workspace:*"
     "@dangerprep/scheduling": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.0.0"
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.0.0"
@@ -675,9 +675,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@dangerprep/typescript-config@workspace:*, @dangerprep/typescript-config@workspace:packages/typescript-config":
+"@dangerprep/typescript@workspace:*, @dangerprep/typescript@workspace:packages/_development/typescript":
   version: 0.0.0-use.local
-  resolution: "@dangerprep/typescript-config@workspace:packages/typescript-config"
+  resolution: "@dangerprep/typescript@workspace:packages/_development/typescript"
   peerDependencies:
     typescript: ^5.0.0
   languageName: unknown
@@ -2456,9 +2456,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "dangerprep@workspace:."
   dependencies:
-    "@dangerprep/eslint-config": "workspace:*"
-    "@dangerprep/prettier-config": "workspace:*"
-    "@dangerprep/typescript-config": "workspace:*"
+    "@dangerprep/eslint": "workspace:*"
+    "@dangerprep/prettier": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
     "@types/node": "npm:^20.14.0"
     "@types/node-cron": "npm:^3.0.11"
     "@typescript-eslint/eslint-plugin": "npm:^8.15.0"
