@@ -35,7 +35,7 @@
     "zod": "^3.22.0"
   },
   "devDependencies": {
-    "@dangerprep/typescript-config": "workspace:*",
+    "@dangerprep/typescript": "workspace:*",
     "@types/js-yaml": "^4.0.5",
     "@types/node": "^20.0.0",
     "rimraf": "^6.0.1",

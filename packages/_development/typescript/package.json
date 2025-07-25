@@ -1,5 +1,5 @@
 {
-  "name": "@dangerprep/typescript-config",
+  "name": "@dangerprep/typescript",
   "version": "1.0.0",
   "description": "Shared TypeScript configuration for DangerPrep projects",
   "private": true,

@@ -1,11 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "DangerPrep Workspace TypeScript Config",
-  "extends": "@dangerprep/typescript-config/base.json",
+  "extends": "@dangerprep/typescript/base.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@dangerprep/*": ["./packages/*/src", "./docker/sync/*/src"]
+      "@dangerprep/*": ["./packages/*/src", "./packages/_development/*/src", "./docker/sync/*/src"]
     }
   }
 }

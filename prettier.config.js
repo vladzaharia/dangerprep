@@ -1,3 +1,3 @@
-import config from '@dangerprep/prettier-config';
+import config from '@dangerprep/prettier';
 
 export default config;

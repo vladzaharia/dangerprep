@@ -1,5 +1,5 @@
 {
-  "name": "@dangerprep/prettier-config",
+  "name": "@dangerprep/prettier",
   "version": "1.0.0",
   "description": "Shared Prettier configuration for DangerPrep projects",
   "private": true,

@@ -1,5 +1,5 @@
 {
-  "name": "@dangerprep/eslint-config",
+  "name": "@dangerprep/eslint",
   "version": "1.0.0",
   "description": "Shared ESLint configuration for DangerPrep projects",
   "private": true,
