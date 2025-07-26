@@ -13,7 +13,6 @@ export class Logger {
     this.component = config.component;
     this.level = typeof config.level === 'string' ? this.parseLogLevel(config.level) : config.level;
 
-    // Default to console transport if none provided
     this.transports = config.transports || [new ConsoleTransport()];
   }
 
@@ -102,7 +101,6 @@ export class Logger {
     data?: Record<string, unknown>,
     error?: Error
   ): void {
-    // Check if we should log this level
     if (level < this.level) {
       return;
     }
@@ -116,11 +114,8 @@ export class Logger {
       ...(error && { error }),
     };
 
-    // Log to all transports asynchronously
     this.transports.forEach(transport => {
       transport.log(entry).catch(err => {
-        // Fallback error handling - don't let transport errors break the application
-        // eslint-disable-next-line no-console
         console.error(`Transport ${transport.name} failed:`, err);
       });
     });

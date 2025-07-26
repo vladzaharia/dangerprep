@@ -10,49 +10,11 @@ import {
   HealthCheckConfig,
   ComponentCheck,
   HealthMetrics,
+  type ComponentName,
+  type HealthScore,
+  createComponentName,
+  createHealthScore,
 } from './types.js';
-
-// Branded types for health checking
-export type ComponentName = string & { readonly __brand: 'ComponentName' };
-export type HealthCheckTimeout = number & { readonly __brand: 'HealthCheckTimeout' };
-export type HealthScore = number & { readonly __brand: 'HealthScore' };
-
-// Type guards
-export function isComponentName(value: string): value is ComponentName {
-  return typeof value === 'string' && value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value);
-}
-
-export function isHealthCheckTimeout(value: number): value is HealthCheckTimeout {
-  return typeof value === 'number' && value > 0 && value <= 300000; // Max 5 minutes
-}
-
-export function isHealthScore(value: number): value is HealthScore {
-  return typeof value === 'number' && value >= 0 && value <= 100;
-}
-
-// Factory functions
-export function createComponentName(name: string): ComponentName {
-  if (!isComponentName(name)) {
-    throw new Error(
-      `Invalid component name: ${name}. Must be alphanumeric with hyphens/underscores only.`
-    );
-  }
-  return name;
-}
-
-export function createHealthCheckTimeout(timeout: number): HealthCheckTimeout {
-  if (!isHealthCheckTimeout(timeout)) {
-    throw new Error(`Invalid health check timeout: ${timeout}. Must be between 1ms and 300000ms.`);
-  }
-  return timeout;
-}
-
-export function createHealthScore(score: number): HealthScore {
-  if (!isHealthScore(score)) {
-    throw new Error(`Invalid health score: ${score}. Must be between 0 and 100.`);
-  }
-  return score;
-}
 
 // Enhanced health check result with immutable patterns
 interface EnhancedHealthCheckResult extends HealthCheckResult {

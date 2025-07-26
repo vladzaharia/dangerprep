@@ -258,7 +258,7 @@ export class ConfigFactory {
             format: 'text' as const,
           },
           performance: {
-            max_concurrent: 1, // Easier debugging
+            max_concurrent: 1,
           },
         });
 

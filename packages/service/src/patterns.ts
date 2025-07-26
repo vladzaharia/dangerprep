@@ -1,4 +1,8 @@
-import { Result, success, failure, safeAsync } from '@dangerprep/errors';
+import {
+  AsyncPatterns as CommonAsyncPatterns,
+  type AsyncOperationOptions as CommonAsyncOperationOptions,
+} from '@dangerprep/common';
+import { Result, success, failure } from '@dangerprep/errors';
 import { ComponentStatus } from '@dangerprep/health';
 import type { Logger } from '@dangerprep/logging';
 import type { Scheduler } from '@dangerprep/scheduling';
@@ -168,6 +172,7 @@ export interface OperationContext {
 
 /**
  * Advanced async patterns and utilities for services
+ * Now uses common AsyncPatterns with service-specific enhancements
  */
 export class AdvancedAsyncPatterns {
   /**
@@ -180,27 +185,16 @@ export class AdvancedAsyncPatterns {
   ): Promise<Result<T>> {
     const { signal, logger, context } = options;
 
-    return safeAsync(async () => {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error(`Operation timeout after ${timeoutMs}ms`));
-        }, timeoutMs);
+    const result = await CommonAsyncPatterns.withTimeout(operation, timeoutMs, signal);
 
-        signal?.addEventListener('abort', () => {
-          clearTimeout(timeoutId);
-          reject(new Error('Operation aborted'));
-        });
-      });
-
-      const result = await Promise.race([operation(), timeoutPromise]);
-
-      logger?.debug('Operation completed within timeout', {
+    if (result.success && logger) {
+      logger.debug('Operation completed within timeout', {
         timeoutMs,
         context,
       });
+    }
 
-      return result;
-    });
+    return result;
   }
 
   /**
@@ -282,40 +276,22 @@ export class AdvancedAsyncPatterns {
     operations: Array<() => Promise<T>>,
     options: AsyncOperationOptions = {}
   ): Promise<Result<T[]>> {
-    const { timeout = 30000, signal, logger, context } = options;
+    const { logger, context } = options;
 
-    return safeAsync(async () => {
-      const promises = operations.map((op, index) => {
-        const timeoutOptions: {
-          signal?: AbortSignal;
-          logger?: Logger;
-          context?: Record<string, unknown>;
-        } = {};
-        if (signal) timeoutOptions.signal = signal;
-        if (logger) timeoutOptions.logger = logger;
-        if (context) timeoutOptions.context = { ...context, operationIndex: index };
+    const commonOptions: CommonAsyncOperationOptions = {};
+    if (options.timeout !== undefined) commonOptions.timeout = options.timeout;
+    if (options.signal !== undefined) commonOptions.signal = options.signal;
 
-        return this.withTimeout(op, timeout, timeoutOptions);
+    const result = await CommonAsyncPatterns.parallel(operations, commonOptions);
+
+    if (result.success && logger) {
+      logger.debug('Parallel operations completed', {
+        operationCount: operations.length,
+        context,
       });
+    }
 
-      const results = await Promise.all(promises);
-
-      // Check if any operations failed
-      const failures = results.filter(result => !result.success);
-      if (failures.length > 0) {
-        const errors = failures
-          .map((f: Result<T>) => f.error?.message || 'Unknown error')
-          .join(', ');
-        throw new Error(`${failures.length} operations failed: ${errors}`);
-      }
-
-      return results.map((result: Result<T>) => {
-        if (!result.success || result.data === undefined) {
-          throw new Error('Operation result is undefined');
-        }
-        return result.data;
-      });
-    });
+    return result;
   }
 
   /**
@@ -325,44 +301,27 @@ export class AdvancedAsyncPatterns {
     operations: Array<() => Promise<T>>,
     options: AsyncOperationOptions = {}
   ): Promise<Result<T[]>> {
-    const { timeout = 30000, signal, logger, context } = options;
+    const { logger, context } = options;
 
-    return safeAsync(async () => {
-      const results: T[] = [];
+    const commonOptions: CommonAsyncOperationOptions = {};
+    if (options.timeout !== undefined) commonOptions.timeout = options.timeout;
+    if (options.signal !== undefined) commonOptions.signal = options.signal;
 
-      for (let i = 0; i < operations.length; i++) {
-        if (signal?.aborted) {
-          throw new Error('Sequential operations aborted');
-        }
+    const result = await CommonAsyncPatterns.sequential(operations, commonOptions);
 
-        const timeoutOptions: {
-          signal?: AbortSignal;
-          logger?: Logger;
-          context?: Record<string, unknown>;
-        } = {};
-        if (signal) timeoutOptions.signal = signal;
-        if (logger) timeoutOptions.logger = logger;
-        if (context) timeoutOptions.context = { ...context, operationIndex: i };
+    if (result.success && logger) {
+      logger.debug('Sequential operations completed', {
+        operationCount: operations.length,
+        context,
+      });
+    }
 
-        const operation = operations[i];
-        if (!operation) {
-          throw new Error(`Operation at index ${i} is undefined`);
-        }
-        const result = await this.withTimeout(operation, timeout, timeoutOptions);
-
-        if (!result.success) {
-          throw result.error || new Error(`Operation ${i} failed`);
-        }
-
-        results.push(result.data);
-      }
-
-      return results;
-    });
+    return result;
   }
 
   /**
    * Execute operation with circuit breaker pattern
+   * @deprecated Use ResiliencePatterns.executeWithResilience from @dangerprep/resilience instead
    */
   static async withCircuitBreaker<T>(
     operation: () => Promise<T>,
@@ -373,19 +332,31 @@ export class AdvancedAsyncPatterns {
     },
     options: { logger?: Logger; context?: Record<string, unknown> } = {}
   ): Promise<Result<T>> {
-    // This is a simplified circuit breaker implementation
-    // In a real implementation, you'd want to maintain state across calls
     const { logger, context } = options;
 
-    return safeAsync(async () => {
-      // For now, just execute the operation
-      // A full circuit breaker would track failures and open/close the circuit
-      const result = await operation();
+    // Use the proper resilience package implementation
+    const { ResiliencePatterns } = await import('@dangerprep/resilience');
 
-      logger?.debug('Circuit breaker operation completed', { context });
-
-      return result;
+    const result = await ResiliencePatterns.executeWithResilience(operation, {
+      name: 'service-circuit-breaker',
+      circuitBreaker: {
+        name: 'service-circuit-breaker',
+        failureThreshold: circuitBreaker.failureThreshold,
+        failureTimeWindowMs: circuitBreaker.monitoringPeriodMs,
+        recoveryTimeoutMs: circuitBreaker.resetTimeoutMs,
+        successThreshold: 2,
+      },
     });
+
+    if (result.success && result.data?.success) {
+      logger?.debug('Circuit breaker operation completed', { context });
+      return success(result.data.data as T);
+    } else {
+      const error = result.data?.error || result.error;
+      return failure(
+        error instanceof Error ? error : new Error('Circuit breaker operation failed')
+      );
+    }
   }
 
   /**
@@ -396,7 +367,7 @@ export class AdvancedAsyncPatterns {
     metadata: Record<string, unknown> = {}
   ): OperationContext {
     return {
-      operationId: `${operationName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      operationId: `${operationName}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       operationName,
       startTime: new Date(),
       metadata: { ...metadata },
@@ -454,62 +425,31 @@ export class AdvancedAsyncPatterns {
     operationName: string,
     options: AsyncOperationOptions = {}
   ): Promise<Result<T>> {
-    const {
-      timeout = 30000,
-      retries = 3,
-      retryDelay = 1000,
-      backoffMultiplier = 2,
-      maxRetryDelay = 10000,
-      signal,
-      logger,
-      context = {},
-    } = options;
-
-    const operationContext = this.createOperationContext(operationName, context);
+    const { logger, context = {} } = options;
 
     logger?.info('Starting monitored operation', {
-      operationId: operationContext.operationId,
       operationName,
-      timeout,
-      retries,
+      timeout: options.timeout,
+      retries: options.retries,
       context,
     });
 
-    const retryStrategy: RetryStrategy = {
-      maxAttempts: retries + 1, // +1 for initial attempt
-      baseDelay: retryDelay,
-      backoffMultiplier,
-      maxDelay: maxRetryDelay,
-    };
+    const operationContext = CommonAsyncPatterns.createOperationContext(operationName, context);
 
-    const wrappedOperation = async () => {
-      const timeoutOptions: {
-        signal?: AbortSignal;
-        logger?: Logger;
-        context?: Record<string, unknown>;
-      } = {};
-      if (signal) timeoutOptions.signal = signal;
-      if (logger) timeoutOptions.logger = logger;
-      if (context) timeoutOptions.context = context;
+    const commonOptions: CommonAsyncOperationOptions = {};
+    if (options.timeout !== undefined) commonOptions.timeout = options.timeout;
+    if (options.retries !== undefined) commonOptions.retries = options.retries;
+    if (options.retryDelay !== undefined) commonOptions.retryDelay = options.retryDelay;
+    if (options.backoffMultiplier !== undefined)
+      commonOptions.backoffMultiplier = options.backoffMultiplier;
+    if (options.maxRetryDelay !== undefined) commonOptions.maxRetryDelay = options.maxRetryDelay;
+    if (options.signal !== undefined) commonOptions.signal = options.signal;
+    commonOptions.context = context;
 
-      return this.withTimeout(operation, timeout, timeoutOptions);
-    };
-
-    const retryOptions: { signal?: AbortSignal; logger?: Logger; context?: OperationContext } = {};
-    if (signal) retryOptions.signal = signal;
-    if (logger) retryOptions.logger = logger;
-    retryOptions.context = operationContext;
-
-    const result = await this.withRetry(
-      async () => {
-        const timeoutResult = await wrappedOperation();
-        if (!timeoutResult.success) {
-          throw timeoutResult.error || new Error('Operation failed');
-        }
-        return timeoutResult.data;
-      },
-      retryStrategy,
-      retryOptions
+    const result = await CommonAsyncPatterns.executeWithMonitoring(
+      operation,
+      operationName,
+      commonOptions
     );
 
     const duration = Date.now() - operationContext.startTime.getTime();

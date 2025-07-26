@@ -7,14 +7,11 @@ import {
   getDirectorySizeAdvanced,
 } from '@dangerprep/files';
 import { ComponentStatus } from '@dangerprep/health';
-import { LoggerFactory } from '@dangerprep/logging';
 import { NotificationType, NotificationLevel, WebhookChannel } from '@dangerprep/notifications';
-import { Scheduler } from '@dangerprep/scheduling';
 import {
   BaseService,
   ServiceConfig,
   ServiceUtils,
-  ServicePatterns,
   AdvancedAsyncPatterns,
 } from '@dangerprep/service';
 
@@ -26,7 +23,6 @@ import { SyncConfig, SyncStatus, SyncResult, SyncConfigSchema, ContentTypeConfig
 
 export class SyncEngine extends BaseService {
   private configManager: ConfigManager<SyncConfig>;
-  private readonly scheduler: Scheduler;
   private readonly handlers = new Map<
     string,
     BooksHandler | MoviesHandler | TVHandler | WebTVHandler
@@ -47,10 +43,39 @@ export class SyncEngine extends BaseService {
         healthCheckIntervalMinutes: 5,
         handleProcessSignals: true,
         shutdownTimeoutMs: 30000,
+
+        enableScheduler: true,
+        enableProgressTracking: true,
+        enableAutoRecovery: true,
+
+        schedulerConfig: {
+          enableHealthMonitoring: true,
+          autoStartTasks: true,
+        },
+
+        progressConfig: {
+          enableNotifications: true,
+          cleanupDelayMs: 300000,
+        },
+
+        recoveryConfig: {
+          maxRestartAttempts: 3,
+          restartDelayMs: 5000,
+          useExponentialBackoff: true,
+          enableGracefulDegradation: true,
+        },
+
+        loggingConfig: {
+          level: 'INFO',
+          file: '/app/data/logs/sync.log',
+          maxSize: '100MB',
+          backupCount: 5,
+          format: 'text',
+          colors: true,
+        },
       }
     );
 
-    // Add lifecycle hooks for NFS sync operations
     const hooks = {
       beforeInitialize: async () => {
         this.components.logger.debug('Preparing NFS sync initialization...');
@@ -71,33 +96,13 @@ export class SyncEngine extends BaseService {
     this.configManager = new ConfigManager(configPath, SyncConfigSchema, {
       logger: this.components.logger,
     });
-    this.scheduler = new Scheduler({ logger: this.components.logger });
   }
 
-  // BaseService abstract method implementations
   protected override async loadConfiguration(): Promise<void> {
     await this.loadConfigurationWithManager(this.configManager);
   }
 
-  protected override async setupLogging(): Promise<void> {
-    const config = this.configManager.getConfig();
-    const logConfig = config.sync_config.logging;
-    // Create a new logger with both console and file transports
-    const logger = LoggerFactory.createCombinedLogger(
-      'SyncEngine',
-      logConfig.file,
-      logConfig.level
-    );
-
-    // Update the logger in components
-    this.components.logger = logger;
-
-    // Update the config manager logger
-    this.configManager = this.updateConfigManagerLogger(this.config.configPath, SyncConfigSchema);
-  }
-
   protected override async setupHealthChecks(): Promise<void> {
-    // Register component-specific health checks
     this.registerComponentHealthChecks();
   }
 
@@ -112,7 +117,6 @@ export class SyncEngine extends BaseService {
     const plexConfig = config.sync_config.plex;
 
     for (const [contentType, contentConfig] of Object.entries(contentTypes)) {
-      // Cast to the interface type for handler compatibility
       const typedConfig = contentConfig as ContentTypeConfig;
       switch (contentType) {
         case 'books':
@@ -134,7 +138,6 @@ export class SyncEngine extends BaseService {
           this.handlers.set(contentType, new WebTVHandler(typedConfig, this.components.logger));
           break;
         case 'kiwix':
-          // Kiwix is handled by separate kiwix-manager service
           this.components.logger.info('Kiwix sync delegated to kiwix-manager service');
           await this.triggerKiwixUpdate();
           break;
@@ -145,7 +148,6 @@ export class SyncEngine extends BaseService {
   private async ensureDirectories(): Promise<void> {
     const config = this.configManager.getConfig();
 
-    // Use advanced file utilities with Result pattern
     const directoryOperations = [
       () =>
         ensureDirectoryAdvanced(createDirectoryPath(config.sync_config.local_storage.base_path)),
@@ -175,15 +177,19 @@ export class SyncEngine extends BaseService {
 
     for (const [contentType, contentConfig] of Object.entries(contentTypes)) {
       if (contentConfig.schedule && this.handlers.has(contentType)) {
-        ServicePatterns.scheduleTask(
-          this.scheduler,
+        this.scheduleTask(
           `sync-${contentType}`,
           contentConfig.schedule,
           async () => {
             await this.syncContentType(contentType);
           },
-          `${contentType} sync`,
-          this.components.logger
+          {
+            name: `${contentType} sync`,
+            enableHealthCheck: true,
+            retryOnFailure: true,
+            maxRetries: 3,
+            notifyOnFailure: true,
+          }
         );
       }
     }
@@ -206,7 +212,6 @@ export class SyncEngine extends BaseService {
     this.syncStatus.progress = 0;
     this.syncStatus.startTime = new Date();
 
-    // Sync started notification (business event)
     await this.components.notificationManager.notify(
       NotificationType.SYNC_STARTED,
       `Starting ${contentType} sync`,
@@ -216,9 +221,7 @@ export class SyncEngine extends BaseService {
         data: { contentType, startTime: this.syncStatus.startTime.toISOString() },
       }
     );
-    this.components.logger.debug(`Starting ${contentType} sync`); // Technical detail
-
-    // Use advanced async patterns for the sync operation
+    this.components.logger.debug(`Starting ${contentType} sync`);
     const operationContext = AdvancedAsyncPatterns.createOperationContext(`sync-${contentType}`, {
       contentType,
       service: 'nfs-sync',
@@ -228,7 +231,7 @@ export class SyncEngine extends BaseService {
       () => handler.sync(),
       `${contentType}-sync`,
       {
-        timeout: 300000, // 5 minutes timeout
+        timeout: 300000,
         retries: 2,
         retryDelay: 5000,
         backoffMultiplier: 2,
@@ -249,17 +252,16 @@ export class SyncEngine extends BaseService {
       const result: SyncResult = {
         contentType,
         success,
-        itemsProcessed: 0, // Would need to be tracked by handlers
-        totalSize: 0, // Would need to be tracked by handlers
+        itemsProcessed: 0,
+        totalSize: 0,
         duration,
         errors: [],
       };
 
       this.syncStatus.results.unshift(result);
-      this.syncStatus.results = this.syncStatus.results.slice(0, 10); // Keep last 10 results
+      this.syncStatus.results = this.syncStatus.results.slice(0, 10);
 
       if (success) {
-        // Sync completed notification (business event)
         await this.components.notificationManager.notify(
           NotificationType.SYNC_COMPLETED,
           `${contentType} sync completed successfully`,
@@ -269,9 +271,8 @@ export class SyncEngine extends BaseService {
             data: { contentType, duration, success: true },
           }
         );
-        this.components.logger.debug(`${contentType} sync completed successfully in ${duration}ms`); // Technical detail
+        this.components.logger.debug(`${contentType} sync completed successfully in ${duration}ms`);
       } else {
-        // Sync failed notification (business event)
         await this.components.notificationManager.notify(
           NotificationType.SYNC_FAILED,
           `${contentType} sync failed`,
@@ -281,15 +282,13 @@ export class SyncEngine extends BaseService {
             data: { contentType, duration, success: false },
           }
         );
-        this.components.logger.error(`${contentType} sync failed after ${duration}ms`); // Technical detail
+        this.components.logger.error(`${contentType} sync failed after ${duration}ms`);
       }
 
-      // Send notification using new system (replaces old webhook-only system)
       await this.sendNotification(result);
 
       return success;
     } catch (error) {
-      // Sync error notification (business event)
       await this.components.notificationManager.notify(
         NotificationType.SYNC_FAILED,
         `${contentType} sync encountered an error`,
@@ -300,7 +299,7 @@ export class SyncEngine extends BaseService {
           data: { contentType },
         }
       );
-      this.components.logger.error(`${contentType} sync error: ${error}`); // Technical detail
+      this.components.logger.error(`${contentType} sync error: ${error}`);
       return false;
     } finally {
       this.syncStatus.isRunning = false;
@@ -321,7 +320,6 @@ export class SyncEngine extends BaseService {
     for (const contentType of this.handlers.keys()) {
       results[contentType] = await this.syncContentType(contentType);
 
-      // Small delay between syncs
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
 
@@ -330,8 +328,6 @@ export class SyncEngine extends BaseService {
 
   private async triggerKiwixUpdate(): Promise<void> {
     try {
-      // Try to trigger kiwix-manager update via HTTP API or container exec
-      // This is a placeholder - would need actual implementation
       this.components.logger.info('Triggering kiwix-manager update');
     } catch (error) {
       this.components.logger.error(`Failed to trigger kiwix update: ${error}`);
@@ -342,10 +338,8 @@ export class SyncEngine extends BaseService {
     const config = this.configManager.getConfig();
     const notifications = config.sync_config.notifications;
 
-    // Legacy webhook support - if configured, add webhook channel to notification manager
     if (notifications?.enabled && notifications.webhook_url) {
       try {
-        // Create a temporary webhook channel for this notification
         const webhookChannel = new WebhookChannel(
           {
             url: notifications.webhook_url,
@@ -354,10 +348,8 @@ export class SyncEngine extends BaseService {
           this.components.logger
         );
 
-        // Add channel temporarily
         this.components.notificationManager.addChannel(webhookChannel);
 
-        // Send notification through the new system
         const notificationType = result.success
           ? NotificationType.SYNC_COMPLETED
           : NotificationType.SYNC_FAILED;
@@ -376,16 +368,14 @@ export class SyncEngine extends BaseService {
           }
         );
 
-        // Remove the temporary channel
         await this.components.notificationManager.removeChannel('webhook');
       } catch (error) {
         this.components.logger.error(`Failed to send notification: ${error}`);
       }
     }
 
-    // Email notifications would be implemented here if configured
     if (notifications?.email?.enabled) {
-      this.components.logger.debug('Email notifications not yet implemented'); // Technical detail
+      this.components.logger.debug('Email notifications not yet implemented');
     }
   }
 
@@ -397,7 +387,6 @@ export class SyncEngine extends BaseService {
     const stats: { [contentType: string]: { size: string; path: string } } = {};
     const config = this.configManager.getConfig();
 
-    // Use parallel processing for better performance
     const storageOperations = Object.entries(config.sync_config.content_types).map(
       async ([contentType, contentConfig]) => {
         try {
@@ -452,7 +441,6 @@ export class SyncEngine extends BaseService {
       }
     } else {
       this.components.logger.error(`Failed to get storage stats: ${results.error?.message}`);
-      // Fallback to error state for all content types
       for (const [contentType, contentConfig] of Object.entries(config.sync_config.content_types)) {
         stats[contentType] = {
           size: 'Error',
@@ -477,11 +465,7 @@ export class SyncEngine extends BaseService {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 
-  /**
-   * Setup health check components
-   */
   private registerComponentHealthChecks(): void {
-    // Configuration check
     this.components.healthChecker.registerComponent({
       name: 'configuration',
       critical: true,
@@ -509,7 +493,6 @@ export class SyncEngine extends BaseService {
       },
     });
 
-    // Storage check
     this.components.healthChecker.registerComponent({
       name: 'storage',
       critical: false,
@@ -536,7 +519,6 @@ export class SyncEngine extends BaseService {
       },
     });
 
-    // Handlers check
     this.components.healthChecker.registerComponent({
       name: 'handlers',
       critical: true,
@@ -555,13 +537,6 @@ export class SyncEngine extends BaseService {
     });
   }
 
-  /**
-   * Shutdown the engine and clean up resources
-   */
-  private shutdown(): void {
-    ServicePatterns.shutdownScheduler(this.scheduler, this.components.logger);
-  }
-
   protected override async startService(): Promise<void> {
     this.syncStatus.isRunning = true;
     this.scheduleSync();
@@ -570,17 +545,14 @@ export class SyncEngine extends BaseService {
 
   protected override async stopService(): Promise<void> {
     this.syncStatus.isRunning = false;
-    this.shutdown();
     this.components.logger.info('NFS sync service stopped');
   }
 }
 
-// Main execution
 if (require.main === module) {
   const configPath = process.env.SYNC_CONFIG_PATH || '/app/data/sync-config.yaml';
   const engine = new SyncEngine(configPath);
 
-  // Use BaseService pattern
   engine
     .initialize()
     .then(async initResult => {
@@ -591,7 +563,6 @@ if (require.main === module) {
       await engine.start();
     })
     .catch(error => {
-      // Use stderr for critical startup errors
       process.stderr.write(`Failed to start Sync Engine: ${error}\n`);
       process.exit(1);
     });

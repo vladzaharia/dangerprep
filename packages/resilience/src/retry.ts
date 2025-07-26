@@ -1,11 +1,77 @@
 /**
- * Retry execution engine with configurable strategies
+ * Retry mechanisms with configurable strategies and jitter
  */
 
 import { isRetryableError } from '@dangerprep/errors';
 
-import { DelayCalculator, DelayUtils } from './calculator.js';
-import type { RetryConfig, RetryAttempt, RetryResult } from './types.js';
+import {
+  RetryStrategy,
+  JitterType,
+  type RetryConfig,
+  type RetryAttempt,
+  type RetryResult,
+} from './types.js';
+
+/**
+ * Calculate delay for retry attempts with various strategies and jitter
+ */
+export class DelayCalculator {
+  private previousDelay = 0;
+
+  constructor(private config: RetryConfig) {}
+
+  calculateDelay(attempt: number): number {
+    const baseDelay = this.calculateBaseDelay(attempt);
+    const cappedDelay = Math.min(baseDelay, this.config.maxDelayMs || Infinity);
+    const jitteredDelay = this.applyJitter(cappedDelay, attempt);
+
+    this.previousDelay = jitteredDelay;
+    return Math.max(0, Math.round(jitteredDelay));
+  }
+
+  reset(): void {
+    this.previousDelay = 0;
+  }
+
+  private calculateBaseDelay(attempt: number): number {
+    const { strategy, baseDelayMs, multiplier = 2 } = this.config;
+
+    switch (strategy) {
+      case RetryStrategy.FIXED:
+        return baseDelayMs;
+
+      case RetryStrategy.LINEAR:
+        return baseDelayMs * attempt * multiplier;
+
+      case RetryStrategy.EXPONENTIAL:
+        return baseDelayMs * Math.pow(multiplier, attempt - 1);
+
+      default:
+        return baseDelayMs;
+    }
+  }
+
+  private applyJitter(delay: number, _attempt: number): number {
+    const { jitter } = this.config;
+
+    switch (jitter) {
+      case JitterType.NONE:
+        return delay;
+
+      case JitterType.FULL:
+        return Math.random() * delay;
+
+      case JitterType.EQUAL:
+        return delay * 0.5 + Math.random() * delay * 0.5;
+
+      case JitterType.DECORRELATED:
+        return Math.random() * (delay * 3 - this.previousDelay) + this.previousDelay;
+
+      default:
+        return delay;
+    }
+  }
+}
 
 /**
  * Execute operations with retry logic
@@ -16,18 +82,10 @@ export class RetryExecutor<T> {
   private attempts: RetryAttempt[] = [];
 
   constructor(private config: RetryConfig) {
-    // Validate configuration
-    const errors = DelayUtils.validateConfig(config);
-    if (errors.length > 0) {
-      throw new Error(`Invalid retry configuration: ${errors.join(', ')}`);
-    }
-
+    this.validateConfig(config);
     this.delayCalculator = new DelayCalculator(config);
   }
 
-  /**
-   * Execute an operation with retry logic
-   */
   async execute(operation: () => Promise<T>): Promise<RetryResult<T>> {
     this.startTime = Date.now();
     this.attempts = [];
@@ -38,10 +96,8 @@ export class RetryExecutor<T> {
 
     while (attempt <= this.config.maxAttempts) {
       try {
-        // Execute the operation
         const result = await operation();
 
-        // Success - return result with attempt information
         return {
           success: true,
           data: result,
@@ -53,21 +109,17 @@ export class RetryExecutor<T> {
         lastError = error;
         const elapsedMs = Date.now() - this.startTime;
 
-        // Check if we should retry
         if (!this.shouldRetryError(error, attempt)) {
           return this.createFailureResult(error, attempt);
         }
 
-        // Check if we've exceeded max total time
         if (this.config.maxTotalTimeMs && elapsedMs >= this.config.maxTotalTimeMs) {
           return this.createFailureResult(error, attempt);
         }
 
-        // Calculate delay for next attempt
         const delayMs =
           attempt < this.config.maxAttempts ? this.delayCalculator.calculateDelay(attempt + 1) : 0;
 
-        // Record this attempt
         const attemptInfo: RetryAttempt = {
           attempt,
           totalAttempts: attempt,
@@ -77,17 +129,14 @@ export class RetryExecutor<T> {
         };
         this.attempts.push(attemptInfo);
 
-        // Call retry callback if provided
         if (this.config.onRetry) {
           this.config.onRetry(error, attempt, delayMs);
         }
 
-        // If this was the last attempt, don't delay
         if (attempt >= this.config.maxAttempts) {
           break;
         }
 
-        // Wait before next attempt
         if (delayMs > 0) {
           await this.sleep(delayMs);
         }
@@ -96,7 +145,6 @@ export class RetryExecutor<T> {
       }
     }
 
-    // All retries exhausted
     if (this.config.onMaxRetriesExceeded) {
       this.config.onMaxRetriesExceeded(lastError, attempt - 1);
     }
@@ -104,22 +152,14 @@ export class RetryExecutor<T> {
     return this.createFailureResult(lastError, attempt - 1);
   }
 
-  /**
-   * Determine if an error should trigger a retry
-   */
   private shouldRetryError(error: unknown, attempt: number): boolean {
-    // Use custom shouldRetry function if provided
     if (this.config.shouldRetry) {
       return this.config.shouldRetry(error, attempt);
     }
 
-    // Use default retry logic from error utilities
     return isRetryableError(error);
   }
 
-  /**
-   * Create a failure result
-   */
   private createFailureResult(error: unknown, totalAttempts: number): RetryResult<T> {
     return {
       success: false,
@@ -130,11 +170,26 @@ export class RetryExecutor<T> {
     };
   }
 
-  /**
-   * Sleep for specified milliseconds
-   */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private validateConfig(config: RetryConfig): void {
+    if (config.maxAttempts <= 0) {
+      throw new Error('maxAttempts must be positive');
+    }
+    if (config.baseDelayMs < 0) {
+      throw new Error('baseDelayMs must be non-negative');
+    }
+    if (config.maxDelayMs !== undefined && config.maxDelayMs < config.baseDelayMs) {
+      throw new Error('maxDelayMs must be greater than or equal to baseDelayMs');
+    }
+    if (config.multiplier !== undefined && config.multiplier <= 0) {
+      throw new Error('multiplier must be positive');
+    }
+    if (config.maxTotalTimeMs !== undefined && config.maxTotalTimeMs <= 0) {
+      throw new Error('maxTotalTimeMs must be positive');
+    }
   }
 }
 
@@ -142,9 +197,6 @@ export class RetryExecutor<T> {
  * Utility functions for retry execution
  */
 export const RetryUtils = {
-  /**
-   * Execute an operation with retry logic using a configuration
-   */
   async executeWithRetry<T>(
     operation: () => Promise<T>,
     config: RetryConfig
@@ -153,9 +205,6 @@ export const RetryUtils = {
     return executor.execute(operation);
   },
 
-  /**
-   * Execute an operation with retry and throw on failure
-   */
   async executeWithRetryOrThrow<T>(operation: () => Promise<T>, config: RetryConfig): Promise<T> {
     const result = await RetryUtils.executeWithRetry(operation, config);
 
@@ -166,9 +215,6 @@ export const RetryUtils = {
     throw result.error;
   },
 
-  /**
-   * Create a retry decorator for methods
-   */
   withRetry<T extends unknown[], R>(config: RetryConfig) {
     return function (
       target: unknown,
@@ -187,9 +233,6 @@ export const RetryUtils = {
     };
   },
 
-  /**
-   * Create a simple retry wrapper function
-   */
   createRetryWrapper<T extends unknown[], R>(
     fn: (...args: T) => Promise<R>,
     config: RetryConfig

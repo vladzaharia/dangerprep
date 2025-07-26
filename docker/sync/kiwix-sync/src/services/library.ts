@@ -1,14 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import {
-  fileExists,
-  getFileStats,
-  ensureDirectory,
-  getFileName,
-  formatSize,
-  getDirectorySize,
-} from '@dangerprep/files';
+import { fileExists, getFileName, formatSize, getDirectorySize } from '@dangerprep/files';
 import type { Logger } from '@dangerprep/logging';
 
 import type { KiwixConfig, ZimPackage, LibraryEntry } from '../types';
@@ -90,8 +83,6 @@ export class LibraryManager {
     const stats = await fs.stat(pkg.path);
     const fileName = path.basename(pkg.path);
 
-    // Extract metadata from filename (basic implementation)
-    // In a real implementation, you might want to read ZIM file headers
     const parts = pkg.name.split('_');
     const language = parts.length > 1 && parts[1] ? parts[1] : 'en';
 
@@ -106,8 +97,8 @@ export class LibraryManager {
       publisher: 'Kiwix',
       date: pkg.date,
       tags: this.generateTags(pkg.name),
-      articleCount: 0, // Would need to read from ZIM file
-      mediaCount: 0, // Would need to read from ZIM file
+      articleCount: 0,
+      mediaCount: 0,
       size: stats.size,
     };
   }
@@ -170,7 +161,6 @@ export class LibraryManager {
 
       const libraryContent = await fs.readFile(this.config.storage.library_file, 'utf8');
 
-      // Basic XML validation
       if (!libraryContent.includes('<?xml') || !libraryContent.includes('<library')) {
         this.logger.error('Library file is not valid XML');
         return false;

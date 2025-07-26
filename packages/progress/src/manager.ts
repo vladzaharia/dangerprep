@@ -4,7 +4,6 @@
 
 import { EventEmitter } from 'events';
 
-// Result types available for future use
 import type { Logger } from '@dangerprep/logging';
 
 import { ProgressTracker } from './tracker.js';
@@ -28,7 +27,6 @@ export class ProgressManager extends EventEmitter implements IProgressManager {
   }
 
   createTracker(config: ProgressConfig): IProgressTracker {
-    // Remove existing tracker with same ID if it exists
     if (this.trackers.has(config.operationId)) {
       this.removeTracker(config.operationId);
     }
@@ -36,11 +34,9 @@ export class ProgressManager extends EventEmitter implements IProgressManager {
     const tracker = new ProgressTracker(config);
     this.trackers.set(config.operationId, tracker);
 
-    // Forward progress events to global listeners
     tracker.addProgressListener((update: ProgressUpdate) => {
       this.emit('progress', update);
 
-      // Notify global listeners
       for (const listener of this.globalListeners) {
         try {
           const result = listener(update);
@@ -55,14 +51,12 @@ export class ProgressManager extends EventEmitter implements IProgressManager {
       }
     });
 
-    // Auto-remove tracker when operation completes
     tracker.addProgressListener((update: ProgressUpdate) => {
       if (
         update.status === ProgressStatus.COMPLETED ||
         update.status === ProgressStatus.FAILED ||
         update.status === ProgressStatus.CANCELLED
       ) {
-        // Remove after a short delay to allow final event processing
         setTimeout(() => {
           this.removeTracker(update.operationId);
         }, 1000);

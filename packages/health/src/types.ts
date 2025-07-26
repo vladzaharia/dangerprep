@@ -2,6 +2,29 @@
  * Health check types and interfaces for standardized service health monitoring
  */
 
+import {
+  type ComponentName as CommonComponentName,
+  ComponentName as ComponentNameFactory,
+  type TimeoutMs as CommonTimeoutMs,
+  TimeoutMs as TimeoutMsFactory,
+  type Percentage as CommonPercentage,
+  Percentage as PercentageFactory,
+} from '@dangerprep/common';
+
+// Re-export common branded types with health-specific aliases
+export type ComponentName = CommonComponentName;
+export type HealthCheckTimeout = CommonTimeoutMs;
+export type HealthScore = CommonPercentage;
+
+// Re-export type guards and factory functions
+export const isComponentName = ComponentNameFactory.guard;
+export const isHealthCheckTimeout = TimeoutMsFactory.guard;
+export const isHealthScore = PercentageFactory.guard;
+
+export const createComponentName = ComponentNameFactory.create;
+export const createHealthCheckTimeout = TimeoutMsFactory.create;
+export const createHealthScore = PercentageFactory.create;
+
 export enum HealthStatus {
   HEALTHY = 'healthy',
   DEGRADED = 'degraded',

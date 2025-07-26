@@ -26,6 +26,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@dangerprep/common": "workspace:*",
     "@dangerprep/logging": "workspace:*"
   },
   "devDependencies": {

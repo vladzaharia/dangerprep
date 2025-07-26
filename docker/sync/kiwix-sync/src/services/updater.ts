@@ -32,7 +32,6 @@ export class ZimUpdater {
 
       this.logger.info(`Updating package: ${packageName}`);
 
-      // Backup existing file if it exists
       const existingPath = path.join(this.config.storage.zim_directory, `${packageName}.zim`);
       const backupPath = path.join(this.config.storage.zim_directory, `${packageName}.zim.backup`);
 
@@ -41,11 +40,9 @@ export class ZimUpdater {
         this.logger.debug(`Backed up existing file to ${backupPath}`);
       }
 
-      // Download new version
       const success = await this.downloader.downloadPackage(packageName);
 
       if (success) {
-        // Remove backup on successful update
         if (await fileExists(backupPath)) {
           await deleteFile(backupPath);
           this.logger.debug(`Removed backup file ${backupPath}`);
@@ -53,7 +50,6 @@ export class ZimUpdater {
         this.logger.info(`Successfully updated ${packageName}`);
         return true;
       } else {
-        // Restore backup on failure
         if (await fileExists(backupPath)) {
           await moveFile(backupPath, existingPath);
           this.logger.info(`Restored backup for ${packageName}`);
@@ -87,7 +83,6 @@ export class ZimUpdater {
         failedCount++;
       }
 
-      // Small delay between updates to avoid overwhelming the server
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
@@ -127,8 +122,6 @@ export class ZimUpdater {
   }
 
   private extractPackageNameFromFile(filename: string): string {
-    // Remove .zim extension and any version/date suffixes
-    // Example: wikipedia_en_all_2024-01.zim -> wikipedia_en_all
     return filename
       .replace(/\.zim$/, '')
       .replace(/_\d{4}-\d{2}$/, '')
@@ -142,7 +135,6 @@ export class ZimUpdater {
       const zimDir = this.config.storage.zim_directory;
       const files = await fs.readdir(zimDir);
 
-      // Find backup files and old versions
       const backupFiles = files.filter(file => file.endsWith('.backup') || file.includes('.old.'));
 
       for (const backupFile of backupFiles) {
@@ -154,8 +146,6 @@ export class ZimUpdater {
           this.logger.warn(`Failed to delete ${backupFile}: ${error}`);
         }
       }
-
-      // Clean up temp directory
       const tempDir = this.config.storage.temp_directory;
       if (await fileExists(tempDir)) {
         const tempFiles = await fs.readdir(tempDir);

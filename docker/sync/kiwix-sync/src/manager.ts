@@ -3,14 +3,11 @@ import path from 'path';
 import { ConfigManager } from '@dangerprep/configuration';
 import { ensureDirectoryAdvanced, createDirectoryPath } from '@dangerprep/files';
 import { ComponentStatus } from '@dangerprep/health';
-import { LoggerFactory } from '@dangerprep/logging';
 import { NotificationType, NotificationLevel } from '@dangerprep/notifications';
-import { Scheduler } from '@dangerprep/scheduling';
 import {
   BaseService,
   ServiceConfig,
   ServiceUtils,
-  ServicePatterns,
   AdvancedAsyncPatterns,
 } from '@dangerprep/service';
 
@@ -22,7 +19,6 @@ import { KiwixConfigSchema } from './types';
 
 export class KiwixManager extends BaseService {
   private configManager: ConfigManager<KiwixConfig>;
-  private readonly scheduler: Scheduler;
   private zimUpdater!: ZimUpdater;
   private zimDownloader!: ZimDownloader;
   private libraryManager!: LibraryManager;
@@ -37,10 +33,38 @@ export class KiwixManager extends BaseService {
         healthCheckIntervalMinutes: 5,
         handleProcessSignals: true,
         shutdownTimeoutMs: 30000,
+
+        enableScheduler: true,
+        enableProgressTracking: true,
+        enableAutoRecovery: true,
+
+        schedulerConfig: {
+          enableHealthMonitoring: true,
+          autoStartTasks: true,
+        },
+
+        progressConfig: {
+          enableNotifications: true,
+          cleanupDelayMs: 600000,
+        },
+
+        recoveryConfig: {
+          maxRestartAttempts: 2,
+          restartDelayMs: 30000,
+          useExponentialBackoff: true,
+          enableGracefulDegradation: true,
+        },
+        loggingConfig: {
+          level: 'INFO',
+          file: '/app/data/logs/kiwix-manager.log',
+          maxSize: '50MB',
+          backupCount: 3,
+          format: 'text',
+          colors: true,
+        },
       }
     );
 
-    // Add lifecycle hooks for Kiwix operations
     const hooks = {
       beforeInitialize: async () => {
         this.components.logger.debug('Preparing Kiwix manager initialization...');
@@ -61,33 +85,13 @@ export class KiwixManager extends BaseService {
     this.configManager = new ConfigManager(configPath, KiwixConfigSchema, {
       logger: this.components.logger,
     });
-    this.scheduler = new Scheduler({ logger: this.components.logger });
   }
 
-  // BaseService abstract method implementations
   protected override async loadConfiguration(): Promise<void> {
     await this.loadConfigurationWithManager(this.configManager);
   }
 
-  protected override async setupLogging(): Promise<void> {
-    const config = this.configManager.getConfig();
-    const logConfig = config.kiwix_manager.logging;
-    // Create a new logger with both console and file transports
-    const logger = LoggerFactory.createCombinedLogger(
-      'KiwixManager',
-      logConfig.file,
-      logConfig.level
-    );
-
-    // Update the logger in components
-    this.components.logger = logger;
-
-    // Update the config manager logger
-    this.configManager = this.updateConfigManagerLogger(this.config.configPath, KiwixConfigSchema);
-  }
-
   protected override async setupHealthChecks(): Promise<void> {
-    // Register component-specific health checks
     this.registerComponentHealthChecks();
   }
 
@@ -107,7 +111,6 @@ export class KiwixManager extends BaseService {
     const config = this.configManager.getConfig();
     const storage = config.kiwix_manager.storage;
 
-    // Use advanced file utilities with Result pattern and parallel execution
     const directoryOperations = [
       () => ensureDirectoryAdvanced(createDirectoryPath(storage.zim_directory)),
       () => ensureDirectoryAdvanced(createDirectoryPath(storage.temp_directory)),
@@ -134,28 +137,34 @@ export class KiwixManager extends BaseService {
     const config = this.configManager.getConfig();
     const schedulerConfig = config.kiwix_manager.scheduler;
 
-    // Schedule daily updates using shared pattern
-    ServicePatterns.scheduleTask(
-      this.scheduler,
+    this.scheduleTask(
       'zim-updates',
       schedulerConfig.update_schedule,
       async () => {
         await this.updateAllZimPackages();
       },
-      'ZIM Updates',
-      this.components.logger
+      {
+        name: 'ZIM Updates',
+        enableHealthCheck: true,
+        retryOnFailure: true,
+        maxRetries: 2,
+        notifyOnFailure: true,
+      }
     );
 
-    // Schedule weekly cleanup using shared pattern
-    ServicePatterns.scheduleTask(
-      this.scheduler,
+    this.scheduleMaintenanceTask(
       'cleanup',
       schedulerConfig.cleanup_schedule,
       async () => {
         await this.cleanupOldFiles();
       },
-      'Cleanup',
-      this.components.logger
+      {
+        name: 'Cleanup',
+        enableHealthCheck: true,
+        retryOnFailure: true,
+        maxRetries: 3,
+        notifyOnFailure: true,
+      }
     );
   }
 
@@ -165,10 +174,8 @@ export class KiwixManager extends BaseService {
 
       const result = await this.zimUpdater.updateAllExistingPackages();
 
-      // Update library.xml after all updates
       await this.libraryManager.updateLibrary();
 
-      // Update completed notification (business event)
       await this.components.notificationManager.notify(
         NotificationType.CONTENT_UPDATED,
         `Kiwix update completed: ${result.success} successful, ${result.failed} failed`,
@@ -180,10 +187,9 @@ export class KiwixManager extends BaseService {
       );
       this.components.logger.debug(
         `Update completed: ${result.success} successful, ${result.failed} failed`
-      ); // Technical detail
+      );
       return result.success > 0;
     } catch (error) {
-      // Update error notification (business event)
       await this.components.notificationManager.notify(
         NotificationType.CONTENT_ERROR,
         'Kiwix update encountered an error',
@@ -193,14 +199,13 @@ export class KiwixManager extends BaseService {
           error: error instanceof Error ? error : new Error(String(error)),
         }
       );
-      this.components.logger.error(`Error during update: ${error}`); // Technical detail
+      this.components.logger.error(`Error during update: ${error}`);
       return false;
     }
   }
 
   async downloadPackage(packageName: string): Promise<boolean> {
     try {
-      // Download started notification (business event)
       await this.components.notificationManager.notify(
         NotificationType.SYNC_STARTED,
         `Downloading package: ${packageName}`,
@@ -210,13 +215,12 @@ export class KiwixManager extends BaseService {
           data: { packageName, operation: 'download' },
         }
       );
-      this.components.logger.debug(`Downloading package: ${packageName}`); // Technical detail
+      this.components.logger.debug(`Downloading package: ${packageName}`);
 
       const success = await this.zimDownloader.downloadPackage(packageName);
       if (success) {
         await this.libraryManager.updateLibrary();
 
-        // Download completed notification (business event)
         await this.components.notificationManager.notify(
           NotificationType.SYNC_COMPLETED,
           `Successfully downloaded and registered ${packageName}`,
@@ -226,9 +230,8 @@ export class KiwixManager extends BaseService {
             data: { packageName, operation: 'download', success: true },
           }
         );
-        this.components.logger.debug(`Successfully downloaded and registered ${packageName}`); // Technical detail
+        this.components.logger.debug(`Successfully downloaded and registered ${packageName}`);
       } else {
-        // Download failed notification (business event)
         await this.components.notificationManager.notify(
           NotificationType.SYNC_FAILED,
           `Failed to download ${packageName}`,
@@ -238,11 +241,10 @@ export class KiwixManager extends BaseService {
             data: { packageName, operation: 'download', success: false },
           }
         );
-        this.components.logger.error(`Failed to download ${packageName}`); // Technical detail
+        this.components.logger.error(`Failed to download ${packageName}`);
       }
       return success;
     } catch (error) {
-      // Download error notification (business event)
       await this.components.notificationManager.notify(
         NotificationType.SYNC_FAILED,
         `Error downloading package ${packageName}`,
@@ -253,7 +255,7 @@ export class KiwixManager extends BaseService {
           data: { packageName, operation: 'download' },
         }
       );
-      this.components.logger.error(`Error downloading package ${packageName}: ${error}`); // Technical detail
+      this.components.logger.error(`Error downloading package ${packageName}: ${error}`);
       return false;
     }
   }
@@ -288,11 +290,7 @@ export class KiwixManager extends BaseService {
     }
   }
 
-  /**
-   * Register component-specific health checks
-   */
   private registerComponentHealthChecks(): void {
-    // Configuration check
     this.components.healthChecker.registerComponent({
       name: 'configuration',
       critical: true,
@@ -321,7 +319,6 @@ export class KiwixManager extends BaseService {
       },
     });
 
-    // Library validation check
     this.components.healthChecker.registerComponent({
       name: 'library',
       critical: true,
@@ -353,7 +350,6 @@ export class KiwixManager extends BaseService {
       },
     });
 
-    // Services check
     this.components.healthChecker.registerComponent({
       name: 'services',
       critical: false,
@@ -379,34 +375,23 @@ export class KiwixManager extends BaseService {
     });
   }
 
-  /**
-   * Shutdown the manager and clean up resources
-   */
-  private shutdown(): void {
-    ServicePatterns.shutdownScheduler(this.scheduler, this.components.logger);
-  }
-
   protected override async startService(): Promise<void> {
     this.scheduleUpdates();
 
-    // Initial library update
     await this.libraryManager.updateLibrary();
 
     this.components.logger.info('Kiwix sync service started successfully');
   }
 
   protected override async stopService(): Promise<void> {
-    this.shutdown();
     this.components.logger.info('Kiwix sync service stopped');
   }
 }
 
-// Main execution
 if (require.main === module) {
   const configPath = process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml';
   const manager = new KiwixManager(configPath);
 
-  // Use BaseService pattern
   manager
     .initialize()
     .then(async initResult => {
@@ -417,9 +402,7 @@ if (require.main === module) {
       await manager.start();
     })
     .catch((error: unknown) => {
-      // Create a simple logger for startup errors
-      const startupLogger = LoggerFactory.createConsoleLogger('Startup');
-      startupLogger.error('Failed to start Kiwix Manager:', error);
+      console.error('Failed to start Kiwix Manager:', error);
       process.exit(1);
     });
 }
