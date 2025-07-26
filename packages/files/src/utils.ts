@@ -1,51 +1,30 @@
 import path from 'path';
 
+import { parseSize as commonParseSize, formatSize as commonFormatSize } from '@dangerprep/common';
+
 /**
  * Pure utility functions for file operations (no I/O)
  *
  * These are stateless functions that perform:
- * - Size parsing and formatting
+ * - Size parsing and formatting (using common utilities)
  * - Path manipulation and sanitization
  * - File name extraction
  */
 
 /**
  * Parse size string (e.g., "1.5GB", "500MB") to bytes
+ * Uses common size parsing utility
  */
 export function parseSize(sizeStr: string): number {
-  const units: { [key: string]: number } = {
-    B: 1,
-    KB: 1024,
-    MB: 1024 * 1024,
-    GB: 1024 * 1024 * 1024,
-    TB: 1024 * 1024 * 1024 * 1024,
-  };
-
-  const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([KMGT]?B)$/i);
-  if (!match?.[1] || !match[2]) {
-    throw new Error(`Invalid size format: ${sizeStr}`);
-  }
-
-  const value = parseFloat(match[1]);
-  const unit = match[2].toUpperCase();
-
-  return value * (units[unit] || 1);
+  return commonParseSize(sizeStr);
 }
 
 /**
  * Format bytes to human-readable string (e.g., "1.50 GB")
+ * Uses common size formatting utility
  */
 export function formatSize(bytes: number): string {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let size = bytes;
-  let unitIndex = 0;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex++;
-  }
-
-  return `${size.toFixed(2)} ${units[unitIndex]}`;
+  return commonFormatSize(bytes);
 }
 
 /**

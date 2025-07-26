@@ -88,19 +88,8 @@ export const SYNC_TYPES = [
 ] as const;
 export type SyncType = (typeof SYNC_TYPES)[number];
 
-// Keep the original interface for backward compatibility
-export interface ContentTypeConfig {
-  readonly type: SyncType;
-  readonly schedule: string;
-  readonly local_path: string;
-  readonly nfs_path?: string;
-  readonly max_size: string;
-  readonly filters?: readonly FilterRule[];
-  readonly priority_rules?: readonly PriorityRule[];
-  readonly include_folders?: readonly string[];
-  readonly max_episodes_per_show?: number;
-  readonly zim_files?: readonly string[];
-}
+// Content type configuration derived from schema
+export type ContentTypeConfig = SyncConfig['sync_config']['content_types'][string];
 
 export interface FilterRule {
   readonly type: string;

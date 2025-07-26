@@ -14,17 +14,14 @@ export async function getSystemInfo(): Promise<SystemInfo> {
       si.osInfo()
     ]);
 
-    // Get temperature if available
     let temperature = 'N/A';
     try {
       const hostSysPath = process.env.HOST_SYS_PATH || '/host/sys';
       const tempData = readFileSync(`${hostSysPath}/class/thermal/thermal_zone0/temp`, 'utf8');
       temperature = `${Math.floor(parseInt(tempData.trim()) / 1000)}°C`;
     } catch (e) {
-      // Temperature not available
+      // Temperature reading failed - this is expected in many environments
     }
-
-    // Format uptime
     const uptimeHours = Math.floor(time.uptime / 3600);
     const uptimeMinutes = Math.floor((time.uptime % 3600) / 60);
     const uptime = `${uptimeHours}h ${uptimeMinutes}m`;
@@ -35,7 +32,7 @@ export async function getSystemInfo(): Promise<SystemInfo> {
       load_avg: [
         currentLoad.avgLoad.toFixed(2),
         currentLoad.currentLoad.toFixed(2),
-        '0.00' // Placeholder for 15min average
+        '0.00'
       ],
       memory: {
         total: mem.total,
@@ -57,7 +54,6 @@ export async function getDockerServices(): Promise<{ services: DockerService[] }
     
     const services: DockerService[] = containers
       .filter(container => {
-        // Only include DangerPrep services
         const name = container.Names[0]?.replace('/', '') || '';
         return ['traefik', 'jellyfin', 'komga', 'kiwix', 'portal', 'sync', 'portainer', 'watchtower'].some(
           service => name.includes(service)

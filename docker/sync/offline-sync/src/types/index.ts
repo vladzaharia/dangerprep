@@ -57,14 +57,8 @@ export type OfflineSyncConfig = z.infer<typeof OfflineSyncConfigSchema>;
 export const SYNC_DIRECTIONS = ['bidirectional', 'to_card', 'from_card'] as const;
 export type SyncDirection = (typeof SYNC_DIRECTIONS)[number];
 
-// Keep the original interface for backward compatibility
-export interface ContentTypeConfig {
-  readonly local_path: string;
-  readonly card_path: string;
-  readonly sync_direction: SyncDirection;
-  readonly max_size: string;
-  readonly file_extensions: readonly string[];
-}
+// Content type configuration derived from schema
+export type ContentTypeConfig = OfflineSyncConfig['offline_sync']['content_types'][string];
 
 export interface USBDeviceDescriptor {
   readonly bLength: number;

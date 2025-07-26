@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import { ErrorFactory, wrapError, ErrorCategory, ErrorSeverity } from '@dangerprep/errors';
 import { ensureDirectory, fileExists } from '@dangerprep/files';
 import { Logger, LoggerFactory } from '@dangerprep/logging';
-import { RetryUtils, DEFAULT_RETRY_CONFIGS } from '@dangerprep/retry';
+import { RetryUtils, DEFAULT_RETRY_CONFIGS } from '@dangerprep/resilience';
 import * as fs from 'fs-extra';
 
 import { DetectedDevice, OfflineSyncConfig } from './types';

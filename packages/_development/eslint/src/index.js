@@ -53,7 +53,7 @@ export default [
 
       // TypeScript-specific rules (more lenient for existing code)
       '@typescript-eslint/no-unused-vars': [
-        'warn',
+        'error',
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',

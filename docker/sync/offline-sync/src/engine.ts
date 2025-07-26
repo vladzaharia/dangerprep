@@ -1,11 +1,7 @@
-// import * as cron from 'node-cron'; // TODO: Implement cron scheduling
-
 import { ConfigManager } from '@dangerprep/configuration';
 import { ErrorFactory, runWithErrorContext, safeAsync } from '@dangerprep/errors';
 import { HealthChecker, ComponentStatus } from '@dangerprep/health';
-import { LoggerFactory } from '@dangerprep/logging';
 import { NotificationType, NotificationLevel } from '@dangerprep/notifications';
-// Advanced file utils available for future use
 import { BaseService, ServiceConfig, ServiceUtils, ServicePatterns } from '@dangerprep/service';
 
 import { CardAnalyzer } from './analyzer';
@@ -16,7 +12,6 @@ import {
   OfflineSyncConfig,
   OfflineSyncConfigSchema,
   DetectedDevice,
-  // CardAnalysis, // TODO: Use for card analysis
   SyncOperation,
   SyncStats,
   NotificationEvent,
@@ -49,13 +44,41 @@ export class OfflineSync extends BaseService {
       configPath || process.env.OFFLINE_SYNC_CONFIG_PATH || '/app/data/config.yaml',
       {
         enablePeriodicHealthChecks: true,
-        healthCheckIntervalMinutes: 5,
+        healthCheckIntervalMinutes: 2,
         handleProcessSignals: true,
-        shutdownTimeoutMs: 30000,
+        shutdownTimeoutMs: 60000,
+
+        enableScheduler: true,
+        enableProgressTracking: true,
+        enableAutoRecovery: true,
+
+        schedulerConfig: {
+          enableHealthMonitoring: true,
+          autoStartTasks: true,
+        },
+
+        progressConfig: {
+          enableNotifications: true,
+          cleanupDelayMs: 180000,
+        },
+
+        recoveryConfig: {
+          maxRestartAttempts: 2,
+          restartDelayMs: 10000,
+          useExponentialBackoff: false,
+          enableGracefulDegradation: true,
+        },
+        loggingConfig: {
+          level: 'INFO',
+          file: '/app/data/logs/offline-sync.log',
+          maxSize: '50MB',
+          backupCount: 3,
+          format: 'text',
+          colors: true,
+        },
       }
     );
 
-    // Add lifecycle hooks for advanced features
     const hooks = {
       beforeInitialize: async () => {
         this.components.logger.debug('Preparing offline sync initialization...');
@@ -84,31 +107,8 @@ export class OfflineSync extends BaseService {
     });
   }
 
-  // BaseService abstract method implementations
   protected override async loadConfiguration(): Promise<void> {
     this.offlineConfig = await this.loadConfigurationWithManager(this.configManager);
-  }
-
-  protected override async setupLogging(): Promise<void> {
-    if (!this.offlineConfig) {
-      throw new Error('Configuration not loaded');
-    }
-
-    const logConfig = this.offlineConfig.offline_sync.logging;
-    const logger = LoggerFactory.createCombinedLogger(
-      'OfflineSync',
-      logConfig.file,
-      logConfig.level
-    );
-
-    // Update the logger in components
-    this.components.logger = logger;
-
-    // Update the config manager logger
-    this.configManager = this.updateConfigManagerLogger(
-      this.config.configPath,
-      OfflineSyncConfigSchema
-    );
   }
 
   protected override async setupHealthChecks(): Promise<void> {
@@ -116,7 +116,6 @@ export class OfflineSync extends BaseService {
       throw new Error('Configuration not loaded');
     }
 
-    // Register file system health check
     this.components.healthChecker.registerComponent(
       HealthChecker.createFileSystemCheck(
         'filesystem',
@@ -128,7 +127,6 @@ export class OfflineSync extends BaseService {
       )
     );
 
-    // Register additional health checks for service components
     this.registerComponentHealthChecks();
   }
 
@@ -139,19 +137,15 @@ export class OfflineSync extends BaseService {
 
     const offlineConfig = this.offlineConfig.offline_sync;
 
-    // Initialize device detector
     this.deviceDetector = new DeviceDetector(offlineConfig);
     this.setupDeviceDetectorEvents();
 
-    // Initialize mount manager
     this.mountManager = new MountManager(offlineConfig);
     await this.mountManager.initialize();
     this.setupMountManagerEvents();
 
-    // Initialize card analyzer
     this.cardAnalyzer = new CardAnalyzer(offlineConfig);
 
-    // Initialize sync engine
     this.syncEngine = new SyncEngine(offlineConfig);
     this.setupSyncEngineEvents();
   }
@@ -160,7 +154,33 @@ export class OfflineSync extends BaseService {
     // Start device monitoring
     this.deviceDetector?.startMonitoring();
 
-    // Start periodic checks
+    // Schedule periodic device checks
+    this.scheduleTask(
+      'device-health-check',
+      '*/30 * * * * *', // Every 30 seconds
+      async () => {
+        await this.performDeviceHealthCheck();
+      },
+      {
+        name: 'Device Health Check',
+        enableHealthCheck: false, // Don't health-check the health checker
+        retryOnFailure: false,
+      }
+    );
+
+    // Schedule cleanup task
+    this.scheduleMaintenanceTask(
+      'cleanup-old-transfers',
+      '0 */6 * * *', // Every 6 hours
+      async () => {
+        await this.cleanupOldTransfers();
+      },
+      {
+        name: 'Transfer Cleanup',
+      }
+    );
+
+    // Start periodic checks (existing)
     this.startPeriodicChecks();
 
     this.components.logger.info('Offline sync service started successfully');
@@ -185,6 +205,107 @@ export class OfflineSync extends BaseService {
     }
 
     this.components.logger.info('Offline sync service stopped');
+  }
+
+  // NEW: Add device health check method
+  private async performDeviceHealthCheck(): Promise<void> {
+    if (!this.mountManager || !this.deviceDetector) return;
+
+    const mountedDevices = this.mountManager.getMountedDevices();
+
+    for (const [devicePath, mountPath] of mountedDevices) {
+      try {
+        const device = this.deviceDetector.getDevice(devicePath);
+        if (device) {
+          const isHealthy = await this.checkDeviceHealth(device, mountPath);
+          if (!isHealthy) {
+            this.components.logger.warn(`Device ${device.devicePath} appears unhealthy`);
+            await this.handleUnhealthyDevice(device);
+          }
+        }
+      } catch (error) {
+        this.components.logger.error(`Health check failed for ${devicePath}:`, error);
+      }
+    }
+  }
+
+  // NEW: Check device health
+  private async checkDeviceHealth(device: DetectedDevice, mountPath: string): Promise<boolean> {
+    try {
+      // Check if mount path is still accessible
+      const fs = await import('fs-extra');
+      await fs.access(mountPath);
+
+      // Try to read directory to ensure it's responsive
+      await fs.readdir(mountPath);
+
+      return true;
+    } catch (error) {
+      this.components.logger.debug(`Device health check failed for ${device.devicePath}:`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  // NEW: Add cleanup method
+  private async cleanupOldTransfers(): Promise<void> {
+    const progressTracker = this.createMaintenanceProgressTracker(
+      'cleanup-transfers',
+      'Transfer Cleanup'
+    );
+
+    try {
+      progressTracker.startPhase('analyze');
+
+      // Clean up old transfer records, logs, etc.
+      const oldTransfers = await this.findOldTransfers();
+
+      progressTracker.completePhase('analyze');
+      progressTracker.startPhase('cleanup');
+
+      for (const transfer of oldTransfers) {
+        await this.cleanupTransfer(transfer);
+      }
+
+      progressTracker.completePhase('cleanup');
+      progressTracker.complete();
+
+      this.components.logger.info(`Cleaned up ${oldTransfers.length} old transfers`);
+    } catch (error) {
+      progressTracker.fail(error instanceof Error ? error.message : 'Cleanup failed');
+      throw error;
+    }
+  }
+
+  // NEW: Add device-specific error handling
+  private async handleUnhealthyDevice(device: DetectedDevice): Promise<void> {
+    try {
+      // Attempt to safely unmount and remount
+      await this.mountManager?.unmountDevice(device);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      await this.mountManager?.mountDevice(device);
+
+      this.components.logger.info(`Successfully recovered device ${device.devicePath}`);
+    } catch (error) {
+      this.components.logger.error(`Failed to recover device ${device.devicePath}:`, error);
+
+      // Use service recovery for device failures
+      await this.handleServiceFailure(new Error(`Device ${device.devicePath} is unrecoverable`));
+    }
+  }
+
+  // NEW: Helper methods for cleanup
+  private async findOldTransfers(): Promise<unknown[]> {
+    // Implementation would find old transfer records
+    // For now, return empty array
+    return [];
+  }
+
+  private async cleanupTransfer(transfer: unknown): Promise<void> {
+    // Implementation would clean up individual transfer
+    // For now, just log
+    this.components.logger.debug(`Cleaning up transfer: ${String(transfer)}`);
   }
 
   /**
@@ -636,24 +757,23 @@ export class OfflineSync extends BaseService {
 // Main entry point when run directly
 if (require.main === module) {
   const service = new OfflineSync();
-  const startupLogger = LoggerFactory.createConsoleLogger('Startup');
 
   // Handle graceful shutdown
   process.on('SIGINT', async () => {
-    startupLogger.info('Received SIGINT, shutting down gracefully...');
+    console.log('Received SIGINT, shutting down gracefully...');
     await service.stop();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
-    startupLogger.info('Received SIGTERM, shutting down gracefully...');
+    console.log('Received SIGTERM, shutting down gracefully...');
     await service.stop();
     process.exit(0);
   });
 
   // Start the service
   service.start().catch(error => {
-    startupLogger.error('Failed to start offline sync service:', error);
+    console.error('Failed to start offline sync service:', error);
     process.exit(1);
   });
 }

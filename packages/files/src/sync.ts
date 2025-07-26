@@ -26,19 +26,16 @@ export async function rsyncDirectory(
   return new Promise(resolve => {
     const args = ['-avz', '--progress', '--stats'];
 
-    // Add exclusions
     if (options.exclude) {
       options.exclude.forEach(pattern => {
         args.push('--exclude', pattern);
       });
     }
 
-    // Add bandwidth limit
     if (options.bandwidthLimit && options.bandwidthLimit !== 'unlimited') {
       args.push(`--bwlimit=${options.bandwidthLimit}`);
     }
 
-    // Add dry run
     if (options.dryRun) {
       args.push('--dry-run');
     }
@@ -48,7 +45,6 @@ export async function rsyncDirectory(
     const rsyncProcess = spawn('rsync', args);
 
     rsyncProcess.stdout.on('data', data => {
-      // Log progress information
       if (options.logger) {
         options.logger.info(`rsync: ${data.toString().trim()}`);
       }
@@ -84,7 +80,6 @@ export async function copyFileAdvanced(
   return safeAsync(async () => {
     const { timeout = 30000, onProgress, signal, logger } = options;
 
-    // Create timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error(`File copy timeout after ${timeout}ms`));
@@ -96,14 +91,12 @@ export async function copyFileAdvanced(
       });
     });
 
-    // Get source file size for progress tracking
     const sourceStats = await fs.stat(sourcePath);
     let copiedBytes = 0;
 
     const copyPromise = pipeline(createReadStream(sourcePath), createWriteStream(destPath));
 
     if (onProgress) {
-      // Simple progress tracking (could be enhanced with actual byte counting)
       const progressInterval = setInterval(() => {
         copiedBytes = Math.min(copiedBytes + sourceStats.size / 10, sourceStats.size);
         onProgress({ completed: copiedBytes, total: sourceStats.size });
@@ -124,7 +117,7 @@ export async function copyFileAdvanced(
 export async function processFileInChunks<T>(
   filePath: FilePath,
   processor: (chunk: Buffer, offset: number) => Promise<T>,
-  chunkSize: number = 64 * 1024, // 64KB default
+  chunkSize: number = 64 * 1024,
   options: FileOperationOptions = {}
 ): Promise<Result<T[]>> {
   return safeAsync(async () => {

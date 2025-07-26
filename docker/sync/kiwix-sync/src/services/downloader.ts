@@ -5,7 +5,6 @@ import path from 'path';
 import {
   ensureDirectory,
   fileExists,
-  getFileStats,
   formatSize,
   getDirectorySize,
   parseSize,
@@ -57,7 +56,6 @@ export class ZimDownloader {
     try {
       this.logger.info(`Starting download of package: ${packageName}`);
 
-      // Find package in catalog
       const availablePackages = await this.listAvailablePackages();
       const packageInfo = availablePackages.find(pkg => pkg.name === packageName);
 
@@ -66,11 +64,9 @@ export class ZimDownloader {
         return false;
       }
 
-      // Ensure directories exist
       await ensureDirectory(this.config.storage.zim_directory);
       await ensureDirectory(this.config.storage.temp_directory);
 
-      // Check available space
       const currentSize = await getDirectorySize(this.config.storage.zim_directory);
       const maxSize = parseSize(this.config.storage.max_total_size);
 
@@ -81,14 +77,12 @@ export class ZimDownloader {
         return false;
       }
 
-      // Download using aria2c for better performance and resume capability
       const tempFilePath = path.join(this.config.storage.temp_directory, `${packageName}.zim`);
       const finalFilePath = path.join(this.config.storage.zim_directory, `${packageName}.zim`);
 
       const success = await this.downloadWithAria2(packageInfo.url, tempFilePath);
 
       if (success) {
-        // Move from temp to final location
         await moveFile(tempFilePath, finalFilePath);
         this.logger.info(`Successfully downloaded ${packageName}`);
         return true;
@@ -119,7 +113,6 @@ export class ZimDownloader {
         '--connect-timeout=30',
       ];
 
-      // Add bandwidth limit if configured
       const bandwidthLimit = this.config.download.bandwidth_limit;
       if (bandwidthLimit && bandwidthLimit !== 'unlimited') {
         args.push(`--max-download-limit=${bandwidthLimit}`);
@@ -132,7 +125,6 @@ export class ZimDownloader {
 
       aria2Process.stdout.on('data', data => {
         const output = data.toString();
-        // Parse progress information
         const progressMatch = output.match(
           /\[#\w+\s+(\d+)%\((\d+[KMGT]?B)\/(\d+[KMGT]?B)\)\s+CN:(\d+)\s+DL:([^\s]+)\s+ETA:([^\]]+)\]/
         );
@@ -176,15 +168,13 @@ export class ZimDownloader {
       const packageExists = await fileExists(localPath);
 
       if (!packageExists) {
-        return true; // New package, needs download
+        return true;
       }
 
       const packageInfo = await this.getPackageInfo(packageName);
       if (!packageInfo) {
-        return false; // Package not available anymore
+        return false;
       }
-
-      // Check file modification time vs package date
       const stats = await fs.stat(localPath);
       const localDate = stats.mtime;
       const remoteDate = new Date(packageInfo.date);

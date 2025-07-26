@@ -1,13 +1,25 @@
 {
-  "name": "@dangerprep/breaker",
+  "name": "@dangerprep/resilience",
   "version": "1.0.0",
-  "description": "Circuit breaker patterns for fault tolerance in DangerPrep services",
+  "description": "Comprehensive resilience patterns including circuit breakers, retry mechanisms, and fault tolerance for DangerPrep services",
   "private": true,
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./circuit-breaker": {
+      "types": "./dist/circuit-breaker.d.ts",
+      "default": "./dist/circuit-breaker.js"
+    },
+    "./retry": {
+      "types": "./dist/retry.d.ts",
+      "default": "./dist/retry.js"
+    },
+    "./patterns": {
+      "types": "./dist/patterns.d.ts",
+      "default": "./dist/patterns.js"
     }
   },
   "files": [
@@ -26,6 +38,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@dangerprep/common": "workspace:*",
     "@dangerprep/errors": "workspace:*"
   },
   "devDependencies": {
@@ -35,9 +48,12 @@
     "typescript": "^5.8.3"
   },
   "keywords": [
-    "circuit-breaker",
-    "fault-tolerance",
     "resilience",
+    "circuit-breaker",
+    "retry",
+    "fault-tolerance",
+    "exponential-backoff",
+    "jitter",
     "typescript",
     "dangerprep"
   ]

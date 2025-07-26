@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/engine.js",
-    "dev": "ts-node src/engine.ts",
+    "dev": "npx tsx src/engine.ts",
     "cli": "node dist/cli.js",
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
@@ -26,7 +26,7 @@
     "@dangerprep/health": "workspace:*",
     "@dangerprep/logging": "workspace:*",
     "@dangerprep/notifications": "workspace:*",
-    "@dangerprep/retry": "workspace:*",
+    "@dangerprep/resilience": "workspace:*",
     "@dangerprep/service": "workspace:*",
     "commander": "^14.0.0",
     "fs-extra": "^11.3.0",
@@ -44,7 +44,7 @@
     "jest": "^30.0.0",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
-    "ts-node": "^10.9.2",
+
     "typescript": "^5.8.3"
   },
   "engines": {

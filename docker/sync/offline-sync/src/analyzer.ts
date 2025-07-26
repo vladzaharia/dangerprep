@@ -2,12 +2,7 @@ import { exec } from 'child_process';
 import * as path from 'path';
 import { promisify } from 'util';
 
-import {
-  getFilesRecursively,
-  getDirectorySize,
-  fileExists,
-  ensureDirectory,
-} from '@dangerprep/files';
+import { getFilesRecursively, fileExists, ensureDirectory } from '@dangerprep/files';
 import { Logger, LoggerFactory } from '@dangerprep/logging';
 import * as fs from 'fs-extra';
 

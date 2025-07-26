@@ -5,10 +5,8 @@ import { Command } from 'commander';
 
 import { KiwixManager } from './manager';
 
-// Create a CLI logger for all output
 const cliLogger = LoggerFactory.createConsoleLogger('CLI');
 
-// Helper function to output structured data
 const outputData = (data: unknown, asJson = false): void => {
   if (asJson) {
     cliLogger.info(JSON.stringify(data, null, 2));
@@ -17,12 +15,10 @@ const outputData = (data: unknown, asJson = false): void => {
   }
 };
 
-// Helper function to output success messages
 const outputSuccess = (message: string): void => {
   cliLogger.info(`✅ ${message}`);
 };
 
-// Helper function to output progress messages
 const outputProgress = (message: string): void => {
   cliLogger.info(`🔄 ${message}`);
 };
@@ -40,7 +36,6 @@ program
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
 
-      // Initialize the service
       const initResult = await manager.initialize();
       if (!initResult.success) {
         throw initResult.error || new Error('Service initialization failed');
@@ -54,7 +49,6 @@ program
       if (options.json) {
         outputData(filtered, true);
       } else {
-        // For table output, we'll format it as structured text since logger doesn't support console.table
         cliLogger.info('\n📦 Available Packages:');
         filtered.forEach(pkg => {
           const title = pkg.title.substring(0, 50) + (pkg.title.length > 50 ? '...' : '');
@@ -76,7 +70,6 @@ program
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
 
-      // Initialize the service
       const initResult = await manager.initialize();
       if (!initResult.success) {
         throw initResult.error || new Error('Service initialization failed');
@@ -109,7 +102,6 @@ program
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
 
-      // Initialize the service
       const initResult = await manager.initialize();
       if (!initResult.success) {
         throw initResult.error || new Error('Service initialization failed');
@@ -137,7 +129,6 @@ program
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
 
-      // Initialize the service
       const initResult = await manager.initialize();
       if (!initResult.success) {
         throw initResult.error || new Error('Service initialization failed');
@@ -166,7 +157,6 @@ program
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
 
-      // Initialize the service
       const initResult = await manager.initialize();
       if (!initResult.success) {
         throw initResult.error || new Error('Service initialization failed');
@@ -204,7 +194,6 @@ program
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
 
-      // Initialize the service
       const initResult = await manager.initialize();
       if (!initResult.success) {
         throw initResult.error || new Error('Service initialization failed');
@@ -236,7 +225,6 @@ program
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
 
-      // Initialize the service
       const initResult = await manager.initialize();
       if (!initResult.success) {
         throw initResult.error || new Error('Service initialization failed');
@@ -282,7 +270,6 @@ program
     try {
       const manager = new KiwixManager(process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml');
 
-      // Initialize the service
       const initResult = await manager.initialize();
       if (!initResult.success) {
         throw initResult.error || new Error('Service initialization failed');
