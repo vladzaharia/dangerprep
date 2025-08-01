@@ -14,8 +14,8 @@ export class CardAnalyzer {
   private config: OfflineSyncConfig['offline_sync'];
   private logger: Logger;
 
-  constructor(config: OfflineSyncConfig['offline_sync']) {
-    this.config = config;
+  constructor(config: OfflineSyncConfig) {
+    this.config = config.offline_sync;
     this.logger = LoggerFactory.createConsoleLogger('CardAnalyzer');
   }
 

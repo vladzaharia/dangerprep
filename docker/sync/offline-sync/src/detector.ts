@@ -30,9 +30,9 @@ export class DeviceDetector extends EventEmitter {
   private isMonitoring = false;
   private logger: Logger;
 
-  constructor(config: OfflineSyncConfig['offline_sync']) {
+  constructor(config: OfflineSyncConfig) {
     super();
-    this.config = config;
+    this.config = config.offline_sync;
     this.logger = LoggerFactory.createConsoleLogger('DeviceDetector');
   }
 

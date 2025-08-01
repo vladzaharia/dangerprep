@@ -1,15 +1,9 @@
 import path from 'path';
 
-import { ConfigManager } from '@dangerprep/configuration';
 import { ensureDirectoryAdvanced, createDirectoryPath } from '@dangerprep/files';
-import { ComponentStatus } from '@dangerprep/health';
 import { NotificationType, NotificationLevel } from '@dangerprep/notifications';
-import {
-  BaseService,
-  ServiceConfig,
-  ServiceUtils,
-  AdvancedAsyncPatterns,
-} from '@dangerprep/service';
+import { AdvancedAsyncPatterns } from '@dangerprep/service';
+import { StandardizedSyncService, ServicePatterns } from '@dangerprep/sync';
 
 import { ZimDownloader } from './services/downloader';
 import { LibraryManager } from './services/library';
@@ -17,98 +11,82 @@ import { ZimUpdater } from './services/updater';
 import type { KiwixConfig, ZimPackage } from './types';
 import { KiwixConfigSchema } from './types';
 
-export class KiwixManager extends BaseService {
-  private configManager: ConfigManager<KiwixConfig>;
+export class KiwixManager extends StandardizedSyncService<KiwixConfig> {
   private zimUpdater!: ZimUpdater;
   private zimDownloader!: ZimDownloader;
   private libraryManager!: LibraryManager;
 
-  constructor(configPath: string) {
-    const serviceConfig: ServiceConfig = ServiceUtils.createServiceConfig(
-      'kiwix-sync',
-      '1.0.0',
-      configPath,
-      {
-        enablePeriodicHealthChecks: true,
-        healthCheckIntervalMinutes: 5,
-        handleProcessSignals: true,
-        shutdownTimeoutMs: 30000,
-
-        enableScheduler: true,
-        enableProgressTracking: true,
-        enableAutoRecovery: true,
-
-        schedulerConfig: {
-          enableHealthMonitoring: true,
-          autoStartTasks: true,
-        },
-
-        progressConfig: {
-          enableNotifications: true,
-          cleanupDelayMs: 600000,
-        },
-
-        recoveryConfig: {
-          maxRestartAttempts: 2,
-          restartDelayMs: 30000,
-          useExponentialBackoff: true,
-          enableGracefulDegradation: true,
-        },
-        loggingConfig: {
-          level: 'INFO',
-          file: '/app/data/logs/kiwix-manager.log',
-          maxSize: '50MB',
-          backupCount: 3,
-          format: 'text',
-          colors: true,
-        },
-      }
-    );
-
-    const hooks = {
-      beforeInitialize: async () => {
-        this.components.logger.debug('Preparing Kiwix manager initialization...');
+  constructor(configPath: string = '/app/data/config.yaml') {
+    const lifecycleHooks = ServicePatterns.createSyncLifecycleHooks({
+      onServiceReady: async () => {
+        this.getLogger().info('Kiwix Manager is ready and operational');
       },
-      afterInitialize: async () => {
-        this.components.logger.info('Kiwix services and directories ready');
+      onServiceStopping: async () => {
+        this.getLogger().info('Kiwix Manager is shutting down...');
       },
-      beforeStart: async () => {
-        this.components.logger.debug('Starting Kiwix update scheduling...');
+      onOperationStart: async (operationId, operationType) => {
+        this.getLogger().info(`Starting ${operationType} operation: ${operationId}`);
       },
-      afterStart: async () => {
-        this.components.logger.info('Kiwix manager operational with scheduled updates');
+      onOperationComplete: async (operationId, success) => {
+        this.getLogger().info(
+          `Operation ${operationId} ${success ? 'completed successfully' : 'failed'}`
+        );
       },
-    };
-
-    super(serviceConfig, hooks);
-
-    this.configManager = new ConfigManager(configPath, KiwixConfigSchema, {
-      logger: this.components.logger,
     });
+
+    super('kiwix-sync', '1.0.0', configPath, KiwixConfigSchema, lifecycleHooks);
   }
 
-  protected override async loadConfiguration(): Promise<void> {
-    await this.loadConfigurationWithManager(this.configManager);
+  // Implement required abstract methods
+  protected async validateServiceConfiguration(config: KiwixConfig): Promise<void> {
+    // Validate Kiwix-specific configuration
+    if (!config.kiwix_manager.storage.zim_directory) {
+      throw new Error('ZIM directory must be specified');
+    }
+
+    if (!config.kiwix_manager.api.base_url) {
+      throw new Error('API base URL must be specified');
+    }
   }
 
-  protected override async setupHealthChecks(): Promise<void> {
-    this.registerComponentHealthChecks();
-  }
-
-  protected override async initializeServiceComponents(): Promise<void> {
+  protected async initializeServiceSpecificComponents(_config: KiwixConfig): Promise<void> {
     await this.initializeServices();
     await this.ensureDirectories();
   }
 
+  protected async startServiceComponents(): Promise<void> {
+    this.scheduleUpdates();
+    await this.libraryManager.updateLibrary();
+    this.getLogger().info('Kiwix sync service started successfully');
+  }
+
+  protected async stopServiceComponents(): Promise<void> {
+    this.getLogger().info('Kiwix sync service stopped');
+  }
+
+  // Override the base service methods that are still required
+  protected override async loadConfiguration(): Promise<void> {
+    // Configuration loading is handled by the standardized base class
+    // This method is called by BaseService.initialize()
+  }
+
+  protected override async startService(): Promise<void> {
+    await this.startServiceComponents();
+  }
+
+  protected override async stopService(): Promise<void> {
+    await this.stopServiceComponents();
+  }
+
   private async initializeServices(): Promise<void> {
-    const config = this.configManager.getConfig();
+    const config = this.getConfig();
     this.zimUpdater = new ZimUpdater(config, this.components.logger);
     this.zimDownloader = new ZimDownloader(config, this.components.logger);
     this.libraryManager = new LibraryManager(config, this.components.logger);
   }
 
   private async ensureDirectories(): Promise<void> {
-    const config = this.configManager.getConfig();
+    const config = this.getConfig();
     const storage = config.kiwix_manager.storage;
 
     const directoryOperations = [
@@ -134,7 +112,7 @@ export class KiwixManager extends BaseService {
   }
 
   scheduleUpdates(): void {
-    const config = this.configManager.getConfig();
+    const config = this.getConfig();
     const schedulerConfig = config.kiwix_manager.scheduler;
 
     this.scheduleTask(
@@ -280,6 +258,10 @@ export class KiwixManager extends BaseService {
     return await this.libraryManager.getLibraryStats();
   }
 
+  async updateLibrary(): Promise<void> {
+    await this.libraryManager.updateLibrary();
+  }
+
   private async cleanupOldFiles(): Promise<void> {
     try {
       await this.zimUpdater.cleanupOldVersions();
@@ -290,119 +272,72 @@ export class KiwixManager extends BaseService {
     }
   }
 
-  private registerComponentHealthChecks(): void {
-    this.components.healthChecker.registerComponent({
-      name: 'configuration',
-      critical: true,
-      check: async () => {
-        try {
-          const config = this.configManager.getConfig();
-          return {
-            status: ComponentStatus.UP,
-            message: 'Configuration loaded successfully',
-            details: {
-              zimDirectory: config.kiwix_manager.storage.zim_directory,
-              libraryFile: config.kiwix_manager.storage.library_file,
-              scheduledUpdates: !!config.kiwix_manager.scheduler.update_schedule,
-            },
-          };
-        } catch (error) {
-          return {
-            status: ComponentStatus.DOWN,
-            message: 'Configuration failed to load',
-            error: {
-              message: error instanceof Error ? error.message : String(error),
-              code: 'CONFIG_LOAD_FAILED',
-            },
-          };
-        }
-      },
-    });
+  // Public methods for CLI commands are already defined above
 
-    this.components.healthChecker.registerComponent({
-      name: 'library',
-      critical: true,
-      check: async () => {
-        try {
-          const libraryValid = await this.libraryManager.validateLibrary();
-          const stats = await this.getLibraryStats();
-
-          return {
-            status: libraryValid ? ComponentStatus.UP : ComponentStatus.DEGRADED,
-            message: libraryValid ? 'Library is valid' : 'Library validation failed',
-            details: {
-              totalPackages: stats.totalPackages,
-              totalSize: stats.totalSize,
-              lastUpdated: stats.lastUpdated,
-              libraryValid,
-            },
-          };
-        } catch (error) {
-          return {
-            status: ComponentStatus.DOWN,
-            message: 'Library check failed',
-            error: {
-              message: error instanceof Error ? error.message : String(error),
-              code: 'LIBRARY_CHECK_FAILED',
-            },
-          };
-        }
-      },
-    });
-
-    this.components.healthChecker.registerComponent({
-      name: 'services',
-      critical: false,
-      check: async () => {
-        const servicesInitialized = !!(
-          this.zimUpdater &&
-          this.zimDownloader &&
-          this.libraryManager
-        );
-
-        return {
-          status: servicesInitialized ? ComponentStatus.UP : ComponentStatus.DOWN,
-          message: servicesInitialized
-            ? 'All services initialized'
-            : 'Services not fully initialized',
-          details: {
-            zimUpdater: !!this.zimUpdater,
-            zimDownloader: !!this.zimDownloader,
-            libraryManager: !!this.libraryManager,
-          },
-        };
-      },
-    });
-  }
-
-  protected override async startService(): Promise<void> {
-    this.scheduleUpdates();
-
-    await this.libraryManager.updateLibrary();
-
-    this.components.logger.info('Kiwix sync service started successfully');
-  }
-
-  protected override async stopService(): Promise<void> {
-    this.components.logger.info('Kiwix sync service stopped');
-  }
+  // Removed duplicate methods - using standardized versions above
 }
 
+// Create service factory for standardized CLI and service management
+const factory = ServicePatterns.createStandardServiceFactory({
+  serviceName: 'kiwix-sync',
+  version: '1.0.0',
+  description: 'Kiwix ZIM file synchronization service',
+  defaultConfigPath: '/app/data/config.yaml',
+  configSchema: KiwixConfigSchema,
+  serviceClass: KiwixManager,
+  lifecycleHooks: ServicePatterns.createSyncLifecycleHooks({
+    onServiceReady: async () => {
+      // eslint-disable-next-line no-console
+      console.log('Kiwix sync service is ready and operational');
+    },
+    onOperationComplete: async (operationId, success) => {
+      // eslint-disable-next-line no-console
+      console.log(
+        `Kiwix operation ${operationId} ${success ? 'completed successfully' : 'failed'}`
+      );
+    },
+  }),
+  additionalCommands: [
+    {
+      name: 'update-library',
+      description: 'Manually trigger library update',
+      action: async (_args, _options, service) => {
+        // eslint-disable-next-line no-console
+        console.log('Triggering manual library update...');
+        const manager = service as KiwixManager;
+        await manager.updateLibrary();
+        // eslint-disable-next-line no-console
+        console.log('Library update completed');
+      },
+    },
+    {
+      name: 'list-packages',
+      description: 'List available ZIM packages',
+      action: async (_args, _options, service) => {
+        // eslint-disable-next-line no-console
+        console.log('Listing available ZIM packages...');
+        const manager = service as KiwixManager;
+        const packages = await manager.listAvailablePackages();
+        // eslint-disable-next-line no-console
+        console.table(
+          packages.map((pkg: ZimPackage) => ({
+            name: pkg.name,
+            title: pkg.title,
+            size: pkg.size,
+            date: pkg.date,
+          }))
+        );
+      },
+    },
+  ],
+});
+
+// Main entry point
 if (require.main === module) {
-  const configPath = process.env.KIWIX_CONFIG_PATH || '/app/data/config.yaml';
-  const manager = new KiwixManager(configPath);
-
-  manager
-    .initialize()
-    .then(async initResult => {
-      if (!initResult.success) {
-        throw initResult.error || new Error('Service initialization failed');
-      }
-
-      await manager.start();
-    })
-    .catch((error: unknown) => {
-      console.error('Failed to start Kiwix Manager:', error);
-      process.exit(1);
-    });
+  const main = factory.createMainEntryPoint();
+  main(process.argv).catch(error => {
+    // eslint-disable-next-line no-console
+    console.error('Kiwix sync service failed:', error);
+    process.exit(1);
+  });
 }

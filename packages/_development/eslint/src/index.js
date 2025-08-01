@@ -103,7 +103,7 @@ export default [
       'node/no-unsupported-features/es-syntax': 'off', // We use TypeScript
       
       // General rules
-      'no-console': 'warn',
+      'no-console': 'error',
       'no-debugger': 'error',
       'prefer-const': 'error',
       'no-var': 'error',

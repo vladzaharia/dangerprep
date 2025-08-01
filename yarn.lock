@@ -515,7 +515,6 @@ __metadata:
     node-cron: "npm:^4.2.1"
     prettier: "npm:^3.6.2"
     rimraf: "npm:^6.0.1"
-    ts-node: "npm:^10.9.2"
     typescript: "npm:^5.8.3"
   languageName: unknown
   linkType: soft
@@ -554,7 +553,6 @@ __metadata:
     node-cron: "npm:^4.2.1"
     prettier: "npm:^3.6.2"
     rimraf: "npm:^6.0.1"
-    ts-node: "npm:^10.9.2"
     typescript: "npm:^5.8.3"
   languageName: unknown
   linkType: soft
@@ -597,7 +595,6 @@ __metadata:
     node-cron: "npm:^4.2.1"
     prettier: "npm:^3.6.2"
     rimraf: "npm:^6.0.1"
-    ts-node: "npm:^10.9.2"
     typescript: "npm:^5.8.3"
     usb: "npm:^2.16.0"
   languageName: unknown
@@ -611,7 +608,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@dangerprep/progress@workspace:packages/progress":
+"@dangerprep/progress@workspace:*, @dangerprep/progress@workspace:packages/progress":
   version: 0.0.0-use.local
   resolution: "@dangerprep/progress@workspace:packages/progress"
   dependencies:
@@ -664,6 +661,46 @@ __metadata:
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.8.3"
     zod: "npm:^4.0.10"
+  languageName: unknown
+  linkType: soft
+
+"@dangerprep/sync@workspace:packages/sync-core":
+  version: 0.0.0-use.local
+  resolution: "@dangerprep/sync@workspace:packages/sync-core"
+  dependencies:
+    "@dangerprep/configuration": "workspace:*"
+    "@dangerprep/errors": "workspace:*"
+    "@dangerprep/files": "workspace:*"
+    "@dangerprep/health": "workspace:*"
+    "@dangerprep/logging": "workspace:*"
+    "@dangerprep/notifications": "workspace:*"
+    "@dangerprep/progress": "workspace:*"
+    "@dangerprep/resilience": "workspace:*"
+    "@dangerprep/service": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
+    "@types/jest": "npm:^30.0.0"
+    "@types/js-yaml": "npm:^4.0.5"
+    "@types/node": "npm:^24.0.0"
+    commander: "npm:^14.0.0"
+    eslint: "npm:^9.32.0"
+    jest: "npm:^30.0.0"
+    js-yaml: "npm:^4.1.0"
+    node-cron: "npm:^4.2.1"
+    prettier: "npm:^3.6.2"
+    rimraf: "npm:^6.0.1"
+    typescript: "npm:^5.8.3"
+  languageName: unknown
+  linkType: soft
+
+"@dangerprep/types@workspace:packages/types":
+  version: 0.0.0-use.local
+  resolution: "@dangerprep/types@workspace:packages/types"
+  dependencies:
+    "@dangerprep/configuration": "workspace:*"
+    "@dangerprep/eslint": "workspace:*"
+    "@dangerprep/prettier": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
+    typescript: "npm:^5.6.3"
   languageName: unknown
   linkType: soft
 
@@ -6883,7 +6920,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:^5.8.3":
+"typescript@npm:^5.6.3, typescript@npm:^5.8.3":
   version: 5.8.3
   resolution: "typescript@npm:5.8.3"
   bin:
@@ -6893,7 +6930,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@npm%3A^5.8.3#optional!builtin<compat/typescript>":
+"typescript@patch:typescript@npm%3A^5.6.3#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.8.3#optional!builtin<compat/typescript>":
   version: 5.8.3
   resolution: "typescript@patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"
   bin:

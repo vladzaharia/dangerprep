@@ -93,6 +93,22 @@ export class ConfigManager {
    */
   public async createDefaultConfig(): Promise<void> {
     const defaultConfig: OfflineSyncConfig = {
+      // Standardized service configuration
+      service_name: 'offline-sync',
+      version: '1.0.0',
+      enabled: true,
+      log_level: 'info',
+      data_directory: '/app/data',
+      temp_directory: '/tmp',
+      max_concurrent_operations: 5,
+      operation_timeout_minutes: 30,
+      health_check_interval_minutes: 5,
+      enable_notifications: true,
+      enable_progress_tracking: true,
+      enable_auto_recovery: true,
+      metadata: {},
+
+      // Service-specific configuration
       offline_sync: {
         storage: {
           content_directory: '/content',

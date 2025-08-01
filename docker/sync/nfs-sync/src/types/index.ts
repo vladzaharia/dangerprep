@@ -1,7 +1,8 @@
 import { z } from '@dangerprep/configuration';
+import { StandardizedServiceConfig } from '@dangerprep/sync';
 
-// Zod schema for SyncConfig
-export const SyncConfigSchema = z.object({
+// Service-specific configuration schema
+const NFSSyncServiceConfigSchema = z.object({
   sync_config: z.object({
     central_nas: z.object({
       host: z.string(),
@@ -76,8 +77,31 @@ export const SyncConfigSchema = z.object({
   }),
 });
 
-// TypeScript type inferred from Zod schema
-export type SyncConfig = z.infer<typeof SyncConfigSchema>;
+// Create standardized configuration schema
+export const NFSSyncConfigSchema = z
+  .object({
+    service_name: z.string().default('nfs-sync'),
+    version: z.string().default('1.0.0'),
+    enabled: z.boolean().default(true),
+    log_level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+    data_directory: z.string().default('/app/data'),
+    temp_directory: z.string().default('/tmp'),
+    max_concurrent_operations: z.number().min(1).max(20).default(5),
+    operation_timeout_minutes: z.number().min(1).max(120).default(30),
+    health_check_interval_minutes: z.number().min(1).max(60).default(5),
+    enable_notifications: z.boolean().default(true),
+    enable_progress_tracking: z.boolean().default(true),
+    enable_auto_recovery: z.boolean().default(true),
+    metadata: z.record(z.string(), z.unknown()).default({}),
+  })
+  .merge(NFSSyncServiceConfigSchema);
+
+// TypeScript type - intersection of standardized config and service-specific config
+export type NFSSyncConfig = StandardizedServiceConfig & z.infer<typeof NFSSyncServiceConfigSchema>;
+
+// Legacy export for backward compatibility
+export const SyncConfigSchema = NFSSyncConfigSchema;
+export type SyncConfig = NFSSyncConfig;
 
 // Sync types with const assertion
 export const SYNC_TYPES = [
@@ -89,7 +113,7 @@ export const SYNC_TYPES = [
 export type SyncType = (typeof SYNC_TYPES)[number];
 
 // Content type configuration derived from schema
-export type ContentTypeConfig = SyncConfig['sync_config']['content_types'][string];
+export type ContentTypeConfig = NFSSyncConfig['sync_config']['content_types'][string];
 
 export interface FilterRule {
   readonly type: string;
