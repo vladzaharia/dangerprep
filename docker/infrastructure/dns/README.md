@@ -5,16 +5,19 @@ This directory contains the DNS infrastructure for DangerPrep, including AdGuard
 ## Components
 
 ### AdGuard Home (`adguardhome` service)
+
 - **Purpose**: Ad-blocking and DNS filtering
 - **Port**: 53 (DNS), 3000 (Web Interface)
 - **Access**: `https://dns.${DOMAIN_NAME}`
 
 ### CoreDNS (`coredns` service)
+
 - **Purpose**: Internal domain resolution
 - **Port**: 5353 (Alternative DNS)
 - **Configuration**: Managed by registrar service
 
 ### DNS Registrar (`registrar` service)
+
 - **Purpose**: Watches Docker labels and updates DNS records
 - **Function**: Automatically registers services with `dns.register` labels
 

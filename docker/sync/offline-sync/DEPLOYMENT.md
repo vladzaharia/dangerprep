@@ -62,6 +62,7 @@ offline_sync:
 
 #### Content Types
 Each content type defines:
+
 - `local_path`: Local directory path
 - `card_path`: Directory name on the MicroSD card
 - `sync_direction`: `bidirectional`, `to_card`, or `from_card`

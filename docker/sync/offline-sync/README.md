@@ -93,6 +93,7 @@ Each content type can be configured with:
 The service is designed to run as a Docker container with the following requirements:
 
 ### Volumes
+
 - `/app/data`: Service data and logs
 - `/content`: Local content directory
 - `/dev`: Device access for USB detection
@@ -102,9 +103,11 @@ The service is designed to run as a Docker container with the following requirem
 - `/run/dbus`: D-Bus for udisks2
 
 ### Privileges
+
 - `privileged: true`: Required for USB device access and mounting
 
 ### Environment Variables
+
 - `INSTALL_ROOT`: Installation root directory
 - `LOG_LEVEL`: Logging level (DEBUG, INFO, WARN, ERROR)
 - `TZ`: Timezone
