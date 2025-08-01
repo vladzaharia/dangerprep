@@ -9,7 +9,8 @@
     "cli",
     "packages/*",
     "packages/_development/*",
-    "docker/sync/*"
+    "docker/sync/*",
+    "docker/sync/__tests__"
   ],
   "scripts": {
     "build": "turbo run build",
@@ -33,10 +34,18 @@
     "cache:clear": "turbo daemon clean",
     "postinstall": "turbo run postinstall || true"
   },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "fast-xml-parser": "^5.2.5",
+    "fs-extra": "^11.3.0",
+    "usb": "^2.16.0"
+  },
   "devDependencies": {
     "@dangerprep/eslint": "workspace:*",
     "@dangerprep/prettier": "workspace:*",
     "@dangerprep/typescript": "workspace:*",
+    "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
     "@types/node-cron": "^3.0.11",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
@@ -47,6 +56,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^5.2.1",
+    "jest": "^30.0.0",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
     "syncpack": "^13.0.4",

@@ -1,18 +1,24 @@
 import { exec } from 'child_process';
-import * as crypto from 'crypto';
 import { EventEmitter } from 'events';
 import * as path from 'path';
 import { promisify } from 'util';
 
 import { getFilesRecursively, sanitizePath, ensureDirectory } from '@dangerprep/files';
 import { Logger, LoggerFactory } from '@dangerprep/logging';
+import {
+  TransferEngine,
+  FileTransfer,
+  SyncProgressManager,
+  UnifiedProgressTracker,
+  StandardSyncErrorHandler,
+  SyncErrorFactory,
+} from '@dangerprep/sync';
 import * as fs from 'fs-extra';
 
 import {
   DetectedDevice,
   OfflineSyncConfig,
   SyncOperation,
-  FileTransfer,
   CardAnalysis,
   ContentTypeConfig,
 } from './types';
@@ -22,13 +28,56 @@ const _execAsync = promisify(exec);
 export class SyncEngine extends EventEmitter {
   private config: OfflineSyncConfig['offline_sync'];
   private activeOperations: Map<string, SyncOperation> = new Map();
-  private activeTransfers: Map<string, FileTransfer> = new Map();
+  private transferEngine: TransferEngine;
+  private progressManager: SyncProgressManager;
+  private errorHandler: StandardSyncErrorHandler;
   private logger: Logger;
 
   constructor(config: OfflineSyncConfig) {
     super();
     this.config = config.offline_sync;
     this.logger = LoggerFactory.createConsoleLogger('SyncEngine');
+
+    // Initialize TransferEngine with configuration from sync config
+    this.transferEngine = new TransferEngine(
+      {
+        maxConcurrentTransfers: this.config.sync.max_concurrent_transfers || 3,
+        defaultChunkSize: this.config.sync.transfer_chunk_size || '1MB',
+        defaultTimeout: 30 * 60 * 1000, // 30 minutes default
+        defaultRetryAttempts: 3,
+        defaultRetryDelay: 1000,
+        verifyTransfers: this.config.sync.verify_transfers || false,
+        createCompletionMarkers: this.config.sync.create_completion_markers || false,
+        enableResume: true,
+        defaultChecksumAlgorithm: 'sha256',
+        resumeDataPath: path.join(this.config.storage.temp_directory, 'transfer-resume.json'),
+      },
+      this.logger
+    );
+
+    // Initialize SyncProgressManager
+    this.progressManager = new SyncProgressManager(
+      {
+        serviceName: 'offline-sync',
+        enableNotifications: true,
+        enableLogging: true,
+        cleanupDelayMs: 300000, // 5 minutes
+        maxActiveTrackers: 10,
+        globalUpdateInterval: 1000, // 1 second
+      },
+      this.logger
+    );
+
+    // Initialize StandardSyncErrorHandler
+    this.errorHandler = new StandardSyncErrorHandler(
+      {
+        serviceName: 'offline-sync',
+        enableRetry: true,
+        enableNotifications: true,
+        enableLogging: true,
+      },
+      this.logger
+    );
   }
 
   /**
@@ -37,6 +86,19 @@ export class SyncEngine extends EventEmitter {
   public async startSync(device: DetectedDevice, analysis: CardAnalysis): Promise<string> {
     const operationId = this.generateOperationId();
 
+    // For now, use estimated values for progress tracking since we don't have detailed file counts
+    // In a real implementation, you would analyze the content types to get actual counts
+    const totalFiles = analysis.detectedContentTypes.length * 100; // Estimated files per content type
+    const totalSize = analysis.totalSize;
+
+    // Create progress tracker for device sync
+    const progressTracker = this.progressManager.createDeviceSyncTracker(
+      operationId,
+      device.devicePath, // Use devicePath as device identifier
+      totalFiles,
+      totalSize
+    );
+
     const operation: SyncOperation = {
       id: operationId,
       device,
@@ -44,9 +106,9 @@ export class SyncEngine extends EventEmitter {
       direction: 'bidirectional',
       status: 'pending',
       startTime: new Date(),
-      totalFiles: 0,
+      totalFiles,
       processedFiles: 0,
-      totalSize: 0,
+      totalSize,
       processedSize: 0,
     };
 
@@ -55,19 +117,47 @@ export class SyncEngine extends EventEmitter {
 
     try {
       operation.status = 'in_progress';
+      progressTracker.start();
+      progressTracker.setPhase('detect');
+      progressTracker.updatePhaseProgress('detect', 100);
+      progressTracker.setPhase('mount');
+      progressTracker.updatePhaseProgress('mount', 100);
+      progressTracker.setPhase('analyze');
+      progressTracker.updatePhaseProgress('analyze', 100);
+      progressTracker.setPhase('sync');
 
       // Process each detected content type
       for (const contentType of analysis.detectedContentTypes) {
-        await this.syncContentType(operation, contentType);
+        await this.syncContentType(operation, contentType, progressTracker);
       }
 
       operation.status = 'completed';
       operation.endTime = new Date();
+      progressTracker.complete();
       this.emit('sync_completed', operation);
     } catch (error) {
       operation.status = 'failed';
       operation.endTime = new Date();
       operation.error = error instanceof Error ? error.message : String(error);
+
+      // Create standardized error and handle it
+      const syncError = SyncErrorFactory.createDeviceError(
+        `Sync operation failed: ${operation.error}`,
+        {
+          serviceName: 'offline-sync',
+          operationId,
+          operationType: 'device_sync',
+          deviceId: device.devicePath,
+          timestamp: new Date(),
+        },
+        {
+          cause: error instanceof Error ? error : new Error(String(error)),
+          data: { device: device.devicePath, contentTypes: analysis.detectedContentTypes },
+        }
+      );
+
+      await this.errorHandler.handleError(syncError);
+      progressTracker.fail(operation.error);
       this.emit('sync_failed', operation, error);
     }
 
@@ -87,11 +177,10 @@ export class SyncEngine extends EventEmitter {
     operation.endTime = new Date();
 
     // Cancel all active transfers for this operation
-    for (const [transferId, transfer] of this.activeTransfers.entries()) {
-      if (transferId.startsWith(operationId)) {
-        transfer.status = 'failed';
-        transfer.error = 'Operation cancelled';
-        this.activeTransfers.delete(transferId);
+    const activeTransfers = this.transferEngine.getActiveTransfers();
+    for (const transfer of activeTransfers) {
+      if (transfer.id.startsWith(operationId)) {
+        await this.transferEngine.cancelTransfer(transfer.id);
       }
     }
 
@@ -116,7 +205,11 @@ export class SyncEngine extends EventEmitter {
   /**
    * Sync a specific content type
    */
-  private async syncContentType(operation: SyncOperation, contentType: string): Promise<void> {
+  private async syncContentType(
+    operation: SyncOperation,
+    contentType: string,
+    progressTracker?: UnifiedProgressTracker
+  ): Promise<void> {
     const contentConfig = this.config.content_types[contentType];
     if (!contentConfig || !operation.device.mountPath) {
       return;
@@ -138,11 +231,11 @@ export class SyncEngine extends EventEmitter {
     const syncDirection = contentConfig.sync_direction;
 
     if (syncDirection === 'bidirectional' || syncDirection === 'to_card') {
-      await this.syncToCard(operation, contentConfig, localPath, cardPath);
+      await this.syncToCard(operation, contentConfig, localPath, cardPath, progressTracker);
     }
 
     if (syncDirection === 'bidirectional' || syncDirection === 'from_card') {
-      await this.syncFromCard(operation, contentConfig, cardPath, localPath);
+      await this.syncFromCard(operation, contentConfig, cardPath, localPath, progressTracker);
     }
   }
 
@@ -153,7 +246,8 @@ export class SyncEngine extends EventEmitter {
     operation: SyncOperation,
     contentConfig: ContentTypeConfig,
     localPath: string,
-    cardPath: string
+    cardPath: string,
+    progressTracker?: UnifiedProgressTracker
   ): Promise<void> {
     this.log(`Syncing to card: ${localPath} -> ${cardPath}`);
 
@@ -191,7 +285,7 @@ export class SyncEngine extends EventEmitter {
       }
 
       if (shouldCopy) {
-        await this.transferFile(operation, localFile, targetPath);
+        await this.transferFile(operation, localFile, targetPath, progressTracker);
       }
     }
   }
@@ -203,7 +297,8 @@ export class SyncEngine extends EventEmitter {
     operation: SyncOperation,
     contentConfig: ContentTypeConfig,
     cardPath: string,
-    localPath: string
+    localPath: string,
+    progressTracker?: UnifiedProgressTracker
   ): Promise<void> {
     this.log(`Syncing from card: ${cardPath} -> ${localPath}`);
 
@@ -241,142 +336,94 @@ export class SyncEngine extends EventEmitter {
       }
 
       if (shouldCopy) {
-        await this.transferFile(operation, cardFile, targetPath);
+        await this.transferFile(operation, cardFile, targetPath, progressTracker);
       }
     }
   }
 
   /**
-   * Transfer a single file with progress tracking
+   * Transfer a single file using the standardized TransferEngine
    */
   private async transferFile(
     operation: SyncOperation,
     sourcePath: string,
-    targetPath: string
+    targetPath: string,
+    progressTracker?: UnifiedProgressTracker
   ): Promise<void> {
-    const transferId = `${operation.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
     try {
+      // Use TransferEngine for standardized file transfer
+      const transferId = await this.transferEngine.queueTransfer(sourcePath, targetPath, {
+        verifyTransfer: this.config.sync.verify_transfers,
+        createCompletionMarkers: this.config.sync.create_completion_markers,
+        timeout: 30 * 60 * 1000, // 30 minutes
+        retryAttempts: 3,
+        retryDelay: 1000,
+      });
+
+      // Wait for transfer to complete using event listeners
+      await new Promise<void>((resolve, reject) => {
+        const onCompleted = (transfer: FileTransfer) => {
+          if (transfer.id === transferId) {
+            this.transferEngine.off('transfer_completed', onCompleted);
+            this.transferEngine.off('transfer_failed', onFailed);
+            resolve();
+          }
+        };
+
+        const onFailed = (transfer: FileTransfer) => {
+          if (transfer.id === transferId) {
+            this.transferEngine.off('transfer_completed', onCompleted);
+            this.transferEngine.off('transfer_failed', onFailed);
+            reject(new Error(transfer.error || 'Transfer failed'));
+          }
+        };
+
+        this.transferEngine.on('transfer_completed', onCompleted);
+        this.transferEngine.on('transfer_failed', onFailed);
+      });
+
+      // Update operation progress
       const sourceStats = await fs.stat(sourcePath);
-
-      const transfer: FileTransfer = {
-        id: transferId,
-        sourcePath,
-        destinationPath: targetPath,
-        size: sourceStats.size,
-        transferred: 0,
-        status: 'pending',
-        startTime: new Date(),
-      };
-
-      this.activeTransfers.set(transferId, transfer);
-      transfer.status = 'in_progress';
-
-      // Ensure target directory exists
-      await ensureDirectory(path.dirname(targetPath));
-
-      // Copy file with progress tracking
-      await this.copyFileWithProgress(transfer);
-
-      // Verify transfer if enabled
-      if (this.config.sync.verify_transfers) {
-        await this.verifyTransfer(transfer);
-      }
-
-      // Create completion marker if enabled
-      if (this.config.sync.create_completion_markers) {
-        await this.createCompletionMarker(targetPath);
-      }
-
-      transfer.status = 'completed';
-      transfer.endTime = new Date();
-
       operation.processedFiles++;
-      operation.processedSize += transfer.size;
+      operation.processedSize += sourceStats.size;
       operation.currentFile = path.basename(sourcePath);
 
-      this.emit('file_transferred', transfer);
-      this.log(`Transferred: ${sourcePath} -> ${targetPath}`);
-    } catch (error) {
-      const transfer = this.activeTransfers.get(transferId);
-      if (transfer) {
-        transfer.status = 'failed';
-        transfer.error = error instanceof Error ? error.message : String(error);
-        transfer.endTime = new Date();
+      // Update progress tracker if provided
+      if (progressTracker) {
+        progressTracker.updateProgress(
+          operation.processedFiles,
+          operation.processedSize,
+          operation.currentFile
+        );
       }
 
-      this.logError(`Failed to transfer ${sourcePath}`, error);
-      throw error;
-    } finally {
-      this.activeTransfers.delete(transferId);
-    }
-  }
-
-  /**
-   * Copy file with progress tracking
-   */
-  private async copyFileWithProgress(transfer: FileTransfer): Promise<void> {
-    const chunkSize = this.parseSize(this.config.sync.transfer_chunk_size);
-
-    const readStream = fs.createReadStream(transfer.sourcePath, { highWaterMark: chunkSize });
-    const writeStream = fs.createWriteStream(transfer.destinationPath);
-
-    return new Promise((resolve, reject) => {
-      readStream.on('data', (chunk: string | Buffer) => {
-        const length = typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
-        transfer.transferred += length;
-      });
-
-      readStream.on('error', reject);
-      writeStream.on('error', reject);
-      writeStream.on('finish', resolve);
-
-      readStream.pipe(writeStream);
-    });
-  }
-
-  /**
-   * Verify file transfer integrity
-   */
-  private async verifyTransfer(transfer: FileTransfer): Promise<void> {
-    const sourceHash = await this.calculateFileHash(transfer.sourcePath);
-    const targetHash = await this.calculateFileHash(transfer.destinationPath);
-
-    if (sourceHash !== targetHash) {
-      throw new Error('File transfer verification failed: checksums do not match');
-    }
-
-    transfer.checksum = sourceHash;
-  }
-
-  /**
-   * Calculate file hash for verification
-   */
-  private async calculateFileHash(filePath: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const hash = crypto.createHash('sha256');
-      const stream = fs.createReadStream(filePath);
-
-      stream.on('data', (data: string | Buffer) => {
-        if (typeof data === 'string') {
-          hash.update(data, 'utf8');
-        } else {
-          hash.update(data);
+      this.log(`Transferred: ${sourcePath} -> ${targetPath}`);
+    } catch (error) {
+      // Create standardized transfer error and handle it
+      const syncError = SyncErrorFactory.createTransferError(
+        `Failed to transfer file: ${sourcePath} -> ${targetPath}`,
+        {
+          serviceName: 'offline-sync',
+          operationId: operation.id,
+          operationType: 'file_transfer',
+          sourcePath,
+          destinationPath: targetPath,
+          timestamp: new Date(),
+        },
+        {
+          cause: error instanceof Error ? error : new Error(String(error)),
+          data: { sourcePath, targetPath, operationId: operation.id },
         }
-      });
-      stream.on('end', () => resolve(hash.digest('hex')));
-      stream.on('error', reject);
-    });
+      );
+
+      await this.errorHandler.handleError(syncError);
+      throw error;
+    }
   }
 
-  /**
-   * Create completion marker file
-   */
-  private async createCompletionMarker(filePath: string): Promise<void> {
-    const markerPath = `${filePath}.sync_complete`;
-    const timestamp = new Date().toISOString();
-    await fs.writeFile(markerPath, timestamp);
-  }
+  // File transfer is now handled by TransferEngine
+
+  // File verification and completion markers are now handled by TransferEngine
 
   /**
    * Parse size string to bytes
@@ -414,7 +461,30 @@ export class SyncEngine extends EventEmitter {
   }
 
   /**
-   * Log an error
+   * Handle an error using the standardized error handler
+   */
+  private async handleError(
+    message: string,
+    error: unknown,
+    context: Partial<Parameters<typeof SyncErrorFactory.createDeviceError>[1]> = {}
+  ): Promise<void> {
+    const syncError = SyncErrorFactory.createDeviceError(
+      message,
+      {
+        serviceName: 'offline-sync',
+        timestamp: new Date(),
+        ...context,
+      },
+      {
+        cause: error instanceof Error ? error : new Error(String(error)),
+      }
+    );
+
+    await this.errorHandler.handleError(syncError);
+  }
+
+  /**
+   * Log an error (legacy method for backward compatibility)
    */
   private logError(message: string, error: unknown): void {
     this.logger.error(message, { error: error instanceof Error ? error.message : String(error) });

@@ -1,5 +1,5 @@
 import { z } from '@dangerprep/configuration';
-import { StandardizedServiceConfig } from '@dangerprep/sync';
+import { StandardizedServiceConfig, StandardizedServiceConfigSchema } from '@dangerprep/sync';
 
 // Service-specific configuration schema
 const OfflineSyncServiceConfigSchema = z.object({
@@ -51,28 +51,15 @@ const OfflineSyncServiceConfigSchema = z.object({
   }),
 });
 
-// Create standardized configuration schema
-export const OfflineSyncConfigSchema = z
-  .object({
-    service_name: z.string().default('offline-sync'),
-    version: z.string().default('1.0.0'),
-    enabled: z.boolean().default(true),
-    log_level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-    data_directory: z.string().default('/app/data'),
-    temp_directory: z.string().default('/tmp'),
-    max_concurrent_operations: z.number().min(1).max(20).default(5),
-    operation_timeout_minutes: z.number().min(1).max(120).default(30),
-    health_check_interval_minutes: z.number().min(1).max(60).default(5),
-    enable_notifications: z.boolean().default(true),
-    enable_progress_tracking: z.boolean().default(true),
-    enable_auto_recovery: z.boolean().default(true),
-    metadata: z.record(z.string(), z.unknown()).default({}),
-  })
-  .merge(OfflineSyncServiceConfigSchema);
+// Create standardized configuration schema by extending with service-specific schema
+export const OfflineSyncConfigSchema = StandardizedServiceConfigSchema.extend({
+  offline_sync: OfflineSyncServiceConfigSchema.shape.offline_sync,
+});
 
-// TypeScript type - intersection of standardized config and service-specific config
-export type OfflineSyncConfig = StandardizedServiceConfig &
-  z.infer<typeof OfflineSyncServiceConfigSchema>;
+// TypeScript type - extends standardized config with service-specific config
+export type OfflineSyncConfig = StandardizedServiceConfig & {
+  offline_sync: z.infer<typeof OfflineSyncServiceConfigSchema>['offline_sync'];
+};
 
 // Sync direction types with const assertion
 export const SYNC_DIRECTIONS = ['bidirectional', 'to_card', 'from_card'] as const;

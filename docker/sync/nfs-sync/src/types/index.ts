@@ -1,5 +1,5 @@
 import { z } from '@dangerprep/configuration';
-import { StandardizedServiceConfig } from '@dangerprep/sync';
+import { StandardizedServiceConfig, StandardizedServiceConfigSchema } from '@dangerprep/sync';
 
 // Service-specific configuration schema
 const NFSSyncServiceConfigSchema = z.object({
@@ -77,27 +77,15 @@ const NFSSyncServiceConfigSchema = z.object({
   }),
 });
 
-// Create standardized configuration schema
-export const NFSSyncConfigSchema = z
-  .object({
-    service_name: z.string().default('nfs-sync'),
-    version: z.string().default('1.0.0'),
-    enabled: z.boolean().default(true),
-    log_level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-    data_directory: z.string().default('/app/data'),
-    temp_directory: z.string().default('/tmp'),
-    max_concurrent_operations: z.number().min(1).max(20).default(5),
-    operation_timeout_minutes: z.number().min(1).max(120).default(30),
-    health_check_interval_minutes: z.number().min(1).max(60).default(5),
-    enable_notifications: z.boolean().default(true),
-    enable_progress_tracking: z.boolean().default(true),
-    enable_auto_recovery: z.boolean().default(true),
-    metadata: z.record(z.string(), z.unknown()).default({}),
-  })
-  .merge(NFSSyncServiceConfigSchema);
+// Create standardized configuration schema by extending with service-specific schema
+export const NFSSyncConfigSchema = StandardizedServiceConfigSchema.extend({
+  sync_config: NFSSyncServiceConfigSchema.shape.sync_config,
+});
 
-// TypeScript type - intersection of standardized config and service-specific config
-export type NFSSyncConfig = StandardizedServiceConfig & z.infer<typeof NFSSyncServiceConfigSchema>;
+// TypeScript type - extends standardized config with service-specific config
+export type NFSSyncConfig = StandardizedServiceConfig & {
+  sync_config: z.infer<typeof NFSSyncServiceConfigSchema>['sync_config'];
+};
 
 // Legacy export for backward compatibility
 export const SyncConfigSchema = NFSSyncConfigSchema;

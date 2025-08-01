@@ -1,5 +1,6 @@
 import path from 'path';
 
+import { z } from '@dangerprep/configuration';
 import {
   ensureDirectoryAdvanced,
   createDirectoryPath,
@@ -8,7 +9,11 @@ import {
 import { ComponentStatus } from '@dangerprep/health';
 import { NotificationType, NotificationLevel, WebhookChannel } from '@dangerprep/notifications';
 import { AdvancedAsyncPatterns } from '@dangerprep/service';
-import { StandardizedSyncService, ServicePatterns } from '@dangerprep/sync';
+import {
+  StandardizedSyncService,
+  ServicePatterns,
+  StandardizedServiceConfig,
+} from '@dangerprep/sync';
 
 import { BooksHandler } from './handlers/books';
 import { MoviesHandler } from './handlers/movies';
@@ -541,8 +546,10 @@ const factory = ServicePatterns.createStandardServiceFactory({
   version: '1.0.0',
   description: 'NFS content synchronization service',
   defaultConfigPath: '/app/data/config.yaml',
-  configSchema: NFSSyncConfigSchema,
-  serviceClass: SyncEngine,
+  configSchema: NFSSyncConfigSchema as z.ZodSchema<StandardizedServiceConfig>,
+  serviceClass: SyncEngine as new (
+    ...args: unknown[]
+  ) => StandardizedSyncService<StandardizedServiceConfig>,
   lifecycleHooks: ServicePatterns.createSyncLifecycleHooks({
     onServiceReady: async () => {
       // eslint-disable-next-line no-console

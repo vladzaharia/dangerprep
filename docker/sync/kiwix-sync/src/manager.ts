@@ -1,9 +1,14 @@
 import path from 'path';
 
+import { z } from '@dangerprep/configuration';
 import { ensureDirectoryAdvanced, createDirectoryPath } from '@dangerprep/files';
 import { NotificationType, NotificationLevel } from '@dangerprep/notifications';
 import { AdvancedAsyncPatterns } from '@dangerprep/service';
-import { StandardizedSyncService, ServicePatterns } from '@dangerprep/sync';
+import {
+  StandardizedSyncService,
+  ServicePatterns,
+  StandardizedServiceConfig,
+} from '@dangerprep/sync';
 
 import { ZimDownloader } from './services/downloader';
 import { LibraryManager } from './services/library';
@@ -283,8 +288,10 @@ const factory = ServicePatterns.createStandardServiceFactory({
   version: '1.0.0',
   description: 'Kiwix ZIM file synchronization service',
   defaultConfigPath: '/app/data/config.yaml',
-  configSchema: KiwixConfigSchema,
-  serviceClass: KiwixManager,
+  configSchema: KiwixConfigSchema as z.ZodSchema<StandardizedServiceConfig>,
+  serviceClass: KiwixManager as new (
+    ...args: unknown[]
+  ) => StandardizedSyncService<StandardizedServiceConfig>,
   lifecycleHooks: ServicePatterns.createSyncLifecycleHooks({
     onServiceReady: async () => {
       // eslint-disable-next-line no-console
@@ -299,34 +306,134 @@ const factory = ServicePatterns.createStandardServiceFactory({
   }),
   additionalCommands: [
     {
-      name: 'update-library',
-      description: 'Manually trigger library update',
-      action: async (_args, _options, service) => {
-        // eslint-disable-next-line no-console
-        console.log('Triggering manual library update...');
+      name: 'list-available',
+      description: 'List available ZIM packages',
+      options: [
+        { flags: '-f, --filter <filter>', description: 'Filter packages by name' },
+        { flags: '--json', description: 'Output as JSON' },
+      ],
+      action: async (_args, options, service) => {
         const manager = service as KiwixManager;
-        await manager.updateLibrary();
-        // eslint-disable-next-line no-console
-        console.log('Library update completed');
+        const packages = await manager.listAvailablePackages();
+        const filtered = options.filter
+          ? packages.filter((pkg: ZimPackage) =>
+              pkg.name.toLowerCase().includes(options.filter.toLowerCase())
+            )
+          : packages;
+
+        if (options.json) {
+          // eslint-disable-next-line no-console
+          console.log(JSON.stringify(filtered, null, 2));
+        } else {
+          // eslint-disable-next-line no-console
+          console.log('📦 Available ZIM Packages:');
+          filtered.forEach((pkg: ZimPackage) => {
+            // eslint-disable-next-line no-console
+            console.log(`   ${pkg.name} - ${pkg.title} (${pkg.size})`);
+          });
+        }
       },
     },
     {
-      name: 'list-packages',
-      description: 'List available ZIM packages',
-      action: async (_args, _options, service) => {
-        // eslint-disable-next-line no-console
-        console.log('Listing available ZIM packages...');
+      name: 'list-installed',
+      description: 'List installed ZIM packages',
+      options: [{ flags: '--json', description: 'Output as JSON' }],
+      action: async (_args, options, service) => {
         const manager = service as KiwixManager;
-        const packages = await manager.listAvailablePackages();
+        const packages = await manager.listInstalledPackages();
+
+        if (options.json) {
+          // eslint-disable-next-line no-console
+          console.log(JSON.stringify(packages, null, 2));
+        } else {
+          // eslint-disable-next-line no-console
+          console.log('💾 Installed ZIM Packages:');
+          packages.forEach((pkg: ZimPackage) => {
+            // eslint-disable-next-line no-console
+            console.log(`   ${pkg.name} - ${pkg.title} (${pkg.size})`);
+          });
+        }
+      },
+    },
+    {
+      name: 'download',
+      description: 'Download a ZIM package',
+      arguments: [{ name: 'package', description: 'Package name to download', required: true }],
+      options: [{ flags: '--force', description: 'Force download even if package exists' }],
+      action: async (args, _options, service) => {
+        const packageName = args[0];
+        const manager = service as KiwixManager;
+
         // eslint-disable-next-line no-console
-        console.table(
-          packages.map((pkg: ZimPackage) => ({
-            name: pkg.name,
-            title: pkg.title,
-            size: pkg.size,
-            date: pkg.date,
-          }))
-        );
+        console.log(`🔄 Downloading ${packageName}...`);
+        const success = await manager.downloadPackage(packageName);
+
+        if (success) {
+          // eslint-disable-next-line no-console
+          console.log(`✅ Successfully downloaded ${packageName}`);
+        } else {
+          // eslint-disable-next-line no-console
+          console.error(`❌ Failed to download ${packageName}`);
+          process.exit(1);
+        }
+      },
+    },
+    {
+      name: 'update-all',
+      description: 'Update all existing ZIM packages',
+      action: async (_args, _options, service) => {
+        const manager = service as KiwixManager;
+
+        // eslint-disable-next-line no-console
+        console.log('🔄 Scanning and updating existing ZIM packages...');
+        const success = await manager.updateAllZimPackages();
+
+        if (success) {
+          // eslint-disable-next-line no-console
+          console.log('✅ Update completed successfully');
+        } else {
+          // eslint-disable-next-line no-console
+          console.error('❌ Update failed');
+          process.exit(1);
+        }
+      },
+    },
+    {
+      name: 'update-library',
+      description: 'Manually trigger library update',
+      action: async (_args, _options, service) => {
+        const manager = service as KiwixManager;
+
+        // eslint-disable-next-line no-console
+        console.log('🔄 Triggering manual library update...');
+        await manager.updateLibrary();
+        // eslint-disable-next-line no-console
+        console.log('✅ Library update completed');
+      },
+    },
+    {
+      name: 'stats',
+      description: 'Show library statistics',
+      options: [{ flags: '--json', description: 'Output as JSON' }],
+      action: async (_args, options, service) => {
+        const manager = service as KiwixManager;
+        const stats = await manager.getLibraryStats();
+
+        if (options.json) {
+          // eslint-disable-next-line no-console
+          console.log(JSON.stringify(stats, null, 2));
+        } else {
+          // eslint-disable-next-line no-console
+          console.log('📊 Library Statistics:');
+          // eslint-disable-next-line no-console
+          console.log(`   Total Packages: ${stats.totalPackages}`);
+          // eslint-disable-next-line no-console
+          console.log(`   Total Size: ${stats.totalSize}`);
+          // eslint-disable-next-line no-console
+          console.log(
+            `   Last Updated: ${stats.lastUpdated ? stats.lastUpdated.toLocaleString() : 'Never'}`
+          );
+        }
       },
     },
   ],

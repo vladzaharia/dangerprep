@@ -9,7 +9,6 @@
     "build": "tsc",
     "start": "node dist/manager.js",
     "dev": "npx tsx src/manager.ts",
-    "cli": "node dist/cli.js",
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
@@ -20,28 +19,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@dangerprep/configuration": "workspace:*",
-    "@dangerprep/files": "workspace:*",
-    "@dangerprep/health": "workspace:*",
-    "@dangerprep/logging": "workspace:*",
-    "@dangerprep/notifications": "workspace:*",
-    "@dangerprep/scheduling": "workspace:*",
-    "@dangerprep/service": "workspace:*",
-    "axios": "^1.11.0",
-    "commander": "^14.0.0",
-    "js-yaml": "^4.1.0",
-    "node-cron": "^4.2.1"
-  },
-  "devDependencies": {
-    "@dangerprep/typescript": "workspace:*",
-    "@types/jest": "^30.0.0",
-    "@types/js-yaml": "^4.0.5",
-    "@types/node": "^24.0.0",
-    "eslint": "^9.32.0",
-    "jest": "^30.0.0",
-    "prettier": "^3.6.2",
-    "rimraf": "^6.0.1",
-    "typescript": "^5.8.3"
+    "@dangerprep/sync": "workspace:*"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -1,7 +1,12 @@
+import { z } from '@dangerprep/configuration';
 import { ErrorFactory, runWithErrorContext, safeAsync } from '@dangerprep/errors';
 import { HealthChecker, ComponentStatus } from '@dangerprep/health';
 import { NotificationType, NotificationLevel } from '@dangerprep/notifications';
-import { StandardizedSyncService, ServicePatterns } from '@dangerprep/sync';
+import {
+  StandardizedSyncService,
+  ServicePatterns,
+  StandardizedServiceConfig,
+} from '@dangerprep/sync';
 
 import { CardAnalyzer } from './analyzer';
 import { DeviceDetector } from './detector';
@@ -745,8 +750,10 @@ const factory = ServicePatterns.createStandardServiceFactory({
   version: '1.0.0',
   description: 'Offline MicroSD card synchronization service',
   defaultConfigPath: '/app/data/config.yaml',
-  configSchema: OfflineSyncConfigSchema,
-  serviceClass: OfflineSync,
+  configSchema: OfflineSyncConfigSchema as z.ZodSchema<StandardizedServiceConfig>,
+  serviceClass: OfflineSync as new (
+    ...args: unknown[]
+  ) => StandardizedSyncService<StandardizedServiceConfig>,
   lifecycleHooks: ServicePatterns.createSyncLifecycleHooks({
     onServiceReady: async () => {
       // eslint-disable-next-line no-console
