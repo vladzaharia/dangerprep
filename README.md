@@ -5,6 +5,7 @@ A comprehensive emergency router and content hub system built on FriendlyWRT wit
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - FriendlyElec NanoPi R6C with FriendlyWRT 24.10
 - 2TB NVMe SSD (portable installation - can be deployed anywhere)
 - Docker and Docker Compose installed
@@ -21,6 +22,7 @@ cd dangerprep
 ```
 
 ### System Requirements
+
 - **Just Command Runner**: Bundled in `lib/just/` (auto-downloaded)
 - **Installation Location**: Can be deployed anywhere (not tied to /opt)
 - **Environment Variable**: Set `DANGERPREP_INSTALL_ROOT` to customize installation directory
@@ -28,6 +30,7 @@ cd dangerprep
 ## 📋 System Overview
 
 ### Hardware
+
 - **Device**: FriendlyElec NanoPi R6C
 - **CPU**: Rockchip RK3588S (ARM64)
 - **Storage**: 2TB NVMe SSD
@@ -35,6 +38,7 @@ cd dangerprep
 - **Network**: 2.5G + 1G Ethernet ports
 
 ### Core Services
+
 - **🌐 Traefik**: Reverse proxy and load balancer
 - **📺 Jellyfin**: Media streaming with hardware transcoding
 - **📚 Komga**: eBook and comic management
@@ -46,6 +50,7 @@ cd dangerprep
 - **🐳 Portainer**: Docker container management
 
 ### Network Configuration
+
 - **LAN Network**: 192.168.120.0/22
 - **Router IP**: 192.168.120.1
 - **Domain**: .danger (local resolution via DNS)
@@ -58,14 +63,14 @@ cd dangerprep
 ### Web Interfaces
 | Service | .danger Domain (HTTPS) |
 |---------|------------------------|
-| Management Portal | https://portal.danger |
-| Jellyfin Media | https://jellyfin.danger |
-| Komga Books | https://komga.danger |
-| RomM Game ROMs | https://romm.danger |
-| Kiwix Offline Content | https://kiwix.danger |
-| Portainer Docker UI | https://portainer.danger |
-| Traefik Dashboard | https://traefik.danger |
-| DNS Management | https://dns.danger |
+| Management Portal | <https://portal.danger> |
+| Jellyfin Media | <https://jellyfin.danger> |
+| Komga Books | <https://komga.danger> |
+| RomM Game ROMs | <https://romm.danger> |
+| Kiwix Offline Content | <https://kiwix.danger> |
+| Portainer Docker UI | <https://portainer.danger> |
+| Traefik Dashboard | <https://traefik.danger> |
+| DNS Management | <https://dns.danger> |
 
 ## 🛠️ Management Commands
 
@@ -180,6 +185,7 @@ content_types:
 ```
 
 ### Tailscale Setup
+
 1. Get an auth key from Tailscale admin console
 2. Set environment variable: `export TAILSCALE_AUTH_KEY="your-key"`
 3. Run: `dangerprep-tailscale install`
@@ -187,6 +193,7 @@ content_types:
 
 ### DNS Configuration
 The system uses a DNS chain for resolution:
+
 - Client → CoreDNS (local .danger domains)
 - CoreDNS → AdGuard Home (ad-blocking)
 - AdGuard Home → NextDNS (external domains via DoH)
@@ -195,6 +202,7 @@ The system uses a DNS chain for resolution:
 ## 📊 Monitoring & Logs
 
 ### Log Locations
+
 - System logs: `/var/log/dangerprep/`
 - Service logs: `docker logs <service-name>`
 - DNS logs: `/var/log/dnsmasq.log`
@@ -202,6 +210,7 @@ The system uses a DNS chain for resolution:
 
 ### Health Monitoring
 The system includes automated health monitoring:
+
 - Service status checks every 10 minutes
 - DNS resolution monitoring every 5 minutes
 - Tailscale connectivity monitoring every 5 minutes
@@ -210,6 +219,7 @@ The system includes automated health monitoring:
 ## 🔒 Security Features
 
 ### Network Security
+
 - Firewall configured for minimal attack surface
 - SSH access via Tailscale only (recommended)
 - DNS filtering and ad blocking
@@ -270,6 +280,7 @@ just update
 ```
 
 ### Getting Help
+
 1. Check service logs: `docker logs <service-name>` or `just logs`
 2. Run system health check: `just monitor`
 3. Check the troubleshooting guide: `_plans/troubleshooting.md`
@@ -278,6 +289,7 @@ just update
 ## 📚 Documentation
 
 Comprehensive documentation is available in the `_plans/` directory:
+
 - `architecture.md` - System architecture details
 - `implementation-phases.md` - Implementation timeline
 - `services.md` - Service configurations
