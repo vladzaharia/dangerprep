@@ -1,5 +1,5 @@
 import { z } from '@dangerprep/configuration';
-import { StandardizedServiceConfig } from '@dangerprep/sync';
+import { StandardizedServiceConfig, StandardizedServiceConfigSchema } from '@dangerprep/sync';
 
 // Service-specific configuration schema
 const KiwixServiceConfigSchema = z.object({
@@ -27,34 +27,22 @@ const KiwixServiceConfigSchema = z.object({
       backup_count: z.number().positive().describe('Number of backup log files'),
     }),
     api: z.object({
-      base_url: z.string().url('Invalid base URL').describe('Base API URL'),
-      catalog_url: z.string().url('Invalid catalog URL').describe('Catalog API URL'),
+      base_url: z.string().url().describe('Base API URL'),
+      catalog_url: z.string().url().describe('Catalog API URL'),
       timeout: z.number().positive().describe('API timeout (ms)'),
     }),
   }),
 });
 
-// Create standardized configuration schema by merging with base schema
-export const KiwixConfigSchema = z
-  .object({
-    service_name: z.string().default('kiwix-sync'),
-    version: z.string().default('1.0.0'),
-    enabled: z.boolean().default(true),
-    log_level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-    data_directory: z.string().default('/app/data'),
-    temp_directory: z.string().default('/tmp'),
-    max_concurrent_operations: z.number().min(1).max(20).default(5),
-    operation_timeout_minutes: z.number().min(1).max(120).default(30),
-    health_check_interval_minutes: z.number().min(1).max(60).default(5),
-    enable_notifications: z.boolean().default(true),
-    enable_progress_tracking: z.boolean().default(true),
-    enable_auto_recovery: z.boolean().default(true),
-    metadata: z.record(z.string(), z.unknown()).default({}),
-  })
-  .merge(KiwixServiceConfigSchema);
+// Create standardized configuration schema by extending with service-specific schema
+export const KiwixConfigSchema = StandardizedServiceConfigSchema.extend({
+  kiwix_manager: KiwixServiceConfigSchema.shape.kiwix_manager,
+});
 
-// TypeScript type - intersection of standardized config and service-specific config
-export type KiwixConfig = StandardizedServiceConfig & z.infer<typeof KiwixServiceConfigSchema>;
+// TypeScript type - extends standardized config with service-specific config
+export type KiwixConfig = StandardizedServiceConfig & {
+  kiwix_manager: z.infer<typeof KiwixServiceConfigSchema>['kiwix_manager'];
+};
 
 export interface ZimPackage {
   readonly name: string;

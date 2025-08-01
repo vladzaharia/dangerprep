@@ -496,26 +496,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@dangerprep/kiwix-sync@workspace:docker/sync/kiwix-sync"
   dependencies:
-    "@dangerprep/configuration": "workspace:*"
     "@dangerprep/files": "workspace:*"
-    "@dangerprep/health": "workspace:*"
-    "@dangerprep/logging": "workspace:*"
     "@dangerprep/notifications": "workspace:*"
-    "@dangerprep/scheduling": "workspace:*"
     "@dangerprep/service": "workspace:*"
-    "@dangerprep/typescript": "workspace:*"
-    "@types/jest": "npm:^30.0.0"
-    "@types/js-yaml": "npm:^4.0.5"
-    "@types/node": "npm:^24.0.0"
-    axios: "npm:^1.11.0"
-    commander: "npm:^14.0.0"
-    eslint: "npm:^9.32.0"
-    jest: "npm:^30.0.0"
-    js-yaml: "npm:^4.1.0"
-    node-cron: "npm:^4.2.1"
-    prettier: "npm:^3.6.2"
-    rimraf: "npm:^6.0.1"
-    typescript: "npm:^5.8.3"
+    "@dangerprep/sync": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -534,26 +518,11 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@dangerprep/nfs-sync@workspace:docker/sync/nfs-sync"
   dependencies:
-    "@dangerprep/configuration": "workspace:*"
     "@dangerprep/files": "workspace:*"
     "@dangerprep/health": "workspace:*"
-    "@dangerprep/logging": "workspace:*"
     "@dangerprep/notifications": "workspace:*"
-    "@dangerprep/scheduling": "workspace:*"
     "@dangerprep/service": "workspace:*"
-    "@dangerprep/typescript": "workspace:*"
-    "@types/jest": "npm:^30.0.0"
-    "@types/js-yaml": "npm:^4.0.5"
-    "@types/node": "npm:^24.0.0"
-    axios: "npm:^1.11.0"
-    eslint: "npm:^9.32.0"
-    fast-xml-parser: "npm:^5.2.5"
-    jest: "npm:^30.0.0"
-    js-yaml: "npm:^4.1.0"
-    node-cron: "npm:^4.2.1"
-    prettier: "npm:^3.6.2"
-    rimraf: "npm:^6.0.1"
-    typescript: "npm:^5.8.3"
+    "@dangerprep/sync": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -574,29 +543,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@dangerprep/offline-sync@workspace:docker/sync/offline-sync"
   dependencies:
-    "@dangerprep/configuration": "workspace:*"
     "@dangerprep/errors": "workspace:*"
-    "@dangerprep/files": "workspace:*"
     "@dangerprep/health": "workspace:*"
-    "@dangerprep/logging": "workspace:*"
     "@dangerprep/notifications": "workspace:*"
-    "@dangerprep/resilience": "workspace:*"
-    "@dangerprep/service": "workspace:*"
-    "@dangerprep/typescript": "workspace:*"
-    "@types/fs-extra": "npm:^11.0.4"
-    "@types/jest": "npm:^30.0.0"
-    "@types/js-yaml": "npm:^4.0.5"
-    "@types/node": "npm:^24.0.0"
-    commander: "npm:^14.0.0"
-    eslint: "npm:^9.32.0"
-    fs-extra: "npm:^11.3.0"
-    jest: "npm:^30.0.0"
-    js-yaml: "npm:^4.1.0"
-    node-cron: "npm:^4.2.1"
-    prettier: "npm:^3.6.2"
-    rimraf: "npm:^6.0.1"
-    typescript: "npm:^5.8.3"
-    usb: "npm:^2.16.0"
+    "@dangerprep/sync": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -664,7 +614,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@dangerprep/sync@workspace:packages/sync-core":
+"@dangerprep/sync-integration-tests@workspace:docker/sync/__tests__":
+  version: 0.0.0-use.local
+  resolution: "@dangerprep/sync-integration-tests@workspace:docker/sync/__tests__"
+  dependencies:
+    "@dangerprep/sync": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
+"@dangerprep/sync@workspace:*, @dangerprep/sync@workspace:packages/sync-core":
   version: 0.0.0-use.local
   resolution: "@dangerprep/sync@workspace:packages/sync-core"
   dependencies:
@@ -2711,16 +2669,22 @@ __metadata:
     "@dangerprep/eslint": "workspace:*"
     "@dangerprep/prettier": "workspace:*"
     "@dangerprep/typescript": "workspace:*"
+    "@types/fs-extra": "npm:^11.0.4"
+    "@types/jest": "npm:^30.0.0"
     "@types/node": "npm:^24.0.0"
     "@types/node-cron": "npm:^3.0.11"
     "@typescript-eslint/eslint-plugin": "npm:^8.38.0"
     "@typescript-eslint/parser": "npm:^8.38.0"
+    axios: "npm:^1.11.0"
     concurrently: "npm:^9.1.0"
     eslint: "npm:^9.32.0"
     eslint-config-prettier: "npm:10.1.8"
     eslint-plugin-import: "npm:^2.31.0"
     eslint-plugin-node: "npm:^11.1.0"
     eslint-plugin-prettier: "npm:^5.2.1"
+    fast-xml-parser: "npm:^5.2.5"
+    fs-extra: "npm:^11.3.0"
+    jest: "npm:^30.0.0"
     prettier: "npm:^3.6.2"
     rimraf: "npm:^6.0.1"
     syncpack: "npm:^13.0.4"
@@ -2728,6 +2692,7 @@ __metadata:
     tsx: "npm:^4.20.3"
     turbo: "npm:^2.5.5"
     typescript: "npm:^5.8.3"
+    usb: "npm:^2.16.0"
   languageName: unknown
   linkType: soft
 
