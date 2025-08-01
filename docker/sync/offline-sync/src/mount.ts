@@ -18,9 +18,9 @@ export class MountManager extends EventEmitter {
   private mountedDevices: Map<string, string> = new Map(); // devicePath -> mountPath
   private logger: Logger;
 
-  constructor(config: OfflineSyncConfig['offline_sync']) {
+  constructor(config: OfflineSyncConfig) {
     super();
-    this.config = config;
+    this.config = config.offline_sync;
     this.logger = LoggerFactory.createConsoleLogger('MountManager');
   }
 

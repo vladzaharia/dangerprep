@@ -1,6 +1,5 @@
 import path from 'path';
 
-import { ConfigManager } from '@dangerprep/configuration';
 import {
   ensureDirectoryAdvanced,
   createDirectoryPath,
@@ -8,21 +7,22 @@ import {
 } from '@dangerprep/files';
 import { ComponentStatus } from '@dangerprep/health';
 import { NotificationType, NotificationLevel, WebhookChannel } from '@dangerprep/notifications';
-import {
-  BaseService,
-  ServiceConfig,
-  ServiceUtils,
-  AdvancedAsyncPatterns,
-} from '@dangerprep/service';
+import { AdvancedAsyncPatterns } from '@dangerprep/service';
+import { StandardizedSyncService, ServicePatterns } from '@dangerprep/sync';
 
 import { BooksHandler } from './handlers/books';
 import { MoviesHandler } from './handlers/movies';
 import { TVHandler } from './handlers/tv';
 import { WebTVHandler } from './handlers/webtv';
-import { SyncConfig, SyncStatus, SyncResult, SyncConfigSchema, ContentTypeConfig } from './types';
+import {
+  NFSSyncConfig,
+  NFSSyncConfigSchema,
+  SyncStatus,
+  SyncResult,
+  ContentTypeConfig,
+} from './types';
 
-export class SyncEngine extends BaseService {
-  private configManager: ConfigManager<SyncConfig>;
+export class SyncEngine extends StandardizedSyncService<NFSSyncConfig> {
   private readonly handlers = new Map<
     string,
     BooksHandler | MoviesHandler | TVHandler | WebTVHandler
@@ -33,86 +33,81 @@ export class SyncEngine extends BaseService {
     results: [],
   };
 
-  constructor(configPath: string) {
-    const serviceConfig: ServiceConfig = ServiceUtils.createServiceConfig(
-      'nfs-sync',
-      '1.0.0',
-      configPath,
-      {
-        enablePeriodicHealthChecks: true,
-        healthCheckIntervalMinutes: 5,
-        handleProcessSignals: true,
-        shutdownTimeoutMs: 30000,
-
-        enableScheduler: true,
-        enableProgressTracking: true,
-        enableAutoRecovery: true,
-
-        schedulerConfig: {
-          enableHealthMonitoring: true,
-          autoStartTasks: true,
-        },
-
-        progressConfig: {
-          enableNotifications: true,
-          cleanupDelayMs: 300000,
-        },
-
-        recoveryConfig: {
-          maxRestartAttempts: 3,
-          restartDelayMs: 5000,
-          useExponentialBackoff: true,
-          enableGracefulDegradation: true,
-        },
-
-        loggingConfig: {
-          level: 'INFO',
-          file: '/app/data/logs/sync.log',
-          maxSize: '100MB',
-          backupCount: 5,
-          format: 'text',
-          colors: true,
-        },
-      }
-    );
-
-    const hooks = {
-      beforeInitialize: async () => {
-        this.components.logger.debug('Preparing NFS sync initialization...');
+  constructor(configPath: string = '/app/data/config.yaml') {
+    const lifecycleHooks = ServicePatterns.createSyncLifecycleHooks({
+      onServiceReady: async () => {
+        this.getLogger().info('NFS sync service is ready and operational');
       },
-      afterInitialize: async () => {
-        this.components.logger.info('NFS sync handlers and directories ready');
+      onServiceStopping: async () => {
+        this.getLogger().info('NFS sync service is shutting down...');
       },
-      beforeStart: async () => {
-        this.components.logger.debug('Starting NFS sync scheduling...');
+      onOperationStart: async (operationId, operationType) => {
+        this.getLogger().info(`Starting ${operationType} operation: ${operationId}`);
       },
-      afterStart: async () => {
-        this.components.logger.info('NFS sync service operational with scheduled tasks');
+      onOperationComplete: async (operationId, success) => {
+        this.getLogger().info(
+          `Operation ${operationId} ${success ? 'completed successfully' : 'failed'}`
+        );
       },
-    };
-
-    super(serviceConfig, hooks);
-
-    this.configManager = new ConfigManager(configPath, SyncConfigSchema, {
-      logger: this.components.logger,
     });
+
+    super('nfs-sync', '1.0.0', configPath, NFSSyncConfigSchema, lifecycleHooks);
   }
 
+  // Implement required abstract methods
+  protected async validateServiceConfiguration(config: NFSSyncConfig): Promise<void> {
+    // Validate NFS-sync specific configuration
+    if (!config.sync_config.central_nas.host) {
+      throw new Error('Central NAS host must be specified');
+    }
+
+    if (!config.sync_config.local_storage.base_path) {
+      throw new Error('Local storage base path must be specified');
+    }
+
+    if (Object.keys(config.sync_config.content_types).length === 0) {
+      throw new Error('At least one content type must be configured');
+    }
+  }
+
+  protected async initializeServiceSpecificComponents(config: NFSSyncConfig): Promise<void> {
+    await this.initializeHandlers(config);
+    await this.ensureDirectories(config);
+  }
+
+  protected async startServiceComponents(): Promise<void> {
+    await this.scheduleContentSyncs();
+    this.getLogger().info('NFS sync service started successfully');
+  }
+
+  protected async stopServiceComponents(): Promise<void> {
+    // Stop any running sync operations
+    if (this.syncStatus.isRunning) {
+      this.syncStatus.isRunning = false;
+      this.getLogger().info('Stopping active sync operations...');
+    }
+    this.getLogger().info('NFS sync service stopped');
+  }
+
+  // Override the base service methods that are still required
   protected override async loadConfiguration(): Promise<void> {
-    await this.loadConfigurationWithManager(this.configManager);
+    // Configuration loading is handled by the standardized base class
+    // This method is called by BaseService.initialize()
   }
 
   protected override async setupHealthChecks(): Promise<void> {
     this.registerComponentHealthChecks();
   }
 
-  protected override async initializeServiceComponents(): Promise<void> {
-    await this.initializeHandlers();
-    await this.ensureDirectories();
+  protected override async startService(): Promise<void> {
+    await this.startServiceComponents();
   }
 
-  private async initializeHandlers(): Promise<void> {
-    const config = this.configManager.getConfig();
+  protected override async stopService(): Promise<void> {
+    await this.stopServiceComponents();
+  }
+
+  private async initializeHandlers(config: NFSSyncConfig): Promise<void> {
     const contentTypes = config.sync_config.content_types;
     const plexConfig = config.sync_config.plex;
 
@@ -120,34 +115,29 @@ export class SyncEngine extends BaseService {
       const typedConfig = contentConfig as ContentTypeConfig;
       switch (contentType) {
         case 'books':
-          this.handlers.set(contentType, new BooksHandler(typedConfig, this.components.logger));
+          this.handlers.set(contentType, new BooksHandler(typedConfig, this.getLogger()));
           break;
         case 'movies':
           this.handlers.set(
             contentType,
-            new MoviesHandler(typedConfig, this.components.logger, plexConfig)
+            new MoviesHandler(typedConfig, this.getLogger(), plexConfig)
           );
           break;
         case 'tv':
-          this.handlers.set(
-            contentType,
-            new TVHandler(typedConfig, this.components.logger, plexConfig)
-          );
+          this.handlers.set(contentType, new TVHandler(typedConfig, this.getLogger(), plexConfig));
           break;
         case 'webtv':
-          this.handlers.set(contentType, new WebTVHandler(typedConfig, this.components.logger));
+          this.handlers.set(contentType, new WebTVHandler(typedConfig, this.getLogger()));
           break;
         case 'kiwix':
-          this.components.logger.info('Kiwix sync delegated to kiwix-manager service');
+          this.getLogger().info('Kiwix sync delegated to kiwix-manager service');
           await this.triggerKiwixUpdate();
           break;
       }
     }
   }
 
-  private async ensureDirectories(): Promise<void> {
-    const config = this.configManager.getConfig();
-
+  private async ensureDirectories(config: NFSSyncConfig): Promise<void> {
     const directoryOperations = [
       () =>
         ensureDirectoryAdvanced(createDirectoryPath(config.sync_config.local_storage.base_path)),
@@ -161,18 +151,18 @@ export class SyncEngine extends BaseService {
 
     const results = await AdvancedAsyncPatterns.sequential(directoryOperations, {
       timeout: 10000,
-      logger: this.components.logger,
+      logger: this.getLogger(),
     });
 
     if (!results.success) {
       throw new Error(`Failed to create directories: ${results.error?.message}`);
     }
 
-    this.components.logger.info('All required directories created successfully');
+    this.getLogger().info('All required directories created successfully');
   }
 
-  scheduleSync(): void {
-    const config = this.configManager.getConfig();
+  private async scheduleContentSyncs(): Promise<void> {
+    const config = this.getConfig();
     const contentTypes = config.sync_config.content_types;
 
     for (const [contentType, contentConfig] of Object.entries(contentTypes)) {
@@ -195,15 +185,22 @@ export class SyncEngine extends BaseService {
     }
   }
 
+  // Legacy method for backward compatibility
+  scheduleSync(): void {
+    this.scheduleContentSyncs().catch(error => {
+      this.getLogger().error('Failed to schedule content syncs:', error);
+    });
+  }
+
   async syncContentType(contentType: string): Promise<boolean> {
     if (this.syncStatus.isRunning) {
-      this.components.logger.warn(`Sync already running, skipping ${contentType} sync`);
+      this.getLogger().warn(`Sync already running, skipping ${contentType} sync`);
       return false;
     }
 
     const handler = this.handlers.get(contentType);
     if (!handler) {
-      this.components.logger.error(`No handler for content type: ${contentType}`);
+      this.getLogger().error(`No handler for content type: ${contentType}`);
       return false;
     }
 
@@ -221,7 +218,7 @@ export class SyncEngine extends BaseService {
         data: { contentType, startTime: this.syncStatus.startTime.toISOString() },
       }
     );
-    this.components.logger.debug(`Starting ${contentType} sync`);
+    this.getLogger().debug(`Starting ${contentType} sync`);
     const operationContext = AdvancedAsyncPatterns.createOperationContext(`sync-${contentType}`, {
       contentType,
       service: 'nfs-sync',
@@ -235,7 +232,7 @@ export class SyncEngine extends BaseService {
         retries: 2,
         retryDelay: 5000,
         backoffMultiplier: 2,
-        logger: this.components.logger,
+        logger: this.getLogger(),
         context: { contentType, operationId: operationContext.operationId },
       }
     );
@@ -271,7 +268,7 @@ export class SyncEngine extends BaseService {
             data: { contentType, duration, success: true },
           }
         );
-        this.components.logger.debug(`${contentType} sync completed successfully in ${duration}ms`);
+        this.getLogger().debug(`${contentType} sync completed successfully in ${duration}ms`);
       } else {
         await this.components.notificationManager.notify(
           NotificationType.SYNC_FAILED,
@@ -282,7 +279,7 @@ export class SyncEngine extends BaseService {
             data: { contentType, duration, success: false },
           }
         );
-        this.components.logger.error(`${contentType} sync failed after ${duration}ms`);
+        this.getLogger().error(`${contentType} sync failed after ${duration}ms`);
       }
 
       await this.sendNotification(result);
@@ -299,7 +296,7 @@ export class SyncEngine extends BaseService {
           data: { contentType },
         }
       );
-      this.components.logger.error(`${contentType} sync error: ${error}`);
+      this.getLogger().error(`${contentType} sync error: ${error}`);
       return false;
     } finally {
       this.syncStatus.isRunning = false;
@@ -311,7 +308,7 @@ export class SyncEngine extends BaseService {
 
   async syncAll(): Promise<Record<string, boolean>> {
     if (this.syncStatus.isRunning) {
-      this.components.logger.warn('Sync already running, cannot start full sync');
+      this.getLogger().warn('Sync already running, cannot start full sync');
       return {};
     }
 
@@ -328,14 +325,14 @@ export class SyncEngine extends BaseService {
 
   private async triggerKiwixUpdate(): Promise<void> {
     try {
-      this.components.logger.info('Triggering kiwix-manager update');
+      this.getLogger().info('Triggering kiwix-manager update');
     } catch (error) {
-      this.components.logger.error(`Failed to trigger kiwix update: ${error}`);
+      this.getLogger().error(`Failed to trigger kiwix update: ${error}`);
     }
   }
 
   private async sendNotification(result: SyncResult): Promise<void> {
-    const config = this.configManager.getConfig();
+    const config = this.getConfig();
     const notifications = config.sync_config.notifications;
 
     if (notifications?.enabled && notifications.webhook_url) {
@@ -345,7 +342,7 @@ export class SyncEngine extends BaseService {
             url: notifications.webhook_url,
             timeout: 10000,
           },
-          this.components.logger
+          this.getLogger()
         );
 
         this.components.notificationManager.addChannel(webhookChannel);
@@ -370,12 +367,12 @@ export class SyncEngine extends BaseService {
 
         await this.components.notificationManager.removeChannel('webhook');
       } catch (error) {
-        this.components.logger.error(`Failed to send notification: ${error}`);
+        this.getLogger().error(`Failed to send notification: ${error}`);
       }
     }
 
     if (notifications?.email?.enabled) {
-      this.components.logger.debug('Email notifications not yet implemented');
+      this.getLogger().debug('Email notifications not yet implemented');
     }
   }
 
@@ -385,7 +382,7 @@ export class SyncEngine extends BaseService {
 
   async getStorageStats(): Promise<{ [contentType: string]: { size: string; path: string } }> {
     const stats: { [contentType: string]: { size: string; path: string } } = {};
-    const config = this.configManager.getConfig();
+    const config = this.getConfig();
 
     const storageOperations = Object.entries(config.sync_config.content_types).map(
       async ([contentType, contentConfig]) => {
@@ -393,7 +390,7 @@ export class SyncEngine extends BaseService {
           const dirPath = createDirectoryPath(contentConfig.local_path);
           const sizeResult = await getDirectorySizeAdvanced(dirPath, {
             timeout: 30000,
-            logger: this.components.logger,
+            logger: this.getLogger(),
           });
 
           if (sizeResult.success) {
@@ -403,7 +400,7 @@ export class SyncEngine extends BaseService {
               path: contentConfig.local_path,
             };
           } else {
-            this.components.logger.warn(
+            this.getLogger().warn(
               `Failed to get size for ${contentType}: ${sizeResult.error?.message}`
             );
             return {
@@ -413,7 +410,7 @@ export class SyncEngine extends BaseService {
             };
           }
         } catch (error) {
-          this.components.logger.error(`Error calculating size for ${contentType}: ${error}`);
+          this.getLogger().error(`Error calculating size for ${contentType}: ${error}`);
           return {
             contentType,
             size: 'Error',
@@ -427,7 +424,7 @@ export class SyncEngine extends BaseService {
       storageOperations.map(op => () => op),
       {
         timeout: 60000,
-        logger: this.components.logger,
+        logger: this.getLogger(),
         context: { operation: 'get-storage-stats' },
       }
     );
@@ -440,7 +437,7 @@ export class SyncEngine extends BaseService {
         };
       }
     } else {
-      this.components.logger.error(`Failed to get storage stats: ${results.error?.message}`);
+      this.getLogger().error(`Failed to get storage stats: ${results.error?.message}`);
       for (const [contentType, contentConfig] of Object.entries(config.sync_config.content_types)) {
         stats[contentType] = {
           size: 'Error',
@@ -536,34 +533,96 @@ export class SyncEngine extends BaseService {
       },
     });
   }
-
-  protected override async startService(): Promise<void> {
-    this.syncStatus.isRunning = true;
-    this.scheduleSync();
-    this.components.logger.info('NFS sync service started successfully');
-  }
-
-  protected override async stopService(): Promise<void> {
-    this.syncStatus.isRunning = false;
-    this.components.logger.info('NFS sync service stopped');
-  }
 }
 
+// Create service factory for standardized CLI and service management
+const factory = ServicePatterns.createStandardServiceFactory({
+  serviceName: 'nfs-sync',
+  version: '1.0.0',
+  description: 'NFS content synchronization service',
+  defaultConfigPath: '/app/data/config.yaml',
+  configSchema: NFSSyncConfigSchema,
+  serviceClass: SyncEngine,
+  lifecycleHooks: ServicePatterns.createSyncLifecycleHooks({
+    onServiceReady: async () => {
+      // eslint-disable-next-line no-console
+      console.log('NFS sync service is ready and operational');
+    },
+    onOperationComplete: async (operationId, success) => {
+      // eslint-disable-next-line no-console
+      console.log(
+        `NFS sync operation ${operationId} ${success ? 'completed successfully' : 'failed'}`
+      );
+    },
+  }),
+  additionalCommands: [
+    {
+      name: 'sync-all',
+      description: 'Manually trigger sync for all content types',
+      action: async (_args, _options, service) => {
+        // eslint-disable-next-line no-console
+        console.log('Triggering sync for all content types...');
+        const syncEngine = service as SyncEngine;
+        const results = await syncEngine.syncAll();
+        // eslint-disable-next-line no-console
+        console.table(
+          Object.entries(results).map(([contentType, success]) => ({
+            contentType,
+            status: success ? 'Success' : 'Failed',
+          }))
+        );
+      },
+    },
+    {
+      name: 'sync-content',
+      description: 'Manually trigger sync for a specific content type',
+      action: async (args, _options, service) => {
+        const contentType = args[0];
+        if (!contentType) {
+          // eslint-disable-next-line no-console
+          console.error('Content type is required');
+          return;
+        }
+        // eslint-disable-next-line no-console
+        console.log(`Triggering sync for content type: ${contentType}`);
+        const syncEngine = service as SyncEngine;
+        try {
+          const success = await syncEngine.syncContentType(contentType);
+          // eslint-disable-next-line no-console
+          console.log(`Sync ${success ? 'completed successfully' : 'failed'}`);
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to trigger sync:', error);
+        }
+      },
+    },
+    {
+      name: 'storage-stats',
+      description: 'Show storage statistics for all content types',
+      action: async (_args, _options, service) => {
+        // eslint-disable-next-line no-console
+        console.log('Getting storage statistics...');
+        const syncEngine = service as SyncEngine;
+        const stats = await syncEngine.getStorageStats();
+        // eslint-disable-next-line no-console
+        console.table(
+          Object.entries(stats).map(([contentType, info]) => ({
+            contentType,
+            size: info.size,
+            path: info.path,
+          }))
+        );
+      },
+    },
+  ],
+});
+
+// Main entry point
 if (require.main === module) {
-  const configPath = process.env.SYNC_CONFIG_PATH || '/app/data/sync-config.yaml';
-  const engine = new SyncEngine(configPath);
-
-  engine
-    .initialize()
-    .then(async initResult => {
-      if (!initResult.success) {
-        throw initResult.error || new Error('Service initialization failed');
-      }
-
-      await engine.start();
-    })
-    .catch(error => {
-      process.stderr.write(`Failed to start Sync Engine: ${error}\n`);
-      process.exit(1);
-    });
+  const main = factory.createMainEntryPoint();
+  main(process.argv).catch(error => {
+    // eslint-disable-next-line no-console
+    console.error('NFS sync service failed:', error);
+    process.exit(1);
+  });
 }

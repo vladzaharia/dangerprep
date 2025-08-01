@@ -116,6 +116,7 @@ export class Logger {
 
     this.transports.forEach(transport => {
       transport.log(entry).catch(err => {
+        // eslint-disable-next-line no-console
         console.error(`Transport ${transport.name} failed:`, err);
       });
     });

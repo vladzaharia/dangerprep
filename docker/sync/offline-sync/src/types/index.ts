@@ -1,7 +1,8 @@
 import { z } from '@dangerprep/configuration';
+import { StandardizedServiceConfig } from '@dangerprep/sync';
 
-// Zod schema for OfflineSyncConfig
-export const OfflineSyncConfigSchema = z.object({
+// Service-specific configuration schema
+const OfflineSyncServiceConfigSchema = z.object({
   offline_sync: z.object({
     storage: z.object({
       content_directory: z.string(),
@@ -50,8 +51,28 @@ export const OfflineSyncConfigSchema = z.object({
   }),
 });
 
-// TypeScript type inferred from Zod schema
-export type OfflineSyncConfig = z.infer<typeof OfflineSyncConfigSchema>;
+// Create standardized configuration schema
+export const OfflineSyncConfigSchema = z
+  .object({
+    service_name: z.string().default('offline-sync'),
+    version: z.string().default('1.0.0'),
+    enabled: z.boolean().default(true),
+    log_level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+    data_directory: z.string().default('/app/data'),
+    temp_directory: z.string().default('/tmp'),
+    max_concurrent_operations: z.number().min(1).max(20).default(5),
+    operation_timeout_minutes: z.number().min(1).max(120).default(30),
+    health_check_interval_minutes: z.number().min(1).max(60).default(5),
+    enable_notifications: z.boolean().default(true),
+    enable_progress_tracking: z.boolean().default(true),
+    enable_auto_recovery: z.boolean().default(true),
+    metadata: z.record(z.string(), z.unknown()).default({}),
+  })
+  .merge(OfflineSyncServiceConfigSchema);
+
+// TypeScript type - intersection of standardized config and service-specific config
+export type OfflineSyncConfig = StandardizedServiceConfig &
+  z.infer<typeof OfflineSyncServiceConfigSchema>;
 
 // Sync direction types with const assertion
 export const SYNC_DIRECTIONS = ['bidirectional', 'to_card', 'from_card'] as const;

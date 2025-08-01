@@ -26,6 +26,7 @@
     "@dangerprep/notifications": "workspace:*",
     "@dangerprep/scheduling": "workspace:*",
     "@dangerprep/service": "workspace:*",
+    "@dangerprep/sync": "workspace:*",
     "axios": "^1.11.0",
     "fast-xml-parser": "^5.2.5",
     "js-yaml": "^4.1.0",
@@ -40,7 +41,6 @@
     "jest": "^30.0.0",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
-
     "typescript": "^5.8.3"
   },
   "engines": {

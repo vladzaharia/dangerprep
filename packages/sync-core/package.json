@@ -1,15 +1,19 @@
 {
-  "name": "@dangerprep/kiwix-sync",
+  "name": "@dangerprep/sync",
   "version": "1.0.0",
-  "description": "DangerPrep Kiwix Manager Service",
+  "description": "DangerPrep Shared Sync Framework",
   "private": true,
-  "main": "dist/manager.js",
-  "types": "dist/manager.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc",
-    "start": "node dist/manager.js",
-    "dev": "npx tsx src/manager.ts",
-    "cli": "node dist/cli.js",
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
@@ -21,13 +25,14 @@
   },
   "dependencies": {
     "@dangerprep/configuration": "workspace:*",
+    "@dangerprep/errors": "workspace:*",
     "@dangerprep/files": "workspace:*",
     "@dangerprep/health": "workspace:*",
     "@dangerprep/logging": "workspace:*",
     "@dangerprep/notifications": "workspace:*",
-    "@dangerprep/scheduling": "workspace:*",
+    "@dangerprep/progress": "workspace:*",
+    "@dangerprep/resilience": "workspace:*",
     "@dangerprep/service": "workspace:*",
-    "axios": "^1.11.0",
     "commander": "^14.0.0",
     "js-yaml": "^4.1.0",
     "node-cron": "^4.2.1"
