@@ -1,0 +1,118 @@
+# Semgrep ignore file for DangerPrep project
+# Patterns to exclude from Semgrep security scanning
+
+# Dependencies and third-party code
+node_modules/
+vendor/
+.yarn/
+.pnp.*
+
+# Build outputs and generated files
+dist/
+build/
+out/
+target/
+*.min.js
+*.bundle.js
+*.d.ts
+
+# Test files and fixtures
+**/*test*
+**/*spec*
+**/__tests__/
+**/__mocks__/
+**/fixtures/
+**/test-data/
+**/mock*/
+
+# Documentation
+docs/
+*.md
+*.txt
+README*
+CHANGELOG*
+LICENSE*
+
+# Configuration files (may contain sensitive data but are intentional)
+*.env.example
+*.env.template
+config.yaml.example
+compose.env.example
+
+# Temporary and cache files
+.cache/
+.tmp/
+tmp/
+temp/
+*.tmp
+*.temp
+*.log
+
+# Version control
+.git/
+.svn/
+.hg/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+*.bak
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+composer.lock
+
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Images and media
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.svg
+*.ico
+*.mp4
+*.mp3
+*.avi
+*.mov
+
+# Data files
+*.csv
+*.json
+*.xml
+*.yaml
+*.yml
+
+# Exclude specific directories that may have false positives
+scripts/maintenance/
+scripts/setup/
+lib/just/
+
+# Exclude Docker-related files that may have intentional patterns
+docker/*/compose.yml
+docker/*/Dockerfile
+**/compose.env
+
+# Exclude configuration templates
+**/*.example
+**/*.template
+**/*.sample

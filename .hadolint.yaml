@@ -1,0 +1,83 @@
+# Hadolint configuration for Docker linting
+# Based on enabled Codacy patterns and best practices
+
+# Ignore specific rules if needed (currently all enabled rules are kept)
+ignored:
+  # Add rule IDs here to ignore them, e.g.:
+  # - DL3008  # Pin versions in apt get install
+
+# Override severity levels for specific rules
+override:
+  error:
+    - DL3002  # Last user should not be root
+    - DL3011  # Valid UNIX ports range from 0 to 65535
+    - DL3021  # COPY with more than 2 arguments requires the last argument to end with /
+    - SC2026  # This word is outside of quotes
+    - SC2035  # Use ./*glob* or -- *glob* so names with dashes won't become options
+    - SC2086  # Double quote to prevent globbing and word splitting
+    - SC2154  # var is referenced but not assigned
+    - SC2164  # Use cd ... || exit in case cd fails
+    - SC1068  # Don't put spaces around the = in assignments
+    - SC1095  # You need a space or linefeed between the function name and body
+    - SC2015  # Note that A && B || C is not if-then-else
+
+  warning:
+    - DL3000  # Use absolute WORKDIR
+    - DL3001  # For some commands it makes no sense running them in a Docker container
+    - DL3003  # Use WORKDIR to switch to a directory
+    - DL3004  # Do not use sudo
+    - DL3005  # Do not use apt-get dist-upgrade
+    - DL3006  # Always tag the version of an image explicitly
+    - DL3007  # Using latest is prone to errors
+    - DL3008  # Pin versions in apt get install
+    - DL3009  # Delete the apt-get lists after installing something
+    - DL3012  # Multiple HEALTHCHECK instructions
+    - DL3013  # Pin versions in pip
+    - DL3014  # Use the -y switch
+    - DL3015  # Avoid additional packages by specifying --no-install-recommends
+    - DL4000  # MAINTAINER is deprecated
+    - DL4004  # Multiple ENTRYPOINT instructions
+    - SC2028  # echo won't expand escape sequences
+    - SC2046  # Quote this to prevent word splitting
+    - SC2140  # Word is of the form "A"B"C"
+
+  info:
+    - DL3010  # Use ADD for extracting archives into an image
+    - DL3020  # Use COPY instead of ADD for files and folders
+
+# Failure threshold (error, warning, info, style)
+failure-threshold: warning
+
+# Trusted registries for base images
+trusted-registries:
+  - docker.io
+  - gcr.io
+  - registry.hub.docker.com
+  - quay.io
+  - ghcr.io
+
+# Disable specific shell checks if needed
+# disable-checks:
+#   - SC2086
+
+# Format for output (tty, json, checkstyle, codeclimate, gitlab_codeclimate, gnu, codacy, sonarqube, sarif)
+format: tty
+
+# Show rules in output
+show-rules: true
+
+# Inline ignore pragma format
+inline-ignore-pragma: "# hadolint ignore"
+
+# Strict labels - require specific labels to be present
+# strict-labels: false
+
+# Label schema for validation
+# label-schema:
+#   author: text
+#   version: semver
+
+# Enable or disable specific features
+no-color: false
+no-fail: false
+verbose: false

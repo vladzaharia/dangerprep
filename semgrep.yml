@@ -1,0 +1,196 @@
+# Semgrep configuration for DangerPrep project
+# Based on enabled Codacy patterns and security best practices
+
+rules:
+  # TypeScript/JavaScript Security Rules
+  - id: typescript-react-unsanitized-html
+    patterns:
+      - pattern-either:
+          - pattern: dangerouslySetInnerHTML={{ __html: $VAR }}
+          - pattern: $ELEMENT.innerHTML = $VAR
+    message: "Detected use of unsanitized HTML content. This can lead to XSS vulnerabilities if the content comes from user input."
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: xss
+      confidence: HIGH
+
+  - id: typescript-angular-bypass-security
+    patterns:
+      - pattern-either:
+          - pattern: $SANITIZER.bypassSecurityTrustHtml($VAR)
+          - pattern: $SANITIZER.bypassSecurityTrustScript($VAR)
+          - pattern: $SANITIZER.bypassSecurityTrustStyle($VAR)
+          - pattern: $SANITIZER.bypassSecurityTrustUrl($VAR)
+          - pattern: $SANITIZER.bypassSecurityTrustResourceUrl($VAR)
+    message: "Detected use of Angular bypassSecurityTrust methods. Ensure input is properly validated to prevent XSS."
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: xss
+      confidence: HIGH
+
+  - id: typescript-aws-cdk-unencrypted-bucket
+    patterns:
+      - pattern: new $S3.Bucket($THIS, $NAME, { ..., $PROPS })
+      - pattern-not: new $S3.Bucket($THIS, $NAME, { ..., encryption: $ENC, ... })
+    message: "AWS CDK S3 Bucket without encryption. Add encryption property with KMS_MANAGED or S3_MANAGED."
+    languages: [typescript, javascript]
+    severity: HIGH
+    metadata:
+      category: security
+      subcategory: insecure-storage
+      confidence: HIGH
+
+  - id: typescript-aws-cdk-bucket-no-ssl
+    patterns:
+      - pattern: new $S3.Bucket($THIS, $NAME, { ..., $PROPS })
+      - pattern-not: new $S3.Bucket($THIS, $NAME, { ..., enforceSSL: true, ... })
+    message: "AWS CDK S3 Bucket without SSL enforcement. Set enforceSSL to true."
+    languages: [typescript, javascript]
+    severity: HIGH
+    metadata:
+      category: security
+      subcategory: insecure-modules-libraries
+      confidence: HIGH
+
+  - id: typescript-aws-cdk-unencrypted-sqs
+    patterns:
+      - pattern: new $SQS.Queue($THIS, $NAME, { ..., $PROPS })
+      - pattern-not: new $SQS.Queue($THIS, $NAME, { ..., encryption: $ENC, ... })
+    message: "AWS CDK SQS Queue without encryption. Add encryption property with KMS or KMS_MANAGED."
+    languages: [typescript, javascript]
+    severity: HIGH
+    metadata:
+      category: security
+      subcategory: insecure-storage
+      confidence: HIGH
+
+  - id: typescript-aws-cdk-public-bucket-access
+    patterns:
+      - pattern: $BUCKET.grantPublicAccess(...)
+    message: "AWS CDK Bucket with public access granted. Verify this is intentional."
+    languages: [typescript, javascript]
+    severity: HIGH
+    metadata:
+      category: security
+      subcategory: visibility
+      confidence: HIGH
+
+  # Terraform Security Rules
+  - id: terraform-s3-public-rw-bucket
+    patterns:
+      - pattern-either:
+          - pattern: |
+              resource "aws_s3_bucket_policy" $NAME {
+                ...
+                policy = jsonencode({
+                  ...
+                  Statement = [
+                    {
+                      ...
+                      Effect = "Allow"
+                      Principal = "*"
+                      Action = ["s3:GetObject", "s3:PutObject"]
+                      ...
+                    }
+                  ]
+                })
+              }
+          - pattern: |
+              resource "aws_s3_bucket_acl" $NAME {
+                ...
+                acl = "public-read-write"
+              }
+    message: "S3 bucket with public read-write access detected. This poses serious security risks."
+    languages: [hcl]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: insecure-modules-libraries
+      confidence: HIGH
+
+  - id: terraform-rds-hardcoded-password
+    patterns:
+      - pattern-either:
+          - pattern: |
+              resource "aws_db_instance" $NAME {
+                ...
+                password = "$PASSWORD"
+                ...
+              }
+          - pattern: |
+              resource "aws_rds_cluster" $NAME {
+                ...
+                master_password = "$PASSWORD"
+                ...
+              }
+    message: "RDS instance with hardcoded password. Use random_password resource or pass at runtime."
+    languages: [hcl]
+    severity: HIGH
+    metadata:
+      category: security
+      subcategory: insecure-storage
+      confidence: HIGH
+
+  # Apex Security Rules
+  - id: apex-soql-injection
+    patterns:
+      - pattern: Database.query($QUERY + $VAR)
+      - pattern: Database.query($VAR + $QUERY)
+    message: "Potential SOQL injection vulnerability. Use binding variables instead of string concatenation."
+    languages: [apex]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: sql-injection
+      confidence: HIGH
+
+  - id: apex-hardcoded-credentials
+    patterns:
+      - pattern-either:
+          - pattern: String $VAR = "password";
+          - pattern: String $VAR = "secret";
+          - pattern: String $VAR = "key";
+          - pattern: String $VAR = "token";
+    message: "Potential hardcoded credentials. Use Named Credentials or secure storage instead."
+    languages: [apex]
+    severity: HIGH
+    metadata:
+      category: security
+      subcategory: insecure-storage
+      confidence: MEDIUM
+
+  # General Security Patterns
+  - id: hardcoded-secrets
+    patterns:
+      - pattern-either:
+          - pattern: password = "$PASSWORD"
+          - pattern: secret = "$SECRET"
+          - pattern: api_key = "$KEY"
+          - pattern: token = "$TOKEN"
+          - pattern: private_key = "$KEY"
+    message: "Potential hardcoded secret detected. Use environment variables or secure storage."
+    languages: [typescript, javascript, python, java, go]
+    severity: HIGH
+    metadata:
+      category: security
+      subcategory: insecure-storage
+      confidence: MEDIUM
+
+  - id: weak-crypto-algorithms
+    patterns:
+      - pattern-either:
+          - pattern: crypto.createHash("md5")
+          - pattern: crypto.createHash("sha1")
+          - pattern: crypto.createCipher("des", ...)
+          - pattern: crypto.createCipher("rc4", ...)
+    message: "Weak cryptographic algorithm detected. Use SHA-256 or stronger algorithms."
+    languages: [typescript, javascript]
+    severity: HIGH
+    metadata:
+      category: security
+      subcategory: weak-crypto
+      confidence: HIGH
