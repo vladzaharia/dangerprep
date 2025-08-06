@@ -1,11 +1,18 @@
-FROM node:18-alpine AS base
+# syntax=docker/dockerfile:1
+FROM --platform=$BUILDPLATFORM node:18-alpine AS base
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+
+# Enable Corepack for proper Yarn version management
+RUN corepack enable
 
 # Install turbo globally
-RUN npm install -g turbo@^2
+RUN yarn global add turbo@^2
 
-FROM base AS builder
-RUN apk update
-RUN apk add --no-cache libc6-compat
+FROM --platform=$BUILDPLATFORM base AS builder
+RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy the entire monorepo
@@ -15,11 +22,8 @@ COPY . .
 RUN turbo prune @dangerprep/kiwix-sync --docker
 
 FROM base AS installer
-RUN apk update
-RUN apk add --no-cache libc6-compat
-
-# Install kiwix-specific system dependencies
-RUN apk add --no-cache \
+RUN apk update && apk add --no-cache \
+    libc6-compat \
     curl \
     wget \
     aria2 \
@@ -29,7 +33,7 @@ WORKDIR /app
 
 # First install dependencies (as they change less often)
 COPY --from=builder /app/out/json/ .
-RUN npm ci --frozen-lockfile
+RUN yarn install
 
 # Build the project and dependencies
 COPY --from=builder /app/out/full/ .
@@ -49,9 +53,11 @@ RUN apk add --no-cache \
 RUN addgroup -g 1001 -S appuser && \
     adduser -S appuser -u 1001 -G appuser
 
-# Copy the built application
+# Copy the built application and dependencies
 COPY --from=installer --chown=appuser:appuser /app/docker/sync/kiwix-sync/dist ./dist
 COPY --from=installer --chown=appuser:appuser /app/docker/sync/kiwix-sync/package.json ./package.json
+COPY --from=installer --chown=appuser:appuser /app/node_modules ./node_modules
+COPY --from=installer --chown=appuser:appuser /app/packages ./packages
 
 # Create data directory
 RUN mkdir -p /app/data/logs && \

@@ -9,6 +9,11 @@ compose.env
 nfs-mounts.conf
 mount-nfs.sh
 
+# Sync service configuration files (keep .example files only)
+docker/sync/kiwix-sync/config.yaml
+docker/sync/nfs-sync/config.yaml
+docker/sync/offline-sync/config.yaml
+
 # Data directories
 /data/
 /content/

@@ -88,6 +88,15 @@ export class OfflineSync extends StandardizedSyncService<OfflineSyncConfig> {
 
     this.syncEngine = new SyncEngine(config);
     this.setupSyncEngineEvents();
+
+    // Register filesystem health checks now that config is loaded
+    this.components.healthChecker.registerComponent(
+      HealthChecker.createFileSystemCheck(
+        'filesystem',
+        [config.offline_sync.storage.content_directory, config.offline_sync.storage.mount_base],
+        true
+      )
+    );
   }
 
   protected async startServiceComponents(): Promise<void> {
@@ -154,16 +163,8 @@ export class OfflineSync extends StandardizedSyncService<OfflineSyncConfig> {
   }
 
   protected override async setupHealthChecks(): Promise<void> {
-    const config = this.getConfig();
-
-    this.components.healthChecker.registerComponent(
-      HealthChecker.createFileSystemCheck(
-        'filesystem',
-        [config.offline_sync.storage.content_directory, config.offline_sync.storage.mount_base],
-        true
-      )
-    );
-
+    // Note: Configuration may not be loaded yet during base service initialization
+    // Health checks that need config will be registered later in registerComponentHealthChecks
     this.registerComponentHealthChecks();
   }
 
@@ -280,24 +281,32 @@ export class OfflineSync extends StandardizedSyncService<OfflineSyncConfig> {
    * Register component-specific health checks
    */
   private registerComponentHealthChecks(): void {
-    const config = this.getConfig();
 
     // Configuration check
     this.components.healthChecker.registerComponent({
       name: 'configuration',
       critical: true,
       check: async () => {
-        const isUp = !!config;
-        return {
-          status: isUp ? ComponentStatus.UP : ComponentStatus.DOWN,
-          message: isUp ? 'Configuration loaded' : 'Configuration not loaded',
-          ...(isUp && {
+        try {
+          const config = this.configManager.getConfig();
+          return {
+            status: ComponentStatus.UP,
+            message: 'Configuration loaded successfully',
             details: {
               contentDirectory: config.offline_sync.storage.content_directory,
               mountBase: config.offline_sync.storage.mount_base,
             },
-          }),
-        };
+          };
+        } catch (error) {
+          return {
+            status: ComponentStatus.DOWN,
+            message: 'Configuration failed to load',
+            error: {
+              message: error instanceof Error ? error.message : String(error),
+              code: 'CONFIG_LOAD_FAILED',
+            },
+          };
+        }
       },
     });
 

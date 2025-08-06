@@ -16,10 +16,22 @@
     "format": "prettier --write src/**/*.{ts,tsx,json}",
     "format:check": "prettier --check src/**/*.{ts,tsx,json}",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up",
+    "docker:up:build": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
   },
   "dependencies": {
-    "@dangerprep/sync": "workspace:*"
+    "@dangerprep/sync": "workspace:*",
+    "axios": "^1.11.0",
+    "fast-xml-parser": "^5.2.5",
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@dangerprep/typescript": "workspace:*",
+    "typescript": "^5.8.3"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Progress tracking and management for DangerPrep services",
   "private": true,
-  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

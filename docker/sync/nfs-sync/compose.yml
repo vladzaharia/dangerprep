@@ -1,11 +1,14 @@
 services:
   sync:
-    build: .
+    build:
+      context: ../../..
+      dockerfile: docker/sync/nfs-sync/Dockerfile
     restart: unless-stopped
     volumes:
       - ${INSTALL_ROOT}/data/sync:/app/data
       - ${INSTALL_ROOT}/content:/content
       - ${INSTALL_ROOT}/nfs:/nfs:ro
+      - ./config.yaml:/app/data/config.yaml:ro
     env_file:
       - compose.env
     labels:

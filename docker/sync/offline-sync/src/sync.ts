@@ -9,7 +9,7 @@ import {
   TransferEngine,
   FileTransfer,
   SyncProgressManager,
-  UnifiedProgressTracker,
+  SyncProgressTracker,
   StandardSyncErrorHandler,
   SyncErrorFactory,
 } from '@dangerprep/sync';
@@ -208,7 +208,7 @@ export class SyncEngine extends EventEmitter {
   private async syncContentType(
     operation: SyncOperation,
     contentType: string,
-    progressTracker?: UnifiedProgressTracker
+    progressTracker?: SyncProgressTracker
   ): Promise<void> {
     const contentConfig = this.config.content_types[contentType];
     if (!contentConfig || !operation.device.mountPath) {
@@ -247,7 +247,7 @@ export class SyncEngine extends EventEmitter {
     contentConfig: ContentTypeConfig,
     localPath: string,
     cardPath: string,
-    progressTracker?: UnifiedProgressTracker
+    progressTracker?: SyncProgressTracker
   ): Promise<void> {
     this.log(`Syncing to card: ${localPath} -> ${cardPath}`);
 
@@ -298,7 +298,7 @@ export class SyncEngine extends EventEmitter {
     contentConfig: ContentTypeConfig,
     cardPath: string,
     localPath: string,
-    progressTracker?: UnifiedProgressTracker
+    progressTracker?: SyncProgressTracker
   ): Promise<void> {
     this.log(`Syncing from card: ${cardPath} -> ${localPath}`);
 
@@ -348,7 +348,7 @@ export class SyncEngine extends EventEmitter {
     operation: SyncOperation,
     sourcePath: string,
     targetPath: string,
-    progressTracker?: UnifiedProgressTracker
+    progressTracker?: SyncProgressTracker
   ): Promise<void> {
     try {
       // Use TransferEngine for standardized file transfer

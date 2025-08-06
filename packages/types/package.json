@@ -2,7 +2,6 @@
   "name": "@dangerprep/types",
   "version": "1.0.0",
   "description": "Shared TypeScript types and interfaces for DangerPrep services",
-  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

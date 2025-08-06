@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Service base class for standardized lifecycle management in DangerPrep services",
   "private": true,
-  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -30,7 +29,8 @@
     "@dangerprep/health": "workspace:*",
     "@dangerprep/logging": "workspace:*",
     "@dangerprep/notifications": "workspace:*",
-    "@dangerprep/scheduling": "workspace:*"
+    "@dangerprep/scheduling": "workspace:*",
+    "tslib": "^2.8.1"
   },
   "devDependencies": {
     "@dangerprep/typescript": "workspace:*",

@@ -34,12 +34,6 @@
     "cache:clear": "turbo daemon clean",
     "postinstall": "turbo run postinstall || true"
   },
-  "dependencies": {
-    "axios": "^1.11.0",
-    "fast-xml-parser": "^5.2.5",
-    "fs-extra": "^11.3.0",
-    "usb": "^2.16.0"
-  },
   "devDependencies": {
     "@dangerprep/eslint": "workspace:*",
     "@dangerprep/prettier": "workspace:*",
@@ -83,5 +77,8 @@
     "turborepo"
   ],
   "author": "Vlad Zaharia <hey@vlad.gg>",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "tslib": "^2.8.1"
+  }
 }
