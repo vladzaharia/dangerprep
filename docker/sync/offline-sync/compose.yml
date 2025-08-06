@@ -1,15 +1,18 @@
 services:
   offline-sync:
-    build: .
+    build:
+      context: ../../..
+      dockerfile: docker/sync/offline-sync/Dockerfile
     restart: unless-stopped
     privileged: true  # Required for USB device access and mounting
     volumes:
       - ${INSTALL_ROOT}/data/offline-sync:/app/data
       - ${INSTALL_ROOT}/content:/content
+      - ./config.yaml:/app/data/config.yaml:ro
       - /dev:/dev  # Device access for USB detection
       - /run/udev:/run/udev:ro  # udev for device information
       - /sys:/sys:ro  # System information for device detection
-      - /proc:/proc:ro  # Process information
+      # - /proc:/proc:ro  # Process information - removed to avoid read-only filesystem issues
       - /run/dbus:/run/dbus  # D-Bus for udisks2 communication
       - /var/run/dbus:/var/run/dbus  # Alternative D-Bus path
     env_file:

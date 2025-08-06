@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "File utilities and operations for DangerPrep services",
   "private": true,
-  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

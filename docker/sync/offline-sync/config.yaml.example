@@ -1,40 +1,67 @@
-# Offline Sync Configuration
+# Offline Sync Configuration - Example
+# Copy this file to config.yaml and customize for your environment
+
+# ============================================================================
+# STANDARDIZED SERVICE CONFIGURATION
+# These fields are required for all DangerPrep sync services
+# ============================================================================
+
+service_name: "offline-sync"
+version: "1.0.0"
+enabled: true
+log_level: "info"  # Options: debug, info, warn, error
+data_directory: "/app/data"
+temp_directory: "/tmp"
+max_concurrent_operations: 3  # Range: 1-20
+operation_timeout_minutes: 30  # Range: 1-120
+health_check_interval_minutes: 5  # Range: 1-60
+enable_notifications: true
+enable_progress_tracking: true
+enable_auto_recovery: true
+
+# ============================================================================
+# OFFLINE SYNC-SPECIFIC CONFIGURATION
+# ============================================================================
+
 offline_sync:
   # Storage configuration
   storage:
-    content_directory: "/content"
-    mount_base: "/mnt/microsd"
-    temp_directory: "/tmp/offline-sync"
-    max_card_size: "2TB"
+    content_directory: "/content"  # Directory containing content to sync
+    mount_base: "/mnt/microsd"  # Base directory for mounting devices
+    temp_directory: "/tmp/offline-sync"  # Temporary directory for operations
+    max_card_size: "2TB"  # Maximum card size to handle
 
   # Device detection settings
   device_detection:
     # Monitor for MicroSD cards and USB storage devices
-    monitor_device_types: ["mass_storage", "sd_card"]
+    monitor_device_types: ["mass_storage", "sd_card"]  # Device types to monitor
     # Minimum size to consider (filters out very small devices)
-    min_device_size: "1GB"
+    min_device_size: "1GB"  # Minimum device size to consider
     # Maximum time to wait for device to be ready
-    mount_timeout: 30
+    mount_timeout: 30  # Timeout for mount operations in seconds (positive)
     # Retry attempts for mounting
-    mount_retry_attempts: 3
-    mount_retry_delay: 5
+    mount_retry_attempts: 3  # Number of mount retry attempts (0 or positive)
+    mount_retry_delay: 5  # Delay between mount retries in seconds (positive)
 
-  # Content directory structure
+  # Content type configurations
   content_types:
+    # Movies - Bidirectional sync
     movies:
-      local_path: "/content/movies"
-      card_path: "movies"
-      sync_direction: "bidirectional"  # bidirectional, to_card, from_card
-      max_size: "800GB"
+      local_path: "/content/movies"  # Local directory path
+      card_path: "movies"  # Path on the card for this content type
+      sync_direction: "bidirectional"  # Options: bidirectional, to_card, from_card
+      max_size: "800GB"  # Maximum size for this content type
       file_extensions: [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"]
-      
+
+    # TV Shows - Bidirectional sync
     tv:
       local_path: "/content/tv"
       card_path: "tv"
       sync_direction: "bidirectional"
       max_size: "600GB"
       file_extensions: [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"]
-      
+
+    # Web TV - Bidirectional sync
     webtv:
       local_path: "/content/webtv"
       card_path: "webtv"
@@ -42,13 +69,15 @@ offline_sync:
       max_size: "300GB"
       file_extensions: [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"]
       
+    # Music - Bidirectional sync
     music:
       local_path: "/content/music"
       card_path: "music"
       sync_direction: "bidirectional"
       max_size: "100GB"
       file_extensions: [".mp3", ".flac", ".wav", ".aac", ".ogg", ".m4a"]
-      
+
+    # Audiobooks - Bidirectional sync
     audiobooks:
       local_path: "/content/audiobooks"
       card_path: "audiobooks"

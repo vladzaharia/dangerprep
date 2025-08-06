@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Configuration management with YAML support and Zod validation for DangerPrep services",
   "private": true,
-  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

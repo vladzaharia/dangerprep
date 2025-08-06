@@ -1,5 +1,5 @@
 import type { Logger } from '@dangerprep/logging';
-import cron from 'node-cron';
+import * as cron from 'node-cron';
 
 import type { ScheduledTask, ScheduleOptions } from './types.js';
 

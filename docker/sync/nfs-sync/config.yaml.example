@@ -1,0 +1,204 @@
+# DangerPrep NFS Sync Configuration - Example
+# Copy this file to config.yaml and customize for your environment
+
+# ============================================================================
+# STANDARDIZED SERVICE CONFIGURATION
+# These fields are required for all DangerPrep sync services
+# ============================================================================
+
+service_name: "nfs-sync"
+version: "1.0.0"
+enabled: true
+log_level: "info"  # Options: debug, info, warn, error
+data_directory: "/app/data"
+temp_directory: "/tmp"
+max_concurrent_operations: 3  # Range: 1-20
+operation_timeout_minutes: 30  # Range: 1-120
+health_check_interval_minutes: 5  # Range: 1-60
+enable_notifications: true
+enable_progress_tracking: true
+enable_auto_recovery: true
+
+# ============================================================================
+# NFS SYNC-SPECIFIC CONFIGURATION
+# ============================================================================
+
+sync_config:
+  # Central NAS connection
+  central_nas:
+    host: "192.168.1.100"  # NFS server hostname or IP address
+    nfs_shares:  # NFS share mappings (share_name: nfs_path)
+      movies: "/mnt/data/movies"
+      tv: "/mnt/data/tv"
+      webtv: "/mnt/data/webtv"
+      music: "/mnt/data/music"
+      books: "/mnt/data/books"
+      comics: "/mnt/data/comics"
+      games: "/mnt/data/games"
+      kiwix: "/mnt/data/kiwix"
+
+  # Plex server for metadata (optional)
+  plex:
+    server: "192.168.1.100:32400"  # Plex server address
+    token: "${PLEX_TOKEN}"  # Plex authentication token (set via environment variable)
+
+  # Local storage configuration
+  local_storage:
+    base_path: "/content"  # Base path for local content storage
+    max_total_size: "1800GB"  # Maximum total size for local storage
+
+  # Content type configurations
+  content_types:
+    # Books - Full synchronization
+    books:
+      type: "full_sync"  # Options: full_sync, metadata_filtered, folder_filtered, kiwix_updater
+      schedule: "0 2 * * *"  # Daily at 2 AM (cron format)
+      local_path: "/content/books"
+      nfs_path: "/nfs/books"  # Optional: specific NFS path override
+      max_size: "50GB"
+      # Optional: File filters
+      filters:
+        - type: "file_extension"
+          operator: "in"
+          value: [".epub", ".pdf", ".mobi", ".azw", ".azw3"]
+        - type: "file_size"
+          operator: "less_than"
+          value: "100MB"
+      # Optional: Priority rules for selection
+      priority_rules:
+        - type: "rating"
+          weight: 0.4
+        - type: "recent"
+          weight: 0.3
+        - type: "size"
+          weight: 0.3
+
+    # Movies - Metadata filtered synchronization
+    movies:
+      type: "metadata_filtered"
+      schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+      local_path: "/content/movies"
+      nfs_path: "/nfs/movies"
+      max_size: "800GB"
+      filters:
+        - type: "rating"
+          operator: "greater_than"
+          value: 7.0
+        - type: "year"
+          operator: "greater_than"
+          value: 2010
+        - type: "resolution"
+          operator: "in"
+          value: ["1080p", "4K"]
+      priority_rules:
+        - type: "rating"
+          weight: 0.5
+        - type: "year"
+          weight: 0.3
+        - type: "genre"
+          weight: 0.2
+
+    # TV Shows - Folder filtered synchronization
+    tv:
+      type: "folder_filtered"
+      schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+      local_path: "/content/tv"
+      nfs_path: "/nfs/tv"
+      max_size: "600GB"
+      # Specific folders to include
+      include_folders:
+        - "Breaking Bad"
+        - "The Office"
+        - "Game of Thrones"
+        - "Stranger Things"
+      max_episodes_per_show: 50  # Limit episodes per show
+      filters:
+        - type: "rating"
+          operator: "greater_than"
+          value: 8.0
+      priority_rules:
+        - type: "rating"
+          weight: 0.6
+        - type: "recent"
+          weight: 0.4
+
+    # Web TV - Full sync with size limits
+    webtv:
+      type: "full_sync"
+      schedule: "0 5 * * 0"  # Weekly on Sunday at 5 AM
+      local_path: "/content/webtv"
+      nfs_path: "/nfs/webtv"
+      max_size: "200GB"
+
+    # Music - Full sync
+    music:
+      type: "full_sync"
+      schedule: "0 6 * * 0"  # Weekly on Sunday at 6 AM
+      local_path: "/content/music"
+      nfs_path: "/nfs/music"
+      max_size: "100GB"
+      filters:
+        - type: "file_extension"
+          operator: "in"
+          value: [".mp3", ".flac", ".m4a", ".ogg"]
+
+    # Comics - Full sync
+    comics:
+      type: "full_sync"
+      schedule: "0 7 * * 0"  # Weekly on Sunday at 7 AM
+      local_path: "/content/comics"
+      nfs_path: "/nfs/comics"
+      max_size: "150GB"
+      filters:
+        - type: "file_extension"
+          operator: "in"
+          value: [".cbz", ".cbr", ".cb7", ".cbt", ".pdf"]
+
+    # Games - Full sync
+    games:
+      type: "full_sync"
+      schedule: "0 8 * * 0"  # Weekly on Sunday at 8 AM
+      local_path: "/content/games"
+      nfs_path: "/nfs/games"
+      max_size: "300GB"
+
+    # Kiwix - Kiwix updater type
+    kiwix:
+      type: "kiwix_updater"
+      schedule: "0 9 * * 0"  # Weekly on Sunday at 9 AM
+      local_path: "/content/kiwix"
+      nfs_path: "/nfs/kiwix"
+      max_size: "100GB"
+      # Specific ZIM files to sync
+      zim_files:
+        - "wikipedia_en_all"
+        - "wikipedia_en_medicine"
+        - "wiktionary_en_all"
+        - "gutenberg_en_all"
+
+  # Performance configuration
+  performance:
+    max_concurrent_transfers: 3  # Maximum concurrent file transfers (positive integer)
+    bandwidth_limit: "50MB/s"  # Bandwidth limit for transfers
+    retry_attempts: 3  # Number of retry attempts for failed transfers (0 or positive)
+    retry_delay: 5000  # Delay between retries in milliseconds (positive)
+
+  # Logging configuration
+  logging:
+    level: "INFO"  # Logging level (DEBUG, INFO, WARN, ERROR)
+    file: "/app/data/logs/nfs-sync.log"  # Log file path
+    max_size: "100MB"  # Maximum log file size
+    backup_count: 5  # Number of backup log files (positive integer)
+
+  # Notifications configuration (optional)
+  notifications:
+    enabled: true
+    webhook_url: "${WEBHOOK_URL}"  # Webhook URL for notifications (set via environment variable)
+    # Optional: Email notifications
+    email:
+      enabled: false
+      smtp_server: "smtp.gmail.com"
+      smtp_port: 587
+      username: "${EMAIL_USERNAME}"
+      password: "${EMAIL_PASSWORD}"
+      to: "${EMAIL_TO}"

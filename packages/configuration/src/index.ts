@@ -68,6 +68,7 @@ export class ConfigValidationError extends Error {
 export class ConfigManager<T> {
   private config: T | null = null;
   private readonly logger: Logger | undefined;
+  private readonly configPath: string;
   private readonly options: {
     logger?: Logger;
     createDirs: boolean;
@@ -83,10 +84,12 @@ export class ConfigManager<T> {
   };
 
   constructor(
-    private readonly configPath: string,
+    configPath: string,
     private readonly schema: z.ZodSchema<T>,
     options: ConfigOptions = {}
   ) {
+    // Resolve configuration path with environment variable support
+    this.configPath = this.resolveConfigPath(configPath);
     this.logger = options.logger;
     this.options = {
       ...(options.logger && { logger: options.logger }),
@@ -102,6 +105,20 @@ export class ConfigManager<T> {
         ...options.yamlOptions,
       },
     };
+  }
+
+  /**
+   * Resolve configuration path with environment variable support
+   */
+  private resolveConfigPath(defaultPath: string): string {
+    // Check for environment variable override
+    const envConfigPath = process.env.CONFIG_FILE || process.env.CONFIG_PATH;
+    if (envConfigPath) {
+      return envConfigPath;
+    }
+
+    // Use provided default path
+    return defaultPath;
   }
 
   /**

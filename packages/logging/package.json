@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Modern structured logging for DangerPrep services",
   "private": true,
-  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -37,5 +36,8 @@
     "structured-logging",
     "typescript",
     "dangerprep"
-  ]
+  ],
+  "dependencies": {
+    "tslib": "^2.8.1"
+  }
 }

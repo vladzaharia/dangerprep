@@ -1,36 +1,60 @@
-# Kiwix Manager Configuration
+# Kiwix Manager Configuration - Example
+# Copy this file to config.yaml and customize for your environment
+
+# ============================================================================
+# STANDARDIZED SERVICE CONFIGURATION
+# These fields are required for all DangerPrep sync services
+# ============================================================================
+
+service_name: "kiwix-sync"
+version: "1.0.0"
+enabled: true
+log_level: "info"  # Options: debug, info, warn, error
+data_directory: "/app/data"
+temp_directory: "/tmp"
+max_concurrent_operations: 3  # Range: 1-20
+operation_timeout_minutes: 30  # Range: 1-120
+health_check_interval_minutes: 5  # Range: 1-60
+enable_notifications: true
+enable_progress_tracking: true
+enable_auto_recovery: true
+
+# ============================================================================
+# KIWIX-SPECIFIC CONFIGURATION
+# ============================================================================
+
 kiwix_manager:
   # Storage configuration
   storage:
-    zim_directory: "/content/kiwix"
-    library_file: "/content/kiwix/library.xml"
-    temp_directory: "/tmp/kiwix-downloads"
-    max_total_size: "100GB"
+    zim_directory: "/content/kiwix"  # Directory to store ZIM files
+    library_file: "/content/kiwix/library.xml"  # Path to Kiwix library file
+    temp_directory: "/tmp/kiwix-downloads"  # Temporary directory for downloads
+    max_total_size: "100GB"  # Maximum total size for ZIM files
 
-  # Update schedule
+  # Scheduler configuration
   scheduler:
-    update_schedule: "0 6 * * *"  # Daily at 6 AM
-    cleanup_schedule: "0 2 * * 0"  # Weekly cleanup on Sunday at 2 AM
+    update_schedule: "0 6 * * *"  # Daily at 6 AM (cron format)
+    cleanup_schedule: "0 2 * * 0"  # Weekly cleanup on Sunday at 2 AM (cron format)
 
-  # Download settings
+  # Download configuration
   download:
-    concurrent_downloads: 2
-    retry_attempts: 3
-    retry_delay: 300  # 5 minutes
-    bandwidth_limit: "25MB/s"
+    concurrent_downloads: 2  # Number of concurrent downloads (positive integer)
+    retry_attempts: 3  # Number of retry attempts (0 or positive)
+    retry_delay: 300  # Delay between retries in seconds (positive)
+    bandwidth_limit: "25MB/s"  # Bandwidth limit for downloads
 
   # Logging configuration
   logging:
-    level: "INFO"
-    file: "/app/data/logs/kiwix-manager.log"
-    max_size: "50MB"
-    backup_count: 3
+    level: "INFO"  # Logging level (DEBUG, INFO, WARN, ERROR)
+    file: "/app/data/logs/kiwix-manager.log"  # Log file path
+    max_size: "50MB"  # Maximum log file size
+    backup_count: 3  # Number of backup log files (positive integer)
 
-  # Kiwix library API
+  # API configuration
   api:
-    base_url: "https://library.kiwix.org"
-    catalog_url: "https://library.kiwix.org/catalog/v2/entries"
-    timeout: 30000
+    base_url: "https://library.kiwix.org"  # Base API URL
+    catalog_url: "https://library.kiwix.org/catalog/v2/entries"  # Catalog API URL
+    timeout: 30000  # API timeout in milliseconds (positive)
 
   # Mirror configuration for faster downloads
   mirrors:

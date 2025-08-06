@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Comprehensive resilience patterns including circuit breakers, retry mechanisms, and fault tolerance for DangerPrep services",
   "private": true,
-  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

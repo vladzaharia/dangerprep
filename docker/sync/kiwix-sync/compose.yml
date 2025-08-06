@@ -1,6 +1,6 @@
 services:
   kiwix-serve:
-    image: kiwix/kiwix-serve:latest
+    image: ghcr.io/kiwix/kiwix-serve:latest
     restart: unless-stopped
     volumes:
       - ${INSTALL_ROOT}/content/kiwix:/data:ro
@@ -31,11 +31,14 @@ services:
       retries: 3
 
   manager:
-    build: .
+    build:
+      context: ../../..
+      dockerfile: docker/sync/kiwix-sync/Dockerfile
     restart: unless-stopped
     volumes:
       - ${INSTALL_ROOT}/content/kiwix:/data/kiwix
       - ${INSTALL_ROOT}/data/kiwix-manager:/app/data
+      - ./config.yaml:/app/data/config.yaml:ro
     env_file:
       - compose.env
     labels:

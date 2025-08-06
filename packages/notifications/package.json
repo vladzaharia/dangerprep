@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Notification system for events and alerts in DangerPrep services",
   "private": true,
-  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
