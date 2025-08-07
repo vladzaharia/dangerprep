@@ -1,0 +1,42 @@
+[Unit]
+Description=RK3588/RK3588S PWM Fan Control Service
+Documentation=man:rk3588-fan-control(8)
+After=multi-user.target
+Wants=multi-user.target
+
+[Service]
+Type=simple
+ExecStart={{PROJECT_ROOT}}/scripts/monitoring/rk3588-fan-control.sh start
+ExecStop={{PROJECT_ROOT}}/scripts/monitoring/rk3588-fan-control.sh stop
+Restart=always
+RestartSec=10
+User=root
+Group=root
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/sys/class/pwm /sys/class/thermal /var/log /etc/dangerprep
+ProtectKernelTunables=false
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictNamespaces=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Resource limits
+LimitNOFILE=1024
+LimitNPROC=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rk3588-fan-control
+
+[Install]
+WantedBy=multi-user.target

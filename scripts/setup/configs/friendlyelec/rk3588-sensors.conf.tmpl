@@ -1,0 +1,34 @@
+# RK3588/RK3588S temperature sensors configuration for lm-sensors
+# Template for FriendlyElec hardware monitoring
+
+chip "rk3588-thermal-*"
+    label temp1 "SoC Temperature"
+    set temp1_max 85
+    set temp1_crit 95
+    compute temp1 @/1000, @*1000
+
+chip "rk3588s-thermal-*"
+    label temp1 "SoC Temperature"
+    set temp1_max 85
+    set temp1_crit 95
+    compute temp1 @/1000, @*1000
+
+# Mali GPU thermal zone
+chip "thermal_zone2-*"
+    label temp1 "Mali GPU"
+    set temp1_max 90
+    set temp1_crit 100
+    compute temp1 @/1000, @*1000
+
+# NPU thermal zone (if available)
+chip "thermal_zone3-*"
+    label temp1 "NPU"
+    set temp1_max 95
+    set temp1_crit 105
+    compute temp1 @/1000, @*1000
+
+# Fan control (if available)
+chip "pwm-fan-*"
+    label fan1 "System Fan"
+    set fan1_min 1000
+    set fan1_max 5000

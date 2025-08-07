@@ -1,0 +1,39 @@
+# GStreamer hardware acceleration configuration for RK3588/RK3588S
+# Enables MPP (Media Process Platform) plugins for hardware video processing
+
+[plugins]
+# Enable MPP plugins for hardware acceleration
+mpp = true
+rockchipmpp = true
+kmssink = true
+
+[elements]
+# Hardware video decoders
+mpph264dec = true
+mpph265dec = true
+mppvp8dec = true
+mppvp9dec = true
+mppav1dec = true
+
+# Hardware video encoders  
+mpph264enc = true
+mpph265enc = true
+mppjpegenc = true
+
+# Hardware video post-processing
+mppvideotransform = true
+mppvideoscale = true
+
+# Display sinks
+kmssink = true
+waylandsink = true
+
+[settings]
+# Performance settings
+mpp_buffer_count = 8
+mpp_output_format = NV12
+mpp_zero_copy = true
+
+# Quality settings
+mpp_quality = high
+mpp_bitrate_mode = vbr

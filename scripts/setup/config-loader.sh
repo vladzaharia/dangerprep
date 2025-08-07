@@ -202,3 +202,153 @@ validate_config_files() {
     success "All configuration files validated"
     return 0
 }
+
+# Load FriendlyElec-specific configurations
+load_friendlyelec_configs() {
+    if [[ "$IS_FRIENDLYELEC" != true ]]; then
+        return 0
+    fi
+
+    log "Loading FriendlyElec-specific configurations..."
+
+    # Load RK3588/RK3588S configurations
+    if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
+        load_rk3588_configs
+    fi
+
+    success "FriendlyElec configurations loaded"
+}
+
+# Load RK3588/RK3588S specific configurations
+load_rk3588_configs() {
+    log "Loading RK3588/RK3588S configurations..."
+
+    # Load sensors configuration
+    load_rk3588_sensors_config
+
+    # Load performance optimizations
+    load_rk3588_performance_config
+
+    # Load udev rules
+    load_rk3588_udev_rules
+
+    # Load GPU configuration
+    load_rk3588_gpu_config
+
+    # Load GStreamer hardware acceleration
+    load_rk3588_gstreamer_config
+
+    # Load fan control configuration
+    load_rk3588_fan_control_config
+
+    # Load GPIO/PWM configuration
+    load_gpio_pwm_config
+}
+
+# Load RK3588 fan control configuration
+load_rk3588_fan_control_config() {
+    local template="$CONFIG_DIR/friendlyelec/rk3588-fan-control.conf.tmpl"
+    local output="/etc/dangerprep/rk3588-fan-control.conf"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        log "Loaded RK3588 fan control configuration"
+    else
+        warning "RK3588 fan control template not found: $template"
+    fi
+}
+
+# Install RK3588 fan control service
+install_rk3588_fan_control_service() {
+    local template="$CONFIG_DIR/friendlyelec/rk3588-fan-control.service.tmpl"
+    local output="/etc/systemd/system/rk3588-fan-control.service"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        systemctl daemon-reload
+        systemctl enable rk3588-fan-control.service 2>/dev/null || true
+        systemctl start rk3588-fan-control.service 2>/dev/null || true
+        log "Installed and started RK3588 fan control service"
+    else
+        warning "RK3588 fan control service template not found: $template"
+    fi
+}
+
+# Load GPIO/PWM configuration
+load_gpio_pwm_config() {
+    local template="$CONFIG_DIR/friendlyelec/gpio-pwm-setup.conf.tmpl"
+    local output="/etc/dangerprep/gpio-pwm-setup.conf"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        log "Loaded GPIO/PWM configuration"
+    else
+        warning "GPIO/PWM configuration template not found: $template"
+    fi
+}
+
+# Load RK3588 sensors configuration
+load_rk3588_sensors_config() {
+    local template="$CONFIG_DIR/friendlyelec/rk3588-sensors.conf.tmpl"
+    local output="/etc/sensors.d/rk3588.conf"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        log "Loaded RK3588 sensors configuration"
+    else
+        warning "RK3588 sensors template not found: $template"
+    fi
+}
+
+# Load RK3588 performance configuration
+load_rk3588_performance_config() {
+    local template="$CONFIG_DIR/friendlyelec/rk3588-performance.conf.tmpl"
+    local output="/etc/sysctl.d/99-rk3588-optimizations.conf"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        log "Loaded RK3588 performance configuration"
+    else
+        warning "RK3588 performance template not found: $template"
+    fi
+}
+
+# Load RK3588 udev rules
+load_rk3588_udev_rules() {
+    local template="$CONFIG_DIR/friendlyelec/rk3588-udev.rules.tmpl"
+    local output="/etc/udev/rules.d/99-rk3588-hardware.rules"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        udevadm control --reload-rules 2>/dev/null || true
+        log "Loaded RK3588 udev rules"
+    else
+        warning "RK3588 udev rules template not found: $template"
+    fi
+}
+
+# Load RK3588 GPU configuration
+load_rk3588_gpu_config() {
+    local template="$CONFIG_DIR/friendlyelec/mali-gpu.conf.tmpl"
+    local output="/etc/environment.d/mali-gpu.conf"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        log "Loaded RK3588 GPU configuration"
+    else
+        warning "RK3588 GPU template not found: $template"
+    fi
+}
+
+# Load RK3588 GStreamer configuration
+load_rk3588_gstreamer_config() {
+    local template="$CONFIG_DIR/friendlyelec/gstreamer-hardware.conf.tmpl"
+    local output="/etc/gstreamer-1.0/rk3588-hardware.conf"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        log "Loaded RK3588 GStreamer configuration"
+    else
+        warning "RK3588 GStreamer template not found: $template"
+    fi
+}
