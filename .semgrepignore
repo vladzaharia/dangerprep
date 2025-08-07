@@ -103,7 +103,11 @@ composer.lock
 *.yml
 
 # Exclude specific directories that may have false positives
-scripts/maintenance/
+scripts/backup/
+scripts/monitoring/
+scripts/security/
+scripts/system/
+scripts/validation/
 scripts/setup/
 lib/just/
 

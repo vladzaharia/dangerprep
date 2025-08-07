@@ -12,7 +12,7 @@ help:
     @echo ""
     @echo "System Management:"
     @echo "  deploy     - Deploy/install the entire DangerPrep system"
-    @echo "  verify     - Verify deployment status"
+    @echo "  cleanup    - Clean up/uninstall DangerPrep system"
     @echo "  update     - Update system from repository"
     @echo "  uninstall  - Uninstall system (preserves data)"
     @echo ""
@@ -59,21 +59,27 @@ help:
     @echo "  aide-check            - Run AIDE integrity check"
     @echo "  antivirus-scan        - Run antivirus scan"
     @echo ""
+    @echo "Network Routing:"
+    @echo "  wan-to-wifi           - Setup WAN-to-WiFi routing"
+    @echo "  wifi-repeater         - Setup WiFi repeater mode"
+    @echo "  local-only            - Setup local only network"
+    @echo "  qos-setup             - Setup QoS traffic shaping"
+    @echo ""
 
 # System Management
 deploy:
     @echo "Deploying DangerPrep system..."
-    @sudo ./scripts/setup/deploy-dangerprep.sh
+    @sudo ./scripts/setup/setup-dangerprep.sh
 
-verify:
-    @echo "Verifying deployment..."
-    @sudo ./scripts/setup/deploy-dangerprep.sh verify
+cleanup:
+    @echo "Cleaning up DangerPrep system..."
+    @sudo ./scripts/setup/cleanup-dangerprep.sh
 
 update:
-    @./scripts/maintenance/system/system-update.sh
+    @./scripts/system/system-update.sh
 
 uninstall:
-    @./scripts/maintenance/system/system-uninstall.sh
+    @./scripts/system/system-uninstall.sh
 
 # Service management
 start:
@@ -165,7 +171,7 @@ clean:
     @sudo docker network prune -f
 
 backup:
-    @./scripts/maintenance/system-backup.sh
+    @./scripts/backup/backup-manager.sh create basic
 
 logs:
     #!/usr/bin/env bash
@@ -187,104 +193,111 @@ logs:
 # Certificate Management
 # Show certificate status for Traefik and Step-CA
 certs-status:
-    @scripts/maintenance/system/certs.sh status
+    @scripts/system/certs.sh status
 
 # Setup Traefik ACME certificates
 certs-traefik:
-    @scripts/maintenance/system/certs.sh traefik
+    @scripts/system/certs.sh traefik
 
 # Setup Step-CA internal certificates
 certs-step-ca:
-    @scripts/maintenance/system/certs.sh step-ca
+    @scripts/system/certs.sh step-ca
 
 # Security and Monitoring (Unified Commands)
 # Run all security checks
 security-audit-all:
-    @scripts/maintenance/security/security-audit-all.sh all
+    @scripts/security/security-audit-all.sh all
 
 # Run specific security checks
 aide-check:
-    @scripts/maintenance/security/security-audit-all.sh aide
+    @scripts/security/security-audit-all.sh aide
 
 antivirus-scan:
-    @scripts/maintenance/security/security-audit-all.sh antivirus
+    @scripts/security/security-audit-all.sh antivirus
 
 security-audit:
-    @scripts/maintenance/security/security-audit-all.sh audit
+    @scripts/security/security-audit-all.sh audit
 
 rootkit-scan:
-    @scripts/maintenance/security/security-audit-all.sh rootkit
+    @scripts/security/security-audit-all.sh rootkit
 
 suricata-monitor:
-    @scripts/maintenance/security/security-audit-all.sh suricata
+    @scripts/security/security-audit-all.sh suricata
 
 # Run all monitoring checks
 monitor-all:
-    @scripts/maintenance/monitoring/monitor-all.sh all
+    @scripts/monitoring/monitor-all.sh all
 
 # Run specific monitoring checks
 system-monitor:
-    @scripts/maintenance/monitoring/monitor-all.sh system
+    @scripts/monitoring/monitor-all.sh system
 
 hardware-monitor:
-    @scripts/maintenance/monitoring/monitor-all.sh hardware
+    @scripts/monitoring/monitor-all.sh hardware
 
 monitor-continuous:
-    @scripts/maintenance/monitoring/monitor-all.sh continuous
+    @scripts/monitoring/monitor-all.sh continuous
 
 # Validation Commands (Unified)
 validate-all:
-    @scripts/maintenance/validation/validate-system.sh all
+    @scripts/validation/validate-system.sh all
 
 validate-compose:
-    @scripts/maintenance/validation/validate-system.sh compose
+    @scripts/validation/validate-system.sh compose
 
 validate-references:
-    @scripts/maintenance/validation/validate-system.sh references
+    @scripts/validation/validate-system.sh references
 
 validate-docker:
-    @scripts/maintenance/validation/validate-system.sh docker
+    @scripts/validation/validate-system.sh docker
 
 validate-nfs:
-    @scripts/maintenance/validation/validate-system.sh nfs
+    @scripts/validation/validate-system.sh nfs
 
 # Check container health
 container-health:
     @scripts/docker/container-health.sh check
 
+# System utilities
+fix-permissions:
+    @scripts/system/fix-permissions.sh
+
+audit-shell-scripts:
+    @scripts/system/audit-shell-scripts.sh
+
 # Backup Management (Unified)
 # Create different types of backups
 backup-create-basic:
-    @scripts/maintenance/backup/backup-manager.sh create basic
+    @scripts/backup/backup-manager.sh create basic
 
 backup-create-encrypted:
-    @scripts/maintenance/backup/backup-manager.sh create encrypted
+    @scripts/backup/backup-manager.sh create encrypted
 
 backup-create-full:
-    @scripts/maintenance/backup/backup-manager.sh create full
+    @scripts/backup/backup-manager.sh create full
 
 # Backup management
 backup-list:
-    @scripts/maintenance/backup/backup-manager.sh list
+    @scripts/backup/backup-manager.sh list
 
 backup-restore backup:
-    @scripts/maintenance/backup/backup-manager.sh restore {{backup}}
+    @scripts/backup/backup-manager.sh restore {{backup}}
 
 backup-cleanup days="30":
-    @scripts/maintenance/backup/backup-manager.sh cleanup {{days}}
+    @scripts/backup/backup-manager.sh cleanup {{days}}
 
 backup-verify backup:
-    @scripts/maintenance/backup/backup-manager.sh verify {{backup}}
+    @scripts/backup/backup-manager.sh verify {{backup}}
 
 # Legacy backup commands (for cron compatibility)
 backup-daily:
-    @scripts/maintenance/backup/backup-manager.sh create encrypted
+    @scripts/backup/backup-manager.sh create encrypted
 
 backup-weekly:
-    @scripts/maintenance/backup/backup-manager.sh create full
+    @scripts/backup/backup-manager.sh create full
 
 backup-monthly:
-    @scripts/maintenance/backup/backup-manager.sh create full
+    @scripts/backup/backup-manager.sh create full
 
 # Network Routing
 # Setup WAN-to-WiFi routing
