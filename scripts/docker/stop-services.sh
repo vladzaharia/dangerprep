@@ -13,7 +13,6 @@ sudo docker compose -f docker/sync/nfs-sync/compose.yml down
 sudo docker compose -f docker/sync/kiwix-sync/compose.yml down
 
 echo "Stopping utility services..."
-sudo docker compose -f docker/infrastructure/portal/compose.yml down
 
 echo "Stopping media services..."
 sudo docker compose -f docker/media/romm/compose.yml down

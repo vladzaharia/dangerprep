@@ -34,7 +34,6 @@ sleep 3
 
 # Start utility services
 echo "Starting utility services..."
-sudo docker compose -f docker/infrastructure/portal/compose.yml up -d
 sleep 3
 
 # Start sync services

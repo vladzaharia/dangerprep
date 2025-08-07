@@ -1580,10 +1580,9 @@ show_final_info() {
     echo -e "${GREEN}Next Steps:${NC}"
     echo "  1. Connect Tailscale: tailscale up --advertise-routes=$LAN_NETWORK --advertise-exit-node"
     echo "  2. Connect to WiFi: $WIFI_SSID (password: $WIFI_PASSWORD)"
-    echo "  3. Access services: https://portal.danger"
-    echo "  4. Configure NFS: edit /etc/dangerprep/nfs-mounts.conf and run 'dangerprep nfs mount'"
-    echo "  5. Check system health: dangerprep monitor report"
-    echo "  6. Check logs: tail -f $LOG_FILE"
+    echo "  3. Configure NFS: edit /etc/dangerprep/nfs-mounts.conf and run 'dangerprep nfs mount'"
+    echo "  4. Check system health: dangerprep monitor report"
+    echo "  5. Check logs: tail -f $LOG_FILE"
     echo
     echo -e "${YELLOW}Important Files:${NC}"
     echo "  Setup log: $LOG_FILE"
