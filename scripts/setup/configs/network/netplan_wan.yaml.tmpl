@@ -1,0 +1,16 @@
+# DangerPrep WAN Configuration
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    {{WAN_INTERFACE}}:
+      dhcp4: true
+      dhcp6: false
+      optional: true
+      dhcp4-overrides:
+        use-dns: true
+        use-routes: true
+      nameservers:
+        addresses:
+          - 1.1.1.1
+          - 8.8.8.8

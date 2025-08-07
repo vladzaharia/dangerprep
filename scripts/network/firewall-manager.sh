@@ -34,6 +34,31 @@ check_root() {
     fi
 }
 
+# Load DangerPrep configuration
+load_config() {
+    # Default values
+    SSH_PORT="2222"
+    LAN_IP="192.168.120.1"
+    LAN_NETWORK="192.168.120.0/22"
+    WAN_INTERFACE=""
+    WIFI_INTERFACE=""
+
+    # Load from setup script configuration if available
+    if [[ -f /etc/dangerprep/interfaces.conf ]]; then
+        source /etc/dangerprep/interfaces.conf
+    fi
+
+    # Load SSH port from sshd_config if available
+    if [[ -f /etc/ssh/sshd_config ]]; then
+        local ssh_port_line=$(grep "^Port " /etc/ssh/sshd_config | head -1)
+        if [[ -n "$ssh_port_line" ]]; then
+            SSH_PORT=$(echo "$ssh_port_line" | awk '{print $2}')
+        fi
+    fi
+
+    log "Configuration loaded: SSH_PORT=$SSH_PORT, WAN_INTERFACE=$WAN_INTERFACE, WIFI_INTERFACE=$WIFI_INTERFACE"
+}
+
 show_firewall_status() {
     echo "Firewall Status:"
     echo "================"
@@ -74,7 +99,7 @@ show_firewall_status() {
     
     echo
     echo "Common Ports Status:"
-    check_port_status 22 "SSH"
+    check_port_status "$SSH_PORT" "SSH"
     check_port_status 80 "HTTP"
     check_port_status 443 "HTTPS"
     check_port_status 53 "DNS"
@@ -94,49 +119,77 @@ check_port_status() {
 
 reset_firewall() {
     check_root
-    
+    load_config
+
     log "Resetting firewall to default DangerPrep rules..."
-    
+
     # Clear all existing rules
     iptables -F
     iptables -t nat -F
     iptables -t mangle -F
     iptables -X
-    
+
     # Set default policies
-    iptables -P INPUT ACCEPT
-    iptables -P FORWARD ACCEPT
+    iptables -P INPUT DROP
+    iptables -P FORWARD DROP
     iptables -P OUTPUT ACCEPT
-    
+
     # Allow loopback traffic
     iptables -A INPUT -i lo -j ACCEPT
     iptables -A OUTPUT -o lo -j ACCEPT
-    
-    # Allow established connections
+
+    # Allow established and related connections
     iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-    
-    # Allow SSH (port 22)
-    iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-    
+    iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+    # Allow SSH on configured port
+    iptables -A INPUT -p tcp --dport "$SSH_PORT" -j ACCEPT
+
     # Allow HTTP/HTTPS (ports 80, 443)
     iptables -A INPUT -p tcp --dport 80 -j ACCEPT
     iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-    
+
     # Allow DNS (port 53)
     iptables -A INPUT -p tcp --dport 53 -j ACCEPT
     iptables -A INPUT -p udp --dport 53 -j ACCEPT
-    
-    # Allow DHCP (port 67)
+
+    # Allow DHCP (port 67, 68)
     iptables -A INPUT -p udp --dport 67 -j ACCEPT
-    
+    iptables -A INPUT -p udp --dport 68 -j ACCEPT
+
     # Allow Tailscale (port 41641)
     iptables -A INPUT -p udp --dport 41641 -j ACCEPT
-    
+    iptables -A INPUT -i tailscale0 -j ACCEPT
+    iptables -A FORWARD -i tailscale0 -j ACCEPT
+    iptables -A FORWARD -o tailscale0 -j ACCEPT
+
+    # Configure NAT if interfaces are available
+    if [[ -n "$WAN_INTERFACE" ]]; then
+        log "Configuring NAT for WAN interface: $WAN_INTERFACE"
+        iptables -t nat -A POSTROUTING -o "$WAN_INTERFACE" -j MASQUERADE
+    fi
+
+    # Configure WiFi forwarding if interfaces are available
+    if [[ -n "$WIFI_INTERFACE" && -n "$WAN_INTERFACE" ]]; then
+        log "Configuring WiFi forwarding: $WIFI_INTERFACE -> $WAN_INTERFACE"
+        iptables -A FORWARD -i "$WIFI_INTERFACE" -o "$WAN_INTERFACE" -j ACCEPT
+        iptables -A FORWARD -i "$WAN_INTERFACE" -o "$WIFI_INTERFACE" -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+        # Allow WiFi clients to access local services
+        iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 80 -j ACCEPT
+        iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 443 -j ACCEPT
+        iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 53 -j ACCEPT
+        iptables -A INPUT -i "$WIFI_INTERFACE" -p udp --dport 53 -j ACCEPT
+        iptables -A INPUT -i "$WIFI_INTERFACE" -p udp --dport 67 -j ACCEPT
+        iptables -A INPUT -i "$WIFI_INTERFACE" -p icmp --icmp-type echo-request -j ACCEPT
+    fi
+
     # Save rules
     mkdir -p /etc/iptables
     iptables-save > /etc/iptables/rules.v4
-    
+
     success "Firewall reset to default DangerPrep configuration"
+    log "SSH port: $SSH_PORT, WAN: $WAN_INTERFACE, WiFi: $WIFI_INTERFACE"
 }
 
 add_port_forward() {
@@ -285,24 +338,29 @@ allow_port() {
 # Main command handling
 case "${1:-}" in
     "status")
+        load_config
         show_firewall_status
         ;;
     "reset")
         reset_firewall
         ;;
     "port-forward")
+        load_config
         add_port_forward "$2" "$3"
         ;;
     "remove-port-forward")
+        load_config
         remove_port_forward "$2"
         ;;
     "list-forwards")
         list_port_forwards
         ;;
     "block-port")
+        load_config
         block_port "$2"
         ;;
     "allow-port")
+        load_config
         allow_port "$2"
         ;;
     *)
@@ -323,6 +381,9 @@ case "${1:-}" in
         echo "  $0 port-forward 8080 192.168.120.100:80"
         echo "  $0 remove-port-forward 8080"
         echo "  $0 allow-port 3000"
+        echo
+        echo "Note: This script reads configuration from /etc/dangerprep/interfaces.conf"
+        echo "      and SSH port from /etc/ssh/sshd_config"
         exit 1
         ;;
 esac

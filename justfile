@@ -25,7 +25,7 @@ help:
     @echo "WAN Management:"
     @echo "  wan-list          - List all available interfaces"
     @echo "  wan-set <if>      - Set interface as WAN (others become LAN)"
-    @echo "  wan-clear         - Clear WAN (emergency/offline mode)"
+    @echo "  wan-clear         - Clear WAN (local only mode)"
     @echo "  wan-status        - Show current WAN/LAN configuration"
     @echo ""
     @echo "Routing:"
@@ -47,8 +47,17 @@ help:
     @echo ""
     @echo "System Maintenance:"
     @echo "  clean      - Clean up unused Docker resources"
-    @echo "  backup     - Create system backup"
+    @echo "  backup-create-basic    - Create basic backup"
+    @echo "  backup-create-encrypted - Create encrypted backup"
+    @echo "  backup-list            - List available backups"
     @echo "  logs       - Show recent service logs"
+    @echo ""
+    @echo "Security & Monitoring:"
+    @echo "  security-audit-all     - Run all security checks"
+    @echo "  monitor-all           - Run all monitoring checks"
+    @echo "  validate-all          - Run all validation checks"
+    @echo "  aide-check            - Run AIDE integrity check"
+    @echo "  antivirus-scan        - Run antivirus scan"
     @echo ""
 
 # System Management
@@ -61,10 +70,10 @@ verify:
     @sudo ./scripts/setup/deploy-dangerprep.sh verify
 
 update:
-    @./scripts/maintenance/system-update.sh
+    @./scripts/maintenance/system/system-update.sh
 
 uninstall:
-    @./scripts/maintenance/system-uninstall.sh
+    @./scripts/maintenance/system/system-uninstall.sh
 
 # Service management
 start:
@@ -174,6 +183,129 @@ logs:
 
 
 
+
+# Certificate Management
+# Show certificate status for Traefik and Step-CA
+certs-status:
+    @scripts/maintenance/system/certs.sh status
+
+# Setup Traefik ACME certificates
+certs-traefik:
+    @scripts/maintenance/system/certs.sh traefik
+
+# Setup Step-CA internal certificates
+certs-step-ca:
+    @scripts/maintenance/system/certs.sh step-ca
+
+# Security and Monitoring (Unified Commands)
+# Run all security checks
+security-audit-all:
+    @scripts/maintenance/security/security-audit-all.sh all
+
+# Run specific security checks
+aide-check:
+    @scripts/maintenance/security/security-audit-all.sh aide
+
+antivirus-scan:
+    @scripts/maintenance/security/security-audit-all.sh antivirus
+
+security-audit:
+    @scripts/maintenance/security/security-audit-all.sh audit
+
+rootkit-scan:
+    @scripts/maintenance/security/security-audit-all.sh rootkit
+
+suricata-monitor:
+    @scripts/maintenance/security/security-audit-all.sh suricata
+
+# Run all monitoring checks
+monitor-all:
+    @scripts/maintenance/monitoring/monitor-all.sh all
+
+# Run specific monitoring checks
+system-monitor:
+    @scripts/maintenance/monitoring/monitor-all.sh system
+
+hardware-monitor:
+    @scripts/maintenance/monitoring/monitor-all.sh hardware
+
+monitor-continuous:
+    @scripts/maintenance/monitoring/monitor-all.sh continuous
+
+# Validation Commands (Unified)
+validate-all:
+    @scripts/maintenance/validation/validate-system.sh all
+
+validate-compose:
+    @scripts/maintenance/validation/validate-system.sh compose
+
+validate-references:
+    @scripts/maintenance/validation/validate-system.sh references
+
+validate-docker:
+    @scripts/maintenance/validation/validate-system.sh docker
+
+validate-nfs:
+    @scripts/maintenance/validation/validate-system.sh nfs
+
+# Check container health
+container-health:
+    @scripts/docker/container-health.sh check
+
+# Backup Management (Unified)
+# Create different types of backups
+backup-create-basic:
+    @scripts/maintenance/backup/backup-manager.sh create basic
+
+backup-create-encrypted:
+    @scripts/maintenance/backup/backup-manager.sh create encrypted
+
+backup-create-full:
+    @scripts/maintenance/backup/backup-manager.sh create full
+
+# Backup management
+backup-list:
+    @scripts/maintenance/backup/backup-manager.sh list
+
+backup-restore backup:
+    @scripts/maintenance/backup/backup-manager.sh restore {{backup}}
+
+backup-cleanup days="30":
+    @scripts/maintenance/backup/backup-manager.sh cleanup {{days}}
+
+backup-verify backup:
+    @scripts/maintenance/backup/backup-manager.sh verify {{backup}}
+
+# Legacy backup commands (for cron compatibility)
+backup-daily:
+    @scripts/maintenance/backup/backup-manager.sh create encrypted
+
+backup-weekly:
+    @scripts/maintenance/backup/backup-manager.sh create full
+
+backup-monthly:
+    @scripts/maintenance/backup/backup-manager.sh create full
+
+# Network Routing
+# Setup WAN-to-WiFi routing
+wan-to-wifi:
+    @scripts/network/wan-to-wifi.sh setup
+
+# Setup WiFi repeater mode
+wifi-repeater:
+    @scripts/network/wifi-repeater.sh setup
+
+# Setup local only network
+local-only:
+    @scripts/network/emergency-local.sh setup
+
+# Setup QoS traffic shaping
+qos-setup:
+    @scripts/network/qos.sh setup
+
+# Show QoS status
+qos-status:
+    @scripts/network/qos.sh status
 
 # Quick access to common tasks
 alias install := deploy

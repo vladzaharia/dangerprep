@@ -108,25 +108,46 @@ get_temperature_info() {
 
 get_network_info() {
     echo "--- Network Information ---"
-    
+
     # Check internet connectivity
     if ping -c 1 -W 2 8.8.8.8 > /dev/null 2>&1; then
         success "Internet connectivity: OK"
     else
         error "Internet connectivity: FAILED"
     fi
-    
+
     # Check Tailscale status
     if command -v tailscale > /dev/null 2>&1; then
-        if tailscale status | grep -q "100.65.182.27"; then
-            success "Tailscale NAS connectivity: OK"
+        local tailscale_status=$(tailscale status 2>/dev/null | head -1)
+        if [[ -n "$tailscale_status" ]]; then
+            success "Tailscale: Connected"
+            # Check for NAS connectivity if configured
+            local nas_host="${NAS_HOST:-100.65.182.27}"
+            if tailscale status | grep -q "$nas_host"; then
+                success "Tailscale NAS connectivity: OK"
+            else
+                warning "Tailscale NAS ($nas_host) not visible"
+            fi
         else
-            warning "Tailscale NAS connectivity: FAILED"
+            warning "Tailscale: Not connected"
         fi
     else
         warning "Tailscale not installed"
     fi
-    
+
+    # Check DangerPrep network services
+    if systemctl is-active --quiet hostapd; then
+        success "WiFi Hotspot (hostapd): Running"
+    else
+        warning "WiFi Hotspot (hostapd): Not running"
+    fi
+
+    if systemctl is-active --quiet dnsmasq; then
+        success "DNS/DHCP (dnsmasq): Running"
+    else
+        warning "DNS/DHCP (dnsmasq): Not running"
+    fi
+
     # Network interfaces
     echo "Active interfaces:"
     ip -brief addr show | grep UP
@@ -182,35 +203,94 @@ get_storage_health() {
 # Service-specific health checks
 check_service_health() {
     echo "--- Service Health Checks ---"
-    
-    local services=($(docker ps --format "{{.Names}}" | sort))
 
-    if [ ${#services[@]} -eq 0 ]; then
-        warning "No services currently running"
-        return 0
+    # Check Docker services
+    if command -v docker > /dev/null 2>&1; then
+        local services=($(docker ps --format "{{.Names}}" 2>/dev/null | sort))
+
+        if [ ${#services[@]} -eq 0 ]; then
+            warning "No Docker services currently running"
+        else
+            for service in "${services[@]}"; do
+                local status=$(docker inspect --format='{{.State.Health.Status}}' "$service" 2>/dev/null || echo "no-healthcheck")
+                local state=$(docker inspect --format='{{.State.Status}}' "$service" 2>/dev/null || echo "unknown")
+
+                if [[ "$state" == "running" ]]; then
+                    if [[ "$status" == "healthy" ]] || [[ "$status" == "no-healthcheck" ]]; then
+                        success "$service: Running ($status)"
+                    else
+                        warning "$service: Running but $status"
+                    fi
+                else
+                    error "$service: $state"
+                fi
+            done
+        fi
+    fi
+    echo
+}
+
+# Security services health check
+check_security_services() {
+    echo "--- Security Services ---"
+
+    # Check fail2ban
+    if systemctl is-active --quiet fail2ban; then
+        success "Fail2ban: Active"
+        local banned_ips=$(fail2ban-client status sshd 2>/dev/null | grep "Banned IP list" | cut -d: -f2 | wc -w)
+        if [[ $banned_ips -gt 0 ]]; then
+            warning "Fail2ban: $banned_ips IPs currently banned"
+        fi
+    else
+        warning "Fail2ban: Not running"
     fi
 
-    for service in "${services[@]}"; do
-        local status=$(docker inspect --format='{{.State.Health.Status}}' "$service" 2>/dev/null || echo "no-healthcheck")
-        local state=$(docker inspect --format='{{.State.Status}}' "$service" 2>/dev/null || echo "unknown")
+    # Check SSH service
+    if systemctl is-active --quiet ssh; then
+        success "SSH: Running"
+        local ssh_port=$(grep "^Port " /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}' || echo "22")
+        log "SSH Port: $ssh_port"
+    else
+        error "SSH: Not running"
+    fi
 
-        if [[ "$state" == "running" ]]; then
-            if [[ "$status" == "healthy" ]] || [[ "$status" == "no-healthcheck" ]]; then
-                success "$service: Running ($status)"
-            else
-                warning "$service: Running but $status"
-            fi
+    # Check firewall status
+    local iptables_rules=$(iptables -L | wc -l)
+    if [[ $iptables_rules -gt 10 ]]; then
+        success "Firewall: Active ($iptables_rules rules)"
+    else
+        warning "Firewall: Minimal rules configured"
+    fi
+
+    # Check AIDE (file integrity monitoring)
+    if command -v aide > /dev/null 2>&1; then
+        if [[ -f /var/lib/aide/aide.db ]]; then
+            success "AIDE: Database present"
         else
-            error "$service: $state"
+            warning "AIDE: Database not initialized"
         fi
-    done
+    else
+        warning "AIDE: Not installed"
+    fi
+
+    # Check antivirus
+    if command -v clamscan > /dev/null 2>&1; then
+        if systemctl is-active --quiet clamav-daemon; then
+            success "ClamAV: Running"
+        else
+            warning "ClamAV: Daemon not running"
+        fi
+    else
+        warning "ClamAV: Not installed"
+    fi
+
     echo
 }
 
 # Generate system report
 generate_report() {
     log "Generating system health report..."
-    
+
     {
         get_system_info
         get_cpu_info
@@ -221,6 +301,7 @@ generate_report() {
         get_docker_info
         get_storage_health
         check_service_health
+        check_security_services
     } | tee "/tmp/dangerprep-health-$(date +%Y%m%d-%H%M%S).txt"
 }
 

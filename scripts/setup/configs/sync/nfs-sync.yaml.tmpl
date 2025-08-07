@@ -1,0 +1,58 @@
+log_level: "info"
+data_directory: "/app/data"
+temp_directory: "/tmp"
+max_concurrent_operations: 2
+operation_timeout_minutes: 30
+health_check_interval_minutes: 10
+enable_notifications: false
+enable_progress_tracking: true
+enable_auto_recovery: true
+
+sync_config:
+  central_nas:
+    host: "{{NAS_HOST}}"
+    nfs_shares:
+      - path: "/volume1/media/movies"
+        local_path: "/content/movies"
+        sync_schedule: "0 2 * * *"
+        enabled: true
+      - path: "/volume1/media/tv"
+        local_path: "/content/tv"
+        sync_schedule: "0 3 * * *"
+        enabled: true
+      - path: "/volume1/media/music"
+        local_path: "/content/music"
+        sync_schedule: "0 4 * * *"
+        enabled: true
+      - path: "/volume1/media/audiobooks"
+        local_path: "/content/audiobooks"
+        sync_schedule: "0 5 * * *"
+        enabled: true
+      - path: "/volume1/media/books"
+        local_path: "/content/books"
+        sync_schedule: "0 6 * * *"
+        enabled: true
+
+  sync_options:
+    bandwidth_limit: "50MB/s"
+    retry_attempts: 3
+    retry_delay_minutes: 5
+    verify_checksums: true
+    preserve_permissions: true
+    delete_removed: false
+    dry_run: false
+
+  filters:
+    include_patterns:
+      - "*.mp4"
+      - "*.mkv"
+      - "*.avi"
+      - "*.mp3"
+      - "*.flac"
+      - "*.epub"
+      - "*.pdf"
+    exclude_patterns:
+      - "*.tmp"
+      - "*.part"
+      - ".DS_Store"
+      - "Thumbs.db"

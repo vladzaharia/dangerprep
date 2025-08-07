@@ -1,0 +1,48 @@
+log_level: "info"
+data_directory: "/app/data"
+temp_directory: "/tmp"
+max_concurrent_operations: 2
+operation_timeout_minutes: 60
+health_check_interval_minutes: 10
+enable_notifications: false
+enable_progress_tracking: true
+enable_auto_recovery: true
+
+kiwix_manager:
+  storage:
+    zim_directory: "/content/kiwix"
+    library_file: "/content/kiwix/library.xml"
+    temp_directory: "/tmp/kiwix"
+    max_storage_gb: 500
+
+  scheduler:
+    update_schedule: "0 6 * * *"
+    cleanup_schedule: "0 2 * * 0"
+    check_interval_minutes: 60
+    max_concurrent_downloads: 1
+    bandwidth_limit: "10MB/s"
+
+  mirrors:
+    preferred: "https://mirrors.dotsrc.org/kiwix/"
+    available:
+      - "https://mirrors.dotsrc.org/kiwix/"
+      - "https://download.kiwix.org/zim/"
+      - "https://mirror.download.kiwix.org/zim/"
+
+  content_types:
+    wikipedia:
+      enabled: true
+      languages: ["en", "es", "fr"]
+      max_size_gb: 100
+    wiktionary:
+      enabled: true
+      languages: ["en"]
+      max_size_gb: 10
+    wikivoyage:
+      enabled: false
+      languages: ["en"]
+      max_size_gb: 5
+    other:
+      enabled: true
+      whitelist: ["ted", "gutenberg", "stackoverflow"]
+      max_size_gb: 50
