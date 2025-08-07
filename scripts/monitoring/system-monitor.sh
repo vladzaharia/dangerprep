@@ -333,7 +333,7 @@ show_help() {
 # Main script logic
 # Show banner for monitoring operations
 if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
-    show_banner
+    show_banner "monitoring"
     echo
 fi
 

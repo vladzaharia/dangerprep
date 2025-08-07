@@ -16,7 +16,7 @@ log() {
 }
 
 setup_wan_to_wifi() {
-    show_banner_with_title "WAN-to-WiFi Routing"
+    show_banner_with_title "WAN-to-WiFi Routing" "network"
     echo
     log "Setting up WAN-to-WiFi routing: Ethernet WAN to WiFi Hotspot"
     

@@ -342,7 +342,7 @@ allow_port() {
 # Main command handling
 # Show banner for firewall operations
 if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
-    show_banner_with_title "Firewall Manager"
+    show_banner_with_title "Firewall Manager" "security"
     echo
 fi
 

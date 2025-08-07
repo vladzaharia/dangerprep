@@ -47,7 +47,7 @@ detect_docker_command() {
     fi
 }
 
-show_banner_with_title "Starting Docker Services"
+show_banner_with_title "Starting Docker Services" "docker"
 echo
 log "Starting DangerPrep services..."
 INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-$(pwd)}"

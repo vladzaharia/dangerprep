@@ -1,6 +1,13 @@
 #!/bin/bash
 # DangerPrep QoS and Traffic Shaping Management
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
+show_banner_with_title "QoS Manager" "network"
+echo
+
 WAN_INTERFACE="${WAN_INTERFACE:-eth0}"
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
 UPLOAD_LIMIT="50mbit"    # Adjust based on your connection

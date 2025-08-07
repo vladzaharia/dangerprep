@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 # Configuration file
 CONFIG_FILE="/etc/dangerprep/rk3588-fan-control.conf"
 DEFAULT_CONFIG="/etc/default/rk3588-fan-control"
@@ -230,6 +234,12 @@ trap cleanup SIGTERM SIGINT
 
 # Main function
 main() {
+    # Show banner for fan control operations
+    if [[ "${1:-start}" != "help" && "${1:-start}" != "--help" && "${1:-start}" != "-h" ]]; then
+        show_banner_with_title "RK3588 Fan Control" "monitoring"
+        echo
+    fi
+
     case "${1:-start}" in
         start)
             load_config

@@ -1,8 +1,15 @@
 #!/bin/bash
 # DangerPrep security audit with Lynis
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 AUDIT_LOG="/var/log/lynis-audit.log"
 AUDIT_REPORT="/tmp/lynis-report-$(date +%Y%m%d-%H%M%S).txt"
+
+show_banner_with_title "Lynis Security Audit" "security"
+echo
 
 echo "[$(date)] Starting security audit..." >> "$AUDIT_LOG"
 

@@ -4,6 +4,10 @@
 
 set -e
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 # Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -278,6 +282,12 @@ disconnect_wifi() {
 }
 
 # Main command handling
+# Show banner for WiFi management
+if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" && "${1:-}" != "" ]]; then
+    show_banner_with_title "WiFi Manager" "network"
+    echo
+fi
+
 case "${1:-}" in
     "scan")
         scan_networks

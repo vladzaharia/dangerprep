@@ -1,8 +1,15 @@
 #!/bin/bash
 # DangerPrep AIDE integrity check
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 LOG_FILE="/var/log/aide-check.log"
 AIDE_REPORT="/tmp/aide-report-$(date +%Y%m%d-%H%M%S).txt"
+
+show_banner_with_title "AIDE Integrity Check" "security"
+echo
 
 echo "[$(date)] Starting AIDE integrity check..." >> "$LOG_FILE"
 
