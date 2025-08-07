@@ -3,6 +3,13 @@
 
 set -e
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
+show_banner_with_title "Permission Fixer" "system"
+echo
+
 # Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'

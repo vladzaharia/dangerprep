@@ -1,6 +1,10 @@
 #!/bin/bash
 # DangerPrep Hardware Monitoring Script with FriendlyElec Support
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 LOG_FILE="/var/log/dangerprep-hardware.log"
 ALERT_TEMP_CPU=80
 ALERT_TEMP_SYSTEM=70
@@ -325,6 +329,12 @@ check_rtc_status() {
 }
 
 # Main monitoring function
+# Show banner for hardware monitoring
+if [[ "${1:-check}" != "help" && "${1:-check}" != "--help" && "${1:-check}" != "-h" ]]; then
+    show_banner_with_title "Hardware Monitor" "monitoring"
+    echo
+fi
+
 case "${1:-check}" in
     check)
         log "=== Hardware Monitoring Check ==="

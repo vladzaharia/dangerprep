@@ -2,6 +2,13 @@
 # DangerPrep Certificate Management
 # Integrates with Traefik (ACME/Let's Encrypt) and Step-CA (internal CA)
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
+show_banner_with_title "Certificate Manager" "system"
+echo
+
 DOCKER_DIR="/opt/dangerprep/docker"
 TRAEFIK_DIR="$DOCKER_DIR/infrastructure/traefik"
 STEP_CA_DIR="$DOCKER_DIR/infrastructure/step-ca"

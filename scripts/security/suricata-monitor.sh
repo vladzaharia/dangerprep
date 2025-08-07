@@ -1,6 +1,13 @@
 #!/bin/bash
 # DangerPrep Suricata IDS Monitoring
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
+show_banner_with_title "Suricata IDS Monitor" "security"
+echo
+
 LOG_FILE="/var/log/suricata/eve.json"
 ALERT_LOG="/var/log/dangerprep-suricata-alerts.log"
 

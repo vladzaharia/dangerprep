@@ -436,7 +436,7 @@ validate_all() {
 main() {
     # Show banner for comprehensive validation
     if [[ "${1:-all}" == "all" ]]; then
-        show_banner_with_title "System Validation"
+        show_banner_with_title "System Validation" "validation"
         echo
     fi
 

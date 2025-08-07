@@ -16,7 +16,7 @@ log() {
 }
 
 setup_local_only() {
-    show_banner_with_title "Emergency Local Network"
+    show_banner_with_title "Emergency Local Network" "network"
     echo
     log "Setting up Local Only Network"
     

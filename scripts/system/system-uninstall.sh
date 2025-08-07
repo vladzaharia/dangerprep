@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Uninstall DangerPrep system (preserves data)
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
+show_banner_with_title "System Uninstaller" "system"
+echo
+
 echo "Uninstalling DangerPrep system..."
 
 # Stop all services
