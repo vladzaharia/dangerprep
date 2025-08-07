@@ -1,0 +1,56 @@
+{
+  "name": "Font Awesome",
+  "description": "The world's most popular icon toolkit",
+  "version": "7.0.0",
+  "type": "icon-library",
+  "homepage": "https://fontawesome.com",
+  "license": "Font Awesome Free License",
+  "endpoints": [
+    {
+      "path": "/fontawesome/css/all.min.css",
+      "description": "All Font Awesome styles (solid, regular, brands)",
+      "type": "stylesheet",
+      "size": "~75KB"
+    },
+    {
+      "path": "/fontawesome/css/solid.min.css",
+      "description": "Solid icons only",
+      "type": "stylesheet",
+      "size": "~25KB"
+    },
+    {
+      "path": "/fontawesome/css/regular.min.css",
+      "description": "Regular icons only",
+      "type": "stylesheet",
+      "size": "~15KB"
+    },
+    {
+      "path": "/fontawesome/css/brands.min.css",
+      "description": "Brand icons only",
+      "type": "stylesheet",
+      "size": "~20KB"
+    },
+    {
+      "path": "/fontawesome/webfonts/",
+      "description": "Web font files (WOFF2, WOFF, TTF)",
+      "type": "fonts",
+      "size": "~500KB total"
+    },
+    {
+      "path": "/fontawesome/svgs/",
+      "description": "Individual SVG icon files",
+      "type": "svg-icons",
+      "size": "~2MB total"
+    }
+  ],
+  "usage": {
+    "html_example": "<!DOCTYPE html>\n<html>\n<head>\n  <link rel=\"stylesheet\" href=\"https://cdn.danger/fontawesome/css/all.min.css\">\n</head>\n<body>\n  <i class=\"fas fa-download\"></i> Download\n  <i class=\"fab fa-github\"></i> GitHub\n  <i class=\"far fa-heart\"></i> Like\n</body>\n</html>",
+    "css_example": ".my-icon::before {\n  font-family: 'Font Awesome 6 Free';\n  content: '\\f019'; /* download icon */\n  font-weight: 900;\n}"
+  },
+  "icon_families": {
+    "solid": "fas",
+    "regular": "far", 
+    "brands": "fab"
+  },
+  "tags": ["icons", "fonts", "svg", "css", "web-fonts"]
+}

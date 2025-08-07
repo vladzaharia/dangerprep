@@ -11,7 +11,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.kiwix.rule=Host(`kiwix.danger`)"
       - "traefik.http.routers.kiwix.entrypoints=websecure"
-      - "traefik.http.routers.kiwix.tls.certresolver=cloudflare"
+      - "traefik.http.routers.kiwix.tls.certresolver=step-ca"
       - "traefik.http.services.kiwix.loadbalancer.server.port=80"
 
       # DNS registration

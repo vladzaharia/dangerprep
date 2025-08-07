@@ -1,0 +1,86 @@
+services:
+  step-ca:
+    image: smallstep/step-ca:latest
+    restart: unless-stopped
+    ports:
+      - "9000:9000"  # step-ca HTTPS API
+    volumes:
+      - ${INSTALL_ROOT}/data/step-ca:/home/step
+      - ./init-ca.sh:/docker-entrypoint.d/init-ca.sh:ro
+    env_file:
+      - compose.env
+    environment:
+      - DOCKER_STEPCA_INIT_NAME=${STEP_CA_NAME:-DangerPrep Internal CA}
+      - DOCKER_STEPCA_INIT_DNS_NAMES=${STEP_CA_DNS_NAMES:-ca.danger,step-ca.danger,localhost}
+      - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
+      - DOCKER_STEPCA_INIT_ACME=true
+      - DOCKER_STEPCA_INIT_PASSWORD=${STEP_CA_PASSWORD}
+    labels:
+      - "traefik.enable=true"
+      
+      # Main CA API
+      - "traefik.http.routers.step-ca.rule=Host(`ca.danger`)"
+      - "traefik.http.routers.step-ca.entrypoints=websecure"
+      - "traefik.http.routers.step-ca.tls.certresolver=step-ca"
+      - "traefik.http.services.step-ca.loadbalancer.server.port=9000"
+      - "traefik.http.services.step-ca.loadbalancer.server.scheme=https"
+
+      # DNS registration
+      - "dns.register=ca.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+      - step-ca
+    healthcheck:
+      test: ["CMD", "step", "ca", "health", "--ca-url", "https://localhost:9000", "--root", "/home/step/certs/root_ca.crt"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  ca-download:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ${INSTALL_ROOT}/data/step-ca:/ca-data:ro
+      - cdn-assets:/cdn-assets
+    env_file:
+      - compose.env
+    environment:
+      - CA_NAME=${STEP_CA_NAME:-DangerPrep Internal CA}
+      - CA_URL=https://ca.danger:9000
+    labels:
+      - "traefik.enable=true"
+      
+      # HTTP-only download service (no HTTPS required for initial setup)
+      - "traefik.http.routers.ca-download.rule=Host(`root.danger`)"
+      - "traefik.http.routers.ca-download.entrypoints=web"
+      - "traefik.http.services.ca-download.loadbalancer.server.port=8080"
+
+      # DNS registration
+      - "dns.register=root.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+      - step-ca
+    depends_on:
+      - step-ca
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  cdn-assets:
+    driver: local
+
+networks:
+  traefik:
+    external: true
+  step-ca:
+    driver: bridge
