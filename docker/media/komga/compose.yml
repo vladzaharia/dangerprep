@@ -13,7 +13,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.komga.rule=Host(`komga.danger`)"
       - "traefik.http.routers.komga.entrypoints=websecure"
-      - "traefik.http.routers.komga.tls.certresolver=cloudflare"
+      - "traefik.http.routers.komga.tls.certresolver=step-ca"
       - "traefik.http.services.komga.loadbalancer.server.port=8080"
 
       # DNS registration

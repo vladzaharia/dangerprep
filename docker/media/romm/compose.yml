@@ -14,7 +14,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.romm.rule=Host(`romm.danger`)"
       - "traefik.http.routers.romm.entrypoints=websecure"
-      - "traefik.http.routers.romm.tls.certresolver=cloudflare"
+      - "traefik.http.routers.romm.tls.certresolver=step-ca"
       - "traefik.http.services.romm.loadbalancer.server.port=8080"
 
       # DNS registration

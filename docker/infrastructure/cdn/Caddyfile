@@ -1,0 +1,67 @@
+# CDN Service Configuration
+:8080 {
+    # Enable compression (gzip/brotli automatically)
+    encode gzip zstd
+
+    # Static assets - serve files directly, proxy directories to API
+    handle /fontawesome/* {
+        root * /usr/share/caddy/assets
+
+        # Try to serve file directly first
+        @file file
+        handle @file {
+            file_server
+            # Cache headers for static assets
+            header Cache-Control "public, max-age=31536000, immutable"
+            header Vary "Accept-Encoding"
+        }
+
+        # If not a file, proxy to API for directory listing
+        reverse_proxy localhost:3000
+    }
+
+    handle /webawesome/* {
+        root * /usr/share/caddy/assets
+
+        # Try to serve file directly first
+        @file file
+        handle @file {
+            file_server
+            # Cache headers for static assets
+            header Cache-Control "public, max-age=31536000, immutable"
+            header Vary "Accept-Encoding"
+        }
+
+        # If not a file, proxy to API for directory listing
+        reverse_proxy localhost:3000
+    }
+
+    # API routes - proxy to Node.js
+    handle /api/* {
+        reverse_proxy localhost:3000
+    }
+
+    # Homepage - proxy to Node.js (catch-all, must be last)
+    handle {
+        reverse_proxy localhost:3000
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    # CORS headers for CDN usage
+    header Access-Control-Allow-Origin "*"
+    header Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+    header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept"
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+}

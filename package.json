@@ -10,7 +10,8 @@
     "packages/*",
     "packages/_development/*",
     "docker/sync/*",
-    "docker/sync/__tests__"
+    "docker/sync/__tests__",
+    "docker/infrastructure/*"
   ],
   "scripts": {
     "build": "turbo run build",

@@ -88,6 +88,20 @@ backup-*
 docker-compose.override.yml
 compose.override.yml
 
+# CDN Assets - External libraries (must be provided separately)
+# FontAwesome files (keep only LICENSE.txt and cdn.config.json)
+docker/infrastructure/cdn/assets/fontawesome/css/
+docker/infrastructure/cdn/assets/fontawesome/js/
+docker/infrastructure/cdn/assets/fontawesome/metadata/
+docker/infrastructure/cdn/assets/fontawesome/scss/
+docker/infrastructure/cdn/assets/fontawesome/sprites/
+docker/infrastructure/cdn/assets/fontawesome/sprites-full/
+docker/infrastructure/cdn/assets/fontawesome/svgs/
+docker/infrastructure/cdn/assets/fontawesome/webfonts/
+
+# Web Awesome files (keep only LICENSE.md, USAGE.md, and cdn.config.json)
+docker/infrastructure/cdn/assets/webawesome/dist/
+
 # OS generated files
 .DS_Store
 .DS_Store?

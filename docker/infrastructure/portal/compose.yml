@@ -14,7 +14,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.portal.rule=Host(`portal.danger`)"
       - "traefik.http.routers.portal.entrypoints=websecure"
-      - "traefik.http.routers.portal.tls.certresolver=cloudflare"
+      - "traefik.http.routers.portal.tls.certresolver=step-ca"
       - "traefik.http.services.portal.loadbalancer.server.port=3000"
 
       # DNS registration
