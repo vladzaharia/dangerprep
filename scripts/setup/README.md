@@ -338,7 +338,7 @@ After cleanup, the scripts directory now contains only the essential components:
 - `start-services.sh`: Start all Docker services
 - `stop-services.sh`: Stop all Docker services
 
-### `/scripts/maintenance/` (System Maintenance)
+### `/scripts/` (System Scripts)
 - `system-monitor.sh`: System health monitoring
 - `system-backup.sh`: System backup utilities
 - `system-update.sh`: System update management
