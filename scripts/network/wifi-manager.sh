@@ -27,6 +27,25 @@ error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Load DangerPrep configuration
+load_config() {
+    # Default values
+    WIFI_INTERFACE=""
+    WIFI_SSID="DangerPrep"
+    WIFI_PASSWORD="Buff00n!"
+    LAN_IP="192.168.120.1"
+
+    # Load from setup script configuration if available
+    if [[ -f /etc/dangerprep/interfaces.conf ]]; then
+        source /etc/dangerprep/interfaces.conf
+    fi
+
+    # Override with detected interface if config doesn't have it
+    if [[ -z "$WIFI_INTERFACE" ]]; then
+        WIFI_INTERFACE=$(get_wifi_interface)
+    fi
+}
+
 # Get first available WiFi interface
 get_wifi_interface() {
     local wifi_interfaces=($(iw dev | grep Interface | awk '{print $2}'))
@@ -110,50 +129,61 @@ connect_to_network() {
 create_access_point() {
     local ssid="$1"
     local password="$2"
-    local interface=$(get_wifi_interface)
-    
+    load_config
+
     if [ -z "$ssid" ] || [ -z "$password" ]; then
         error "Usage: ap <ssid> <password>"
         echo "Password must be at least 8 characters"
         exit 1
     fi
-    
+
     if [ ${#password} -lt 8 ]; then
         error "Password must be at least 8 characters"
         exit 1
     fi
-    
-    if [ -z "$interface" ]; then
+
+    if [ -z "$WIFI_INTERFACE" ]; then
         error "No WiFi interface found"
         exit 1
     fi
-    
+
     log "Creating WiFi access point: $ssid"
-    
+
+    # Check if hostapd is configured and running (from setup script)
+    if systemctl is-active --quiet hostapd && [[ -f /etc/hostapd/hostapd.conf ]]; then
+        warning "DangerPrep hostapd is already configured and running"
+        log "Current configuration uses SSID: $WIFI_SSID"
+        log "To use the existing AP, connect to: $WIFI_SSID with password: $WIFI_PASSWORD"
+        log "To reconfigure, edit /etc/hostapd/hostapd.conf and restart hostapd"
+        return 0
+    fi
+
     # Stop any existing hotspot
     nmcli connection show | grep "Hotspot\|DangerPrep-AP" | awk '{print $1}' | while read conn; do
         nmcli connection down "$conn" 2>/dev/null || true
         nmcli connection delete "$conn" 2>/dev/null || true
     done
-    
-    # Create WiFi hotspot
+
+    # Create WiFi hotspot using NetworkManager
     if nmcli device wifi hotspot \
-        ifname "$interface" \
+        ifname "$WIFI_INTERFACE" \
         con-name "DangerPrep-AP" \
         ssid "$ssid" \
         password "$password" \
         band bg; then
-        
+
         success "WiFi access point created: $ssid"
-        
+
         # Show AP details
         sleep 3
-        local ip=$(ip addr show "$interface" | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+        local ip=$(ip addr show "$WIFI_INTERFACE" | grep "inet " | awk '{print $2}' | cut -d/ -f1)
         if [ -n "$ip" ]; then
             log "AP IP Address: $ip"
         fi
-        
+
         log "Clients can connect with password: $password"
+        warning "Note: This AP is managed by NetworkManager, not hostapd"
+        warning "For production use, consider using the hostapd configuration from setup script"
     else
         error "Failed to create access point"
         exit 1

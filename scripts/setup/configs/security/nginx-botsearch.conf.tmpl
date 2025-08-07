@@ -1,0 +1,13 @@
+# DangerPrep Fail2ban filter for nginx bot searches
+# Blocks common bot and vulnerability scanning attempts
+
+[Definition]
+failregex = ^<HOST> -.*"(GET|POST|HEAD).*HTTP.*" (404|403|400) .*$
+            ^<HOST> -.*"(GET|POST|HEAD).*(\.php|\.asp|\.exe|\.pl|\.cgi|\.scgi).*HTTP.*" .*$
+            ^<HOST> -.*"(GET|POST|HEAD).*(admin|wp-admin|phpmyadmin|mysql|sql).*HTTP.*" .*$
+            ^<HOST> -.*"(GET|POST|HEAD).*(union|select|insert|cast|concat|declare).*HTTP.*" .*$
+
+ignoreregex =
+
+# Author: DangerPrep
+# Description: Filter for blocking common bot and vulnerability scanning attempts

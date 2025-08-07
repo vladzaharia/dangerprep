@@ -3,42 +3,93 @@
 
 set -e
 
-echo "Starting DangerPrep services..."
+# Color codes
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+log() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Detect Docker command based on setup
+detect_docker_command() {
+    # Check if running as ubuntu user with rootless Docker
+    if [[ "$USER" == "ubuntu" ]] && [[ -S "/run/user/1000/docker.sock" ]]; then
+        echo "docker"
+    # Check if rootless Docker is available for current user
+    elif [[ -S "/run/user/$(id -u)/docker.sock" ]]; then
+        echo "docker"
+    # Check if user is in docker group
+    elif groups | grep -q docker; then
+        echo "docker"
+    # Fall back to sudo
+    else
+        echo "sudo docker"
+    fi
+}
+
+log "Starting DangerPrep services..."
 INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-$(pwd)}"
 cd "$INSTALL_ROOT"
 
+# Detect appropriate Docker command
+DOCKER_CMD=$(detect_docker_command)
+log "Using Docker command: $DOCKER_CMD"
+
+# Set Docker environment for rootless if needed
+if [[ "$DOCKER_CMD" == "docker" ]] && [[ -S "/run/user/$(id -u)/docker.sock" ]]; then
+    export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+fi
+
 # Ensure Traefik network exists
-if ! sudo docker network ls | grep -q "traefik"; then
-    echo "Creating Traefik network..."
-    sudo docker network create traefik
+if ! $DOCKER_CMD network ls | grep -q "traefik"; then
+    log "Creating Traefik network..."
+    $DOCKER_CMD network create traefik
 fi
 
 # Start Traefik first (required by all other services)
-echo "Starting Traefik..."
-sudo docker compose -f docker/infrastructure/traefik/compose.yml up -d
+log "Starting Traefik..."
+$DOCKER_CMD compose -f docker/infrastructure/traefik/compose.yml up -d
 sleep 5
 
 # Start core infrastructure services
-echo "Starting infrastructure services..."
-sudo docker compose -f docker/infrastructure/portainer/compose.yml up -d
-sudo docker compose -f docker/infrastructure/watchtower/compose.yml up -d
-sudo docker compose -f docker/infrastructure/dns/compose.yml up -d
+log "Starting infrastructure services..."
+[[ -f docker/infrastructure/portainer/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/portainer/compose.yml up -d
+[[ -f docker/infrastructure/watchtower/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/watchtower/compose.yml up -d
+[[ -f docker/infrastructure/dns/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/dns/compose.yml up -d
 sleep 3
 
 # Start media services
-echo "Starting media services..."
-sudo docker compose -f docker/media/jellyfin/compose.yml up -d
-sudo docker compose -f docker/media/komga/compose.yml up -d
-sudo docker compose -f docker/media/romm/compose.yml up -d
+log "Starting media services..."
+[[ -f docker/media/jellyfin/compose.yml ]] && $DOCKER_CMD compose -f docker/media/jellyfin/compose.yml up -d
+[[ -f docker/media/komga/compose.yml ]] && $DOCKER_CMD compose -f docker/media/komga/compose.yml up -d
+[[ -f docker/media/romm/compose.yml ]] && $DOCKER_CMD compose -f docker/media/romm/compose.yml up -d
 sleep 3
 
 # Start utility services
-echo "Starting utility services..."
+log "Starting utility services..."
+# Add utility services here as they are created
 sleep 3
 
 # Start sync services
-echo "Starting sync services..."
-sudo docker compose -f docker/sync/nfs-sync/compose.yml up -d
-sudo docker compose -f docker/sync/kiwix-sync/compose.yml up -d
+log "Starting sync services..."
+[[ -f docker/sync/nfs-sync/compose.yml ]] && $DOCKER_CMD compose -f docker/sync/nfs-sync/compose.yml up -d
+[[ -f docker/sync/kiwix-sync/compose.yml ]] && $DOCKER_CMD compose -f docker/sync/kiwix-sync/compose.yml up -d
+[[ -f docker/sync/offline-sync/compose.yml ]] && $DOCKER_CMD compose -f docker/sync/offline-sync/compose.yml up -d
 
-echo "All services started successfully!"
+success "All services started successfully!"

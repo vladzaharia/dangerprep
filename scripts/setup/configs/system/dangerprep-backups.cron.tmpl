@@ -1,0 +1,7 @@
+# DangerPrep Encrypted Backups
+# Daily backup at 1 AM
+0 1 * * * root /usr/local/bin/dangerprep-backup-encrypted daily
+# Weekly backup on Sunday at 2 AM
+0 2 * * 0 root /usr/local/bin/dangerprep-backup-encrypted weekly
+# Monthly backup on 1st at 3 AM
+0 3 1 * * root /usr/local/bin/dangerprep-backup-encrypted monthly

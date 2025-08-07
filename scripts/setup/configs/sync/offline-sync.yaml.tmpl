@@ -1,0 +1,57 @@
+log_level: "info"
+data_directory: "/app/data"
+temp_directory: "/tmp"
+max_concurrent_operations: 2
+operation_timeout_minutes: 30
+health_check_interval_minutes: 10
+enable_notifications: false
+enable_progress_tracking: true
+enable_auto_recovery: true
+
+offline_sync:
+  storage:
+    mount_base: "/mnt/cards"
+    max_card_size: "2TB"
+    supported_filesystems: ["ext4", "ntfs", "exfat", "fat32"]
+    auto_mount: true
+    auto_unmount: true
+
+  detection:
+    poll_interval_seconds: 5
+    device_patterns: ["/dev/sd*", "/dev/mmcblk*"]
+    ignore_system_devices: true
+    min_device_size_mb: 100
+
+  sync_strategy:
+    priority_order: ["movies", "tv", "music", "books", "audiobooks"]
+    fill_percentage: 90
+    preserve_structure: true
+    create_index: true
+    verify_after_sync: true
+
+  content_selection:
+    movies:
+      enabled: true
+      source_path: "/content/movies"
+      selection_criteria: "newest_first"
+      max_file_size_gb: 10
+    tv:
+      enabled: true
+      source_path: "/content/tv"
+      selection_criteria: "complete_seasons"
+      max_file_size_gb: 5
+    music:
+      enabled: true
+      source_path: "/content/music"
+      selection_criteria: "complete_albums"
+      max_file_size_gb: 1
+    books:
+      enabled: true
+      source_path: "/content/books"
+      selection_criteria: "all"
+      max_file_size_gb: 0.1
+    audiobooks:
+      enabled: true
+      source_path: "/content/audiobooks"
+      selection_criteria: "complete_books"
+      max_file_size_gb: 2

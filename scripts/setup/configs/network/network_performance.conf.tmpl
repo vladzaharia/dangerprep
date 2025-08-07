@@ -1,0 +1,28 @@
+# DangerPrep Network Performance Optimization
+# TCP congestion control
+net.ipv4.tcp_congestion_control = bbr
+
+# TCP buffer sizes
+net.core.rmem_default = 262144
+net.core.rmem_max = 16777216
+net.core.wmem_default = 262144
+net.core.wmem_max = 16777216
+net.ipv4.tcp_rmem = 4096 65536 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+
+# Network device queue length
+net.core.netdev_max_backlog = 5000
+
+# TCP optimization
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_fack = 1
+net.ipv4.tcp_low_latency = 1
+
+# Reduce TIME_WAIT sockets
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 30
+
+# Increase local port range
+net.ipv4.ip_local_port_range = 1024 65535

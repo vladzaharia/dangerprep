@@ -1,0 +1,21 @@
+# DangerPrep Hardware Monitoring Configuration
+# Custom sensor configurations for emergency router hardware
+
+# CPU temperature thresholds
+chip "coretemp-*"
+    label temp1 "CPU Core"
+    set temp1_max 85
+    set temp1_crit 95
+
+# System temperature monitoring
+chip "acpi-*"
+    label temp1 "System"
+    set temp1_max 70
+    set temp1_crit 80
+
+# Fan speed monitoring
+chip "it87-*"
+    label fan1 "CPU Fan"
+    label fan2 "System Fan"
+    set fan1_min 1000
+    set fan2_min 800
