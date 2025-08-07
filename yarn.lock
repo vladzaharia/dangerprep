@@ -433,15 +433,16 @@ __metadata:
     "@dangerprep/typescript": "workspace:*"
     "@types/compression": "npm:^1.7.5"
     "@types/express": "npm:^4.17.21"
-    "@types/mime-types": "npm:^2.1.4"
     "@types/node": "npm:^24.0.0"
     compression: "npm:^1.7.4"
     express: "npm:^4.18.2"
     express-rate-limit: "npm:^7.1.5"
     helmet: "npm:^7.1.0"
-    mime-types: "npm:^2.1.35"
+    jest: "npm:^30.0.0"
     node-cache: "npm:^5.1.2"
+    prettier: "npm:^3.6.2"
     rimraf: "npm:^6.0.1"
+    tslib: "npm:^2.8.1"
     tsx: "npm:^4.20.3"
     typescript: "npm:^5.8.3"
   languageName: unknown
@@ -654,6 +655,27 @@ __metadata:
     tslib: "npm:^2.8.1"
     typescript: "npm:^5.8.3"
     zod: "npm:^4.0.10"
+  languageName: unknown
+  linkType: soft
+
+"@dangerprep/step-ca@workspace:docker/infrastructure/step-ca":
+  version: 0.0.0-use.local
+  resolution: "@dangerprep/step-ca@workspace:docker/infrastructure/step-ca"
+  dependencies:
+    "@dangerprep/eslint": "workspace:*"
+    "@dangerprep/prettier": "workspace:*"
+    "@dangerprep/typescript": "workspace:*"
+    "@types/express": "npm:^4.17.21"
+    "@types/mime-types": "npm:^2.1.4"
+    "@types/node": "npm:^24.0.0"
+    express: "npm:^4.18.2"
+    jest: "npm:^30.0.0"
+    mime-types: "npm:^2.1.35"
+    prettier: "npm:^3.6.2"
+    rimraf: "npm:^6.0.1"
+    tslib: "npm:^2.8.1"
+    tsx: "npm:^4.20.3"
+    typescript: "npm:^5.8.3"
   languageName: unknown
   linkType: soft
 
@@ -3194,15 +3216,6 @@ __metadata:
   checksum: 10c0/76d1c43cbd602794ad8ad2ae94095cddeb1de78c5dddaa7005c51af10b0176c69971a6d88e805a90c2b6550d76636e43c40d8427a808b8645ede885de4a0358e
   languageName: node
   linkType: hard
-
-"ca-download-service@workspace:docker/infrastructure/step-ca":
-  version: 0.0.0-use.local
-  resolution: "ca-download-service@workspace:docker/infrastructure/step-ca"
-  dependencies:
-    express: "npm:^4.18.2"
-    mime-types: "npm:^2.1.35"
-  languageName: unknown
-  linkType: soft
 
 "cacache@npm:^19.0.1":
   version: 19.0.1

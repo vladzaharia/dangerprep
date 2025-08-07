@@ -1,8 +1,16 @@
 {
   "name": "@dangerprep/logging",
-  "version": "1.0.0",
   "description": "Modern structured logging for DangerPrep services",
-  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@dangerprep/typescript": "workspace:*",
+    "@types/node": "^24.0.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.8.3"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -12,32 +20,24 @@
   "files": [
     "dist/**/*"
   ],
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "clean": "rimraf dist",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write src/**/*.{ts,tsx,json}",
-    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
-    "test": "jest",
-    "test:watch": "jest --watch"
-  },
-  "devDependencies": {
-    "@dangerprep/typescript": "workspace:*",
-    "@types/node": "^24.0.0",
-    "rimraf": "^6.0.1",
-    "typescript": "^5.8.3"
-  },
   "keywords": [
+    "dangerprep",
     "logging",
-    "winston",
     "structured-logging",
     "typescript",
-    "dangerprep"
+    "winston"
   ],
-  "dependencies": {
-    "tslib": "^2.8.1"
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "dev": "tsc --watch",
+    "format": "prettier --write src/**/*.{ts,tsx,json}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
   }
 }

@@ -281,7 +281,6 @@ export class OfflineSync extends StandardizedSyncService<OfflineSyncConfig> {
    * Register component-specific health checks
    */
   private registerComponentHealthChecks(): void {
-
     // Configuration check
     this.components.healthChecker.registerComponent({
       name: 'configuration',

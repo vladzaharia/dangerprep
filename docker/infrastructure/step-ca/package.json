@@ -1,19 +1,70 @@
 {
-  "name": "ca-download-service",
+  "name": "@dangerprep/step-ca",
+  "description": "Step-CA certificate download service with MDM profile generation for DangerPrep infrastructure",
   "version": "1.0.0",
-  "description": "Simple HTTP service for downloading CA certificates and MDM profiles",
-  "main": "src/server.js",
-  "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
-  },
+  "author": "Vlad Zaharia <hey@vlad.gg>",
   "dependencies": {
     "express": "^4.18.2",
-    "mime-types": "^2.1.35"
+    "mime-types": "^2.1.35",
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@dangerprep/eslint": "workspace:*",
+    "@dangerprep/prettier": "workspace:*",
+    "@dangerprep/typescript": "workspace:*",
+    "@types/express": "^4.17.21",
+    "@types/mime-types": "^2.1.4",
+    "@types/node": "^24.0.0",
+    "jest": "^30.0.0",
+    "prettier": "^3.6.2",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
-  "author": "DangerPrep",
-  "license": "MIT"
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "keywords": [
+    "certificate-authority",
+    "dangerprep",
+    "ios",
+    "macos",
+    "mdm",
+    "ssl",
+    "step-ca",
+    "tls",
+    "typescript"
+  ],
+  "license": "MIT",
+  "main": "dist/server.js",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "dev": "npx tsx src/server.ts",
+    "docker:build": "docker compose build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:up": "docker compose up",
+    "docker:up:build": "docker compose up --build",
+    "format": "prettier --write src/**/*.{ts,tsx,json}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "start": "node dist/server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "type": "module",
+  "types": "dist/server.d.ts"
 }

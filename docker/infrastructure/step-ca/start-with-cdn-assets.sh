@@ -20,7 +20,7 @@ wait_for_ca() {
 # Generate CDN assets
 generate_assets() {
     echo "📦 Generating CDN assets..."
-    node /app/generate-cdn-assets.js
+    node /app/dist/generate-cdn-assets.js
     if [ $? -eq 0 ]; then
         echo "✅ CDN assets generated successfully"
     else
@@ -70,7 +70,7 @@ main() {
     
     # Start the main application
     echo "🌐 Starting step-ca download service..."
-    exec node /app/src/server.js
+    exec node /app/dist/server.js
 }
 
 # Handle signals for graceful shutdown

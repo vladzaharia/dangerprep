@@ -1,28 +1,7 @@
 {
   "name": "@dangerprep/nfs-sync",
-  "version": "1.0.0",
   "description": "DangerPrep Content Synchronization Service",
-  "private": true,
-  "main": "dist/engine.js",
-  "types": "dist/engine.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/engine.js",
-    "dev": "npx tsx src/engine.ts",
-    "clean": "rimraf dist",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts,.tsx",
-    "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "format": "prettier --write src/**/*.{ts,tsx,json}",
-    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "docker:build": "docker compose build",
-    "docker:up": "docker compose up",
-    "docker:up:build": "docker compose up --build",
-    "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f"
-  },
+  "version": "1.0.0",
   "dependencies": {
     "@dangerprep/sync": "workspace:*",
     "axios": "^1.11.0",
@@ -35,5 +14,26 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "main": "dist/engine.js",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "dev": "npx tsx src/engine.ts",
+    "docker:build": "docker compose build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:up": "docker compose up",
+    "docker:up:build": "docker compose up --build",
+    "format": "prettier --write src/**/*.{ts,tsx,json}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "start": "node dist/engine.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "types": "dist/engine.d.ts"
 }
