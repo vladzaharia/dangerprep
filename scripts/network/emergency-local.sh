@@ -2,6 +2,10 @@
 # DangerPrep Local Only Network
 # WiFi hotspot with optional ethernet LAN, no internet
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
 ETH_INTERFACE="${ETH_INTERFACE:-eth0}"
 LAN_IP="192.168.120.1"
@@ -12,6 +16,8 @@ log() {
 }
 
 setup_local_only() {
+    show_banner_with_title "Emergency Local Network"
+    echo
     log "Setting up Local Only Network"
     
     # Configure WiFi interface as hotspot

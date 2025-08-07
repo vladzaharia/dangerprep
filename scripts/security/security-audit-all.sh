@@ -4,6 +4,10 @@
 
 set -e
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 # Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -250,6 +254,12 @@ generate_report() {
 
 # Main function
 main() {
+    # Show banner for comprehensive security audit
+    if [[ "${1:-all}" == "all" ]]; then
+        show_security_banner
+        echo
+    fi
+
     case "${1:-all}" in
         aide)
             run_aide_check

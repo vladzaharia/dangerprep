@@ -4,6 +4,10 @@
 
 set -e
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 # Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -219,6 +223,8 @@ generate_recommendations() {
 
 # Main audit function
 main() {
+    show_banner_with_title "Shell Script Audit"
+    echo
     log "Starting shell script audit..."
     echo
     

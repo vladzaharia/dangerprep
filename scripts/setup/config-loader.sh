@@ -83,6 +83,19 @@ load_aide_config() {
     cat "$CONFIG_DIR/security/aide_dangerprep.conf.tmpl" >> /etc/aide/aide.conf
 }
 
+load_motd_config() {
+    log "Loading MOTD configuration..."
+    # Install DangerPrep banner for MOTD
+    cp "$CONFIG_DIR/system/01-dangerprep-banner" "/etc/update-motd.d/01-dangerprep-banner"
+    chmod +x "/etc/update-motd.d/01-dangerprep-banner"
+
+    # Disable default Ubuntu MOTD components that might conflict
+    chmod -x /etc/update-motd.d/10-help-text 2>/dev/null || true
+    chmod -x /etc/update-motd.d/50-motd-news 2>/dev/null || true
+    chmod -x /etc/update-motd.d/80-esm 2>/dev/null || true
+    chmod -x /etc/update-motd.d/95-hwe-eol 2>/dev/null || true
+}
+
 load_hardware_monitoring_config() {
     log "Loading hardware monitoring configuration..."
     cat "$CONFIG_DIR/monitoring/sensors3_dangerprep.conf.tmpl" >> /etc/sensors3.conf
@@ -181,6 +194,7 @@ validate_config_files() {
         # System configs
         "$CONFIG_DIR/system/50unattended-upgrades.tmpl"
         "$CONFIG_DIR/system/20auto-upgrades.tmpl"
+        "$CONFIG_DIR/system/01-dangerprep-banner"
 
         # Docker configs
         "$CONFIG_DIR/docker/daemon.json.tmpl"

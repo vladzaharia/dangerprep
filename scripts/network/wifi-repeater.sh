@@ -2,6 +2,10 @@
 # DangerPrep WiFi Repeater Mode
 # Connect to existing WiFi and repeat signal
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
 UPSTREAM_SSID="${UPSTREAM_SSID:-}"
 UPSTREAM_PASSWORD="${UPSTREAM_PASSWORD:-}"

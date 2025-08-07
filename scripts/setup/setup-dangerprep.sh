@@ -45,6 +45,9 @@ info() {
 # Configuration variables with validation
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
+# Source shared banner utility
+source "$SCRIPT_DIR/../shared/banner.sh"
 INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-$(pwd)}"
 LOG_FILE="/var/log/dangerprep-setup.log"
 BACKUP_DIR="/var/backups/dangerprep-$(date +%Y%m%d-%H%M%S)"
@@ -161,20 +164,19 @@ setup_logging() {
 
 # Display banner
 show_banner() {
-    echo -e "${PURPLE}"
-    cat << 'EOF'
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                           DangerPrep Setup 2025                             ║
-║                    Emergency Router & Content Hub                           ║
-║                                                                              ║
-║  • WiFi Hotspot: DangerPrep (WPA3/WPA2)                                    ║
-║  • Network: 192.168.120.0/22                                               ║
-║  • Security: 2025 Hardening Standards                                      ║
-║  • Services: Docker + Traefik + Sync                                       ║
-║                                                                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-EOF
-    echo -e "${NC}"
+    show_setup_banner
+    echo
+    info "Emergency Router & Content Hub Setup"
+    info "• WiFi Hotspot: DangerPrep (WPA3/WPA2)"
+    info "• Network: 192.168.120.0/22"
+    info "• Security: 2025 Hardening Standards"
+    info "• Services: Docker + Traefik + Sync"
+    echo
+    info "All changes are logged and backed up."
+    echo
+    info "Logs: $LOG_FILE"
+    info "Backups: $BACKUP_DIR"
+    info "Install root: $INSTALL_ROOT"
 }
 
 # Show system information and detect FriendlyElec hardware
@@ -1671,6 +1673,7 @@ main() {
 
     log "System preparation completed. Continuing with security hardening..."
     configure_ssh_hardening
+    load_motd_config
     setup_fail2ban
     configure_kernel_hardening
     setup_file_integrity_monitoring
