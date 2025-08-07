@@ -1,61 +1,74 @@
-# Simple build for CDN service
-FROM node:20-alpine AS builder
+# syntax=docker/dockerfile:1
+FROM --platform=$BUILDPLATFORM node:20-alpine AS base
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
+# Enable Corepack for proper Yarn version management
+RUN corepack enable
+
+# Install turbo globally
+RUN yarn global add turbo@^2
+
+FROM --platform=$BUILDPLATFORM base AS builder
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Copy the entire monorepo
+COPY . .
+
+# Generate a partial monorepo with a pruned lockfile for cdn
+RUN turbo prune @dangerprep/cdn --docker
+
+FROM base AS installer
+RUN apk update && apk add --no-cache \
+    libc6-compat \
+    python3 \
+    make \
+    g++
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
+# First install dependencies (as they change less often)
+COPY --from=builder /app/out/json/ .
+RUN yarn install --immutable
 
-# Install dependencies
-RUN npm install
+# Build the project and dependencies
+COPY --from=builder /app/out/full/ .
+RUN turbo run build --filter=@dangerprep/cdn
 
-# Copy source code
-COPY src/ ./src/
-COPY assets/ ./assets/
-
-# Assets are ready - compression will be done on-the-fly by Nginx
-
-# Production stage
-FROM caddy:alpine
-
-# Install Node.js for the API service
-RUN apk add --no-cache nodejs supervisor wget curl
-
-# Copy Caddy configuration
-COPY Caddyfile /etc/caddy/Caddyfile
-
-# Copy pre-compressed assets from builder
-COPY --from=builder /app/assets /usr/share/caddy/assets
-
-# Set up Node.js API service
+FROM base AS runner
 WORKDIR /app
 
-# Copy application and dependencies from builder
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+# Install runtime system dependencies
+RUN apk add --no-cache \
+    curl \
+    wget \
+    bash
 
-# Copy supervisor configuration
-COPY supervisord.conf /etc/supervisord.conf
+# Create non-root user with consistent UID/GID
+RUN addgroup -g 1001 -S appuser && \
+    adduser -S appuser -u 1001 -G appuser
 
-# Create non-root user for Node.js
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app
+# Copy built application from installer
+COPY --from=installer /app/docker/infrastructure/cdn/dist ./dist
+COPY --from=installer /app/docker/infrastructure/cdn/assets ./assets
+COPY --from=installer /app/node_modules ./node_modules
 
-# Create log directories
-RUN mkdir -p /var/log/supervisor /var/log/cdn && \
-    chown -R nodejs:nodejs /var/log/cdn
+# Create necessary directories and set permissions
+RUN mkdir -p /app/data /app/logs && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Expose port
-EXPOSE 80
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Start both Nginx and Node.js with supervisor
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+# Start the CDN service
+CMD ["node", "dist/server.js"]

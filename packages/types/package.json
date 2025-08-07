@@ -1,42 +1,7 @@
 {
   "name": "@dangerprep/types",
-  "version": "1.0.0",
   "description": "Shared TypeScript types and interfaces for DangerPrep services",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./sync": {
-      "import": "./dist/sync.js",
-      "require": "./dist/sync.js",
-      "types": "./dist/sync.d.ts"
-    },
-    "./transfer": {
-      "import": "./dist/transfer.js",
-      "require": "./dist/transfer.js",
-      "types": "./dist/transfer.d.ts"
-    },
-    "./progress": {
-      "import": "./dist/progress.js",
-      "require": "./dist/progress.js",
-      "types": "./dist/progress.d.ts"
-    },
-    "./service": {
-      "import": "./dist/service.js",
-      "require": "./dist/service.js",
-      "types": "./dist/service.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "tsc",
-    "clean": "rm -rf dist",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix"
-  },
+  "version": "1.0.0",
   "dependencies": {
     "@dangerprep/configuration": "workspace:*"
   },
@@ -46,7 +11,42 @@
     "@dangerprep/typescript": "workspace:*",
     "typescript": "^5.6.3"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./sync": {
+      "types": "./dist/sync.d.ts",
+      "import": "./dist/sync.js",
+      "require": "./dist/sync.js"
+    },
+    "./transfer": {
+      "types": "./dist/transfer.d.ts",
+      "import": "./dist/transfer.js",
+      "require": "./dist/transfer.js"
+    },
+    "./progress": {
+      "types": "./dist/progress.d.ts",
+      "import": "./dist/progress.js",
+      "require": "./dist/progress.js"
+    },
+    "./service": {
+      "types": "./dist/service.d.ts",
+      "import": "./dist/service.js",
+      "require": "./dist/service.js"
+    }
+  },
   "files": [
     "dist"
-  ]
+  ],
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix"
+  },
+  "types": "dist/index.d.ts"
 }

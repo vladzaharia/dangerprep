@@ -1,29 +1,7 @@
 {
   "name": "@dangerprep/health",
-  "version": "1.0.0",
   "description": "Health check system for service monitoring in DangerPrep services",
-  "private": true,
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist/**/*"
-  ],
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "clean": "rimraf dist",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write src/**/*.{ts,tsx,json}",
-    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
-    "test": "jest",
-    "test:watch": "jest --watch"
-  },
+  "version": "1.0.0",
   "dependencies": {
     "@dangerprep/common": "workspace:*",
     "@dangerprep/logging": "workspace:*",
@@ -35,11 +13,33 @@
     "rimraf": "^6.0.1",
     "typescript": "^5.8.3"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*"
+  ],
   "keywords": [
+    "checks",
+    "dangerprep",
     "health",
     "monitoring",
-    "checks",
-    "typescript",
-    "dangerprep"
-  ]
+    "typescript"
+  ],
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "dev": "tsc --watch",
+    "format": "prettier --write src/**/*.{ts,tsx,json}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
+  }
 }

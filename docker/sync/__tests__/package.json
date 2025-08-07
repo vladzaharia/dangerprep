@@ -1,13 +1,7 @@
 {
   "name": "@dangerprep/sync-integration-tests",
-  "version": "1.0.0",
   "description": "Integration tests for DangerPrep sync services standardized architecture",
-  "private": true,
-  "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
-  },
+  "version": "1.0.0",
   "dependencies": {
     "@dangerprep/sync": "workspace:*"
   },
@@ -24,5 +18,11 @@
       "../*/src/**/*.ts",
       "!../*/src/**/*.d.ts"
     ]
+  },
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
   }
 }

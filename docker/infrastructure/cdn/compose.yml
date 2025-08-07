@@ -1,21 +1,22 @@
 services:
   cdn:
-    build: .
+    build:
+      context: ../../..
+      dockerfile: docker/infrastructure/cdn/Dockerfile
     restart: unless-stopped
     volumes:
-      - ./assets:/usr/share/nginx/html/assets:ro
+      - ${INSTALL_ROOT}/data/cdn:/app/data
+      - ./assets:/app/assets:ro
     env_file:
       - compose.env
-    ports:
-      - "8080:8080"
     labels:
       - "traefik.enable=true"
-      
+
       # CDN service
       - "traefik.http.routers.cdn.rule=Host(`cdn.danger`)"
       - "traefik.http.routers.cdn.entrypoints=websecure"
       - "traefik.http.routers.cdn.tls.certresolver=step-ca"
-      - "traefik.http.services.cdn.loadbalancer.server.port=80"
+      - "traefik.http.services.cdn.loadbalancer.server.port=8080"
 
       # DNS registration
       - "dns.register=cdn.danger"
@@ -25,10 +26,11 @@ services:
     networks:
       - traefik
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
 networks:
   traefik:

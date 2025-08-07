@@ -41,11 +41,13 @@ services:
       start_period: 30s
 
   ca-download:
-    build: .
+    build:
+      context: ../../..
+      dockerfile: docker/infrastructure/step-ca/Dockerfile
     restart: unless-stopped
     volumes:
       - ${INSTALL_ROOT}/data/step-ca:/ca-data:ro
-      - cdn-assets:/cdn-assets
+      - ${INSTALL_ROOT}/data/cdn-assets:/cdn-assets
     env_file:
       - compose.env
     environment:
@@ -53,7 +55,7 @@ services:
       - CA_URL=https://ca.danger:9000
     labels:
       - "traefik.enable=true"
-      
+
       # HTTP-only download service (no HTTPS required for initial setup)
       - "traefik.http.routers.ca-download.rule=Host(`root.danger`)"
       - "traefik.http.routers.ca-download.entrypoints=web"
@@ -70,14 +72,13 @@ services:
     depends_on:
       - step-ca
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
-volumes:
-  cdn-assets:
-    driver: local
+
 
 networks:
   traefik:

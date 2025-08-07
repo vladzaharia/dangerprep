@@ -1,28 +1,7 @@
 {
   "name": "@dangerprep/sync",
-  "version": "1.0.0",
   "description": "DangerPrep Shared Sync Framework",
-  "private": true,
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "tsc",
-    "clean": "rimraf dist",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts,.tsx",
-    "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "format": "prettier --write src/**/*.{ts,tsx,json}",
-    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
-    "test": "jest",
-    "test:watch": "jest --watch"
-  },
+  "version": "1.0.0",
   "dependencies": {
     "@dangerprep/configuration": "workspace:*",
     "@dangerprep/errors": "workspace:*",
@@ -52,5 +31,26 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "main": "dist/index.js",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "format": "prettier --write src/**/*.{ts,tsx,json}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "types": "dist/index.d.ts"
 }

@@ -1,29 +1,7 @@
 {
   "name": "@dangerprep/service",
-  "version": "1.0.0",
   "description": "Service base class for standardized lifecycle management in DangerPrep services",
-  "private": true,
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist/**/*"
-  ],
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "clean": "rimraf dist",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write src/**/*.{ts,tsx,json}",
-    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
-    "test": "jest",
-    "test:watch": "jest --watch"
-  },
+  "version": "1.0.0",
   "dependencies": {
     "@dangerprep/configuration": "workspace:*",
     "@dangerprep/health": "workspace:*",
@@ -39,11 +17,33 @@
     "typescript": "^5.8.3",
     "zod": "^4.0.10"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*"
+  ],
   "keywords": [
-    "service",
-    "lifecycle",
     "base-class",
-    "typescript",
-    "dangerprep"
-  ]
+    "dangerprep",
+    "lifecycle",
+    "service",
+    "typescript"
+  ],
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "dev": "tsc --watch",
+    "format": "prettier --write src/**/*.{ts,tsx,json}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json}",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
+  }
 }
