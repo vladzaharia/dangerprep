@@ -45,6 +45,39 @@ export PLEX_TOKEN="test-plex-token"
 export NAS_HOST="100.65.182.27"
 export PLEX_SERVER="100.65.182.27:32400"
 
+# Detect FriendlyElec hardware
+detect_friendlyelec_hardware() {
+    IS_FRIENDLYELEC=false
+    IS_RK3588=false
+    IS_RK3588S=false
+    FRIENDLYELEC_MODEL=""
+
+    if [[ -f /proc/device-tree/model ]]; then
+        local platform=$(cat /proc/device-tree/model | tr -d '\0')
+
+        if [[ "$platform" =~ (NanoPi|NanoPC|CM3588) ]]; then
+            IS_FRIENDLYELEC=true
+
+            if [[ "$platform" =~ NanoPi[[:space:]]*M6 ]]; then
+                FRIENDLYELEC_MODEL="NanoPi-M6"
+                IS_RK3588S=true
+            elif [[ "$platform" =~ NanoPi[[:space:]]*R6[CS] ]]; then
+                FRIENDLYELEC_MODEL="NanoPi-R6C"
+                IS_RK3588S=true
+            elif [[ "$platform" =~ NanoPC[[:space:]]*T6 ]]; then
+                FRIENDLYELEC_MODEL="NanoPC-T6"
+                IS_RK3588=true
+            elif [[ "$platform" =~ CM3588 ]]; then
+                FRIENDLYELEC_MODEL="CM3588"
+                IS_RK3588=true
+            fi
+        fi
+    fi
+}
+
+# Initialize hardware detection
+detect_friendlyelec_hardware
+
 # Show help
 show_help() {
     echo "DangerPrep System Validation Script"
@@ -55,6 +88,7 @@ show_help() {
     echo "  references   Validate file references"
     echo "  docker       Validate Docker dependencies"
     echo "  nfs          Test NFS mounts"
+    echo "  friendlyelec Validate FriendlyElec hardware features"
     echo "  all          Run all validations (default)"
     echo "  help         Show this help message"
     echo
@@ -191,6 +225,174 @@ validate_nfs() {
     success "NFS validation complete"
 }
 
+# Validate FriendlyElec hardware features
+validate_friendlyelec() {
+    if [[ "$IS_FRIENDLYELEC" != true ]]; then
+        log "Not running on FriendlyElec hardware, skipping hardware validation"
+        return 0
+    fi
+
+    log "Validating FriendlyElec hardware features ($FRIENDLYELEC_MODEL)..."
+
+    # Validate platform detection
+    validate_platform_detection
+
+    # Validate hardware acceleration
+    validate_hardware_acceleration
+
+    # Validate performance optimizations
+    validate_performance_optimizations
+
+    # Validate configuration files
+    validate_friendlyelec_configs
+
+    success "FriendlyElec validation complete"
+}
+
+# Validate platform detection
+validate_platform_detection() {
+    log "Validating platform detection..."
+
+    # Check device tree model
+    if [[ -f /proc/device-tree/model ]]; then
+        local model=$(cat /proc/device-tree/model | tr -d '\0')
+        success "  Platform detected: $model"
+    else
+        error "  Device tree model not found"
+        ((ISSUES_FOUND++))
+    fi
+
+    # Validate model detection
+    if [[ -n "$FRIENDLYELEC_MODEL" ]]; then
+        success "  FriendlyElec model: $FRIENDLYELEC_MODEL"
+    else
+        error "  FriendlyElec model not detected"
+        ((ISSUES_FOUND++))
+    fi
+
+    # Validate SoC detection
+    if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
+        local soc_type="RK3588"
+        [[ "$IS_RK3588S" == true ]] && soc_type="RK3588S"
+        success "  SoC type: $soc_type"
+    else
+        warning "  SoC type not detected or not RK3588/RK3588S"
+    fi
+}
+
+# Validate hardware acceleration
+validate_hardware_acceleration() {
+    log "Validating hardware acceleration..."
+
+    # Check GPU
+    if [[ -d /sys/class/devfreq/fb000000.gpu ]]; then
+        success "  Mali GPU detected"
+
+        # Check GPU governor
+        local gpu_governor=$(cat /sys/class/devfreq/fb000000.gpu/governor 2>/dev/null || echo "unknown")
+        log "    GPU governor: $gpu_governor"
+    else
+        warning "  Mali GPU not detected"
+    fi
+
+    # Check VPU
+    if [[ -c /dev/mpp_service ]]; then
+        success "  VPU (MPP) device available"
+
+        # Check VPU permissions
+        local vpu_perms=$(ls -l /dev/mpp_service 2>/dev/null | awk '{print $1,$3,$4}')
+        log "    VPU permissions: $vpu_perms"
+    else
+        warning "  VPU device not available"
+    fi
+
+    # Check NPU
+    if [[ -d /sys/class/devfreq/fdab0000.npu ]]; then
+        success "  NPU detected"
+
+        # Check NPU governor
+        local npu_governor=$(cat /sys/class/devfreq/fdab0000.npu/governor 2>/dev/null || echo "unknown")
+        log "    NPU governor: $npu_governor"
+    else
+        warning "  NPU not detected"
+    fi
+
+    # Check DRM devices
+    local drm_count=$(ls /dev/dri/ 2>/dev/null | wc -l)
+    if [[ $drm_count -gt 0 ]]; then
+        success "  DRM devices: $drm_count available"
+    else
+        warning "  No DRM devices found"
+    fi
+}
+
+# Validate performance optimizations
+validate_performance_optimizations() {
+    log "Validating performance optimizations..."
+
+    # Check CPU governors
+    local cpu_policies=($(ls /sys/devices/system/cpu/cpufreq/policy* 2>/dev/null | head -3))
+    for policy in "${cpu_policies[@]}"; do
+        if [[ -r "$policy/scaling_governor" ]]; then
+            local governor=$(cat "$policy/scaling_governor")
+            local policy_name=$(basename "$policy")
+            log "    $policy_name governor: $governor"
+
+            if [[ "$governor" == "performance" ]]; then
+                success "    $policy_name optimized for performance"
+            else
+                warning "    $policy_name not set to performance governor"
+            fi
+        fi
+    done
+
+    # Check sysctl optimizations
+    if [[ -f /etc/sysctl.d/99-rk3588-optimizations.conf ]]; then
+        success "  RK3588 sysctl optimizations loaded"
+    else
+        warning "  RK3588 sysctl optimizations not found"
+    fi
+
+    # Check udev rules
+    if [[ -f /etc/udev/rules.d/99-rk3588-hardware.rules ]]; then
+        success "  RK3588 udev rules loaded"
+    else
+        warning "  RK3588 udev rules not found"
+    fi
+}
+
+# Validate FriendlyElec configuration files
+validate_friendlyelec_configs() {
+    log "Validating FriendlyElec configuration files..."
+
+    local config_files=(
+        "/etc/sensors.d/rk3588.conf"
+        "/etc/environment.d/mali-gpu.conf"
+        "/etc/gstreamer-1.0/rk3588-hardware.conf"
+    )
+
+    for config_file in "${config_files[@]}"; do
+        if [[ -f "$config_file" ]]; then
+            success "  Configuration found: $(basename "$config_file")"
+        else
+            warning "  Configuration missing: $(basename "$config_file")"
+        fi
+    done
+
+    # Check systemd services
+    local services=(
+        "rk3588-cpu-governor.service"
+    )
+
+    for service in "${services[@]}"; do
+        if systemctl is-enabled "$service" >/dev/null 2>&1; then
+            success "  Service enabled: $service"
+        else
+            warning "  Service not enabled: $service"
+        fi
+    done
+}
+
 # Run all validations
 validate_all() {
     log "Running comprehensive system validation..."
@@ -207,7 +409,13 @@ validate_all() {
     
     validate_nfs
     echo
-    
+
+    # FriendlyElec-specific validation
+    if [[ "$IS_FRIENDLYELEC" == true ]]; then
+        validate_friendlyelec
+        echo
+    fi
+
     echo "=================================="
     log "System Validation Summary:"
     
@@ -234,6 +442,9 @@ main() {
             ;;
         nfs)
             validate_nfs
+            ;;
+        friendlyelec)
+            validate_friendlyelec
             ;;
         all)
             validate_all

@@ -1,0 +1,54 @@
+# RK3588/RK3588S PWM Fan Control Configuration
+# Automatic thermal management with fan curve control
+
+# Fan control device (PWM channel)
+FAN_PWM_DEVICE="/sys/class/pwm/pwmchip0/pwm0"
+FAN_PWM_CHIP="/sys/class/pwm/pwmchip0"
+
+# Temperature thresholds (Celsius)
+TEMP_MIN=40          # Fan starts at minimum speed
+TEMP_LOW=50          # Low speed threshold
+TEMP_MID=65          # Medium speed threshold  
+TEMP_HIGH=75         # High speed threshold
+TEMP_MAX=85          # Maximum speed threshold
+TEMP_CRITICAL=90     # Critical temperature - emergency cooling
+
+# Fan speed settings (PWM duty cycle: 0-100%)
+FAN_SPEED_OFF=0      # Fan off
+FAN_SPEED_MIN=25     # Minimum fan speed (quiet)
+FAN_SPEED_LOW=40     # Low fan speed
+FAN_SPEED_MID=60     # Medium fan speed
+FAN_SPEED_HIGH=80    # High fan speed
+FAN_SPEED_MAX=100    # Maximum fan speed
+
+# PWM frequency (Hz) - typical fan frequency
+PWM_FREQUENCY=25000
+
+# Temperature sensor paths for RK3588/RK3588S
+TEMP_SENSORS=(
+    "/sys/class/thermal/thermal_zone0/temp"  # SoC thermal zone
+    "/sys/class/thermal/thermal_zone1/temp"  # Additional thermal zone
+)
+
+# Monitoring interval (seconds)
+MONITOR_INTERVAL=5
+
+# Hysteresis (temperature difference to prevent oscillation)
+TEMP_HYSTERESIS=3
+
+# Log file for fan control
+FAN_LOG_FILE="/var/log/rk3588-fan-control.log"
+
+# Enable/disable logging
+ENABLE_LOGGING=true
+
+# Emergency shutdown temperature (if fan fails)
+EMERGENCY_SHUTDOWN_TEMP=95
+
+# Fan failure detection
+FAN_FAILURE_DETECTION=true
+FAN_FAILURE_TIMEOUT=30  # seconds without speed change
+
+# Power management
+ENABLE_POWER_SAVE=true  # Reduce fan speed when on battery (if applicable)
+POWER_SAVE_MULTIPLIER=0.8  # Reduce fan speed by 20% on battery

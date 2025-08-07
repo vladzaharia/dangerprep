@@ -1,0 +1,65 @@
+# FriendlyElec GPIO and PWM Configuration
+# Hardware interface setup for RK3588/RK3588S
+
+# GPIO Configuration
+GPIO_BASE_PATH="/sys/class/gpio"
+GPIO_GROUPS="gpio gpio-admin"
+
+# PWM Configuration  
+PWM_BASE_PATH="/sys/class/pwm"
+PWM_GROUPS="gpio pwm"
+
+# I2C Configuration
+I2C_BASE_PATH="/dev/i2c-*"
+I2C_GROUPS="i2c"
+
+# SPI Configuration
+SPI_BASE_PATH="/dev/spidev*"
+SPI_GROUPS="spi"
+
+# Hardware-specific GPIO pins for RK3588/RK3588S
+# These are commonly used pins - adjust based on your specific needs
+
+# Status LEDs (if available)
+STATUS_LED_GPIO=32
+POWER_LED_GPIO=33
+
+# User buttons (if available)
+USER_BUTTON_GPIO=34
+RESET_BUTTON_GPIO=35
+
+# Fan control PWM
+FAN_PWM_CHIP=0
+FAN_PWM_CHANNEL=0
+
+# Additional PWM channels
+PWM_CHIP_0="/sys/class/pwm/pwmchip0"
+PWM_CHIP_1="/sys/class/pwm/pwmchip1"
+PWM_CHIP_2="/sys/class/pwm/pwmchip2"
+
+# I2C buses commonly available on FriendlyElec boards
+I2C_BUS_0="/dev/i2c-0"  # System I2C
+I2C_BUS_1="/dev/i2c-1"  # User I2C
+I2C_BUS_2="/dev/i2c-2"  # Additional I2C
+I2C_BUS_6="/dev/i2c-6"  # HDMI I2C
+I2C_BUS_7="/dev/i2c-7"  # Camera I2C
+
+# SPI buses
+SPI_BUS_0="/dev/spidev0.0"
+SPI_BUS_1="/dev/spidev1.0"
+
+# UART devices
+UART_0="/dev/ttyS0"
+UART_2="/dev/ttyS2"
+UART_3="/dev/ttyS3"
+UART_4="/dev/ttyS4"
+
+# Hardware monitoring
+TEMP_SENSOR_I2C_ADDR="0x1c"  # Common temperature sensor address
+RTC_I2C_ADDR="0x51"          # HYM8563 RTC address
+
+# Security settings
+ALLOW_NON_ROOT_GPIO=true
+ALLOW_NON_ROOT_PWM=true
+ALLOW_NON_ROOT_I2C=true
+ALLOW_NON_ROOT_SPI=false  # SPI typically requires root for security

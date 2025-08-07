@@ -1,10 +1,12 @@
 # DangerPrep Setup Scripts
 
-This directory contains the comprehensive setup and cleanup scripts for the DangerPrep emergency router and content hub system.
+This directory contains the comprehensive setup and cleanup scripts for the DangerPrep emergency router and content hub system, with full support for FriendlyElec hardware including NanoPi M6, R6C, NanoPC-T6, and CM3588 boards.
 
 ## Overview
 
 The DangerPrep setup script provides a complete, automated installation of:
+
+### Core Features
 - **WiFi Hotspot**: "DangerPrep" with WPA2 security
 - **Network Routing**: LAN port as WAN, WiFi clients with full internet access
 - **Security Hardening**: 2025 best practices for Ubuntu 24.04
@@ -15,13 +17,31 @@ The DangerPrep setup script provides a complete, automated installation of:
 - **NFS Client**: Central NAS integration and mount management
 - **Routing Scenarios**: Multiple network configuration scenarios
 
+### FriendlyElec Hardware Support
+
+**Supported Devices:**
+- **NanoPi M6** - RK3588S SoC with 1x GbE, M.2 WiFi, hardware acceleration
+- **NanoPi R6C** - RK3588S SoC with 2.5GbE + GbE, dual ethernet routing
+- **NanoPC-T6** - RK3588 SoC with dual GbE, high-performance computing
+- **CM3588** - RK3588 compute module with flexible I/O
+
+**Hardware Features:**
+- **Automatic Platform Detection** - Detects FriendlyElec hardware and configures optimizations
+- **RK3588/RK3588S Performance Tuning** - CPU governors, GPU optimization, memory tuning
+- **Hardware Acceleration** - Mali GPU, VPU video processing, NPU neural processing
+- **Thermal Management** - PWM fan control with intelligent temperature curves
+- **GPIO/PWM/I2C/SPI Access** - Configured hardware interfaces with proper permissions
+- **Multi-Ethernet Support** - Advanced routing for dual ethernet devices
+- **Hardware Monitoring** - RK3588-specific temperature, power, and performance monitoring
+
 ## Quick Start
 
 ### Prerequisites
-- Ubuntu 24.04 LTS on NanoPi M6 or R6C
+- Ubuntu 24.04 LTS on supported hardware (NanoPi M6/R6C/NanoPC-T6/CM3588 or generic x86_64)
 - Root access (sudo)
 - Internet connection for initial setup
 - At least 20GB free storage space
+- For FriendlyElec hardware: Latest Ubuntu Noble Desktop image recommended
 
 ### Installation
 
@@ -248,6 +268,56 @@ dangerprep audit                    # Run security audit
 - Regular image updates via Watchtower
 
 ## Troubleshooting
+
+### FriendlyElec Hardware Issues
+
+**Hardware Not Detected:**
+```bash
+# Check platform detection
+cat /proc/device-tree/model
+
+# Validate FriendlyElec features
+sudo bash scripts/validation/validate-system.sh friendlyelec
+
+# Test hardware validation
+sudo bash scripts/validation/hardware-validation.sh
+```
+
+**GPU/VPU/NPU Issues:**
+```bash
+# Check hardware acceleration
+ls -la /dev/mpp_service /dev/dri/
+glmark2-es2 --off-screen  # Test GPU
+gst-inspect-1.0 mppvideodec  # Test VPU
+
+# Check device permissions
+groups $USER  # Should include video, render groups
+```
+
+**Fan Control Issues:**
+```bash
+# Check PWM availability
+ls -la /sys/class/pwm/
+
+# Test fan control
+sudo bash scripts/monitoring/rk3588-fan-control.sh test
+
+# Check fan service
+sudo systemctl status rk3588-fan-control.service
+```
+
+**GPIO/PWM Access Issues:**
+```bash
+# Test hardware interfaces
+sudo bash scripts/setup/setup-gpio.sh test
+
+# Check user groups
+groups $USER  # Should include gpio, pwm, i2c groups
+
+# Reload udev rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
 
 ### Common Issues
 
