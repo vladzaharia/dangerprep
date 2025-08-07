@@ -13,6 +13,10 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 # Logging functions
 log() {
     echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
@@ -91,18 +95,11 @@ show_help() {
 
 # Display banner
 show_banner() {
-    echo -e "${PURPLE}"
-    cat << 'EOF'
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                        DangerPrep Cleanup Script                            ║
-║                     System Restoration & Cleanup                            ║
-║                                                                              ║
-║  WARNING: This will remove DangerPrep configuration and restore             ║
-║           the system to its original state.                                 ║
-║                                                                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-EOF
-    echo -e "${NC}"
+    show_cleanup_banner
+    echo
+    warning "This will remove DangerPrep configuration and restore"
+    warning "the system to its original state."
+    echo
 }
 
 # Confirm cleanup

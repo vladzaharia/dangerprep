@@ -2,6 +2,10 @@
 # DangerPrep WAN-to-WiFi Routing
 # Internet via Ethernet, sharing via WiFi hotspot
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 WAN_INTERFACE="${WAN_INTERFACE:-eth0}"
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
 LAN_IP="192.168.120.1"
@@ -12,6 +16,8 @@ log() {
 }
 
 setup_wan_to_wifi() {
+    show_banner_with_title "WAN-to-WiFi Routing"
+    echo
     log "Setting up WAN-to-WiFi routing: Ethernet WAN to WiFi Hotspot"
     
     # Configure WAN interface for DHCP

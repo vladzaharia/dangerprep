@@ -1,0 +1,59 @@
+#!/bin/bash
+# DangerPrep MOTD Banner
+# Displays the DangerPrep banner on login
+
+# Find the banner utility
+BANNER_SCRIPT=""
+SEARCH_PATHS=(
+    "/opt/dangerprep/scripts/shared/banner.sh"
+    "/usr/local/dangerprep/scripts/shared/banner.sh"
+    "$(dirname "$(dirname "$(dirname "$(readlink -f "$0")")")")/scripts/shared/banner.sh"
+)
+
+for path in "${SEARCH_PATHS[@]}"; do
+    if [[ -f "$path" ]]; then
+        BANNER_SCRIPT="$path"
+        break
+    fi
+done
+
+# Show banner if found
+if [[ -n "$BANNER_SCRIPT" ]]; then
+    source "$BANNER_SCRIPT"
+    show_motd_banner
+    echo
+    echo "Welcome to DangerPrep Emergency Router System"
+    echo "System Status: https://portal.danger"
+    echo "Documentation: https://github.com/vladzaharia/dangerprep"
+    echo
+else
+    # Fallback simple banner
+    echo "DangerPrep Emergency Router System"
+    echo "=================================="
+    echo
+fi
+
+# Show system info
+echo "System Information:"
+echo "  Hostname: $(hostname)"
+echo "  Uptime: $(uptime -p)"
+echo "  Load: $(uptime | awk -F'load average:' '{print $2}')"
+echo "  Memory: $(free -h | awk '/^Mem:/ {print $3 "/" $2}')"
+echo "  Disk: $(df -h / | awk 'NR==2 {print $3 "/" $2 " (" $5 " used)"}')"
+echo
+
+# Show network status
+if command -v ip >/dev/null 2>&1; then
+    echo "Network Interfaces:"
+    ip -br addr show | grep -E "(UP|UNKNOWN)" | while read -r line; do
+        echo "  $line"
+    done
+    echo
+fi
+
+# Show Docker status if available
+if command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker; then
+    echo "Docker Services:"
+    docker ps --format "table {{.Names}}\t{{.Status}}" 2>/dev/null | head -6
+    echo
+fi

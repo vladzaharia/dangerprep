@@ -3,6 +3,10 @@
 
 set -e
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 # Color codes
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -43,6 +47,8 @@ detect_docker_command() {
     fi
 }
 
+show_banner_with_title "Starting Docker Services"
+echo
 log "Starting DangerPrep services..."
 INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-$(pwd)}"
 cd "$INSTALL_ROOT"

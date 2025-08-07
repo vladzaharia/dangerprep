@@ -4,6 +4,10 @@
 
 set -e
 
+# Source shared banner utility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/banner.sh"
+
 LOG_FILE="/var/log/dangerprep-monitor.log"
 ALERT_THRESHOLD_CPU=80
 ALERT_THRESHOLD_MEMORY=85
@@ -327,6 +331,12 @@ show_help() {
 }
 
 # Main script logic
+# Show banner for monitoring operations
+if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
+    show_banner
+    echo
+fi
+
 case "$1" in
     report)
         generate_report
