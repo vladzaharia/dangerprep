@@ -12,6 +12,7 @@
 // Core exports
 export { HealthChecker } from './checker.js';
 export { PeriodicHealthChecker } from './periodic.js';
+export { MonitoringService } from './monitoring-service.js';
 
 // Types and enums
 export {

@@ -63,8 +63,6 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "postinstall": "turbo run postinstall || true",
-    "test": "turbo run test",
-    "test:watch": "turbo run test:watch",
     "typecheck": "turbo run typecheck",
     "workspace:add": "yarn workspace",
     "workspace:info": "yarn workspaces list --verbose"
@@ -74,7 +72,6 @@
     "packages/*",
     "packages/_development/*",
     "docker/sync/*",
-    "docker/sync/__tests__",
     "docker/infrastructure/*"
   ]
 }

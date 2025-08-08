@@ -25,6 +25,12 @@ services:
     networks:
       - traefik
       - dns
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Local DNS resolver for internal domain registration
   coredns:
@@ -50,6 +56,12 @@ services:
       - dns
     depends_on:
       - registrar
+    healthcheck:
+      test: ["CMD", "dig", "@127.0.0.1", "health.check", "+short", "+time=5"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # DNS registrar service to manage domain registrations from labels
   registrar:
@@ -71,6 +83,12 @@ services:
       - dns
     depends_on:
       - adguardhome
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "dns-registrar.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 networks:
   traefik:

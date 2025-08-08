@@ -16,14 +16,7 @@ target/
 *.bundle.js
 *.d.ts
 
-# Test files and fixtures
-**/*test*
-**/*spec*
-**/__tests__/
-**/__mocks__/
-**/fixtures/
-**/test-data/
-**/mock*/
+
 
 # Documentation
 docs/
