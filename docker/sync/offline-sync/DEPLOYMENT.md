@@ -5,7 +5,7 @@ This guide covers the deployment and configuration of the DangerPrep Offline Syn
 ## Prerequisites
 
 - Docker and Docker Compose
-- Node.js 18+ (for development/testing)
+- Node.js 22+ (for development/testing)
 - Ubuntu 24.04 (recommended for production)
 - NanoPi M6 or R6C (target hardware)
 
@@ -25,13 +25,13 @@ This guide covers the deployment and configuration of the DangerPrep Offline Syn
 
 3. **Deploy the service:**
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 4. **Verify deployment:**
    ```bash
-   docker-compose logs -f offline-sync
-   docker-compose exec offline-sync offline-sync-cli status
+   docker compose logs -f offline-sync
+   docker compose exec offline-sync offline-sync-cli status
    ```
 
 ## Configuration
@@ -170,7 +170,7 @@ offline-sync-cli config --show
 offline-sync-cli logs -n 100
 
 # View logs in real-time
-docker-compose logs -f offline-sync
+docker compose logs -f offline-sync
 ```
 
 ## Testing
@@ -199,7 +199,7 @@ The service provides built-in health monitoring:
 offline-sync-cli status
 
 # View health in Docker
-docker-compose ps
+docker compose ps
 ```
 
 ### Log Rotation

@@ -63,7 +63,7 @@ https://dns.nextdns.io/3ca9ab
 
 - AdGuard Home listens on: `172.20.0.2:53` (DNS network)
 - CoreDNS forwards to: `172.20.0.2:53`
-- Clients should use: CoreDNS at port 53 (advertised by FriendlyWRT DHCP)
+- Clients should use: CoreDNS at port 53 (advertised by system DHCP)
 
 ## Testing
 

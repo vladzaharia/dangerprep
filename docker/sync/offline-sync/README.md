@@ -193,7 +193,7 @@ The service is built with modern TypeScript practices:
 
 ## Dependencies
 
-- Node.js 18+
+- Node.js 22+
 - TypeScript 5+
 - usb: USB device detection
 - fs-extra: Enhanced file system operations
