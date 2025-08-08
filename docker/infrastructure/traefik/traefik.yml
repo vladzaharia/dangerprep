@@ -20,16 +20,6 @@ providers:
     network: traefik
 
 certificatesResolvers:
-  cloudflare:
-    acme:
-      email: ${ACME_EMAIL}
-      storage: /data/acme.json
-      caServer: https://acme-v02.api.letsencrypt.org/directory
-      dnsChallenge:
-        provider: cloudflare
-        resolvers:
-          - "1.1.1.1:53"
-          - "8.8.8.8:53"
   step-ca:
     acme:
       email: ${ACME_EMAIL}

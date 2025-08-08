@@ -19,6 +19,9 @@ docker/sync/offline-sync/config.yaml
 /content/
 /nfs/
 
+# Secrets directory
+/secrets/
+
 # Logs
 *.log
 logs/

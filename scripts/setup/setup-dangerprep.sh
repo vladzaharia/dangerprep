@@ -728,7 +728,25 @@ setup_docker_services() {
         cp -r "$PROJECT_ROOT"/docker/* "$INSTALL_ROOT"/docker/ 2>/dev/null || true
     fi
 
+    # Setup secrets for Docker services
+    setup_docker_secrets
+
     success "Docker services configured"
+}
+
+# Setup Docker secrets
+setup_docker_secrets() {
+    log "Setting up Docker secrets..."
+
+    # Run the secret setup script
+    if [[ -f "$PROJECT_ROOT/scripts/security/setup-secrets.sh" ]]; then
+        log "Generating and configuring secrets for all Docker services..."
+        "$PROJECT_ROOT/scripts/security/setup-secrets.sh"
+        success "Docker secrets configured"
+    else
+        warning "Secret setup script not found, skipping secret generation"
+        warning "You may need to manually configure secrets for Docker services"
+    fi
 }
 
 # Setup container health monitoring

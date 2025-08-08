@@ -63,7 +63,8 @@ log "Stopping sync services..."
 [[ -f docker/sync/nfs-sync/compose.yml ]] && $DOCKER_CMD compose -f docker/sync/nfs-sync/compose.yml down
 
 log "Stopping utility services..."
-# Add utility services here as they are created
+[[ -f docker/services/onedev/compose.yml ]] && $DOCKER_CMD compose -f docker/services/onedev/compose.yml down
+[[ -f docker/services/docmost/compose.yml ]] && $DOCKER_CMD compose -f docker/services/docmost/compose.yml down
 
 log "Stopping media services..."
 [[ -f docker/media/romm/compose.yml ]] && $DOCKER_CMD compose -f docker/media/romm/compose.yml down
@@ -73,6 +74,7 @@ log "Stopping media services..."
 log "Stopping infrastructure services..."
 [[ -f docker/infrastructure/dns/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/dns/compose.yml down
 [[ -f docker/infrastructure/watchtower/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/watchtower/compose.yml down
+[[ -f docker/infrastructure/arcane/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/arcane/compose.yml down
 [[ -f docker/infrastructure/portainer/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/portainer/compose.yml down
 
 # Stop Traefik last
