@@ -47,7 +47,7 @@ services:
     networks:
       - kiwix
     healthcheck:
-      test: ["CMD", "node", "-e", "require('./dist/kiwix-manager').KiwixManager.prototype.healthCheck().then(h => process.exit(h.status === 'healthy' ? 0 : 1))"]
+      test: ["CMD", "node", "dist/manager.js", "health", "--simple"]
       interval: 30s
       timeout: 10s
       retries: 3

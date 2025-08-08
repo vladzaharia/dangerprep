@@ -31,8 +31,6 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "start": "node dist/engine.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit"
   },
   "types": "dist/engine.d.ts"

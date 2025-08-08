@@ -329,7 +329,6 @@ export class AsyncPatterns {
  * Configuration patterns used across packages
  */
 export class ConfigPatterns {
-
   /**
    * Merge configurations with deep merge support
    */

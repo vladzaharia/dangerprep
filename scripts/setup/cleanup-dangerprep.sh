@@ -341,6 +341,23 @@ remove_configurations() {
     # Remove SSH banner (optimistic cleanup)
     [[ -f /etc/ssh/ssh_banner ]] && rm -f /etc/ssh/ssh_banner 2>/dev/null || true
 
+    # Remove FriendlyElec/RK3588 specific configurations (optimistic cleanup)
+    [[ -f /etc/environment.d/mali-gpu.conf ]] && rm -f /etc/environment.d/mali-gpu.conf 2>/dev/null || true
+    [[ -f /etc/profile.d/mali-gpu.sh ]] && rm -f /etc/profile.d/mali-gpu.sh 2>/dev/null || true
+    [[ -f /etc/sensors.d/rk3588.conf ]] && rm -f /etc/sensors.d/rk3588.conf 2>/dev/null || true
+    [[ -f /etc/sysctl.d/99-rk3588-optimizations.conf ]] && rm -f /etc/sysctl.d/99-rk3588-optimizations.conf 2>/dev/null || true
+    [[ -f /etc/udev/rules.d/99-rk3588-storage.rules ]] && rm -f /etc/udev/rules.d/99-rk3588-storage.rules 2>/dev/null || true
+    [[ -f /etc/udev/rules.d/99-rk3588-io-scheduler.rules ]] && rm -f /etc/udev/rules.d/99-rk3588-io-scheduler.rules 2>/dev/null || true
+    [[ -f /etc/udev/rules.d/99-rk3588-vpu.rules ]] && rm -f /etc/udev/rules.d/99-rk3588-vpu.rules 2>/dev/null || true
+
+    # Remove MOTD banner and restore Ubuntu defaults (optimistic cleanup)
+    [[ -f /etc/update-motd.d/01-dangerprep-banner ]] && rm -f /etc/update-motd.d/01-dangerprep-banner 2>/dev/null || true
+    # Re-enable default Ubuntu MOTD components that were disabled
+    [[ -f /etc/update-motd.d/10-help-text ]] && chmod +x /etc/update-motd.d/10-help-text 2>/dev/null || true
+    [[ -f /etc/update-motd.d/50-motd-news ]] && chmod +x /etc/update-motd.d/50-motd-news 2>/dev/null || true
+    [[ -f /etc/update-motd.d/80-esm ]] && chmod +x /etc/update-motd.d/80-esm 2>/dev/null || true
+    [[ -f /etc/update-motd.d/95-hwe-eol ]] && chmod +x /etc/update-motd.d/95-hwe-eol 2>/dev/null || true
+
     # Remove automatic update configurations added by setup script (optimistic cleanup)
     [[ -f /etc/apt/apt.conf.d/50unattended-upgrades ]] && rm -f /etc/apt/apt.conf.d/50unattended-upgrades 2>/dev/null || true
     [[ -f /etc/apt/apt.conf.d/20auto-upgrades ]] && rm -f /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null || true
@@ -370,6 +387,15 @@ remove_configurations() {
     [[ -d /etc/letsencrypt ]] && rm -rf /etc/letsencrypt 2>/dev/null || true
     [[ -d /etc/ssl/dangerprep ]] && rm -rf /etc/ssl/dangerprep 2>/dev/null || true
     [[ -d /var/www/html ]] && rm -rf /var/www/html 2>/dev/null || true
+
+    # Remove GStreamer hardware acceleration configuration (optimistic cleanup)
+    [[ -d /etc/gstreamer-1.0 ]] && rm -rf /etc/gstreamer-1.0 2>/dev/null || true
+
+    # Remove backup encryption key and directory (optimistic cleanup)
+    [[ -d /etc/dangerprep/backup ]] && rm -rf /etc/dangerprep/backup 2>/dev/null || true
+
+    # Remove backup cron job (optimistic cleanup)
+    [[ -f /etc/cron.d/dangerprep-backups ]] && rm -f /etc/cron.d/dangerprep-backups 2>/dev/null || true
 
     # Remove Suricata configuration (optimistic cleanup)
     if [[ -f "$BACKUP_DIR/suricata.yaml.original" ]]; then
@@ -451,6 +477,11 @@ remove_packages() {
         "wpasupplicant"
         "iw"
         "rfkill"
+        "netplan.io"
+        "iproute2"
+        "tc"
+        "wondershaper"
+        "iperf3"
 
         # DNS tools
         "unbound"
@@ -477,14 +508,11 @@ remove_packages() {
         "hddtemp"
         "fancontrol"
         "sensors-applet"
+        "smartmontools"
 
         # Certificate management (new)
         "certbot"
         "python3-certbot-nginx"
-
-        # Traffic control and QoS (new)
-        "wondershaper"
-        "iperf3"
 
         # Additional monitoring (new)
         "collectd"
@@ -496,6 +524,9 @@ remove_packages() {
 
         # Advanced security (new)
         "suricata"
+
+        # NFS client (installed by setup script)
+        "nfs-common"
     )
 
     # Ask user which packages to remove
@@ -623,11 +654,28 @@ final_cleanup() {
         rmdir /home/ubuntu/.config 2>/dev/null || true
     fi
 
+    # Remove any FriendlyElec/RK3588 specific systemd services (optimistic cleanup)
+    [[ -f /etc/systemd/system/rk3588-fan-control.service ]] && rm -f /etc/systemd/system/rk3588-fan-control.service 2>/dev/null || true
+
     # Reload systemd after removing service files (optimistic cleanup)
     systemctl daemon-reload 2>/dev/null || true
 
     # Reload user systemd for ubuntu user (optimistic cleanup)
     sudo -u ubuntu systemctl --user daemon-reload 2>/dev/null || true
+
+    # Reload udev rules after removing RK3588 specific rules (optimistic cleanup)
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger 2>/dev/null || true
+
+    # Reset GPU/hardware acceleration settings (optimistic cleanup)
+    # Reset GPU governor to default if it exists
+    if [[ -f /sys/class/devfreq/fb000000.gpu/governor ]]; then
+        echo "simple_ondemand" > /sys/class/devfreq/fb000000.gpu/governor 2>/dev/null || true
+    fi
+    # Reset NPU governor to default if it exists
+    if [[ -f /sys/class/devfreq/fdab0000.npu/governor ]]; then
+        echo "simple_ondemand" > /sys/class/devfreq/fdab0000.npu/governor 2>/dev/null || true
+    fi
 
     # Reset iptables to completely clean state (optimistic cleanup)
     iptables -F 2>/dev/null || true
@@ -657,6 +705,9 @@ show_completion() {
     echo "  • Security tools configurations removed"
     echo "  • Firewall rules reset to default"
     echo "  • Cron jobs and automated tasks removed"
+    echo "  • FriendlyElec/RK3588 specific configurations removed"
+    echo "  • MOTD banner removed and Ubuntu defaults restored"
+    echo "  • Hardware acceleration settings reset to defaults"
     if [[ "$PRESERVE_DATA" == "true" ]]; then
         echo "  • Data directories preserved"
     else

@@ -65,10 +65,7 @@ out/
 # Turborepo
 .turbo/
 
-# Testing
-coverage/
-.nyc_output/
-junit.xml
+
 
 # Docker
 .dockerignore

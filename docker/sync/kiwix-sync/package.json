@@ -30,8 +30,6 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "start": "node dist/manager.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit"
   },
   "types": "dist/manager.d.ts"

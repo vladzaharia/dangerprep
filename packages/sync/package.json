@@ -48,8 +48,6 @@
     "format:check": "prettier --check src/**/*.{ts,tsx,json}",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit"
   },
   "types": "dist/index.d.ts"

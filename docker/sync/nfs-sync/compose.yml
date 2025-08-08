@@ -17,7 +17,7 @@ services:
     networks:
       - traefik
     healthcheck:
-      test: ["CMD", "node", "-e", "require('./dist/engine').SyncEngine.prototype.healthCheck().then(h => process.exit(h.status === 'healthy' ? 0 : 1))"]
+      test: ["CMD", "node", "dist/engine.js", "health", "--simple"]
       interval: 30s
       timeout: 10s
       retries: 3
