@@ -11,7 +11,7 @@ This service provides an optimized, self-hosted CDN with dynamic library discove
 - **Multi-stage Build**: Optimized container with pre-compressed assets
 
 ### cdn
-- **Base Image**: `nginx:alpine` + `node:18-alpine`
+- **Base Image**: `nginx:alpine` + `node:22-alpine`
 - **URL**: https://cdn.danger
 - **Purpose**: High-performance asset delivery with dynamic configuration
 - **Assets**: `./assets/` directory with automatic discovery
