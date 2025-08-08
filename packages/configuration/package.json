@@ -6,7 +6,7 @@
     "@dangerprep/files": "workspace:*",
     "@dangerprep/logging": "workspace:*",
     "js-yaml": "^4.1.0",
-    "zod": "^4.0.10"
+    "zod": "^4.0.15"
   },
   "devDependencies": {
     "@dangerprep/typescript": "workspace:*",

@@ -329,7 +329,7 @@ export class AsyncPatterns {
  * Configuration patterns used across packages
  */
 export class ConfigPatterns {
-  private static unusedTestVariable = 'test';
+
   /**
    * Merge configurations with deep merge support
    */

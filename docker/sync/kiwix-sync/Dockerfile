@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM --platform=$BUILDPLATFORM node:18-alpine AS base
+FROM --platform=$BUILDPLATFORM node:22-alpine AS base
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS

@@ -16,7 +16,6 @@
     "@types/node-cron": "^3.0.11",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
-    "concurrently": "^9.1.0",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-import": "^2.31.0",
@@ -32,7 +31,7 @@
     "typescript": "^5.8.3"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.0.0",
     "yarn": ">=4.0.0"
   },
   "keywords": [
@@ -72,7 +71,6 @@
   },
   "type": "module",
   "workspaces": [
-    "cli",
     "packages/*",
     "packages/_development/*",
     "docker/sync/*",
