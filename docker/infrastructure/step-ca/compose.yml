@@ -7,6 +7,8 @@ services:
     volumes:
       - ${INSTALL_ROOT}/data/step-ca:/home/step
       - ./init-ca.sh:/docker-entrypoint.d/init-ca.sh:ro
+      # Mount CA password as secret file
+      - ${INSTALL_ROOT}/secrets/step-ca/ca_password:/home/step/secrets/password:ro
     env_file:
       - compose.env
     environment:
@@ -14,7 +16,7 @@ services:
       - DOCKER_STEPCA_INIT_DNS_NAMES=${STEP_CA_DNS_NAMES:-ca.danger,step-ca.danger,localhost}
       - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
       - DOCKER_STEPCA_INIT_ACME=true
-      - DOCKER_STEPCA_INIT_PASSWORD=${STEP_CA_PASSWORD}
+      # Step-CA will automatically read password from /home/step/secrets/password
     labels:
       - "traefik.enable=true"
       
