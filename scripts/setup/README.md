@@ -94,7 +94,7 @@ sudo ./scripts/setup/cleanup-dangerprep.sh
 - **Jellyfin**: Media server
 - **Komga**: Book/comic server
 - **Kiwix**: Offline Wikipedia and content
-- **Portainer**: Docker management
+
 - **Sync Services**: NFS, Kiwix, and offline sync capabilities
 
 ### Security Features
@@ -156,7 +156,7 @@ The setup script automatically creates sensible configuration files for all sync
    - Jellyfin Media: https://jellyfin.danger
    - Books: https://komga.danger
    - Offline Content: https://kiwix.danger
-   - Docker Management: https://portainer.danger
+
 
 4. **Configure NFS** (if using central NAS):
    - Edit /etc/dangerprep/nfs-mounts.conf

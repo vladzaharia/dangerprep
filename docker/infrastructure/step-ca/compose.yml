@@ -66,6 +66,15 @@ services:
       # DNS registration
       - "dns.register=root.danger"
 
+      # App registration for discovery
+      - "app.register=true"
+      - "app.name=Certificate Authority"
+      - "app.description=SSL Certificate Management"
+      - "app.icon=shield-check"
+      - "app.category=Security"
+      - "app.url=https://root.danger"
+      - "app.version=1.0.0"
+
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
     networks:

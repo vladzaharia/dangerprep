@@ -66,8 +66,6 @@ Complete secret management setup (combines generation and updates).
 ### Step-CA Service
 - `DOCKER_STEPCA_INIT_PASSWORD` - Root CA password (32 chars, strong)
 
-### Portainer Service
-- `PORTAINER_ADMIN_PASSWORD` - Initial admin password (20 chars, strong)
 
 ### Traefik Service
 - `TRAEFIK_AUTH_USERS` - Basic auth hash for admin user (dashboard access)
@@ -122,8 +120,7 @@ secrets/
 │   └── redis_password
 ├── step-ca/
 │   └── ca_password
-├── portainer/
-│   └── admin_password
+
 ├── traefik/
 │   ├── auth_password
 │   └── auth_users

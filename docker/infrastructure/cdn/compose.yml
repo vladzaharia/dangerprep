@@ -9,6 +9,8 @@ services:
       - ./assets:/app/assets:ro
     env_file:
       - compose.env
+    ports:
+      - 8080:8080
     labels:
       - "traefik.enable=true"
 
@@ -20,6 +22,15 @@ services:
 
       # DNS registration
       - "dns.register=cdn.danger"
+
+      # App registration for discovery
+      - "app.register=true"
+      - "app.name=CDN Manager"
+      - "app.description=Content Delivery Network Management"
+      - "app.icon=rocket"
+      - "app.category=Infrastructure"
+      - "app.url=https://cdn.danger"
+      - "app.version=1.0.0"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

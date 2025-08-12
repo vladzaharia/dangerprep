@@ -6,6 +6,10 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import NodeCache from 'node-cache';
 
+// Import local template utilities
+import { TemplateRenderer, createTemplateData, type TemplateData } from './utils/template-renderer.js';
+import { AppDiscoveryService, type AppMetadata } from './utils/app-discovery.js';
+
 // Simple logger to replace console statements
 const logger = {
   info: (message: string, ...args: unknown[]) => {
@@ -64,6 +68,10 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 // Initialize cache (TTL: 1 hour)
 const cache = new NodeCache({ stdTTL: 3600 });
+
+// Initialize template renderer and app discovery
+const templateRenderer = new TemplateRenderer();
+const appDiscovery = new AppDiscoveryService();
 
 // Security middleware
 app.use(
@@ -191,6 +199,17 @@ app.get('/health', (req: Request, res: Response) => {
   res.json(health);
 });
 
+// API: App discovery endpoint
+app.get('/api/apps', async (_req: Request, res: Response) => {
+  try {
+    const apps = await appDiscovery.getApps();
+    res.json(apps);
+  } catch (error) {
+    logger.error('Failed to get apps:', error);
+    res.status(500).json({ error: 'Failed to retrieve apps' });
+  }
+});
+
 // API: List all libraries
 app.get('/api/libraries', (req: Request, res: Response) => {
   const libraries = Array.from(libraryRegistry.values()).map(lib => ({
@@ -264,240 +283,74 @@ app.get('/api/library/:id/endpoints', (req: Request, res: Response): void => {
   });
 });
 
-// Homepage with dynamic library listing
-app.get('/', (_req: Request, res: Response) => {
-  const libraries = Array.from(libraryRegistry.values());
+// Helper function to calculate total size
+function calculateTotalSize(libraries: LibraryConfig[]): string {
+  const totalBytes = libraries.reduce((sum, lib) => {
+    // Parse size string back to bytes (rough approximation)
+    const sizeStr = lib.total_size || '0 Bytes';
+    const parts = sizeStr.split(' ');
+    const value = parts[0] || '0';
+    const unit = parts[1] || 'Bytes';
+    const numValue = parseFloat(value);
 
-  const html = generateHomepage(libraries);
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(html);
+    if (isNaN(numValue)) return sum;
+
+    switch (unit) {
+      case 'GB': return sum + (numValue * 1024 * 1024 * 1024);
+      case 'MB': return sum + (numValue * 1024 * 1024);
+      case 'KB': return sum + (numValue * 1024);
+      default: return sum + numValue;
+    }
+  }, 0);
+
+  return formatBytes(totalBytes);
+}
+
+// Homepage with dynamic library listing
+app.get('/', async (_req: Request, res: Response) => {
+  try {
+    const libraries = Array.from(libraryRegistry.values());
+
+    // Prepare CDN app template data
+    const cdnAppData = {
+      libraries,
+      libraryCount: libraries.length,
+      totalFiles: libraries.reduce((sum, lib) => sum + (lib.file_count || 0), 0),
+      totalSize: calculateTotalSize(libraries)
+    };
+
+    const cdnAppContent = await templateRenderer.render('cdn-app', cdnAppData);
+
+    // Prepare base template data
+    const templateData = createTemplateData(
+      'CDN Manager',
+      cdnAppContent,
+      {
+        appTitle: 'CDN Manager',
+        headerActions: `
+          <wa-button appearance="outlined" variant="neutral" size="small" href="/api/libraries">
+            <wa-icon slot="start" name="code" variant="regular"></wa-icon>
+            API
+          </wa-button>
+          <wa-button appearance="outlined" variant="neutral" size="small" href="/health">
+            <wa-icon slot="start" name="heart-pulse" variant="regular"></wa-icon>
+            Status
+          </wa-button>
+        `
+      }
+    );
+
+    const html = await templateRenderer.render('base', { ...templateData });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    logger.error('Failed to render homepage:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
-// Generate dynamic homepage
-function generateHomepage(libraries: LibraryConfig[]): string {
-  const libraryCards = libraries
-    .map(
-      lib => `
-        <div class="library-card">
-            <div class="library-header">
-                <h3>${lib.name}</h3>
-                <span class="version">v${lib.version}</span>
-                <span class="type ${lib.type}">${lib.type}</span>
-            </div>
-            <p class="description">${lib.description}</p>
-            <div class="library-stats">
-                <span class="stat">📦 ${lib.total_size || 'Unknown'}</span>
-                <span class="stat">📄 ${lib.file_count || 0} files</span>
-            </div>
-            <div class="library-actions">
-                <a href="/api/library/${lib.id}" class="btn btn-api">API</a>
-                <a href="${lib.base_url}/" class="btn btn-browse">Browse</a>
-            </div>
-            ${
-              lib.endpoints && lib.endpoints.length > 0
-                ? `
-                <div class="endpoints">
-                    <h4>Key Endpoints:</h4>
-                    ${lib.endpoints
-                      .slice(0, 3)
-                      .map(
-                        endpoint => `
-                        <div class="endpoint">
-                            <code>${endpoint.path}</code>
-                            <span class="endpoint-type">${endpoint.type}</span>
-                        </div>
-                    `
-                      )
-                      .join('')}
-                </div>
-            `
-                : ''
-            }
-        </div>
-    `
-    )
-    .join('');
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DangerPrep CDN</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            line-height: 1.6; 
-            color: #333; 
-            background: #f8f9fa;
-        }
-        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-        .header { text-align: center; margin-bottom: 3rem; }
-        .header h1 { font-size: 2.5rem; color: #2c3e50; margin-bottom: 0.5rem; }
-        .header p { font-size: 1.2rem; color: #7f8c8d; }
-        .stats { 
-            display: flex; 
-            justify-content: center; 
-            gap: 2rem; 
-            margin: 2rem 0; 
-            flex-wrap: wrap;
-        }
-        .stat-card { 
-            background: white; 
-            padding: 1rem 2rem; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .stat-number { font-size: 2rem; font-weight: bold; color: #3498db; }
-        .stat-label { color: #7f8c8d; font-size: 0.9rem; }
-        .libraries { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
-            gap: 2rem; 
-        }
-        .library-card { 
-            background: white; 
-            border-radius: 12px; 
-            padding: 1.5rem; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .library-card:hover { 
-            transform: translateY(-2px); 
-            box-shadow: 0 8px 15px rgba(0,0,0,0.15);
-        }
-        .library-header { 
-            display: flex; 
-            align-items: center; 
-            gap: 1rem; 
-            margin-bottom: 1rem; 
-            flex-wrap: wrap;
-        }
-        .library-header h3 { color: #2c3e50; flex: 1; }
-        .version { 
-            background: #e74c3c; 
-            color: white; 
-            padding: 0.2rem 0.5rem; 
-            border-radius: 4px; 
-            font-size: 0.8rem; 
-        }
-        .type { 
-            padding: 0.2rem 0.5rem; 
-            border-radius: 4px; 
-            font-size: 0.8rem; 
-            font-weight: bold;
-        }
-        .type.component-library { background: #3498db; color: white; }
-        .type.icon-library { background: #9b59b6; color: white; }
-        .description { color: #7f8c8d; margin-bottom: 1rem; }
-        .library-stats { 
-            display: flex; 
-            gap: 1rem; 
-            margin-bottom: 1rem; 
-            font-size: 0.9rem; 
-        }
-        .library-actions { 
-            display: flex; 
-            gap: 0.5rem; 
-            margin-bottom: 1rem; 
-        }
-        .btn { 
-            padding: 0.5rem 1rem; 
-            border-radius: 6px; 
-            text-decoration: none; 
-            font-size: 0.9rem; 
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-        .btn-api { background: #3498db; color: white; }
-        .btn-api:hover { background: #2980b9; }
-        .btn-browse { background: #95a5a6; color: white; }
-        .btn-browse:hover { background: #7f8c8d; }
-        .endpoints { 
-            border-top: 1px solid #ecf0f1; 
-            padding-top: 1rem; 
-        }
-        .endpoints h4 { 
-            color: #2c3e50; 
-            margin-bottom: 0.5rem; 
-            font-size: 0.9rem; 
-        }
-        .endpoint { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin-bottom: 0.5rem; 
-        }
-        .endpoint code { 
-            background: #f8f9fa; 
-            padding: 0.2rem 0.4rem; 
-            border-radius: 3px; 
-            font-size: 0.8rem; 
-            flex: 1;
-        }
-        .endpoint-type { 
-            background: #27ae60; 
-            color: white; 
-            padding: 0.1rem 0.3rem; 
-            border-radius: 3px; 
-            font-size: 0.7rem; 
-            margin-left: 0.5rem;
-        }
-        .footer { 
-            text-align: center; 
-            margin-top: 3rem; 
-            padding-top: 2rem; 
-            border-top: 1px solid #ecf0f1; 
-            color: #7f8c8d; 
-        }
-        @media (max-width: 768px) {
-            .libraries { grid-template-columns: 1fr; }
-            .stats { flex-direction: column; align-items: center; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🚀 DangerPrep CDN</h1>
-            <p>High-performance self-hosted content delivery network</p>
-        </div>
-        
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-number">${libraries.length}</div>
-                <div class="stat-label">Libraries</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${libraries.reduce((sum, lib) => sum + (lib.file_count || 0), 0)}</div>
-                <div class="stat-label">Total Files</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">99.9%</div>
-                <div class="stat-label">Uptime</div>
-            </div>
-        </div>
-        
-        <div class="libraries">
-            ${libraryCards}
-        </div>
-        
-        <div class="footer">
-            <p>
-                <strong>DangerPrep CDN</strong> • 
-                <a href="/api/libraries">API Documentation</a> • 
-                <a href="/health">Health Status</a>
-            </p>
-            <p style="margin-top: 0.5rem; font-size: 0.9rem;">
-                Optimized for emergency response scenarios • Offline-ready • Self-hosted
-            </p>
-        </div>
-    </div>
-</body>
-</html>`;
-}
+
 
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

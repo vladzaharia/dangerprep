@@ -12,14 +12,16 @@
     "typescript": "^5.8.3"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.0.0",
+    "yarn": ">=4.0.0"
   },
   "main": "dist/manager.js",
+  "packageManager": "yarn@4.5.3",
   "private": true,
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
-    "dev": "npx tsx src/manager.ts",
+    "dev": "yarn tsx src/manager.ts",
     "docker:build": "docker compose build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
