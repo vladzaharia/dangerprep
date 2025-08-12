@@ -54,7 +54,6 @@ cd dangerprep
 - **🔒 Step-CA**: Internal certificate authority with ACME support
 - **📡 CDN**: High-performance self-hosted CDN for Web Awesome and Font Awesome
 - **🌐 DNS**: CoreDNS + AdGuard Home + NextDNS chain with DoH/DoT
-- **� Portainer**: Docker container management
 - **👁️ Watchtower**: Automatic container updates
 
 **Media Services:**
@@ -88,7 +87,6 @@ cd dangerprep
 | Komga Books | <https://komga.danger> | eBook and comic management |
 | RomM Game ROMs | <https://romm.danger> | Game ROM management and emulation |
 | Kiwix Offline Content | <https://kiwix.danger> | Offline Wikipedia and educational content |
-| Portainer Docker UI | <https://portainer.danger> | Docker container management |
 | Traefik Dashboard | <https://traefik.danger> | Reverse proxy dashboard |
 | DNS Management | <https://dns.danger> | AdGuard Home DNS management |
 | CDN Assets | <https://cdn.danger> | Self-hosted CDN for libraries |
@@ -173,7 +171,6 @@ dangerprep/                   # Project root (TypeScript monorepo)
 ├── docker/                  # Docker Compose configurations
 │   ├── infrastructure/      # Core infrastructure services
 │   │   ├── traefik/        # Reverse proxy
-│   │   ├── portainer/      # Container management
 │   │   ├── dns/            # DNS services (CoreDNS + AdGuard)
 │   │   ├── watchtower/     # Auto-updates
 │   │   ├── step-ca/        # Internal certificate authority

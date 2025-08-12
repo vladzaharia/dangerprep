@@ -1,0 +1,233 @@
+<!-- CDN Manager Application Template -->
+
+<!-- Hero Section -->
+<div class="hero-section" style="
+    background: linear-gradient(135deg, var(--wa-color-brand-600) 0%, var(--wa-color-brand-800) 100%);
+    color: white;
+    padding: var(--wa-space-2xl);
+    text-align: center;
+    margin: calc(var(--wa-space-xl) * -1) calc(var(--wa-space-xl) * -1) var(--wa-space-xl);
+">
+    <div class="hero-title" style="font-size: var(--wa-font-size-3xl); font-weight: var(--wa-font-weight-bold); margin-bottom: var(--wa-space-md);">
+        <wa-icon name="rocket" style="margin-right: var(--wa-space-sm);"></wa-icon>
+        DangerPrep CDN
+    </div>
+    <div class="hero-subtitle" style="font-size: var(--wa-font-size-lg); opacity: 0.9;">
+        High-performance self-hosted content delivery network
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="stats-grid" style="
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--wa-space-lg);
+    margin-bottom: var(--wa-space-2xl);
+">
+    <wa-card class="stat-card" style="text-align: center;">
+        <div class="stat-number" style="font-size: var(--wa-font-size-3xl); font-weight: var(--wa-font-weight-bold); color: var(--wa-color-brand-600); margin-bottom: var(--wa-space-xs);">
+            {{libraryCount}}
+        </div>
+        <div class="stat-label" style="color: var(--wa-color-text-quiet); font-size: var(--wa-font-size-sm);">
+            Libraries
+        </div>
+    </wa-card>
+    
+    <wa-card class="stat-card" style="text-align: center;">
+        <div class="stat-number" style="font-size: var(--wa-font-size-3xl); font-weight: var(--wa-font-weight-bold); color: var(--wa-color-brand-600); margin-bottom: var(--wa-space-xs);">
+            {{totalFiles}}
+        </div>
+        <div class="stat-label" style="color: var(--wa-color-text-quiet); font-size: var(--wa-font-size-sm);">
+            Total Files
+        </div>
+    </wa-card>
+    
+    <wa-card class="stat-card" style="text-align: center;">
+        <div class="stat-number" style="font-size: var(--wa-font-size-3xl); font-weight: var(--wa-font-weight-bold); color: var(--wa-color-brand-600); margin-bottom: var(--wa-space-xs);">
+            {{totalSize}}
+        </div>
+        <div class="stat-label" style="color: var(--wa-color-text-quiet); font-size: var(--wa-font-size-sm);">
+            Total Size
+        </div>
+    </wa-card>
+    
+    <wa-card class="stat-card" style="text-align: center;">
+        <div class="stat-number" style="font-size: var(--wa-font-size-3xl); font-weight: var(--wa-font-weight-bold); color: var(--wa-color-success-600); margin-bottom: var(--wa-space-xs);">
+            99.9%
+        </div>
+        <div class="stat-label" style="color: var(--wa-color-text-quiet); font-size: var(--wa-font-size-sm);">
+            Uptime
+        </div>
+    </wa-card>
+</div>
+
+<!-- Libraries Grid -->
+<div class="libraries-section">
+    <h2 class="wa-heading-l" style="margin-bottom: var(--wa-space-lg);">Available Libraries</h2>
+    
+    {{#if libraries}}
+    <div class="libraries-grid" style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: var(--wa-space-lg);
+        margin-bottom: var(--wa-space-2xl);
+    ">
+        {{#each libraries}}
+        <wa-card>
+            <div class="wa-stack wa-gap-md">
+                <!-- Library Header -->
+                <div class="wa-flank wa-gap-sm">
+                    <h3 class="wa-heading-m">{{name}}</h3>
+                    <div class="wa-cluster wa-gap-xs">
+                        <wa-badge variant="danger" pill>v{{version}}</wa-badge>
+                        <wa-badge variant="neutral" pill>{{type}}</wa-badge>
+                    </div>
+                </div>
+
+                <!-- Library Description -->
+                <p class="wa-body-s">{{description}}</p>
+
+                <!-- Library Stats -->
+                <div class="wa-cluster wa-gap-md">
+                    <div class="wa-cluster wa-gap-xs">
+                        <wa-icon name="box" variant="regular"></wa-icon>
+                        <span class="wa-caption-s">{{total_size}}</span>
+                    </div>
+                    <div class="wa-cluster wa-gap-xs">
+                        <wa-icon name="file" variant="regular"></wa-icon>
+                        <span class="wa-caption-s">{{file_count}} files</span>
+                    </div>
+                    {{#if last_scanned}}
+                    <div class="wa-cluster wa-gap-xs">
+                        <wa-icon name="clock" variant="regular"></wa-icon>
+                        <span class="wa-caption-s">Updated {{last_scanned}}</span>
+                    </div>
+                    {{/if}}
+                </div>
+
+                <!-- Library Actions -->
+                <div class="wa-cluster wa-gap-sm">
+                    <wa-button href="/api/library/{{id}}" size="small" appearance="outlined">
+                        <wa-icon slot="start" name="code" variant="regular"></wa-icon>
+                        API
+                    </wa-button>
+                    <wa-button href="{{base_url}}/" size="small" variant="brand">
+                        <wa-icon slot="start" name="folder-open" variant="regular"></wa-icon>
+                        Browse
+                    </wa-button>
+                    {{#if homepage}}
+                    <wa-button href="{{homepage}}" size="small" appearance="plain" target="_blank">
+                        <wa-icon slot="start" name="external-link" variant="regular"></wa-icon>
+                        Homepage
+                    </wa-button>
+                    {{/if}}
+                </div>
+
+                <!-- Key Endpoints -->
+                {{#if endpoints}}
+                <wa-details summary="Key Endpoints" size="small">
+                    <div class="wa-stack wa-gap-xs">
+                        {{#each endpoints}}
+                        <div class="wa-flank wa-gap-sm">
+                            <code class="wa-caption-s">{{path}}</code>
+                            <wa-badge size="small" variant="success">{{type}}</wa-badge>
+                        </div>
+                        {{/each}}
+                    </div>
+                </wa-details>
+                {{/if}}
+
+                <!-- Usage Examples -->
+                {{#if usage}}
+                <wa-details summary="Usage Examples" size="small">
+                    <div class="wa-stack wa-gap-sm">
+                        {{#if usage.html_example}}
+                        <div>
+                            <strong class="wa-caption-s">HTML:</strong>
+                            <pre class="wa-caption-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-xs); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code>{{usage.html_example}}</code></pre>
+                        </div>
+                        {{/if}}
+                        
+                        {{#if usage.import_example}}
+                        <div>
+                            <strong class="wa-caption-s">Import:</strong>
+                            <pre class="wa-caption-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-xs); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code>{{usage.import_example}}</code></pre>
+                        </div>
+                        {{/if}}
+                        
+                        {{#if usage.css_example}}
+                        <div>
+                            <strong class="wa-caption-s">CSS:</strong>
+                            <pre class="wa-caption-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-xs); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code>{{usage.css_example}}</code></pre>
+                        </div>
+                        {{/if}}
+                    </div>
+                </wa-details>
+                {{/if}}
+
+                <!-- Tags -->
+                {{#if tags}}
+                <div class="wa-cluster wa-gap-xs">
+                    {{#each tags}}
+                    <wa-tag size="small" variant="neutral">{{this}}</wa-tag>
+                    {{/each}}
+                </div>
+                {{/if}}
+            </div>
+        </wa-card>
+        {{/each}}
+    </div>
+    {{else}}
+    <wa-callout variant="neutral">
+        <wa-icon slot="icon" name="info-circle" variant="regular"></wa-icon>
+        No libraries found. Libraries will appear here once they are scanned and registered.
+    </wa-callout>
+    {{/if}}
+</div>
+
+<!-- API Information -->
+<div class="api-section">
+    <h2 class="wa-heading-l" style="margin-bottom: var(--wa-space-lg);">API Endpoints</h2>
+    
+    <div class="wa-grid" style="--wa-grid-columns: 1; gap: var(--wa-space-md);">
+        <wa-card appearance="outlined">
+            <div class="wa-stack wa-gap-sm">
+                <div class="wa-flank wa-gap-sm">
+                    <code class="wa-heading-s">GET /api/libraries</code>
+                    <wa-badge variant="success" size="small">GET</wa-badge>
+                </div>
+                <p class="wa-body-s">List all available libraries with metadata</p>
+            </div>
+        </wa-card>
+        
+        <wa-card appearance="outlined">
+            <div class="wa-stack wa-gap-sm">
+                <div class="wa-flank wa-gap-sm">
+                    <code class="wa-heading-s">GET /api/library/:id</code>
+                    <wa-badge variant="success" size="small">GET</wa-badge>
+                </div>
+                <p class="wa-body-s">Get detailed information about a specific library</p>
+            </div>
+        </wa-card>
+        
+        <wa-card appearance="outlined">
+            <div class="wa-stack wa-gap-sm">
+                <div class="wa-flank wa-gap-sm">
+                    <code class="wa-heading-s">GET /api/library/:id/endpoints</code>
+                    <wa-badge variant="success" size="small">GET</wa-badge>
+                </div>
+                <p class="wa-body-s">List all endpoints for a specific library</p>
+            </div>
+        </wa-card>
+        
+        <wa-card appearance="outlined">
+            <div class="wa-stack wa-gap-sm">
+                <div class="wa-flank wa-gap-sm">
+                    <code class="wa-heading-s">GET /health</code>
+                    <wa-badge variant="success" size="small">GET</wa-badge>
+                </div>
+                <p class="wa-body-s">Health check endpoint with system status</p>
+            </div>
+        </wa-card>
+    </div>
+</div>

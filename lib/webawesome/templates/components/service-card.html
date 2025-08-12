@@ -1,0 +1,108 @@
+<!-- Service Card Component -->
+<wa-card class="service-card">
+    <div class="wa-stack wa-gap-md">
+        <!-- Service Header -->
+        <div class="wa-flank wa-gap-sm">
+            <div class="wa-cluster wa-gap-sm">
+                {{#if icon}}
+                <wa-icon name="{{icon}}" style="color: var(--wa-color-brand-600);" aria-hidden="true"></wa-icon>
+                {{/if}}
+                <h3 class="wa-heading-m">{{name}}</h3>
+            </div>
+            
+            <div class="wa-cluster wa-gap-xs">
+                {{#if version}}
+                <wa-badge variant="{{#if status}}{{status}}{{else}}neutral{{/if}}" pill>v{{version}}</wa-badge>
+                {{/if}}
+                {{#if type}}
+                <wa-badge variant="neutral" pill>{{type}}</wa-badge>
+                {{/if}}
+                {{#if status}}
+                <wa-badge variant="{{#if (eq status 'healthy')}}success{{else if (eq status 'warning')}}warning{{else}}danger{{/if}}" pill>
+                    {{#if (eq status 'healthy')}}Healthy{{else if (eq status 'warning')}}Warning{{else}}Error{{/if}}
+                </wa-badge>
+                {{/if}}
+            </div>
+        </div>
+
+        <!-- Service Description -->
+        {{#if description}}
+        <p class="wa-body-s">{{description}}</p>
+        {{/if}}
+
+        <!-- Service Stats -->
+        {{#if stats}}
+        <div class="wa-cluster wa-gap-md">
+            {{#each stats}}
+            <div class="wa-cluster wa-gap-xs">
+                {{#if icon}}
+                <wa-icon name="{{icon}}" variant="regular" style="color: var(--wa-color-text-quiet);"></wa-icon>
+                {{/if}}
+                <span class="wa-caption-s">{{label}}: {{value}}</span>
+            </div>
+            {{/each}}
+        </div>
+        {{/if}}
+
+        <!-- Service Actions -->
+        <div class="wa-cluster wa-gap-sm">
+            {{#if url}}
+            <wa-button href="{{url}}" size="small" variant="brand" appearance="filled">
+                <wa-icon slot="start" name="external-link" variant="regular"></wa-icon>
+                Open
+            </wa-button>
+            {{/if}}
+            
+            {{#if apiUrl}}
+            <wa-button href="{{apiUrl}}" size="small" appearance="outlined">
+                <wa-icon slot="start" name="code" variant="regular"></wa-icon>
+                API
+            </wa-button>
+            {{/if}}
+            
+            {{#if docsUrl}}
+            <wa-button href="{{docsUrl}}" size="small" appearance="outlined">
+                <wa-icon slot="start" name="book" variant="regular"></wa-icon>
+                Docs
+            </wa-button>
+            {{/if}}
+            
+            {{#if healthUrl}}
+            <wa-button href="{{healthUrl}}" size="small" appearance="plain">
+                <wa-icon slot="start" name="heart-pulse" variant="regular"></wa-icon>
+                Health
+            </wa-button>
+            {{/if}}
+        </div>
+
+        <!-- Additional Details -->
+        {{#if details}}
+        <wa-details summary="Details" size="small">
+            <div class="wa-stack wa-gap-xs">
+                {{#each details}}
+                <div class="wa-flank wa-gap-sm">
+                    <strong class="wa-caption-s">{{label}}:</strong>
+                    <span class="wa-caption-s">{{value}}</span>
+                </div>
+                {{/each}}
+            </div>
+        </wa-details>
+        {{/if}}
+
+        <!-- Endpoints -->
+        {{#if endpoints}}
+        <wa-details summary="Key Endpoints" size="small">
+            <div class="wa-stack wa-gap-xs">
+                {{#each endpoints}}
+                <div class="wa-flank wa-gap-sm">
+                    <code class="wa-caption-s">{{path}}</code>
+                    <wa-badge size="small" variant="{{#if (eq type 'GET')}}success{{else if (eq type 'POST')}}brand{{else if (eq type 'PUT')}}warning{{else if (eq type 'DELETE')}}danger{{else}}neutral{{/if}}">
+                        {{type}}
+                    </wa-badge>
+                </div>
+                {{/each}}
+            </div>
+        </wa-details>
+        {{/if}}
+    </div>
+</wa-card>

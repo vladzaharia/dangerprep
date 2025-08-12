@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html class="wa-theme-tailspin wa-palette-default wa-brand-blue wa-neutral-gray wa-success-green wa-warning-yellow wa-danger-red" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{pageTitle}} - DangerPrep</title>
+    
+    <!-- Web Awesome (Self-hosted with fallback) -->
+    <link rel="stylesheet" href="https://cdn.danger/webawesome/dist/styles/webawesome.css" onerror="this.onerror=null;this.href='https://early.webawesome.com/webawesome@3.0.0-beta.4/dist/styles/webawesome.css';">
+    <link rel="stylesheet" href="https://cdn.danger/webawesome/dist/styles/themes/tailspin.css" onerror="this.onerror=null;this.href='https://early.webawesome.com/webawesome@3.0.0-beta.4/dist/styles/themes/tailspin.css';">
+    <link rel="stylesheet" href="https://cdn.danger/webawesome/dist/styles/color/palettes/default.css" onerror="this.onerror=null;this.href='https://early.webawesome.com/webawesome@3.0.0-beta.4/dist/styles/color/palettes/default.css';">
+    
+    <script type="module">
+        // Try local CDN first, fallback to WebAwesome CDN
+        try {
+            const { setDefaultIconFamily } = await import('https://cdn.danger/webawesome/dist/webawesome.js');
+            await import('https://cdn.danger/webawesome/dist/webawesome.loader.js');
+            setDefaultIconFamily('duotone');
+        } catch (error) {
+            console.warn('Local WebAwesome CDN unavailable, falling back to webawesome.com');
+            const { setDefaultIconFamily } = await import('https://early.webawesome.com/webawesome@3.0.0-beta.4/dist/webawesome.js');
+            await import('https://early.webawesome.com/webawesome@3.0.0-beta.4/dist/webawesome.loader.js');
+            setDefaultIconFamily('duotone');
+        }
+    </script>
+
+    <style>
+        :root {
+            --wa-border-radius-scale: 0.75;
+            --wa-border-width-scale: 0.5;
+            --wa-space-scale: 0.75;
+            
+            /* DangerPrep brand colors */
+            --dangerprep-primary: #dc2626;
+            --dangerprep-secondary: #1f2937;
+            --dangerprep-accent: #f59e0b;
+        }
+
+        html, body {
+            min-height: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* App switcher styles */
+        .app-switcher {
+            position: relative;
+        }
+
+        .app-switcher-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--wa-color-surface-raised);
+            border: 1px solid var(--wa-color-surface-border);
+            border-radius: var(--wa-border-radius-m);
+            box-shadow: var(--wa-shadow-large);
+            min-width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .app-switcher-menu.open {
+            display: block;
+        }
+
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: var(--wa-space-sm);
+            padding: var(--wa-space-md);
+        }
+
+        .app-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: var(--wa-space-sm);
+            border-radius: var(--wa-border-radius-m);
+            text-decoration: none;
+            color: var(--wa-color-text-normal);
+            transition: background-color 0.2s;
+        }
+
+        .app-item:hover {
+            background-color: var(--wa-color-surface-lowered);
+        }
+
+        .app-item wa-icon {
+            font-size: 2rem;
+            margin-bottom: var(--wa-space-xs);
+            color: var(--wa-color-brand-600);
+        }
+
+        .app-item-name {
+            font-size: var(--wa-font-size-sm);
+            font-weight: var(--wa-font-weight-medium);
+            text-align: center;
+        }
+
+        /* DangerPrep branding */
+        .dangerprep-brand {
+            color: var(--dangerprep-primary);
+            font-weight: var(--wa-font-weight-bold);
+        }
+
+        .dangerprep-logo {
+            color: var(--dangerprep-primary);
+            font-size: 1.5rem;
+        }
+
+        /* Page layout */
+        .page-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--wa-space-xl);
+        }
+
+        {{{customStyles}}}
+    </style>
+
+    {{{additionalHead}}}
+</head>
+<body class="{{bodyClass}}">
+    <wa-page mobile-breakpoint="920" view="desktop" navigation-placement="start" style="--header-height: 75px; --subheader-height: 0px; --banner-height: 0px; --footer-height: 60px;">
+        
+        <!-- Skip to content for accessibility -->
+        <div id="main-content" slot="skip-to-content-target"></div>
+        
+        <!-- Main Header -->
+        <header slot="header">
+            <div class="wa-cluster">
+                <!-- App Switcher -->
+                <div class="app-switcher">
+                    <wa-button id="app-switcher-btn" appearance="plain" size="small" variant="neutral">
+                        <wa-icon name="grid-3x3" label="Apps" role="img" aria-label="Switch Apps"></wa-icon>
+                    </wa-button>
+                    <div id="app-switcher-menu" class="app-switcher-menu">
+                        <div class="loading-fallback">Loading apps...</div>
+                        <div id="app-grid" class="app-grid"></div>
+                    </div>
+                </div>
+                
+                <!-- DangerPrep Brand -->
+                <wa-icon name="shield-exclamation" class="dangerprep-logo" aria-hidden="true"></wa-icon>
+                <span class="wa-heading-m dangerprep-brand">DangerPrep</span>
+                
+                <!-- Current App Title -->
+                {{#if appTitle}}
+                <wa-divider orientation="vertical"></wa-divider>
+                <span class="wa-heading-s">{{appTitle}}</span>
+                {{/if}}
+            </div>
+            
+            <!-- Header Actions -->
+            <div class="wa-cluster">
+                {{{headerActions}}}
+            </div>
+        </header>
+
+        <!-- Navigation Header (mobile/drawer) -->
+        {{#if navigationHeader}}
+        <div slot="navigation-header">
+            {{{navigationHeader}}}
+        </div>
+        {{/if}}
+
+        <!-- Navigation Sidebar -->
+        {{#if navigation}}
+        <nav slot="navigation">
+            {{{navigation}}}
+        </nav>
+        {{/if}}
+
+        <!-- Main Header (page-specific) -->
+        {{#if mainHeader}}
+        <header slot="main-header">
+            {{{mainHeader}}}
+        </header>
+        {{/if}}
+
+        <!-- Main Content -->
+        <main class="page-container">
+            {{#if breadcrumbs}}
+            <wa-breadcrumb style="margin-bottom: var(--wa-space-lg);">
+                {{#each breadcrumbs}}
+                <wa-breadcrumb-item {{#if @last}}aria-current="page"{{/if}}>
+                    {{#if href}}<a href="{{href}}">{{/if}}
+                    {{text}}
+                    {{#if href}}</a>{{/if}}
+                </wa-breadcrumb-item>
+                {{/each}}
+            </wa-breadcrumb>
+            {{/if}}
+            
+            {{{content}}}
+        </main>
+
+        <!-- Main Footer (page-specific) -->
+        {{#if mainFooter}}
+        <footer slot="main-footer">
+            {{{mainFooter}}}
+        </footer>
+        {{/if}}
+
+        <!-- Global Footer -->
+        <footer slot="footer" class="wa-cluster wa-gap-lg" style="padding: var(--wa-space-md); background: var(--wa-color-surface-lowered); border-top: 1px solid var(--wa-color-surface-border);">
+            <div class="wa-cluster wa-gap-xs">
+                <wa-icon name="shield-exclamation" class="dangerprep-logo" aria-hidden="true"></wa-icon>
+                <span class="wa-body-s dangerprep-brand">DangerPrep</span>
+            </div>
+            <span class="wa-body-s" style="color: var(--wa-color-text-quiet);">
+                Emergency Response Infrastructure • Self-Hosted • Offline-Ready
+            </span>
+        </footer>
+    </wa-page>
+
+    <!-- App Discovery and Switching Script -->
+    <script>
+        class DangerPrepAppSwitcher {
+            constructor() {
+                this.apps = [];
+                this.init();
+            }
+
+            async init() {
+                await this.loadApps();
+                this.setupEventListeners();
+                this.renderApps();
+            }
+
+            async loadApps() {
+                try {
+                    // Try to load from local app discovery service first
+                    const response = await fetch('/api/apps', {
+                        timeout: 5000,
+                        signal: AbortSignal.timeout(5000)
+                    });
+
+                    if (response.ok) {
+                        this.apps = await response.json();
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('Local app discovery service unavailable:', error);
+                }
+
+                try {
+                    // Try to load from CDN service as fallback
+                    const response = await fetch('https://cdn.danger/api/apps', {
+                        timeout: 5000,
+                        signal: AbortSignal.timeout(5000)
+                    });
+
+                    if (response.ok) {
+                        this.apps = await response.json();
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('CDN app discovery service unavailable:', error);
+                }
+
+                // Final fallback to default apps
+                console.info('Using default app configuration');
+                this.apps = this.getDefaultApps();
+            }
+
+            getDefaultApps() {
+                return [
+                    {
+                        name: 'CDN Manager',
+                        description: 'Content Delivery Network',
+                        icon: 'rocket',
+                        url: 'https://cdn.danger',
+                        category: 'Infrastructure'
+                    },
+                    {
+                        name: 'Certificate Authority',
+                        description: 'SSL Certificate Management',
+                        icon: 'shield-check',
+                        url: 'https://ca.danger',
+                        category: 'Security'
+                    },
+                    {
+                        name: 'Media Server',
+                        description: 'Jellyfin Media Library',
+                        icon: 'play-circle',
+                        url: 'https://media.danger',
+                        category: 'Media'
+                    },
+                    {
+                        name: 'Knowledge Base',
+                        description: 'Kiwix Offline Content',
+                        icon: 'book',
+                        url: 'https://kiwix.danger',
+                        category: 'Content'
+                    }
+                ];
+            }
+
+            setupEventListeners() {
+                const button = document.getElementById('app-switcher-btn');
+                const menu = document.getElementById('app-switcher-menu');
+
+                button?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    menu?.classList.toggle('open');
+                });
+
+                document.addEventListener('click', () => {
+                    menu?.classList.remove('open');
+                });
+
+                menu?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+            }
+
+            renderApps() {
+                const grid = document.getElementById('app-grid');
+                if (!grid) return;
+
+                grid.innerHTML = this.apps.map(app => `
+                    <a href="${app.url}" class="app-item" title="${app.description}">
+                        <wa-icon name="${app.icon}" aria-hidden="true"></wa-icon>
+                        <span class="app-item-name">${app.name}</span>
+                    </a>
+                `).join('');
+            }
+        }
+
+        // Initialize app switcher when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            new DangerPrepAppSwitcher();
+        });
+    </script>
+
+    {{{additionalScripts}}}
+</body>
+</html>

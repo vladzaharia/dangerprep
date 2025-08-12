@@ -1,0 +1,22 @@
+<!-- Stats Card Component -->
+<wa-card class="stat-card">
+    <div class="wa-stack wa-gap-sm wa-align-items-center">
+        {{#if icon}}
+        <wa-icon name="{{icon}}" style="font-size: 2rem; color: var(--wa-color-{{variant}}-600, var(--wa-color-brand-600));" aria-hidden="true"></wa-icon>
+        {{/if}}
+        
+        <div class="stat-number" style="font-size: var(--wa-font-size-3xl); font-weight: var(--wa-font-weight-bold); color: var(--wa-color-{{variant}}-600, var(--wa-color-brand-600));">
+            {{value}}
+        </div>
+        
+        <div class="stat-label" style="color: var(--wa-color-text-quiet); font-size: var(--wa-font-size-sm); text-align: center;">
+            {{label}}
+        </div>
+        
+        {{#if description}}
+        <div class="stat-description" style="color: var(--wa-color-text-quiet); font-size: var(--wa-font-size-xs); text-align: center;">
+            {{description}}
+        </div>
+        {{/if}}
+    </div>
+</wa-card>

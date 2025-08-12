@@ -60,13 +60,13 @@ DangerPrep is an emergency router and content hub system designed for travel and
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   DNS Chain     │    │   Portainer     │    │   Watchtower    │
-│                 │    │ (Container Mgmt)│    │ (Auto Updates)  │
-│ CoreDNS ──────► │    │                 │    │                 │
-│ AdGuard ──────► │    │ • Web UI        │    │ • Image Updates │
-│ NextDNS         │    │ • Monitoring    │    │ • Notifications │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐
+│   DNS Chain     │    │   Watchtower    │
+│                 │    │ (Auto Updates)  │
+│ CoreDNS ──────► │    │                 │
+│ AdGuard ──────► │    │ • Image Updates │
+│ NextDNS         │    │ • Notifications │
+└─────────────────┘    └─────────────────┘
 ```
 
 ### 4. Application Layer
@@ -213,7 +213,7 @@ docker/
 │   ├── step-ca/          # Internal certificate authority
 │   ├── cdn/              # Self-hosted CDN (TypeScript)
 │   ├── dns/              # DNS services (CoreDNS + AdGuard)
-│   ├── portainer/        # Container management
+
 │   └── watchtower/       # Auto-updates
 ├── media/                # Media services
 │   ├── jellyfin/         # Video streaming
