@@ -4,7 +4,7 @@
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
 ETH_INTERFACE="${ETH_INTERFACE:-eth0}"
@@ -21,24 +21,24 @@ setup_local_only() {
     log "Setting up Local Only Network"
     
     # Configure WiFi interface as hotspot
-    log "Configuring WiFi hotspot: $WIFI_INTERFACE"
-    ip link set "$WIFI_INTERFACE" up
-    ip addr flush dev "$WIFI_INTERFACE"
-    ip addr add "$LAN_IP/22" dev "$WIFI_INTERFACE"
+    log "Configuring WiFi hotspot: ${WIFI_INTERFACE}"
+    ip link set "${WIFI_INTERFACE}" up
+    ip addr flush dev "${WIFI_INTERFACE}"
+    ip addr add "${LAN_IP}/22" dev "${WIFI_INTERFACE}"
     
     # Configure ethernet as LAN if available
-    if ip link show "$ETH_INTERFACE" >/dev/null 2>&1; then
-        log "Configuring Ethernet LAN: $ETH_INTERFACE"
-        ip link set "$ETH_INTERFACE" up
-        ip addr flush dev "$ETH_INTERFACE"
-        ip addr add "192.168.120.2/22" dev "$ETH_INTERFACE"
+    if ip link show "${ETH_INTERFACE}" >/dev/null 2>&1; then
+        log "Configuring Ethernet LAN: ${ETH_INTERFACE}"
+        ip link set "${ETH_INTERFACE}" up
+        ip addr flush dev "${ETH_INTERFACE}"
+        ip addr add "192.168.120.2/22" dev "${ETH_INTERFACE}"
         
         # Bridge WiFi and Ethernet
         brctl addbr br0 2>/dev/null || true
-        brctl addif br0 "$WIFI_INTERFACE" 2>/dev/null || true
-        brctl addif br0 "$ETH_INTERFACE" 2>/dev/null || true
+        brctl addif br0 "${WIFI_INTERFACE}" 2>/dev/null || true
+        brctl addif br0 "${ETH_INTERFACE}" 2>/dev/null || true
         ip link set br0 up
-        ip addr add "$LAN_IP/22" dev br0
+        ip addr add "${LAN_IP}/22" dev br0
     fi
     
     # Disable IP forwarding (local network only)
@@ -58,8 +58,8 @@ setup_local_only() {
     iptables -A FORWARD -d 0.0.0.0/0 -j DROP
     
     # Allow local network traffic
-    iptables -I OUTPUT -d "$LAN_NETWORK" -j ACCEPT
-    iptables -I FORWARD -d "$LAN_NETWORK" -j ACCEPT
+    iptables -I OUTPUT -d "${LAN_NETWORK}" -j ACCEPT
+    iptables -I FORWARD -d "${LAN_NETWORK}" -j ACCEPT
     iptables -I OUTPUT -d 127.0.0.0/8 -j ACCEPT
     
     # Allow DNS and DHCP
@@ -72,9 +72,9 @@ setup_local_only() {
     
     log "Local Only Network configured successfully"
     log "Local only network active"
-    log "WiFi Hotspot: $WIFI_INTERFACE ($LAN_IP)"
-    if ip link show "$ETH_INTERFACE" >/dev/null 2>&1; then
-        log "Ethernet LAN: $ETH_INTERFACE (192.168.120.2)"
+    log "WiFi Hotspot: ${WIFI_INTERFACE} (${LAN_IP})"
+    if ip link show "${ETH_INTERFACE}" >/dev/null 2>&1; then
+        log "Ethernet LAN: ${ETH_INTERFACE} (192.168.120.2)"
     fi
 }
 
@@ -82,13 +82,13 @@ show_status() {
     echo "Local Only Network Status"
     echo "========================="
     
-    echo "WiFi Interface ($WIFI_INTERFACE):"
-    ip addr show "$WIFI_INTERFACE" | grep inet
+    echo "WiFi Interface (${WIFI_INTERFACE}):"
+    ip addr show "${WIFI_INTERFACE}" | grep inet
     
-    if ip link show "$ETH_INTERFACE" >/dev/null 2>&1; then
+    if ip link show "${ETH_INTERFACE}" >/dev/null 2>&1; then
         echo
-        echo "Ethernet Interface ($ETH_INTERFACE):"
-        ip addr show "$ETH_INTERFACE" | grep inet
+        echo "Ethernet Interface (${ETH_INTERFACE}):"
+        ip addr show "${ETH_INTERFACE}" | grep inet
     fi
     
     if ip link show br0 >/dev/null 2>&1; then
@@ -100,11 +100,11 @@ show_status() {
     fi
     
     echo
-    echo "Local Network Range: $LAN_NETWORK"
+    echo "Local Network Range: ${LAN_NETWORK}"
     
     echo
     echo "Connected WiFi clients:"
-    iw dev "$WIFI_INTERFACE" station dump 2>/dev/null | grep Station || echo "No clients connected"
+    iw dev "${WIFI_INTERFACE}" station dump 2>/dev/null | grep Station || echo "No clients connected"
     
     echo
     echo "Services:"

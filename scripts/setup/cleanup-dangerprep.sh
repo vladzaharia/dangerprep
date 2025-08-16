@@ -1,118 +1,226 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Cleanup Script
-# Safely removes DangerPrep configuration and restores original system state
+#
+# Purpose: Safely removes DangerPrep configuration and restores original system state
+# Usage: cleanup-dangerprep.sh [--force] [--keep-data] [--dry-run]
+# Dependencies: systemctl, docker, rm, find, sed, awk
+# Author: DangerPrep Project
+# Version: 2.0
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# Script metadata
+SCRIPT_NAME=""
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
+readonly SCRIPT_NAME
 
-# Source shared banner utility
+SCRIPT_DIR=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+readonly SCRIPT_DIR
 
-# Logging functions
-log() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
+readonly SCRIPT_VERSION="2.0"
+readonly SCRIPT_DESCRIPTION="DangerPrep System Cleanup"
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
+source "${SCRIPT_DIR}/../shared/banner.sh"
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-cleanup.log"
+readonly DEFAULT_INSTALL_ROOT="/opt/dangerprep"
+readonly INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-${DEFAULT_INSTALL_ROOT}}"
+
+# Global variables
+FORCE_CLEANUP=false
+KEEP_DATA=false
+DRY_RUN=false
+BACKUP_DIR=""
+
+# Valid cleanup operations (defined for documentation purposes)
+
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Validate required commands
+    require_commands systemctl find sed awk chmod mkdir
+
+    # Validate root permissions for cleanup operations
+    validate_root_user
+
+    # Create backup directory with timestamp
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S)
+    BACKUP_DIR="/var/backups/dangerprep-cleanup-${timestamp}"
+
+    debug "Cleanup script initialized"
+    debug "Backup directory: ${BACKUP_DIR}"
+    clear_error_context
 }
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE" >&2
-}
+# Show help information
+show_help() {
+    cat << EOF
+${SCRIPT_DESCRIPTION} v${SCRIPT_VERSION}
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1" | tee -a "$LOG_FILE"
-}
+Usage: ${SCRIPT_NAME} [OPTIONS]
 
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1" | tee -a "$LOG_FILE"
-}
+OPTIONS:
+    --force         Force cleanup without confirmation prompts
+    --keep-data     Preserve user data and content directories
+    --dry-run       Show what would be removed without making changes
+    -h, --help      Show this help message
 
-info() {
-    echo -e "${CYAN}[INFO]${NC} $1" | tee -a "$LOG_FILE"
-}
+DESCRIPTION:
+    Safely removes DangerPrep configuration and restores original system state.
+    This script will:
+    • Stop all DangerPrep services (Docker, hostapd, dnsmasq, etc.)
+    • Remove DangerPrep configurations and files
+    • Restore original system configurations
+    • Clean up temporary files and logs
+    • Optionally preserve user data
 
-# Configuration
-LOG_FILE="/var/log/dangerprep-cleanup.log"
-BACKUP_DIR="/var/backups/dangerprep-cleanup-$(date +%Y%m%d-%H%M%S)"
-PRESERVE_DATA=false
+EXAMPLES:
+    ${SCRIPT_NAME}                    # Interactive cleanup
+    ${SCRIPT_NAME} --force            # Force cleanup without prompts
+    ${SCRIPT_NAME} --keep-data        # Cleanup but preserve data
+    ${SCRIPT_NAME} --dry-run          # Show what would be removed
 
-# Check if running as root
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        error "This script must be run as root (use sudo)"
-        echo "Usage: sudo $0 [--preserve-data]"
-        exit 1
-    fi
+NOTES:
+    - This script must be run as root
+    - Creates backup in: /var/backups/dangerprep-cleanup-*
+    - Use --keep-data to preserve media and user content
+    - Use --dry-run to preview changes before execution
+
+EXIT CODES:
+    0   Success
+    1   General error
+    2   Invalid arguments
+
+For more information, see the DangerPrep documentation.
+EOF
 }
 
 # Parse command line arguments
-parse_args() {
+parse_arguments() {
+    set_error_context "Argument parsing"
+
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --preserve-data)
-                PRESERVE_DATA=true
+            --force)
+                FORCE_CLEANUP=true
+                info "Force cleanup enabled"
                 shift
                 ;;
-            --help|-h)
+            --keep-data)
+                KEEP_DATA=true
+                info "Data preservation enabled"
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                info "Dry run mode enabled"
+                shift
+                ;;
+            -h|--help)
                 show_help
                 exit 0
                 ;;
             *)
                 error "Unknown option: $1"
-                show_help
-                exit 1
+                error "Use '${SCRIPT_NAME} --help' for usage information"
+                exit 2
                 ;;
         esac
     done
+
+    debug "Arguments parsed successfully"
+    clear_error_context
 }
 
-# Show help
-show_help() {
-    echo "DangerPrep Cleanup Script"
-    echo "Usage: $0 [OPTIONS]"
-    echo
-    echo "Options:"
-    echo "  --preserve-data    Keep user data and content directories"
-    echo "  --help, -h         Show this help message"
-    echo
-    echo "This script will:"
-    echo "  • Stop all DangerPrep services (Docker, hostapd, dnsmasq, etc.)"
-    echo "  • Remove network configurations and restore originals"
-    echo "  • Remove all DangerPrep configuration files and scripts"
-    echo "  • Clean up user configurations (rootless Docker, etc.)"
-    echo "  • Optionally remove installed packages"
-    echo "  • Remove Docker containers and networks"
-    echo "  • Optionally remove data directories"
-    echo "  • Restore system to pre-DangerPrep state"
-}
+# Safe removal function with validation and dry-run support
+safe_remove() {
+    local path="$1"
+    local description
+    description=${2:-item}
 
-# Display banner
-show_banner() {
-    show_cleanup_banner
-    echo
-    warning "This will remove DangerPrep configuration and restore"
-    warning "the system to its original state."
-    echo
-}
+    set_error_context "Safe removal: ${description}"
 
-# Confirm cleanup
-confirm_cleanup() {
-    echo -e "${YELLOW}This will remove all DangerPrep configurations and services.${NC}"
-    if [[ "$PRESERVE_DATA" == "true" ]]; then
-        echo -e "${GREEN}Data directories will be preserved.${NC}"
+    # Validate path is not empty and not root
+    validate_not_empty "${path}" "removal path"
+
+    if [[ "${path}" == "/" || "${path}" == "/etc" || "${path}" == "/var" || "${path}" == "/usr" ]]; then
+        error "Refusing to remove critical system directory: ${path}"
+        clear_error_context
+        return 1
+    fi
+
+    # Check if path exists
+    if [[ ! -e "${path}" ]]; then
+        debug "Path does not exist (skipping): ${path}"
+        clear_error_context
+        return 0
+    fi
+
+    # Show what would be removed
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        info "[DRY RUN] Would remove ${description}: ${path}"
+        clear_error_context
+        return 0
+    fi
+
+    # Create backup if it's a file/directory
+    if [[ -d "${path}" || -f "${path}" ]]; then
+        local backup_path
+        backup_path="${BACKUP_DIR}/$(basename "${path}")"
+        safe_execute 1 0 mkdir -p "${BACKUP_DIR}"
+
+        if safe_execute 1 0 cp -r "${path}" "${backup_path}" 2>/dev/null; then
+            debug "Backed up ${description} to: ${backup_path}"
+        else
+            warning "Failed to backup ${description}: ${path}"
+        fi
+    fi
+
+    # Perform removal
+    info "Removing ${description}: ${path}"
+    if safe_execute 1 0 rm -rf "${path}" 2>/dev/null; then
+        success "Removed ${description}: ${path}"
     else
-        echo -e "${RED}Data directories will be REMOVED.${NC}"
+        warning "Failed to remove ${description}: ${path}"
+    fi
+
+    clear_error_context
+}
+
+
+# Confirm cleanup operation
+confirm_cleanup() {
+    set_error_context "User confirmation"
+
+    if [[ "${FORCE_CLEANUP}" == "true" ]]; then
+        info "Force mode enabled - skipping confirmation"
+        clear_error_context
+        return 0
+    fi
+
+    warning "This will remove all DangerPrep configurations and services."
+
+    if [[ "${KEEP_DATA}" == "true" ]]; then
+        success "Data directories will be preserved."
+    else
+        error "Data directories will be REMOVED."
     fi
     echo
     read -p "Are you sure you want to continue? (yes/no): " -r
-    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+    if [[ ! ${REPLY} =~ ^[Yy][Ee][Ss]$ ]]; then
         echo "Cleanup cancelled."
         exit 0
     fi
@@ -120,36 +228,56 @@ confirm_cleanup() {
 
 # Setup logging
 setup_logging() {
-    mkdir -p "$BACKUP_DIR"
-    mkdir -p "$(dirname "$LOG_FILE")"
-    touch "$LOG_FILE"
-    chmod 640 "$LOG_FILE"
+    mkdir -p "${BACKUP_DIR}"
+    mkdir -p "$(dirname "${LOG_FILE}")"
+    touch "${LOG_FILE}"
+    chmod 640 "${LOG_FILE}"
     
     log "DangerPrep Cleanup Started"
-    log "Backup directory: $BACKUP_DIR"
-    log "Preserve data: $PRESERVE_DATA"
+    log "Backup directory: ${BACKUP_DIR}"
+    log "Preserve data: ${PRESERVE_DATA}"
 }
 
 # Stop all services
 stop_services() {
     log "Stopping DangerPrep services..."
 
-    # Stop Docker services (handle both rootless and regular Docker)
+    # Stop Olares/K3s services first
+    if command -v kubectl >/dev/null 2>&1; then
+        log "Stopping Olares services..."
+        kubectl delete --all pods --all-namespaces 2>/dev/null || true
+        kubectl delete --all services --all-namespaces 2>/dev/null || true
+    fi
+
+    # Stop K3s if running
+    if systemctl is-active --quiet k3s 2>/dev/null; then
+        log "Stopping K3s..."
+        systemctl stop k3s 2>/dev/null || true
+    fi
+
+    # Uninstall K3s completely
+    if [[ -f /usr/local/bin/k3s-uninstall.sh ]]; then
+        log "Uninstalling K3s..."
+        /usr/local/bin/k3s-uninstall.sh 2>/dev/null || true
+    fi
+
+    # Stop host-based services
+    if systemctl is-active --quiet adguardhome 2>/dev/null; then
+        log "Stopping AdGuard Home..."
+        systemctl stop adguardhome 2>/dev/null || true
+    fi
+
+    if systemctl is-active --quiet step-ca 2>/dev/null; then
+        log "Stopping Step-CA..."
+        systemctl stop step-ca 2>/dev/null || true
+    fi
+
+    # Legacy Docker cleanup (in case Docker was previously installed)
     if command -v docker >/dev/null 2>&1; then
-        log "Stopping Docker containers..."
-
-        # Try rootless Docker first
-        if [[ -S "/run/user/1000/docker.sock" ]]; then
-            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker stop $(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -q) 2>/dev/null || true
-            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker rm $(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -aq) 2>/dev/null || true
-            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker network rm traefik 2>/dev/null || true
-        else
-            # Regular Docker
-            docker stop $(docker ps -q) 2>/dev/null || true
-            docker rm $(docker ps -aq) 2>/dev/null || true
-            docker network rm traefik 2>/dev/null || true
-        fi
-
+        log "Stopping any remaining Docker containers..."
+        docker stop "$(docker ps -q)" 2>/dev/null || true
+        docker rm "$(docker ps -aq)" 2>/dev/null || true
+        docker network rm traefik 2>/dev/null || true
         success "Docker services stopped"
     fi
 
@@ -158,13 +286,14 @@ stop_services() {
         "hostapd"
         "dnsmasq"
         "fail2ban"
-        "cloudflared"
-        "unbound"
         "clamav-daemon"
         "clamav-freshclam"
         "tailscaled"
         "unattended-upgrades"
-        "docker"
+        "adguardhome"
+        "step-ca"
+        "k3s"
+        "k3s-agent"
     )
 
     for service in "${services_to_stop[@]}"; do
@@ -179,11 +308,12 @@ stop_services() {
         "hostapd"
         "dnsmasq"
         "fail2ban"
-        "cloudflared"
-        "unbound"
         "tailscaled"
         "unattended-upgrades"
-        "docker"
+        "adguardhome"
+        "step-ca"
+        "k3s"
+        "k3s-agent"
     )
 
     for service in "${services_to_disable[@]}"; do
@@ -201,7 +331,8 @@ restore_network() {
     log "Restoring network configuration..."
     
     # Find most recent backup
-    local latest_backup=$(find /var/backups -name "dangerprep-*" -type d | sort | tail -1)
+    local latest_backup
+    latest_backup=$(find /var/backups -name "dangerprep-*" -type d | sort | tail -1)
     
     if [[ -n "$latest_backup" && -d "$latest_backup" ]]; then
         log "Using backup from: $latest_backup"
@@ -255,7 +386,8 @@ restore_network() {
 
     # Reset NetworkManager management
     if command -v nmcli >/dev/null 2>&1; then
-        local wifi_interfaces=($(iw dev 2>/dev/null | grep Interface | awk '{print $2}' || echo))
+        local wifi_interfaces
+        mapfile -t wifi_interfaces < <(iw dev 2>/dev/null | grep Interface | awk '{print $2}' || echo)
         for interface in "${wifi_interfaces[@]}"; do
             nmcli device set "$interface" managed yes 2>/dev/null || true
         done
@@ -278,16 +410,44 @@ restore_network() {
     success "Network configuration restored"
 }
 
-# Remove configurations
+# Remove configurations with safe validation
 remove_configurations() {
-    log "Removing DangerPrep configurations..."
+    set_error_context "Configuration removal"
 
-    # Remove configuration directories (optimistic cleanup)
-    [[ -d /etc/dangerprep ]] && rm -rf /etc/dangerprep 2>/dev/null || true
-    [[ -d /var/lib/dangerprep ]] && rm -rf /var/lib/dangerprep 2>/dev/null || true
-    [[ -d /etc/cloudflared ]] && rm -rf /etc/cloudflared 2>/dev/null || true
-    [[ -f /etc/unbound/unbound.conf.d/dangerprep.conf ]] && rm -f /etc/unbound/unbound.conf.d/dangerprep.conf 2>/dev/null || true
-    [[ -f /var/lib/unbound/root.hints ]] && rm -f /var/lib/unbound/root.hints 2>/dev/null || true
+    log_section "Removing DangerPrep configurations"
+
+    # Remove DangerPrep configuration directories
+    safe_remove "/etc/dangerprep" "DangerPrep etc configuration"
+    safe_remove "/var/lib/dangerprep" "DangerPrep var lib data"
+
+    # Remove Olares/K3s configurations
+    log_subsection "Removing Olares/K3s configurations"
+    safe_remove "/etc/olares" "Olares etc configuration"
+    safe_remove "/var/lib/olares" "Olares var lib data"
+    safe_remove "/etc/rancher" "Rancher etc configuration"
+    safe_remove "/var/lib/rancher" "Rancher var lib data"
+    safe_remove "/usr/local/bin/k3s" "K3s binary"
+    safe_remove "/usr/local/bin/kubectl" "kubectl binary"
+    safe_remove "/usr/local/bin/crictl" "crictl binary"
+    safe_remove "/usr/local/bin/ctr" "ctr binary"
+
+    # Remove host-based service configurations
+    log_subsection "Removing host-based service configurations"
+    safe_remove "/etc/adguardhome" "AdGuard Home etc configuration"
+    safe_remove "/var/lib/adguardhome" "AdGuard Home var lib data"
+    safe_remove "/usr/local/bin/AdGuardHome" "AdGuard Home binary"
+    safe_remove "/etc/systemd/system/adguardhome.service" "AdGuard Home systemd service"
+
+    safe_remove "/var/lib/step" "Step CA var lib data"
+    safe_remove "/etc/step" "Step CA etc configuration"
+    safe_remove "/usr/local/bin/step" "Step binary"
+    safe_remove "/usr/local/bin/step-ca" "Step CA binary"
+    safe_remove "/etc/systemd/system/step-ca.service" "Step CA systemd service"
+
+
+
+    # Remove systemd-resolved configuration
+    [[ -f /etc/systemd/resolved.conf.d/adguard.conf ]] && rm -f /etc/systemd/resolved.conf.d/adguard.conf 2>/dev/null || true
 
     # Remove security tools configurations and cron jobs (optimistic cleanup)
     [[ -f /etc/cron.d/aide-check ]] && rm -f /etc/cron.d/aide-check 2>/dev/null || true
@@ -370,58 +530,72 @@ remove_configurations() {
     [[ -f /etc/docker/daemon.json ]] && rm -f /etc/docker/daemon.json 2>/dev/null || true
     [[ -f /etc/docker/seccomp.json ]] && rm -f /etc/docker/seccomp.json 2>/dev/null || true
 
-    # Remove backup encryption key (optimistic cleanup)
-    [[ -d /etc/dangerprep/backup ]] && rm -rf /etc/dangerprep/backup 2>/dev/null || true
+    # Remove backup encryption key
+    safe_remove "/etc/dangerprep/backup" "backup encryption key directory"
 
-    # Remove AIDE database and configuration additions (optimistic cleanup)
-    [[ -f /var/lib/aide/aide.db ]] && rm -f /var/lib/aide/aide.db 2>/dev/null || true
-    [[ -f /var/lib/aide/aide.db.new ]] && rm -f /var/lib/aide/aide.db.new 2>/dev/null || true
+    # Remove AIDE database and configuration additions
+    log_subsection "Removing AIDE configurations"
+    safe_remove "/var/lib/aide/aide.db" "AIDE database"
+    safe_remove "/var/lib/aide/aide.db.new" "AIDE new database"
 
-    # Restore original AIDE configuration by removing DangerPrep additions (optimistic cleanup)
+    # Restore original AIDE configuration by removing DangerPrep additions
     if [[ -f /etc/aide/aide.conf ]]; then
+        info "Restoring original AIDE configuration"
         # Remove DangerPrep specific monitoring rules
-        sed -i '/# DangerPrep specific monitoring rules/,$d' /etc/aide/aide.conf 2>/dev/null || true
+        local aide_pattern='# DangerPrep specific monitoring rules'
+        safe_execute 1 0 sed -i "/${aide_pattern}/,\$d" /etc/aide/aide.conf
     fi
 
-    # Remove certificate management files (optimistic cleanup)
-    [[ -d /etc/letsencrypt ]] && rm -rf /etc/letsencrypt 2>/dev/null || true
-    [[ -d /etc/ssl/dangerprep ]] && rm -rf /etc/ssl/dangerprep 2>/dev/null || true
-    [[ -d /var/www/html ]] && rm -rf /var/www/html 2>/dev/null || true
+    # Remove certificate management files
+    log_subsection "Removing certificate management files"
+    safe_remove "/etc/letsencrypt" "Let's Encrypt certificates"
+    safe_remove "/etc/ssl/dangerprep" "DangerPrep SSL certificates"
+    safe_remove "/var/www/html" "web server document root"
 
-    # Remove GStreamer hardware acceleration configuration (optimistic cleanup)
-    [[ -d /etc/gstreamer-1.0 ]] && rm -rf /etc/gstreamer-1.0 2>/dev/null || true
-
-    # Remove backup encryption key and directory (optimistic cleanup)
-    [[ -d /etc/dangerprep/backup ]] && rm -rf /etc/dangerprep/backup 2>/dev/null || true
+    # Remove GStreamer hardware acceleration configuration
+    safe_remove "/etc/gstreamer-1.0" "GStreamer hardware acceleration configuration"
 
     # Remove backup cron job (optimistic cleanup)
     [[ -f /etc/cron.d/dangerprep-backups ]] && rm -f /etc/cron.d/dangerprep-backups 2>/dev/null || true
 
     # Remove Suricata configuration (optimistic cleanup)
-    if [[ -f "$BACKUP_DIR/suricata.yaml.original" ]]; then
-        cp "$BACKUP_DIR/suricata.yaml.original" /etc/suricata/suricata.yaml 2>/dev/null || true
+    if [[ -f "${BACKUP_DIR}/suricata.yaml.original" ]]; then
+        cp "${BACKUP_DIR}/suricata.yaml.original" /etc/suricata/suricata.yaml 2>/dev/null || true
     fi
 
     # Remove hardware monitoring configuration (optimistic cleanup)
-    if [[ -f "$BACKUP_DIR/sensors3.conf.original" ]]; then
-        cp "$BACKUP_DIR/sensors3.conf.original" /etc/sensors3.conf 2>/dev/null || true
+    if [[ -f "${BACKUP_DIR}/sensors3.conf.original" ]]; then
+        cp "${BACKUP_DIR}/sensors3.conf.original" /etc/sensors3.conf 2>/dev/null || true
     else
         # Remove DangerPrep additions from sensors config
         [[ -f /etc/sensors3.conf ]] && sed -i '/# DangerPrep Hardware Monitoring Configuration/,$d' /etc/sensors3.conf 2>/dev/null || true
     fi
 
-    # Remove temporary files (optimistic cleanup)
-    rm -rf /tmp/dangerprep* 2>/dev/null || true
-    rm -rf /tmp/aide-report-* 2>/dev/null || true
-    rm -rf /tmp/lynis-report-* 2>/dev/null || true
+    # Remove temporary files
+    log_subsection "Removing temporary files"
+    # Use safe wildcard cleanup
+    safe_wildcard_cleanup "dangerprep*" "/tmp" "temporary files"
+
+    if find /tmp -name "aide-report-*" -type f 2>/dev/null | head -1 | grep -q .; then
+        find /tmp -name "aide-report-*" -exec rm -f {} + 2>/dev/null || true
+        debug "Removed AIDE report files"
+    fi
+
+    if find /tmp -name "lynis-report-*" -type f 2>/dev/null | head -1 | grep -q .; then
+        find /tmp -name "lynis-report-*" -exec rm -f {} + 2>/dev/null || true
+        debug "Removed Lynis report files"
+    fi
 
     # Remove additional configurations that setup script creates
-    [[ -f /etc/netplan/01-dangerprep*.yaml ]] && rm -f /etc/netplan/01-dangerprep*.yaml 2>/dev/null || true
-    [[ -f /etc/hostapd/hostapd.conf ]] && rm -f /etc/hostapd/hostapd.conf 2>/dev/null || true
-    [[ -f /etc/iptables/rules.v4 ]] && rm -f /etc/iptables/rules.v4 2>/dev/null || true
+    log_subsection "Removing additional configurations"
+    # Use safe wildcard cleanup
+    safe_wildcard_cleanup "01-dangerprep*.yaml" "/etc/netplan" "netplan configurations"
 
-    # Remove NFS client configurations (optimistic cleanup)
-    [[ -d "$INSTALL_ROOT/nfs" ]] && rm -rf "$INSTALL_ROOT/nfs" 2>/dev/null || true
+    safe_remove "/etc/hostapd/hostapd.conf" "hostapd configuration"
+    safe_remove "/etc/iptables/rules.v4" "iptables rules"
+
+    # Remove NFS client configurations
+    safe_remove "${INSTALL_ROOT}/nfs" "NFS client configuration"
 
     # Remove sysctl modifications made by setup script (optimistic cleanup)
     if [[ -f /etc/sysctl.conf ]]; then
@@ -439,8 +613,8 @@ remove_configurations() {
         # Check if it's the minimal config created by setup script
         if grep -q "# Minimal dnsmasq config for WiFi hotspot DHCP only" /etc/dnsmasq.conf 2>/dev/null; then
             # Restore original or remove if it was created by setup
-            if [[ -f "$BACKUP_DIR/dnsmasq.conf.original" ]]; then
-                cp "$BACKUP_DIR/dnsmasq.conf.original" /etc/dnsmasq.conf 2>/dev/null || true
+            if [[ -f "${BACKUP_DIR}/dnsmasq.conf.original" ]]; then
+                cp "${BACKUP_DIR}/dnsmasq.conf.original" /etc/dnsmasq.conf 2>/dev/null || true
             else
                 # Remove the file if no original backup exists
                 rm -f /etc/dnsmasq.conf 2>/dev/null || true
@@ -458,15 +632,16 @@ remove_packages() {
     # Packages that were specifically installed by setup script
     local packages_to_remove=(
         # Security tools that may not have been on system before
+        "fail2ban"
         "aide"
         "rkhunter"
         "chkrootkit"
         "clamav"
         "clamav-daemon"
         "lynis"
-        "ossec-hids"
         "acct"
         "psacct"
+        "apache2-utils"
 
         # Network tools that may not have been installed
         "hostapd"
@@ -482,10 +657,6 @@ remove_packages() {
         "tc"
         "wondershaper"
         "iperf3"
-
-        # DNS tools
-        "unbound"
-        "unbound-anchor"
 
         # Backup tools
         "borgbackup"
@@ -503,27 +674,20 @@ remove_packages() {
         "libpam-pwquality"
         "libpam-tmpdir"
 
-        # Hardware monitoring (new)
+        # Hardware monitoring
         "lm-sensors"
         "hddtemp"
         "fancontrol"
         "sensors-applet"
         "smartmontools"
 
-        # Certificate management (new)
-        "certbot"
-        "python3-certbot-nginx"
-
-        # Additional monitoring (new)
+        # Additional monitoring
         "collectd"
         "collectd-utils"
 
-        # Log management (new)
+        # Log management
         "logwatch"
         "rsyslog-gnutls"
-
-        # Advanced security (new)
-        "suricata"
 
         # NFS client (installed by setup script)
         "nfs-common"
@@ -535,7 +699,7 @@ remove_packages() {
     echo
     read -p "Remove these packages? This may affect other applications! (yes/no): " -r
 
-    if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+    if [[ ${REPLY} =~ ^[Yy][Ee][Ss]$ ]]; then
         log "Removing DangerPrep packages..."
 
         for package in "${packages_to_remove[@]}"; do
@@ -557,7 +721,7 @@ remove_packages() {
 
 # Remove data directories
 remove_data() {
-    if [[ "$PRESERVE_DATA" == "true" ]]; then
+    if [[ "${PRESERVE_DATA}" == "true" ]]; then
         log "Preserving data directories as requested"
         return 0
     fi
@@ -565,22 +729,36 @@ remove_data() {
     log "Removing data directories..."
 
     # Get install root from environment or default
-    local install_root="${DANGERPREP_INSTALL_ROOT:-/opt/dangerprep}"
+    local install_root
+    install_root=${DANGERPREP_INSTALL_ROOT:-/opt/dangerprep}
 
-    # Remove Docker data
-    rm -rf "$install_root/data" 2>/dev/null || true
-    rm -rf "$install_root/docker" 2>/dev/null || true
-    rm -rf "$install_root/nfs" 2>/dev/null || true
+    # Check if data should be preserved
+    if [[ "${KEEP_DATA}" == "true" ]]; then
+        info "Data preservation enabled - skipping data removal"
+        clear_error_context
+        return 0
+    fi
 
-    # Remove content directories (be careful here)
-    if [[ -d "$install_root/content" ]]; then
-        echo -e "${RED}WARNING: This will delete all media files in $install_root/content${NC}"
-        read -p "Remove content directories? (yes/no): " -r
-        if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-            rm -rf "$install_root/content" 2>/dev/null || true
-            success "Content directories removed"
+    # Remove Docker data with confirmation
+    log_subsection "Removing Docker and application data"
+    safe_remove "${install_root}/data" "Docker application data"
+    safe_remove "${install_root}/docker" "Docker configuration"
+    safe_remove "${install_root}/nfs" "NFS client configuration"
+
+    # Remove content directories with explicit confirmation
+    if [[ -d "${install_root}/content" ]]; then
+        if [[ "${FORCE_CLEANUP}" == "true" ]]; then
+            warning "Force mode: Removing content directories without confirmation"
+            safe_remove "${install_root}/content" "media content directories"
         else
-            info "Content directories preserved"
+            warning "This will delete all media files in ${install_root}/content"
+            read -p "Remove content directories? (yes/no): " -r
+            if [[ ${REPLY} =~ ^[Yy][Ee][Ss]$ ]]; then
+                safe_remove "${install_root}/content" "media content directories"
+                success "Content directories removed"
+            else
+                info "Content directories preserved"
+            fi
         fi
     fi
 
@@ -613,7 +791,7 @@ cleanup_user_configs() {
 
         # Clean up .bashrc modifications
         if [[ -f /home/ubuntu/.bashrc ]]; then
-            sed -i '/export PATH=\/home\/ubuntu\/bin:\$PATH/d' /home/ubuntu/.bashrc 2>/dev/null || true
+            grep -v "export PATH=/home/ubuntu/bin:\${PATH}" /home/ubuntu/.bashrc > /tmp/bashrc.tmp 2>/dev/null && mv /tmp/bashrc.tmp /home/ubuntu/.bashrc || true
             sed -i '/export DOCKER_HOST=unix:\/\/\/run\/user\/1000\/docker.sock/d' /home/ubuntu/.bashrc 2>/dev/null || true
         fi
 
@@ -621,22 +799,37 @@ cleanup_user_configs() {
     fi
 
     # Remove any remaining Docker socket files
-    rm -f /run/user/1000/docker.sock 2>/dev/null || true
-    rm -rf /run/user/1000/docker 2>/dev/null || true
+    safe_remove "/run/user/1000/docker.sock" "Docker socket file"
+    safe_remove "/run/user/1000/docker" "Docker runtime directory"
+
+    clear_error_context
 }
 
 # Final cleanup
 final_cleanup() {
-    log "Performing final cleanup..."
+    set_error_context "Final cleanup"
+
+    log_section "Performing final cleanup"
 
     # Clean package cache
-    apt autoremove -y 2>/dev/null || true
-    apt autoclean 2>/dev/null || true
+    log_subsection "Cleaning package cache"
+    safe_execute 1 0 apt autoremove -y
+    safe_execute 1 0 apt autoclean
 
-    # Remove temporary files
-    rm -rf /tmp/dangerprep* 2>/dev/null || true
-    rm -rf /tmp/aide-report-* 2>/dev/null || true
-    rm -rf /tmp/lynis-report-* 2>/dev/null || true
+    # Remove temporary files (already handled in remove_configurations)
+    log_subsection "Final temporary file cleanup"
+    # Use safe wildcard cleanup
+    safe_wildcard_cleanup "dangerprep*" "/tmp" "temporary files"
+
+    if find /tmp -name "aide-report-*" -type f 2>/dev/null | head -1 | grep -q .; then
+        find /tmp -name "aide-report-*" -exec rm -f {} + 2>/dev/null || true
+        debug "Final cleanup of AIDE report files"
+    fi
+
+    if find /tmp -name "lynis-report-*" -type f 2>/dev/null | head -1 | grep -q .; then
+        find /tmp -name "lynis-report-*" -exec rm -f {} + 2>/dev/null || true
+        debug "Final cleanup of Lynis report files"
+    fi
 
     # Clean up systemd
     systemctl daemon-reload 2>/dev/null || true
@@ -708,7 +901,7 @@ show_completion() {
     echo "  • FriendlyElec/RK3588 specific configurations removed"
     echo "  • MOTD banner removed and Ubuntu defaults restored"
     echo "  • Hardware acceleration settings reset to defaults"
-    if [[ "$PRESERVE_DATA" == "true" ]]; then
+    if [[ "${PRESERVE_DATA}" == "true" ]]; then
         echo "  • Data directories preserved"
     else
         echo "  • Data directories removed"
@@ -720,8 +913,8 @@ show_completion() {
     echo "  • Network interfaces have been reset to NetworkManager control"
     echo "  • Tailscale may need to be reconfigured if you plan to use it again"
     echo
-    echo -e "${CYAN}Log file: $LOG_FILE${NC}"
-    echo -e "${CYAN}Backup created: $BACKUP_DIR${NC}"
+    echo -e "${CYAN}Log file: ${LOG_FILE}${NC}"
+    echo -e "${CYAN}Backup created: ${BACKUP_DIR}${NC}"
     echo
     echo "The system has been restored to its pre-DangerPrep state."
     echo -e "${GREEN}Reboot recommended to ensure all changes take effect.${NC}"

@@ -6,7 +6,7 @@ set -e
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Color codes
 RED='\033[0;31m'
@@ -32,7 +32,7 @@ error() {
 }
 
 check_root() {
-    if [[ $EUID -ne 0 ]]; then
+    if [[ ${EUID} -ne 0 ]]; then
         error "This script must be run as root"
         exit 1
     fi
@@ -42,25 +42,25 @@ check_root() {
 load_config() {
     # Default values
     SSH_PORT="2222"
-    LAN_IP="192.168.120.1"
-    LAN_NETWORK="192.168.120.0/22"
     WAN_INTERFACE=""
     WIFI_INTERFACE=""
 
     # Load from setup script configuration if available
     if [[ -f /etc/dangerprep/interfaces.conf ]]; then
+        # shellcheck source=/dev/null
         source /etc/dangerprep/interfaces.conf
     fi
 
     # Load SSH port from sshd_config if available
     if [[ -f /etc/ssh/sshd_config ]]; then
-        local ssh_port_line=$(grep "^Port " /etc/ssh/sshd_config | head -1)
+        local ssh_port_line
+        ssh_port_line=$(grep "^Port " /etc/ssh/sshd_config | head -1)
         if [[ -n "$ssh_port_line" ]]; then
             SSH_PORT=$(echo "$ssh_port_line" | awk '{print $2}')
         fi
     fi
 
-    log "Configuration loaded: SSH_PORT=$SSH_PORT, WAN_INTERFACE=$WAN_INTERFACE, WIFI_INTERFACE=$WIFI_INTERFACE"
+    log "Configuration loaded: SSH_PORT=${SSH_PORT}, WAN_INTERFACE=${WAN_INTERFACE}, WIFI_INTERFACE=${WIFI_INTERFACE}"
 }
 
 show_firewall_status() {
@@ -68,7 +68,8 @@ show_firewall_status() {
     echo "================"
     
     # Check if iptables has rules
-    local rule_count=$(iptables -L | grep -c "^Chain\|^target" || echo "0")
+    local rule_count
+    rule_count=$(iptables -L | grep -c "^Chain\|^target" || echo "0")
     echo "Active iptables rules: $rule_count"
     
     echo
@@ -85,7 +86,8 @@ show_firewall_status() {
     
     echo
     echo "Port Forwarding Rules:"
-    local prerouting_rules=$(iptables -t nat -L PREROUTING -n | grep DNAT | wc -l)
+    local prerouting_rules
+    prerouting_rules=$(iptables -t nat -L PREROUTING -n | grep -c DNAT)
     if [ "$prerouting_rules" -gt 0 ]; then
         iptables -t nat -L PREROUTING -n --line-numbers | grep DNAT
     else
@@ -94,7 +96,8 @@ show_firewall_status() {
     
     echo
     echo "IP Forwarding:"
-    local ip_forward=$(cat /proc/sys/net/ipv4/ip_forward)
+    local ip_forward
+    ip_forward=$(cat /proc/sys/net/ipv4/ip_forward)
     if [ "$ip_forward" = "1" ]; then
         success "IP forwarding enabled"
     else
@@ -103,7 +106,7 @@ show_firewall_status() {
     
     echo
     echo "Common Ports Status:"
-    check_port_status "$SSH_PORT" "SSH"
+    check_port_status "${SSH_PORT}" "SSH"
     check_port_status 80 "HTTP"
     check_port_status 443 "HTTPS"
     check_port_status 53 "DNS"
@@ -147,7 +150,7 @@ reset_firewall() {
     iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
 
     # Allow SSH on configured port
-    iptables -A INPUT -p tcp --dport "$SSH_PORT" -j ACCEPT
+    iptables -A INPUT -p tcp --dport "${SSH_PORT}" -j ACCEPT
 
     # Allow HTTP/HTTPS (ports 80, 443)
     iptables -A INPUT -p tcp --dport 80 -j ACCEPT
@@ -167,25 +170,31 @@ reset_firewall() {
     iptables -A FORWARD -i tailscale0 -j ACCEPT
     iptables -A FORWARD -o tailscale0 -j ACCEPT
 
+    # Allow K3s/Kubernetes ports for Olares (only what's needed for external access)
+    iptables -A INPUT -p tcp --dport 6443 -j ACCEPT   # K3s API server (for external kubectl access)
+
     # Configure NAT if interfaces are available
-    if [[ -n "$WAN_INTERFACE" ]]; then
-        log "Configuring NAT for WAN interface: $WAN_INTERFACE"
-        iptables -t nat -A POSTROUTING -o "$WAN_INTERFACE" -j MASQUERADE
+    if [[ -n "${WAN_INTERFACE}" ]]; then
+        log "Configuring NAT for WAN interface: ${WAN_INTERFACE}"
+        iptables -t nat -A POSTROUTING -o "${WAN_INTERFACE}" -j MASQUERADE
     fi
 
     # Configure WiFi forwarding if interfaces are available
-    if [[ -n "$WIFI_INTERFACE" && -n "$WAN_INTERFACE" ]]; then
-        log "Configuring WiFi forwarding: $WIFI_INTERFACE -> $WAN_INTERFACE"
-        iptables -A FORWARD -i "$WIFI_INTERFACE" -o "$WAN_INTERFACE" -j ACCEPT
-        iptables -A FORWARD -i "$WAN_INTERFACE" -o "$WIFI_INTERFACE" -m state --state ESTABLISHED,RELATED -j ACCEPT
+    if [[ -n "${WIFI_INTERFACE}" && -n "${WAN_INTERFACE}" ]]; then
+        log "Configuring WiFi forwarding: ${WIFI_INTERFACE} -> ${WAN_INTERFACE}"
+        iptables -A FORWARD -i "${WIFI_INTERFACE}" -o "${WAN_INTERFACE}" -j ACCEPT
+        iptables -A FORWARD -i "${WAN_INTERFACE}" -o "${WIFI_INTERFACE}" -m state --state ESTABLISHED,RELATED -j ACCEPT
 
         # Allow WiFi clients to access local services
-        iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 80 -j ACCEPT
-        iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 443 -j ACCEPT
-        iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 53 -j ACCEPT
-        iptables -A INPUT -i "$WIFI_INTERFACE" -p udp --dport 53 -j ACCEPT
-        iptables -A INPUT -i "$WIFI_INTERFACE" -p udp --dport 67 -j ACCEPT
-        iptables -A INPUT -i "$WIFI_INTERFACE" -p icmp --icmp-type echo-request -j ACCEPT
+        iptables -A INPUT -i "${WIFI_INTERFACE}" -p tcp --dport 80 -j ACCEPT
+        iptables -A INPUT -i "${WIFI_INTERFACE}" -p tcp --dport 443 -j ACCEPT
+        iptables -A INPUT -i "${WIFI_INTERFACE}" -p tcp --dport 53 -j ACCEPT
+        iptables -A INPUT -i "${WIFI_INTERFACE}" -p udp --dport 53 -j ACCEPT
+        iptables -A INPUT -i "${WIFI_INTERFACE}" -p udp --dport 67 -j ACCEPT
+        iptables -A INPUT -i "${WIFI_INTERFACE}" -p icmp --icmp-type echo-request -j ACCEPT
+
+        # Allow WiFi clients to access Olares services
+        iptables -A INPUT -i "${WIFI_INTERFACE}" -p tcp --dport 6443 -j ACCEPT
     fi
 
     # Save rules
@@ -193,7 +202,7 @@ reset_firewall() {
     iptables-save > /etc/iptables/rules.v4
 
     success "Firewall reset to default DangerPrep configuration"
-    log "SSH port: $SSH_PORT, WAN: $WAN_INTERFACE, WiFi: $WIFI_INTERFACE"
+    log "SSH port: ${SSH_PORT}, WAN: ${WAN_INTERFACE}, WiFi: ${WIFI_INTERFACE}"
 }
 
 add_port_forward() {
@@ -218,8 +227,10 @@ add_port_forward() {
     
     # Parse target
     if [[ "$target" =~ ^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):([0-9]+)$ ]]; then
-        local target_ip="${BASH_REMATCH[1]}"
-        local target_port="${BASH_REMATCH[2]}"
+        local target_ip
+        target_ip=${BASH_REMATCH[1]}
+        local target_port
+        target_port=${BASH_REMATCH[2]}
     else
         error "Invalid target format. Use IP:PORT (e.g., 192.168.120.100:80)"
         exit 1
@@ -275,15 +286,18 @@ list_port_forwards() {
     echo "Port Forwarding Rules:"
     echo "====================="
     
-    local rules=$(iptables -t nat -L PREROUTING -n --line-numbers | grep DNAT)
+    local rules
+    rules=$(iptables -t nat -L PREROUTING -n --line-numbers | grep DNAT)
     
     if [ -n "$rules" ]; then
         echo "Line  External Port  →  Target"
         echo "----  -------------     ------"
-        echo "$rules" | while read line_num chain target prot opt source dest extra; do
+        echo "$rules" | while read -r line_num _chain _target _prot _opt _source _dest extra; do
             if [[ "$extra" =~ dpt:([0-9]+).*to:([0-9.]+:[0-9]+) ]]; then
-                local ext_port="${BASH_REMATCH[1]}"
-                local target_addr="${BASH_REMATCH[2]}"
+                local ext_port
+                ext_port=${BASH_REMATCH[1]}
+                local target_addr
+                target_addr=${BASH_REMATCH[2]}
                 printf "%-4s  %-13s  →  %s\n" "$line_num" "$ext_port" "$target_addr"
             fi
         done

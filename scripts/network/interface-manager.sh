@@ -6,7 +6,7 @@ set -e
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Color codes
 RED='\033[0;31m'
@@ -42,19 +42,24 @@ enumerate_interfaces() {
     log "Enumerating physical network interfaces..."
     
     # Clear existing configuration
-    > "$INTERFACE_CONFIG"
+    true > "${INTERFACE_CONFIG}"
     
-    echo "# DangerPrep Interface Configuration" >> "$INTERFACE_CONFIG"
-    echo "# Generated on $(date)" >> "$INTERFACE_CONFIG"
-    echo "" >> "$INTERFACE_CONFIG"
+    {
+        echo "# DangerPrep Interface Configuration"
+        echo "# Generated on $(date)"
+        echo ""
+    } >> "${INTERFACE_CONFIG}"
     
     # Enumerate Ethernet interfaces
     log "Detecting Ethernet interfaces..."
-    local eth_interfaces=($(ip link show | grep -E "^[0-9]+: en" | cut -d: -f2 | tr -d ' '))
+    local eth_interfaces=()
+    mapfile -t eth_interfaces < <(ip link show | grep -E "^[0-9]+: en" | cut -d: -f2 | tr -d ' ')
     
     for interface in "${eth_interfaces[@]}"; do
-        local mac=$(ip link show "$interface" | grep -o "link/ether [a-f0-9:]*" | awk '{print $2}')
-        local state=$(ip link show "$interface" | grep -o "state [A-Z]*" | awk '{print $2}')
+        local mac
+        mac=$(ip link show "$interface" | grep -o "link/ether [a-f0-9:]*" | awk '{print $2}')
+        local state
+        state=$(ip link show "$interface" | grep -o "state [A-Z]*" | awk '{print $2}')
         local speed="unknown"
         
         # Try to get link speed
@@ -65,27 +70,31 @@ enumerate_interfaces() {
             fi
         fi
         
-        echo "ETHERNET_$interface=\"type=ethernet,mac=$mac,state=$state,speed=$speed\"" >> "$INTERFACE_CONFIG"
+        echo "ETHERNET_$interface=\"type=ethernet,mac=$mac,state=$state,speed=$speed\"" >> "${INTERFACE_CONFIG}"
         success "Ethernet: $interface ($mac, $state, $speed)"
     done
     
     # Enumerate WiFi interfaces
     log "Detecting WiFi interfaces..."
-    local wifi_interfaces=($(iw dev | grep Interface | awk '{print $2}'))
+    local wifi_interfaces=()
+    mapfile -t wifi_interfaces < <(iw dev | grep Interface | awk '{print $2}')
     
     for interface in "${wifi_interfaces[@]}"; do
-        local mac=$(ip link show "$interface" | grep -o "link/ether [a-f0-9:]*" | awk '{print $2}')
-        local state=$(ip link show "$interface" | grep -o "state [A-Z]*" | awk '{print $2}')
+        local mac
+        mac=$(ip link show "$interface" | grep -o "link/ether [a-f0-9:]*" | awk '{print $2}')
+        local state
+        state=$(ip link show "$interface" | grep -o "state [A-Z]*" | awk '{print $2}')
         local driver="unknown"
         local capabilities=""
         
         # Get driver information
         if [ -d "/sys/class/net/$interface/device/driver" ]; then
-            driver=$(basename $(readlink "/sys/class/net/$interface/device/driver") 2>/dev/null || echo "unknown")
+            driver=$(basename "$(readlink "/sys/class/net/$interface/device/driver")" 2>/dev/null || echo "unknown")
         fi
         
         # Check WiFi capabilities
-        local phy=$(iw dev "$interface" info | grep wiphy | awk '{print $2}')
+        local phy
+        phy=$(iw dev "$interface" info | grep wiphy | awk '{print $2}')
         if [ -n "$phy" ]; then
             # Check for AP mode support
             if iw phy "phy$phy" info | grep -q "AP"; then
@@ -102,30 +111,34 @@ enumerate_interfaces() {
         fi
         capabilities=${capabilities%,}  # Remove trailing comma
         
-        echo "WIFI_$interface=\"type=wifi,mac=$mac,state=$state,driver=$driver,capabilities=$capabilities\"" >> "$INTERFACE_CONFIG"
+        echo "WIFI_$interface=\"type=wifi,mac=$mac,state=$state,driver=$driver,capabilities=$capabilities\"" >> "${INTERFACE_CONFIG}"
         success "WiFi: $interface ($mac, $state, $driver, caps: $capabilities)"
     done
     
     # Enumerate Tailscale interface
     log "Detecting Tailscale interface..."
     if ip link show tailscale0 >/dev/null 2>&1; then
-        local ts_ip=$(ip addr show tailscale0 | grep "inet " | awk '{print $2}' | head -1)
-        local ts_state=$(ip link show tailscale0 | grep -o "state [A-Z]*" | awk '{print $2}')
+        local ts_ip
+        ts_ip=$(ip addr show tailscale0 | grep "inet " | awk '{print $2}' | head -1)
+        local ts_state
+        ts_state=$(ip link show tailscale0 | grep -o "state [A-Z]*" | awk '{print $2}')
         
-        echo "TAILSCALE_tailscale0=\"type=tailscale,ip=$ts_ip,state=$ts_state\"" >> "$INTERFACE_CONFIG"
+        echo "TAILSCALE_tailscale0=\"type=tailscale,ip=$ts_ip,state=$ts_state\"" >> "${INTERFACE_CONFIG}"
         success "Tailscale: tailscale0 ($ts_ip, $ts_state)"
     else
         warning "Tailscale interface not found"
     fi
     
-    echo "" >> "$INTERFACE_CONFIG"
-    echo "# Interface enumeration completed on $(date)" >> "$INTERFACE_CONFIG"
+    {
+        echo ""
+        echo "# Interface enumeration completed on $(date)"
+    } >> "${INTERFACE_CONFIG}"
     
     success "Interface enumeration completed"
 }
 
 list_interfaces() {
-    if [ ! -f "$INTERFACE_CONFIG" ]; then
+    if [ ! -f "${INTERFACE_CONFIG}" ]; then
         warning "No interface configuration found. Run 'enumerate' first."
         return 1
     fi
@@ -136,9 +149,12 @@ list_interfaces() {
     # Parse and display interfaces
     while IFS= read -r line; do
         if [[ $line =~ ^(ETHERNET|WIFI|TAILSCALE)_([^=]+)=\"(.*)\"$ ]]; then
-            local type="${BASH_REMATCH[1],,}"  # Convert to lowercase
-            local interface="${BASH_REMATCH[2]}"
-            local config="${BASH_REMATCH[3]}"
+            local type
+            type=${BASH_REMATCH[1],,}  # Convert to lowercase
+            local interface
+            interface=${BASH_REMATCH[2]}
+            local config
+            config=${BASH_REMATCH[3]}
             
             echo
             echo "Interface: $interface"
@@ -154,19 +170,20 @@ list_interfaces() {
             done
             
             # Show current IP if assigned
-            local current_ip=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | head -1)
+            local current_ip
+            current_ip=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | head -1)
             if [ -n "$current_ip" ]; then
                 echo "  current_ip: $current_ip"
             fi
             
             # Show if this is the current WAN
-            if [ -f "$WAN_CONFIG" ] && grep -q "^$interface$" "$WAN_CONFIG"; then
+            if [ -f "${WAN_CONFIG}" ] && grep -q "^$interface$" "${WAN_CONFIG}"; then
                 echo "  role: WAN"
             else
                 echo "  role: LAN"
             fi
         fi
-    done < "$INTERFACE_CONFIG"
+    done < "${INTERFACE_CONFIG}"
     
     echo
 }
@@ -182,13 +199,13 @@ set_wan_interface() {
     fi
     
     # Validate interface exists
-    if ! grep -q "_${wan_interface}=" "$INTERFACE_CONFIG" 2>/dev/null; then
+    if ! grep -q "_${wan_interface}=" "${INTERFACE_CONFIG}" 2>/dev/null; then
         error "Interface '$wan_interface' not found. Run 'enumerate' first."
         return 1
     fi
     
     # Set WAN interface
-    echo "$wan_interface" > "$WAN_CONFIG"
+    echo "$wan_interface" > "${WAN_CONFIG}"
     success "Set $wan_interface as WAN interface"
     
     # Show updated configuration
@@ -199,8 +216,8 @@ set_wan_interface() {
 }
 
 clear_wan_interface() {
-    if [ -f "$WAN_CONFIG" ]; then
-        rm "$WAN_CONFIG"
+    if [ -f "${WAN_CONFIG}" ]; then
+        rm "${WAN_CONFIG}"
         success "Cleared WAN interface designation"
         echo "All interfaces are now considered LAN"
     else
@@ -212,8 +229,9 @@ show_current_config() {
     echo "Current Interface Configuration:"
     echo "==============================="
     
-    if [ -f "$WAN_CONFIG" ]; then
-        local wan_interface=$(cat "$WAN_CONFIG")
+    if [ -f "${WAN_CONFIG}" ]; then
+        local wan_interface
+        wan_interface=$(cat "${WAN_CONFIG}")
         echo "WAN Interface: $wan_interface"
         echo
         echo "LAN Interfaces:"
@@ -221,24 +239,28 @@ show_current_config() {
         # List all interfaces except WAN
         while IFS= read -r line; do
             if [[ $line =~ ^(ETHERNET|WIFI|TAILSCALE)_([^=]+)=\"(.*)\"$ ]]; then
-                local interface="${BASH_REMATCH[2]}"
+                local interface
+                interface=${BASH_REMATCH[2]}
                 if [ "$interface" != "$wan_interface" ]; then
-                    local type="${BASH_REMATCH[1],,}"
+                    local type
+                    type=${BASH_REMATCH[1],,}
                     echo "  $interface ($type)"
                 fi
             fi
-        done < "$INTERFACE_CONFIG"
+        done < "${INTERFACE_CONFIG}"
     else
         echo "WAN Interface: None (all interfaces are LAN)"
         echo
         echo "LAN Interfaces:"
         while IFS= read -r line; do
             if [[ $line =~ ^(ETHERNET|WIFI|TAILSCALE)_([^=]+)=\"(.*)\"$ ]]; then
-                local interface="${BASH_REMATCH[2]}"
-                local type="${BASH_REMATCH[1],,}"
+                local interface
+                interface=${BASH_REMATCH[2]}
+                local type
+                type=${BASH_REMATCH[1],,}
                 echo "  $interface ($type)"
             fi
-        done < "$INTERFACE_CONFIG"
+        done < "${INTERFACE_CONFIG}"
     fi
     
     echo

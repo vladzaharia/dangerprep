@@ -7,9 +7,9 @@ set -euo pipefail
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-SECRETS_DIR="$PROJECT_ROOT/secrets"
-DOCKER_DIR="$PROJECT_ROOT/docker"
+PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+SECRETS_DIR="${PROJECT_ROOT}/secrets"
+DOCKER_DIR="${PROJECT_ROOT}/docker"
 
 # Colors for output
 RED='\033[0;31m'
@@ -94,7 +94,7 @@ update_env_var() {
     local var_value="$3"
     local description="$4"
     
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN}" == "true" ]]; then
         log "[DRY RUN] Would update $var_name in $(basename "$env_file")"
         return 0
     fi
@@ -121,19 +121,22 @@ update_env_var() {
 # Update ROMM environment file
 update_romm_env() {
     log "Updating ROMM environment file..."
-    local env_file="$DOCKER_DIR/media/romm/compose.env"
-    local secrets_dir="$SECRETS_DIR/romm"
+    local env_file="${DOCKER_DIR}/media/romm/compose.env"
+    local secrets_dir="${SECRETS_DIR}/romm"
     
     # ROMM Auth Secret Key
-    local auth_key=$(read_secret "$secrets_dir/auth_secret_key")
+    local auth_key
+    auth_key=$(read_secret "$secrets_dir/auth_secret_key")
     update_env_var "$env_file" "ROMM_AUTH_SECRET_KEY" "$auth_key" "ROMM auth secret key"
     
     # Database password
-    local db_password=$(read_secret "$secrets_dir/db_password")
+    local db_password
+    db_password=$(read_secret "$secrets_dir/db_password")
     update_env_var "$env_file" "DB_PASSWD" "$db_password" "database password"
     
     # Redis password
-    local redis_password=$(read_secret "$secrets_dir/redis_password")
+    local redis_password
+    redis_password=$(read_secret "$secrets_dir/redis_password")
     update_env_var "$env_file" "REDIS_PASSWORD" "$redis_password" "Redis password"
     
     success "ROMM environment updated"
@@ -142,11 +145,12 @@ update_romm_env() {
 # Update Step-CA environment file
 update_step_ca_env() {
     log "Updating Step-CA environment file..."
-    local env_file="$DOCKER_DIR/infrastructure/step-ca/compose.env"
-    local secrets_dir="$SECRETS_DIR/step-ca"
+    local env_file="${DOCKER_DIR}/infrastructure/step-ca/compose.env"
+    local secrets_dir="${SECRETS_DIR}/step-ca"
     
     # CA Password
-    local ca_password=$(read_secret "$secrets_dir/ca_password")
+    local ca_password
+    ca_password=$(read_secret "$secrets_dir/ca_password")
     update_env_var "$env_file" "DOCKER_STEPCA_INIT_PASSWORD" "$ca_password" "Step-CA password"
     
     success "Step-CA environment updated"
@@ -155,11 +159,12 @@ update_step_ca_env() {
 # Update Portainer environment file
 update_portainer_env() {
     log "Updating Portainer environment file..."
-    local env_file="$DOCKER_DIR/infrastructure/portainer/compose.env"
-    local secrets_dir="$SECRETS_DIR/portainer"
+    local env_file="${DOCKER_DIR}/infrastructure/portainer/compose.env"
+    local secrets_dir="${SECRETS_DIR}/portainer"
     
     # Admin password
-    local admin_password=$(read_secret "$secrets_dir/admin_password")
+    local admin_password
+    admin_password=$(read_secret "$secrets_dir/admin_password")
     update_env_var "$env_file" "PORTAINER_ADMIN_PASSWORD" "$admin_password" "Portainer admin password"
     
     success "Portainer environment updated"
@@ -168,11 +173,12 @@ update_portainer_env() {
 # Update Traefik environment file
 update_traefik_env() {
     log "Updating Traefik environment file..."
-    local env_file="$DOCKER_DIR/infrastructure/traefik/compose.env"
-    local secrets_dir="$SECRETS_DIR/traefik"
+    local env_file="${DOCKER_DIR}/infrastructure/traefik/compose.env"
+    local secrets_dir="${SECRETS_DIR}/traefik"
     
     # Auth users hash
-    local auth_users=$(read_secret "$secrets_dir/auth_users")
+    local auth_users
+    auth_users=$(read_secret "$secrets_dir/auth_users")
     update_env_var "$env_file" "TRAEFIK_AUTH_USERS" "$auth_users" "Traefik auth users"
     
     success "Traefik environment updated"
@@ -181,19 +187,22 @@ update_traefik_env() {
 # Update Watchtower environment file
 update_watchtower_env() {
     log "Updating Watchtower environment file..."
-    local env_file="$DOCKER_DIR/infrastructure/watchtower/compose.env"
-    local secrets_dir="$SECRETS_DIR/watchtower"
+    local env_file="${DOCKER_DIR}/infrastructure/watchtower/compose.env"
+    local secrets_dir="${SECRETS_DIR}/watchtower"
     
     # API token
-    local api_token=$(read_secret "$secrets_dir/api_token")
+    local api_token
+    api_token=$(read_secret "$secrets_dir/api_token")
     update_env_var "$env_file" "WATCHTOWER_HTTP_API_TOKEN" "$api_token" "Watchtower API token"
     
     # Email password (placeholder)
-    local email_password=$(read_secret "$secrets_dir/email_password")
+    local email_password
+    email_password=$(read_secret "$secrets_dir/email_password")
     update_env_var "$env_file" "WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD" "$email_password" "Watchtower email password"
     
     # Gotify token (placeholder)
-    local gotify_token=$(read_secret "$secrets_dir/gotify_token")
+    local gotify_token
+    gotify_token=$(read_secret "$secrets_dir/gotify_token")
     update_env_var "$env_file" "WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN" "$gotify_token" "Watchtower Gotify token"
     
     success "Watchtower environment updated"
@@ -202,11 +211,12 @@ update_watchtower_env() {
 # Update Komga environment file
 update_komga_env() {
     log "Updating Komga environment file..."
-    local env_file="$DOCKER_DIR/media/komga/compose.env"
-    local secrets_dir="$SECRETS_DIR/komga"
+    local env_file="${DOCKER_DIR}/media/komga/compose.env"
+    local secrets_dir="${SECRETS_DIR}/komga"
     
     # SSL Keystore password
-    local keystore_password=$(read_secret "$secrets_dir/keystore_password")
+    local keystore_password
+    keystore_password=$(read_secret "$secrets_dir/keystore_password")
     update_env_var "$env_file" "SERVER_SSL_KEYSTOREPASSWORD" "$keystore_password" "Komga keystore password"
     
     success "Komga environment updated"
@@ -215,11 +225,12 @@ update_komga_env() {
 # Update Jellyfin environment file
 update_jellyfin_env() {
     log "Updating Jellyfin environment file..."
-    local env_file="$DOCKER_DIR/media/jellyfin/compose.env"
-    local secrets_dir="$SECRETS_DIR/jellyfin"
+    local env_file="${DOCKER_DIR}/media/jellyfin/compose.env"
+    local secrets_dir="${SECRETS_DIR}/jellyfin"
     
     # Certificate password
-    local cert_password=$(read_secret "$secrets_dir/certificate_password")
+    local cert_password
+    cert_password=$(read_secret "$secrets_dir/certificate_password")
     update_env_var "$env_file" "JELLYFIN_CertificatePassword" "$cert_password" "Jellyfin certificate password"
     
     success "Jellyfin environment updated"
@@ -228,11 +239,12 @@ update_jellyfin_env() {
 # Update Arcane environment file
 update_arcane_env() {
     log "Updating Arcane environment file..."
-    local env_file="$DOCKER_DIR/infrastructure/arcane/compose.env"
-    local secrets_dir="$SECRETS_DIR/arcane"
+    local env_file="${DOCKER_DIR}/infrastructure/arcane/compose.env"
+    local secrets_dir="${SECRETS_DIR}/arcane"
 
     # Session secret
-    local session_secret=$(read_secret "$secrets_dir/session_secret")
+    local session_secret
+    session_secret=$(read_secret "$secrets_dir/session_secret")
     update_env_var "$env_file" "PUBLIC_SESSION_SECRET" "$session_secret" "Arcane session secret"
 
     success "Arcane environment updated"
@@ -241,15 +253,17 @@ update_arcane_env() {
 # Update Docmost environment file
 update_docmost_env() {
     log "Updating Docmost environment file..."
-    local env_file="$DOCKER_DIR/services/docmost/compose.env"
-    local secrets_dir="$SECRETS_DIR/docmost"
+    local env_file="${DOCKER_DIR}/services/docmost/compose.env"
+    local secrets_dir="${SECRETS_DIR}/docmost"
 
     # App secret
-    local app_secret=$(read_secret "$secrets_dir/app_secret")
+    local app_secret
+    app_secret=$(read_secret "$secrets_dir/app_secret")
     update_env_var "$env_file" "APP_SECRET" "$app_secret" "Docmost app secret"
 
     # Database password
-    local db_password=$(read_secret "$secrets_dir/db_password")
+    local db_password
+    db_password=$(read_secret "$secrets_dir/db_password")
     update_env_var "$env_file" "POSTGRES_PASSWORD" "$db_password" "Docmost database password"
 
     # Database URL with password
@@ -262,11 +276,12 @@ update_docmost_env() {
 # Update OneDev environment file
 update_onedev_env() {
     log "Updating OneDev environment file..."
-    local env_file="$DOCKER_DIR/services/onedev/compose.env"
-    local secrets_dir="$SECRETS_DIR/onedev"
+    local env_file="${DOCKER_DIR}/services/onedev/compose.env"
+    local secrets_dir="${SECRETS_DIR}/onedev"
 
     # Database password
-    local db_password=$(read_secret "$secrets_dir/db_password")
+    local db_password
+    db_password=$(read_secret "$secrets_dir/db_password")
     update_env_var "$env_file" "POSTGRES_PASSWORD" "$db_password" "OneDev database password"
 
     success "OneDev environment updated"
@@ -274,7 +289,7 @@ update_onedev_env() {
 
 # Main update function
 update_environments() {
-    case "$TARGET_SERVICE" in
+    case "${TARGET_SERVICE}" in
         "romm")
             update_romm_env
             ;;
@@ -318,7 +333,7 @@ update_environments() {
             update_onedev_env
             ;;
         *)
-            error "Unknown service: $TARGET_SERVICE"
+            error "Unknown service: ${TARGET_SERVICE}"
             show_help
             exit 1
             ;;
@@ -329,8 +344,8 @@ update_environments() {
 verify_secrets() {
     log "Verifying secrets exist..."
     
-    if [[ ! -d "$SECRETS_DIR" ]]; then
-        error "Secrets directory not found: $SECRETS_DIR"
+    if [[ ! -d "${SECRETS_DIR}" ]]; then
+        error "Secrets directory not found: ${SECRETS_DIR}"
         error "Run ./scripts/security/generate-secrets.sh first"
         exit 1
     fi
@@ -341,13 +356,13 @@ verify_secrets() {
 # Main execution
 main() {
     log "DangerPrep Environment File Secret Updater"
-    log "Target service: $TARGET_SERVICE"
-    log "Dry run: $DRY_RUN"
+    log "Target service: ${TARGET_SERVICE}"
+    log "Dry run: ${DRY_RUN}"
     
     verify_secrets
     update_environments
     
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN}" == "true" ]]; then
         success "Dry run completed - no changes made"
     else
         success "Environment files updated with generated secrets!"

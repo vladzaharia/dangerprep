@@ -6,7 +6,7 @@ set -e
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Color codes
 RED='\033[0;31m'
@@ -19,30 +19,78 @@ NC='\033[0m'
 
 # Logging functions
 log() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1"
+    local message
+    message="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    if [[ "$CRON_MODE" == "true" ]]; then
+        echo "$message" >> "$CRON_LOG_FILE"
+    else
+        echo -e "${BLUE}${message}${NC}"
+    fi
 }
 
 error() {
-    echo -e "${RED}[ERROR]${NC} $1" >&2
+    local message="[ERROR] $1"
+    if [[ "$CRON_MODE" == "true" ]]; then
+        echo "$message" >> "$CRON_LOG_FILE"
+        logger -t "DANGERPREP-SECURITY" -p daemon.error "$1"
+    else
+        echo -e "${RED}${message}${NC}" >&2
+    fi
 }
 
 success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    local message="[SUCCESS] $1"
+    if [[ "$CRON_MODE" == "true" ]]; then
+        echo "$message" >> "$CRON_LOG_FILE"
+    else
+        echo -e "${GREEN}${message}${NC}"
+    fi
 }
 
 warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    local message="[WARNING] $1"
+    if [[ "$CRON_MODE" == "true" ]]; then
+        echo "$message" >> "$CRON_LOG_FILE"
+        logger -t "DANGERPREP-SECURITY" -p daemon.warning "$1"
+    else
+        echo -e "${YELLOW}${message}${NC}"
+    fi
 }
 
 info() {
-    echo -e "${CYAN}[INFO]${NC} $1"
+    local message="[INFO] $1"
+    if [[ "$CRON_MODE" == "true" ]]; then
+        echo "$message" >> "$CRON_LOG_FILE"
+    else
+        echo -e "${CYAN}${message}${NC}"
+    fi
+}
+
+# Alert function for critical issues
+alert() {
+    local message="[ALERT] $1"
+    echo "$message" >> "$CRON_LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S'): $1" >> "$ALERT_THRESHOLD_FILE"
+    logger -t "DANGERPREP-SECURITY" -p daemon.alert "$1"
+
+    # In interactive mode, also display
+    if [[ "$CRON_MODE" != "true" ]]; then
+        echo -e "${RED}${message}${NC}" >&2
+    fi
 }
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# PROJECT_ROOT is used by sourced scripts
+PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+export PROJECT_ROOT
 LOG_FILE="/var/log/dangerprep-security-audit.log"
 REPORT_FILE="/tmp/security-audit-$(date +%Y%m%d-%H%M%S).txt"
+CRON_LOG_FILE="/var/log/dangerprep-security-cron.log"
+ALERT_THRESHOLD_FILE="/tmp/dangerprep-security-alerts"
+
+# Cron mode flag
+CRON_MODE=false
 
 # Show banner
 show_banner() {
@@ -67,8 +115,9 @@ show_help() {
     echo "  lynis        Run Lynis security audit"
     echo "  rootkit      Run rootkit detection scan"
     echo "  audit        Run general security audit"
-    echo "  suricata     Check Suricata IDS status"
+
     echo "  all          Run all security checks (default)"
+    echo "  cron         Run all checks in cron-friendly mode (quiet, logs to file)"
     echo "  report       Generate comprehensive security report"
     echo "  help         Show this help message"
     echo
@@ -83,8 +132,8 @@ run_aide_check() {
     log "Running AIDE integrity check..."
     
     if command -v aide >/dev/null 2>&1; then
-        if [[ -f "$SCRIPT_DIR/aide-check.sh" ]]; then
-            bash "$SCRIPT_DIR/aide-check.sh"
+        if [[ -f "${SCRIPT_DIR}/aide-check.sh" ]]; then
+            bash "${SCRIPT_DIR}/aide-check.sh"
             success "AIDE check completed"
         else
             warning "AIDE check script not found"
@@ -99,8 +148,8 @@ run_antivirus_scan() {
     log "Running ClamAV antivirus scan..."
     
     if command -v clamscan >/dev/null 2>&1; then
-        if [[ -f "$SCRIPT_DIR/antivirus-scan.sh" ]]; then
-            bash "$SCRIPT_DIR/antivirus-scan.sh"
+        if [[ -f "${SCRIPT_DIR}/antivirus-scan.sh" ]]; then
+            bash "${SCRIPT_DIR}/antivirus-scan.sh"
             success "Antivirus scan completed"
         else
             warning "Antivirus scan script not found"
@@ -115,8 +164,8 @@ run_lynis_audit() {
     log "Running Lynis security audit..."
     
     if command -v lynis >/dev/null 2>&1; then
-        if [[ -f "$SCRIPT_DIR/lynis-audit.sh" ]]; then
-            bash "$SCRIPT_DIR/lynis-audit.sh"
+        if [[ -f "${SCRIPT_DIR}/lynis-audit.sh" ]]; then
+            bash "${SCRIPT_DIR}/lynis-audit.sh"
             success "Lynis audit completed"
         else
             warning "Lynis audit script not found"
@@ -131,8 +180,8 @@ run_rootkit_scan() {
     log "Running rootkit detection scan..."
     
     if command -v rkhunter >/dev/null 2>&1 || command -v chkrootkit >/dev/null 2>&1; then
-        if [[ -f "$SCRIPT_DIR/rootkit-scan.sh" ]]; then
-            bash "$SCRIPT_DIR/rootkit-scan.sh"
+        if [[ -f "${SCRIPT_DIR}/rootkit-scan.sh" ]]; then
+            bash "${SCRIPT_DIR}/rootkit-scan.sh"
             success "Rootkit scan completed"
         else
             warning "Rootkit scan script not found"
@@ -146,29 +195,15 @@ run_rootkit_scan() {
 run_security_audit() {
     log "Running general security audit..."
     
-    if [[ -f "$SCRIPT_DIR/security-audit.sh" ]]; then
-        bash "$SCRIPT_DIR/security-audit.sh"
+    if [[ -f "${SCRIPT_DIR}/security-audit.sh" ]]; then
+        bash "${SCRIPT_DIR}/security-audit.sh"
         success "Security audit completed"
     else
         warning "Security audit script not found"
     fi
 }
 
-# Check Suricata IDS
-check_suricata() {
-    log "Checking Suricata IDS status..."
-    
-    if command -v suricata >/dev/null 2>&1; then
-        if [[ -f "$SCRIPT_DIR/suricata-monitor.sh" ]]; then
-            bash "$SCRIPT_DIR/suricata-monitor.sh"
-            success "Suricata check completed"
-        else
-            warning "Suricata monitor script not found"
-        fi
-    else
-        warning "Suricata not installed"
-    fi
-}
+
 
 # Run all security checks
 run_all_checks() {
@@ -190,12 +225,11 @@ run_all_checks() {
     run_security_audit
     echo
     
-    check_suricata
-    echo
+
     
     success "All security checks completed"
     info "Check individual log files for detailed results"
-    info "Comprehensive report available at: $REPORT_FILE"
+    info "Comprehensive report available at: ${REPORT_FILE}"
 }
 
 # Generate comprehensive security report
@@ -220,7 +254,7 @@ generate_report() {
         echo "  ClamAV: $(command -v clamscan >/dev/null 2>&1 && echo "Installed" || echo "Not installed")"
         echo "  Lynis: $(command -v lynis >/dev/null 2>&1 && echo "Installed" || echo "Not installed")"
         echo "  RKHunter: $(command -v rkhunter >/dev/null 2>&1 && echo "Installed" || echo "Not installed")"
-        echo "  Suricata: $(command -v suricata >/dev/null 2>&1 && echo "Installed" || echo "Not installed")"
+
         echo "  Fail2ban: $(systemctl is-active fail2ban 2>/dev/null || echo "Not active")"
         echo
         
@@ -230,13 +264,13 @@ generate_report() {
         echo
         
         echo "File System Security:"
-        echo "  Root filesystem permissions: $(ls -ld / | awk '{print $1}')"
-        echo "  /etc permissions: $(ls -ld /etc | awk '{print $1}')"
-        echo "  /var/log permissions: $(ls -ld /var/log | awk '{print $1}')"
+        echo "  Root filesystem permissions: $(find / -maxdepth 0 -printf '%M\n')"
+        echo "  /etc permissions: $(find /etc -maxdepth 0 -printf '%M\n')"
+        echo "  /var/log permissions: $(find /var/log -maxdepth 0 -printf '%M\n')"
         echo
         
         echo "Network Security:"
-        echo "  Open ports: $(ss -tuln | grep LISTEN | wc -l)"
+        echo "  Open ports: $(ss -tuln | grep -c LISTEN)"
         echo "  Firewall status: $(ufw status 2>/dev/null | head -1 || echo "UFW not configured")"
         echo
         
@@ -247,16 +281,16 @@ generate_report() {
         echo "  RKHunter: /var/log/rkhunter-scan.log"
         echo "  General audit: Check security-audit.sh output"
         
-    } | tee "$REPORT_FILE"
+    } | tee "${REPORT_FILE}"
     
-    success "Security report generated: $REPORT_FILE"
+    success "Security report generated: ${REPORT_FILE}"
 }
 
 # Main function
 main() {
     # Show banner for comprehensive security audit
     if [[ "${1:-all}" == "all" ]]; then
-        show_security_banner
+        show_security_banner "$@"
         echo
     fi
 
@@ -276,13 +310,25 @@ main() {
         audit)
             run_security_audit
             ;;
-        suricata)
-            check_suricata
-            ;;
         all)
             show_banner
             run_all_checks
             generate_report
+            ;;
+        cron)
+            CRON_MODE=true
+            # Ensure log directories exist
+            mkdir -p "$(dirname "${CRON_LOG_FILE}")" 2>/dev/null || true
+            mkdir -p "$(dirname "${ALERT_THRESHOLD_FILE}")" 2>/dev/null || true
+
+            # Run all checks in quiet mode
+            run_all_checks
+
+            # Check for critical alerts
+            if [[ -f "$ALERT_THRESHOLD_FILE" ]] && [[ -s "$ALERT_THRESHOLD_FILE" ]]; then
+                # Send alert notification (could be extended to email, etc.)
+                logger -t "DANGERPREP-SECURITY" -p daemon.alert "Critical security issues detected. Check $ALERT_THRESHOLD_FILE"
+            fi
             ;;
         report)
             generate_report
@@ -300,8 +346,8 @@ main() {
 }
 
 # Setup logging
-mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
-touch "$LOG_FILE" 2>/dev/null || true
+mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
+touch "${LOG_FILE}" 2>/dev/null || true
 
 # Run main function
 main "$@"

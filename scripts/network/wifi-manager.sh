@@ -6,7 +6,7 @@ set -e
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Color codes
 RED='\033[0;31m'
@@ -37,22 +37,25 @@ load_config() {
     WIFI_INTERFACE=""
     WIFI_SSID="DangerPrep"
     WIFI_PASSWORD="Buff00n!"
-    LAN_IP="192.168.120.1"
+    # LAN_IP is used for hotspot configuration
+    export LAN_IP="192.168.120.1"
 
     # Load from setup script configuration if available
     if [[ -f /etc/dangerprep/interfaces.conf ]]; then
+        # shellcheck source=/dev/null
         source /etc/dangerprep/interfaces.conf
     fi
 
     # Override with detected interface if config doesn't have it
-    if [[ -z "$WIFI_INTERFACE" ]]; then
+    if [[ -z "${WIFI_INTERFACE}" ]]; then
         WIFI_INTERFACE=$(get_wifi_interface)
     fi
 }
 
 # Get first available WiFi interface
 get_wifi_interface() {
-    local wifi_interfaces=($(iw dev | grep Interface | awk '{print $2}'))
+    local wifi_interfaces=()
+    mapfile -t wifi_interfaces < <(iw dev | grep Interface | awk '{print $2}')
     if [ ${#wifi_interfaces[@]} -gt 0 ]; then
         echo "${wifi_interfaces[0]}"
     else
@@ -61,7 +64,8 @@ get_wifi_interface() {
 }
 
 scan_networks() {
-    local interface=$(get_wifi_interface)
+    local interface
+    interface=$(get_wifi_interface)
     
     if [ -z "$interface" ]; then
         error "No WiFi interface found"
@@ -90,7 +94,8 @@ scan_networks() {
 connect_to_network() {
     local ssid="$1"
     local password="$2"
-    local interface=$(get_wifi_interface)
+    local interface
+    interface=$(get_wifi_interface)
     
     if [ -z "$ssid" ] || [ -z "$password" ]; then
         error "Usage: connect <ssid> <password>"
@@ -113,7 +118,8 @@ connect_to_network() {
         
         # Show connection details
         sleep 3
-        local ip=$(ip addr show "$interface" | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+        local ip
+        ip=$(ip addr show "$interface" | grep "inet " | awk '{print $2}' | cut -d/ -f1)
         if [ -n "$ip" ]; then
             log "IP Address: $ip"
         fi
@@ -146,7 +152,7 @@ create_access_point() {
         exit 1
     fi
 
-    if [ -z "$WIFI_INTERFACE" ]; then
+    if [ -z "${WIFI_INTERFACE}" ]; then
         error "No WiFi interface found"
         exit 1
     fi
@@ -156,21 +162,21 @@ create_access_point() {
     # Check if hostapd is configured and running (from setup script)
     if systemctl is-active --quiet hostapd && [[ -f /etc/hostapd/hostapd.conf ]]; then
         warning "DangerPrep hostapd is already configured and running"
-        log "Current configuration uses SSID: $WIFI_SSID"
-        log "To use the existing AP, connect to: $WIFI_SSID with password: $WIFI_PASSWORD"
+        log "Current configuration uses SSID: ${WIFI_SSID}"
+        log "To use the existing AP, connect to: ${WIFI_SSID} with password: ${WIFI_PASSWORD}"
         log "To reconfigure, edit /etc/hostapd/hostapd.conf and restart hostapd"
         return 0
     fi
 
     # Stop any existing hotspot
-    nmcli connection show | grep "Hotspot\|DangerPrep-AP" | awk '{print $1}' | while read conn; do
+    nmcli connection show | grep "Hotspot\|DangerPrep-AP" | awk '{print $1}' | while read -r conn; do
         nmcli connection down "$conn" 2>/dev/null || true
         nmcli connection delete "$conn" 2>/dev/null || true
     done
 
     # Create WiFi hotspot using NetworkManager
     if nmcli device wifi hotspot \
-        ifname "$WIFI_INTERFACE" \
+        ifname "${WIFI_INTERFACE}" \
         con-name "DangerPrep-AP" \
         ssid "$ssid" \
         password "$password" \
@@ -180,7 +186,8 @@ create_access_point() {
 
         # Show AP details
         sleep 3
-        local ip=$(ip addr show "$WIFI_INTERFACE" | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+        local ip
+        ip=$(ip addr show "${WIFI_INTERFACE}" | grep "inet " | awk '{print $2}' | cut -d/ -f1)
         if [ -n "$ip" ]; then
             log "AP IP Address: $ip"
         fi
@@ -198,7 +205,8 @@ show_wifi_status() {
     echo "WiFi Interface Status:"
     echo "====================="
     
-    local wifi_interfaces=($(iw dev | grep Interface | awk '{print $2}'))
+    local wifi_interfaces=()
+    mapfile -t wifi_interfaces < <(iw dev | grep Interface | awk '{print $2}')
     
     if [ ${#wifi_interfaces[@]} -eq 0 ]; then
         warning "No WiFi interfaces found"
@@ -210,32 +218,38 @@ show_wifi_status() {
         echo "Interface: $interface"
         
         # Get basic info
-        local mac=$(ip link show "$interface" | grep -o "link/ether [a-f0-9:]*" | awk '{print $2}')
-        local state=$(ip link show "$interface" | grep -o "state [A-Z]*" | awk '{print $2}')
+        local mac
+        mac=$(ip link show "$interface" | grep -o "link/ether [a-f0-9:]*" | awk '{print $2}')
+        local state
+        state=$(ip link show "$interface" | grep -o "state [A-Z]*" | awk '{print $2}')
         echo "  MAC: $mac"
         echo "  State: $state"
         
         # Get IP if assigned
-        local ip=$(ip addr show "$interface" | grep "inet " | awk '{print $2}' | head -1)
+        local ip
+        ip=$(ip addr show "$interface" | grep "inet " | awk '{print $2}' | head -1)
         if [ -n "$ip" ]; then
             echo "  IP: $ip"
         fi
         
         # Check NetworkManager connection
-        local connection=$(nmcli connection show --active | grep "$interface" | awk '{print $1}' | head -1)
+        local connection
+        connection=$(nmcli connection show --active | grep "$interface" | awk '{print $1}' | head -1)
         if [ -n "$connection" ]; then
             echo "  Connection: $connection"
             
             # Check if it's an AP or client
             if nmcli connection show "$connection" | grep -q "802-11-wireless.mode.*ap"; then
                 echo "  Mode: Access Point"
-                local ssid=$(nmcli connection show "$connection" | grep "802-11-wireless.ssid" | awk '{print $2}')
+                local ssid
+                ssid=$(nmcli connection show "$connection" | grep "802-11-wireless.ssid" | awk '{print $2}')
                 if [ -n "$ssid" ]; then
                     echo "  SSID: $ssid"
                 fi
             else
                 echo "  Mode: Client"
-                local ssid=$(nmcli connection show "$connection" | grep "802-11-wireless.ssid" | awk '{print $2}')
+                local ssid
+                ssid=$(nmcli connection show "$connection" | grep "802-11-wireless.ssid" | awk '{print $2}')
                 if [ -n "$ssid" ]; then
                     echo "  Connected to: $ssid"
                 fi
@@ -246,7 +260,8 @@ show_wifi_status() {
         
         # Show signal strength if connected as client
         if [ -n "$connection" ] && ! nmcli connection show "$connection" | grep -q "802-11-wireless.mode.*ap"; then
-            local signal=$(nmcli device wifi list | grep "^\*" | awk '{print $7}')
+            local signal
+            signal=$(nmcli device wifi list | grep "^\*" | awk '{print $7}')
             if [ -n "$signal" ]; then
                 echo "  Signal: $signal"
             fi
@@ -261,7 +276,8 @@ show_wifi_status() {
 }
 
 disconnect_wifi() {
-    local interface=$(get_wifi_interface)
+    local interface
+    interface=$(get_wifi_interface)
     
     if [ -z "$interface" ]; then
         error "No WiFi interface found"
@@ -271,7 +287,8 @@ disconnect_wifi() {
     log "Disconnecting WiFi on $interface..."
     
     # Get active connection
-    local connection=$(nmcli connection show --active | grep "$interface" | awk '{print $1}' | head -1)
+    local connection
+    connection=$(nmcli connection show --active | grep "$interface" | awk '{print $1}' | head -1)
     
     if [ -n "$connection" ]; then
         nmcli connection down "$connection"

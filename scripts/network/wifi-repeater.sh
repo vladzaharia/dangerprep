@@ -4,7 +4,7 @@
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
 UPSTREAM_SSID="${UPSTREAM_SSID:-}"
@@ -18,7 +18,7 @@ log() {
 setup_wifi_repeater() {
     log "Setting up WiFi Repeater Mode"
     
-    if [[ -z "$UPSTREAM_SSID" ]]; then
+    if [[ -z "${UPSTREAM_SSID}" ]]; then
         echo "Error: UPSTREAM_SSID not set"
         echo "Usage: UPSTREAM_SSID='network_name' UPSTREAM_PASSWORD='password' $0 setup"
         exit 1
@@ -28,10 +28,10 @@ setup_wifi_repeater() {
     systemctl stop hostapd
     
     # Connect to upstream WiFi
-    log "Connecting to upstream WiFi: $UPSTREAM_SSID"
-    wpa_passphrase "$UPSTREAM_SSID" "$UPSTREAM_PASSWORD" > /etc/wpa_supplicant/wpa_supplicant.conf
-    wpa_supplicant -B -i "$WIFI_INTERFACE" -c /etc/wpa_supplicant/wpa_supplicant.conf
-    dhclient "$WIFI_INTERFACE"
+    log "Connecting to upstream WiFi: ${UPSTREAM_SSID}"
+    wpa_passphrase "${UPSTREAM_SSID}" "${UPSTREAM_PASSWORD}" > /etc/wpa_supplicant/wpa_supplicant.conf
+    wpa_supplicant -B -i "${WIFI_INTERFACE}" -c /etc/wpa_supplicant/wpa_supplicant.conf
+    dhclient "${WIFI_INTERFACE}"
     
     # Wait for connection
     sleep 10
@@ -45,9 +45,9 @@ setup_wifi_repeater() {
     log "Connected to upstream WiFi successfully"
     
     # Create virtual interface for hotspot
-    iw dev "$WIFI_INTERFACE" interface add "${WIFI_INTERFACE}_ap" type __ap
+    iw dev "${WIFI_INTERFACE}" interface add "${WIFI_INTERFACE}_ap" type __ap
     ip link set "${WIFI_INTERFACE}_ap" up
-    ip addr add "$LAN_IP/22" dev "${WIFI_INTERFACE}_ap"
+    ip addr add "${LAN_IP}/22" dev "${WIFI_INTERFACE}_ap"
     
     # Update hostapd configuration for virtual interface
     sed -i "s/interface=.*/interface=${WIFI_INTERFACE}_ap/" /etc/hostapd/hostapd.conf
@@ -57,26 +57,26 @@ setup_wifi_repeater() {
     
     # Configure NAT
     iptables -t nat -F
-    iptables -t nat -A POSTROUTING -o "$WIFI_INTERFACE" -j MASQUERADE
-    iptables -A FORWARD -i "${WIFI_INTERFACE}_ap" -o "$WIFI_INTERFACE" -j ACCEPT
-    iptables -A FORWARD -i "$WIFI_INTERFACE" -o "${WIFI_INTERFACE}_ap" -m state --state RELATED,ESTABLISHED -j ACCEPT
+    iptables -t nat -A POSTROUTING -o "${WIFI_INTERFACE}" -j MASQUERADE
+    iptables -A FORWARD -i "${WIFI_INTERFACE}_ap" -o "${WIFI_INTERFACE}" -j ACCEPT
+    iptables -A FORWARD -i "${WIFI_INTERFACE}" -o "${WIFI_INTERFACE}_ap" -m state --state RELATED,ESTABLISHED -j ACCEPT
     
     # Start services
     systemctl start hostapd
     systemctl start dnsmasq
     
     log "WiFi Repeater Mode configured successfully"
-    log "Upstream: $WIFI_INTERFACE (connected to $UPSTREAM_SSID)"
-    log "Hotspot: ${WIFI_INTERFACE}_ap ($LAN_IP)"
+    log "Upstream: ${WIFI_INTERFACE} (connected to ${UPSTREAM_SSID})"
+    log "Hotspot: ${WIFI_INTERFACE}_ap (${LAN_IP})"
 }
 
 show_status() {
     echo "WiFi Repeater Status"
     echo "===================="
     
-    echo "Upstream WiFi ($WIFI_INTERFACE):"
-    ip addr show "$WIFI_INTERFACE" | grep inet
-    iwconfig "$WIFI_INTERFACE" 2>/dev/null | grep ESSID
+    echo "Upstream WiFi (${WIFI_INTERFACE}):"
+    ip addr show "${WIFI_INTERFACE}" | grep inet
+    iwconfig "${WIFI_INTERFACE}" 2>/dev/null | grep ESSID
     
     echo
     echo "Hotspot Interface (${WIFI_INTERFACE}_ap):"
@@ -109,7 +109,7 @@ cleanup_wifi_repeater() {
     killall wpa_supplicant 2>/dev/null || true
     
     # Reset hostapd configuration
-    sed -i "s/interface=.*/interface=$WIFI_INTERFACE/" /etc/hostapd/hostapd.conf
+    sed -i "s/interface=.*/interface=${WIFI_INTERFACE}/" /etc/hostapd/hostapd.conf
     
     log "WiFi Repeater Mode cleanup completed"
 }

@@ -6,7 +6,7 @@ set -e
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Color codes
 RED='\033[0;31m'
@@ -40,7 +40,7 @@ info() {
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
 LOG_FILE="/var/log/dangerprep-monitoring.log"
 REPORT_FILE="/tmp/monitoring-report-$(date +%Y%m%d-%H%M%S).txt"
 
@@ -66,21 +66,21 @@ show_help() {
     echo "  hardware     Run hardware monitoring (temperature, SMART)"
     echo "  all          Run all monitoring checks (default)"
     echo "  report       Generate comprehensive monitoring report"
-    echo "  continuous   Run continuous monitoring (every 5 minutes)"
+
     echo "  help         Show this help message"
     echo
     echo "Examples:"
     echo "  $0 all           # Run all monitoring checks"
     echo "  $0 system        # Run only system monitoring"
-    echo "  $0 continuous    # Start continuous monitoring"
+
 }
 
 # Run system monitoring
 run_system_monitoring() {
     log "Running system monitoring..."
     
-    if [[ -f "$SCRIPT_DIR/system-monitor.sh" ]]; then
-        bash "$SCRIPT_DIR/system-monitor.sh" report
+    if [[ -f "${SCRIPT_DIR}/system-monitor.sh" ]]; then
+        bash "${SCRIPT_DIR}/system-monitor.sh" report
         success "System monitoring completed"
     else
         warning "System monitor script not found"
@@ -91,8 +91,8 @@ run_system_monitoring() {
 run_hardware_monitoring() {
     log "Running hardware monitoring..."
     
-    if [[ -f "$SCRIPT_DIR/hardware-monitor.sh" ]]; then
-        bash "$SCRIPT_DIR/hardware-monitor.sh" report
+    if [[ -f "${SCRIPT_DIR}/hardware-monitor.sh" ]]; then
+        bash "${SCRIPT_DIR}/hardware-monitor.sh" report
         success "Hardware monitoring completed"
     else
         warning "Hardware monitor script not found"
@@ -112,7 +112,7 @@ run_all_monitoring() {
     
     success "All monitoring checks completed"
     info "Detailed results available in individual log files"
-    info "Comprehensive report available at: $REPORT_FILE"
+    info "Comprehensive report available at: ${REPORT_FILE}"
 }
 
 # Generate comprehensive monitoring report
@@ -133,22 +133,24 @@ generate_report() {
         echo
         
         echo "CPU Information:"
-        local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
+        local cpu_usage
+        cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
         echo "  Usage: ${cpu_usage}%"
         echo "  Cores: $(nproc)"
         echo "  Model: $(grep "model name" /proc/cpuinfo | head -1 | cut -d':' -f2 | xargs)"
         echo
         
         echo "Memory Information:"
-        local mem_info=$(free -h | grep "Mem:")
-        echo "  Total: $(echo $mem_info | awk '{print $2}')"
-        echo "  Used: $(echo $mem_info | awk '{print $3}')"
-        echo "  Available: $(echo $mem_info | awk '{print $7}')"
+        local mem_info
+        mem_info=$(free -h | grep "Mem:")
+        echo "  Total: $(echo "$mem_info" | awk '{print $2}')"
+        echo "  Used: $(echo "$mem_info" | awk '{print $3}')"
+        echo "  Available: $(echo "$mem_info" | awk '{print $7}')"
         echo "  Usage: $(free | grep Mem | awk '{printf "%.1f%%", $3/$2 * 100.0}')"
         echo
         
         echo "Disk Information:"
-        df -h | grep -E "^/dev/" | while read filesystem size used avail percent mount; do
+        df -h | grep -E "^/dev/" | while read -r _filesystem size used _avail percent mount; do
             echo "  $mount: $used/$size ($percent)"
         done
         echo
@@ -165,7 +167,8 @@ generate_report() {
         echo "Service Status:"
         local services=("ssh" "docker" "fail2ban" "hostapd" "dnsmasq")
         for service in "${services[@]}"; do
-            local status=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
+            local status
+            status=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
             echo "  $service: $status"
         done
         echo
@@ -175,7 +178,7 @@ generate_report() {
             echo "  Status: Running"
             echo "  Containers: $(docker ps -q | wc -l) running, $(docker ps -aq | wc -l) total"
             echo "  Images: $(docker images -q | wc -l)"
-            echo "  Networks: $(docker network ls -q | wc -l)"
+            echo "  Networks: $(docker network find -q  -maxdepth 1 -type f | wc -l)"
         else
             echo "  Status: Not running or not accessible"
         fi
@@ -184,7 +187,8 @@ generate_report() {
         echo "Hardware Status:"
         if command -v sensors >/dev/null 2>&1; then
             echo "  Temperature sensors available: Yes"
-            local cpu_temp=$(sensors 2>/dev/null | grep -i "core\|cpu" | grep -o '[0-9]\+\.[0-9]\+°C' | head -1 || echo "N/A")
+            local cpu_temp
+            cpu_temp=$(sensors 2>/dev/null | grep -i "core\|cpu" | grep -o '[0-9]\+\.[0-9]\+°C' | head -1 || echo "N/A")
             echo "  CPU Temperature: $cpu_temp"
         else
             echo "  Temperature sensors: Not available"
@@ -192,7 +196,8 @@ generate_report() {
         
         if command -v smartctl >/dev/null 2>&1; then
             echo "  SMART monitoring: Available"
-            local disk_count=$(ls /dev/sd* /dev/nvme* 2>/dev/null | wc -l)
+            local disk_count
+            disk_count=$(find /dev/sd* /dev/nvme* -maxdepth 1 -type f 2>/dev/null | wc -l)
             echo "  Monitored disks: $disk_count"
         else
             echo "  SMART monitoring: Not available"
@@ -220,29 +225,18 @@ generate_report() {
         echo "  Hardware monitor log: /var/log/dangerprep-hardware.log"
         echo "  System journal: journalctl -f"
         
-    } | tee "$REPORT_FILE"
+    } | tee "${REPORT_FILE}"
     
-    success "Monitoring report generated: $REPORT_FILE"
+    success "Monitoring report generated: ${REPORT_FILE}"
 }
 
-# Continuous monitoring mode
-run_continuous_monitoring() {
-    log "Starting continuous monitoring mode..."
-    info "Monitoring will run every 5 minutes. Press Ctrl+C to stop."
-    
-    while true; do
-        echo "$(date): Running monitoring cycle..."
-        run_all_monitoring > /dev/null 2>&1
-        echo "$(date): Monitoring cycle completed"
-        sleep 300  # 5 minutes
-    done
-}
+
 
 # Main function
 main() {
     # Show banner for comprehensive monitoring
     if [[ "${1:-all}" == "all" ]]; then
-        show_monitoring_banner
+        show_monitoring_banner "$@"
         echo
     fi
 
@@ -261,9 +255,6 @@ main() {
         report)
             generate_report
             ;;
-        continuous)
-            run_continuous_monitoring
-            ;;
         help|--help|-h)
             show_help
             exit 0
@@ -277,8 +268,8 @@ main() {
 }
 
 # Setup logging
-mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
-touch "$LOG_FILE" 2>/dev/null || true
+mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
+touch "${LOG_FILE}" 2>/dev/null || true
 
 # Run main function
 main "$@"

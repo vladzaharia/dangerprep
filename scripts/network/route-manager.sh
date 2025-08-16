@@ -6,7 +6,7 @@ set -e
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Color codes
 RED='\033[0;31m'
@@ -40,38 +40,40 @@ ROUTING_STATE="/var/lib/dangerprep/routing-state"
 mkdir -p /etc/dangerprep /var/lib/dangerprep
 
 check_prerequisites() {
-    if [[ $EUID -ne 0 ]]; then
+    if [[ ${EUID} -ne 0 ]]; then
         error "This script must be run as root"
         exit 1
     fi
     
-    if [ ! -f "$INTERFACE_CONFIG" ]; then
+    if [ ! -f "${INTERFACE_CONFIG}" ]; then
         error "Interface configuration not found. Run 'just net-enumerate' first."
         exit 1
     fi
 }
 
 get_wan_interface() {
-    if [ -f "$WAN_CONFIG" ]; then
-        cat "$WAN_CONFIG"
+    if [ -f "${WAN_CONFIG}" ]; then
+        cat "${WAN_CONFIG}"
     else
         echo ""
     fi
 }
 
 get_lan_interfaces() {
-    local wan_interface=$(get_wan_interface)
+    local wan_interface
+    wan_interface=$(get_wan_interface)
     local lan_interfaces=()
     
     # Get all interfaces except WAN
     while IFS= read -r line; do
         if [[ $line =~ ^(ETHERNET|WIFI|TAILSCALE)_([^=]+)=\"(.*)\"$ ]]; then
-            local interface="${BASH_REMATCH[2]}"
+            local interface
+            interface=${BASH_REMATCH[2]}
             if [ "$interface" != "$wan_interface" ]; then
                 lan_interfaces+=("$interface")
             fi
         fi
-    done < "$INTERFACE_CONFIG"
+    done < "${INTERFACE_CONFIG}"
     
     echo "${lan_interfaces[@]}"
 }
@@ -81,18 +83,20 @@ get_interface_type() {
     
     while IFS= read -r line; do
         if [[ $line =~ ^(ETHERNET|WIFI|TAILSCALE)_${interface}=\"(.*)\"$ ]]; then
-            local type="${BASH_REMATCH[1],,}"
+            local type
+            type=${BASH_REMATCH[1],,}
             echo "$type"
             return 0
         fi
-    done < "$INTERFACE_CONFIG"
+    done < "${INTERFACE_CONFIG}"
     
     echo "unknown"
 }
 
 configure_wan_interface() {
     local wan_interface="$1"
-    local wan_type=$(get_interface_type "$wan_interface")
+    local wan_type
+    wan_type=$(get_interface_type "$wan_interface")
     
     log "Configuring WAN interface: $wan_interface ($wan_type)"
     
@@ -145,7 +149,8 @@ configure_wan_interface() {
     # Verify WAN connectivity
     if ip route | grep -q "default.*$wan_interface"; then
         success "WAN interface $wan_interface configured successfully"
-        local wan_ip=$(ip addr show "$wan_interface" | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+        local wan_ip
+        wan_ip=$(ip addr show "$wan_interface" | grep "inet " | awk '{print $2}' | cut -d/ -f1)
         log "WAN IP: $wan_ip"
     else
         error "Failed to configure WAN interface: $wan_interface"
@@ -155,14 +160,16 @@ configure_wan_interface() {
 
 configure_lan_interfaces() {
     local wan_interface="$1"
-    local lan_interfaces=($(get_lan_interfaces))
+    local lan_interfaces=()
+    mapfile -t lan_interfaces < <(get_lan_interfaces)
     local lan_ip="192.168.120.1"
     local dhcp_interfaces=()
     
     log "Configuring LAN interfaces..."
     
     for interface in "${lan_interfaces[@]}"; do
-        local interface_type=$(get_interface_type "$interface")
+        local interface_type
+        interface_type=$(get_interface_type "$interface")
         
         log "Configuring LAN interface: $interface ($interface_type)"
         
@@ -268,7 +275,8 @@ EOF
 
 configure_routing() {
     local wan_interface="$1"
-    local lan_interfaces=($(get_lan_interfaces))
+    local lan_interfaces=()
+    mapfile -t lan_interfaces < <(get_lan_interfaces)
     
     log "Configuring routing and NAT..."
     
@@ -333,7 +341,8 @@ configure_routing() {
 start_routing() {
     check_prerequisites
     
-    local wan_interface=$(get_wan_interface)
+    local wan_interface
+    wan_interface=$(get_wan_interface)
     
     if [ -z "$wan_interface" ]; then
         error "No WAN interface configured. Use 'just net-set-wan <interface>' first."
@@ -349,7 +358,7 @@ start_routing() {
     configure_routing "$wan_interface"
     
     # Save routing state
-    cat > "$ROUTING_STATE" << EOF
+    cat > "${ROUTING_STATE}" << EOF
 wan_interface=$wan_interface
 lan_interfaces=$(get_lan_interfaces)
 started_at=$(date)
@@ -364,7 +373,7 @@ stop_routing() {
     log "Stopping dynamic routing..."
     
     # Stop all DangerPrep connections
-    nmcli connection show | grep "DangerPrep" | awk '{print $1}' | while read conn; do
+    nmcli connection show | grep "DangerPrep" | awk '{print $1}' | while read -r conn; do
         nmcli connection down "$conn" 2>/dev/null || true
         nmcli connection delete "$conn" 2>/dev/null || true
     done
@@ -378,7 +387,7 @@ stop_routing() {
     systemctl restart dnsmasq 2>/dev/null || true
     
     # Clear routing state
-    rm -f "$ROUTING_STATE"
+    rm -f "${ROUTING_STATE}"
     
     success "Dynamic routing stopped"
 }
@@ -387,12 +396,15 @@ show_routing_status() {
     echo "Dynamic Routing Status:"
     echo "======================"
     
-    local wan_interface=$(get_wan_interface)
-    local lan_interfaces=($(get_lan_interfaces))
+    local wan_interface
+    wan_interface=$(get_wan_interface)
+    local lan_interfaces=()
+    mapfile -t lan_interfaces < <(get_lan_interfaces)
     
     if [ -n "$wan_interface" ]; then
         echo "WAN Interface: $wan_interface ($(get_interface_type "$wan_interface"))"
-        local wan_ip=$(ip addr show "$wan_interface" 2>/dev/null | grep "inet " | awk '{print $2}' | head -1)
+        local wan_ip
+        wan_ip=$(ip addr show "$wan_interface" 2>/dev/null | grep "inet " | awk '{print $2}' | head -1)
         if [ -n "$wan_ip" ]; then
             echo "  IP: $wan_ip"
         fi
@@ -403,10 +415,12 @@ show_routing_status() {
     echo
     echo "LAN Interfaces:"
     for interface in "${lan_interfaces[@]}"; do
-        local interface_type=$(get_interface_type "$interface")
+        local interface_type
+        interface_type=$(get_interface_type "$interface")
         echo "  $interface ($interface_type)"
         
-        local ip=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | head -1)
+        local ip
+        ip=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | head -1)
         if [ -n "$ip" ]; then
             echo "    IP: $ip"
         fi
@@ -414,14 +428,16 @@ show_routing_status() {
     
     echo
     echo "Routing Rules:"
-    local nat_rules=$(iptables -t nat -L POSTROUTING -n | grep MASQUERADE | wc -l)
-    local forward_rules=$(iptables -L FORWARD -n | grep ACCEPT | wc -l)
+    local nat_rules
+    nat_rules=$(iptables -t nat -L POSTROUTING -n | grep -c MASQUERADE)
+    local forward_rules
+    forward_rules=$(iptables -L FORWARD -n | grep -c ACCEPT)
     echo "  NAT rules: $nat_rules"
     echo "  Forward rules: $forward_rules"
     
-    if [ -f "$ROUTING_STATE" ]; then
+    if [ -f "${ROUTING_STATE}" ]; then
         echo
-        echo "Started: $(grep started_at "$ROUTING_STATE" | cut -d= -f2)"
+        echo "Started: $(grep started_at "${ROUTING_STATE}" | cut -d= -f2)"
     fi
 }
 

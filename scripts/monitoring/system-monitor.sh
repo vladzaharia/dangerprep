@@ -6,7 +6,7 @@ set -e
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 LOG_FILE="/var/log/dangerprep-monitor.log"
 ALERT_THRESHOLD_CPU=80
@@ -24,22 +24,22 @@ NC='\033[0m'
 # Logging function
 log() {
     echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "${LOG_FILE}"
 }
 
 error() {
     echo -e "${RED}[ERROR]${NC} $1" >&2
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" >> "${LOG_FILE}"
 }
 
 success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] SUCCESS: $1" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] SUCCESS: $1" >> "${LOG_FILE}"
 }
 
 warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1" >> "${LOG_FILE}"
 }
 
 # System information functions
@@ -52,30 +52,34 @@ get_system_info() {
 }
 
 get_cpu_info() {
-    local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
-    local load_avg=$(cat /proc/loadavg | cut -d' ' -f1-3)
+    local cpu_usage
+    cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
+    local load_avg
+    load_avg=$(cat /proc/loadavg | cut -d' ' -f1-3)
     
     echo "--- CPU Information ---"
     echo "CPU Usage: ${cpu_usage}%"
     echo "Load Average: $load_avg"
     
     # Check CPU threshold
-    if (( $(echo "$cpu_usage > $ALERT_THRESHOLD_CPU" | bc -l) )); then
+    if (( $(echo "$cpu_usage > ${ALERT_THRESHOLD_CPU}" | bc -l) )); then
         warning "High CPU usage detected: ${cpu_usage}%"
     fi
     echo
 }
 
 get_memory_info() {
-    local mem_info=$(free -h)
-    local mem_usage=$(free | grep Mem | awk '{printf("%.1f"), $3/$2 * 100.0}')
+    local mem_info
+    mem_info=$(free -h)
+    local mem_usage
+    mem_usage=$(free | grep Mem | awk '{printf("%.1f"), $3/$2 * 100.0}')
     
     echo "--- Memory Information ---"
     echo "$mem_info"
     echo "Memory Usage: ${mem_usage}%"
     
     # Check memory threshold
-    if (( $(echo "$mem_usage > $ALERT_THRESHOLD_MEMORY" | bc -l) )); then
+    if (( $(echo "$mem_usage > ${ALERT_THRESHOLD_MEMORY}" | bc -l) )); then
         warning "High memory usage detected: ${mem_usage}%"
     fi
     echo
@@ -83,12 +87,14 @@ get_memory_info() {
 
 get_disk_info() {
     echo "--- Disk Information ---"
-    df -h | grep -E "(^/dev|^tmpfs)" | while read line; do
+    df -h | grep -E "(^/dev|^tmpfs)" | while read -r line; do
         echo "$line"
-        local usage=$(echo "$line" | awk '{print $5}' | sed 's/%//')
-        local mount=$(echo "$line" | awk '{print $6}')
-        
-        if [[ $usage -gt $ALERT_THRESHOLD_DISK ]]; then
+        local usage
+        usage=$(echo "$line" | awk '{print $5}' | sed 's/%//')
+        local mount
+        mount=$(echo "$line" | awk '{print $6}')
+
+        if [[ $usage -gt ${ALERT_THRESHOLD_DISK} ]]; then
             warning "High disk usage on $mount: ${usage}%"
         fi
     done
@@ -98,10 +104,11 @@ get_disk_info() {
 get_temperature_info() {
     echo "--- Temperature Information ---"
     if [[ -f /sys/class/thermal/thermal_zone0/temp ]]; then
-        local temp=$(($(cat /sys/class/thermal/thermal_zone0/temp) / 1000))
+        local temp
+        temp=$(($(cat /sys/class/thermal/thermal_zone0/temp) / 1000))
         echo "CPU Temperature: ${temp}°C"
         
-        if [[ $temp -gt $ALERT_THRESHOLD_TEMP ]]; then
+        if [[ $temp -gt ${ALERT_THRESHOLD_TEMP} ]]; then
             warning "High CPU temperature detected: ${temp}°C"
         fi
     else
@@ -122,11 +129,13 @@ get_network_info() {
 
     # Check Tailscale status
     if command -v tailscale > /dev/null 2>&1; then
-        local tailscale_status=$(tailscale status 2>/dev/null | head -1)
+        local tailscale_status
+        tailscale_status=$(tailscale status 2>/dev/null | head -1)
         if [[ -n "$tailscale_status" ]]; then
             success "Tailscale: Connected"
             # Check for NAS connectivity if configured
-            local nas_host="${NAS_HOST:-100.65.182.27}"
+            local nas_host
+            nas_host=${NAS_HOST:-100.65.182.27}
             if tailscale status | grep -q "$nas_host"; then
                 success "Tailscale NAS connectivity: OK"
             else
@@ -162,13 +171,15 @@ get_docker_info() {
     echo "--- Docker Services ---"
     
     if command -v docker > /dev/null 2>&1; then
-        local running_containers=$(docker ps --format "table {{.Names}}\t{{.Status}}" | grep -v NAMES)
+        local running_containers
+        running_containers=$(docker ps --format "table {{.Names}}\t{{.Status}}" | grep -v NAMES)
         
         if [[ -n "$running_containers" ]]; then
             echo "$running_containers"
             
             # Check for unhealthy containers
-            local unhealthy=$(docker ps --filter "health=unhealthy" --format "{{.Names}}")
+            local unhealthy
+            unhealthy=$(docker ps --filter "health=unhealthy" --format "{{.Names}}")
             if [[ -n "$unhealthy" ]]; then
                 error "Unhealthy containers detected: $unhealthy"
             fi
@@ -191,12 +202,14 @@ get_storage_health() {
     
     # Check NVMe health if available
     if command -v smartctl > /dev/null 2>&1 && [[ -e /dev/nvme0n1 ]]; then
-        local nvme_health=$(smartctl -H /dev/nvme0n1 | grep "overall-health")
+        local nvme_health
+        nvme_health=$(smartctl -H /dev/nvme0n1 | grep "overall-health")
         echo "NVMe Health: $nvme_health"
     fi
     
     # Check for filesystem errors
-    local fs_errors=$(dmesg | grep -i "error\|fail" | tail -5)
+    local fs_errors
+    fs_errors=$(dmesg | grep -i "error\|fail" | tail -5)
     if [[ -n "$fs_errors" ]]; then
         warning "Recent filesystem errors detected"
         echo "$fs_errors"
@@ -210,14 +223,17 @@ check_service_health() {
 
     # Check Docker services
     if command -v docker > /dev/null 2>&1; then
-        local services=($(docker ps --format "{{.Names}}" 2>/dev/null | sort))
+        local services=()
+        mapfile -t services < <(docker ps --format "{{.Names}}" 2>/dev/null | sort)
 
         if [ ${#services[@]} -eq 0 ]; then
             warning "No Docker services currently running"
         else
             for service in "${services[@]}"; do
-                local status=$(docker inspect --format='{{.State.Health.Status}}' "$service" 2>/dev/null || echo "no-healthcheck")
-                local state=$(docker inspect --format='{{.State.Status}}' "$service" 2>/dev/null || echo "unknown")
+                local status
+                status=$(docker inspect --format='{{.State.Health.Status}}' "$service" 2>/dev/null || echo "no-healthcheck")
+                local state
+                state=$(docker inspect --format='{{.State.Status}}' "$service" 2>/dev/null || echo "unknown")
 
                 if [[ "$state" == "running" ]]; then
                     if [[ "$status" == "healthy" ]] || [[ "$status" == "no-healthcheck" ]]; then
@@ -241,7 +257,8 @@ check_security_services() {
     # Check fail2ban
     if systemctl is-active --quiet fail2ban; then
         success "Fail2ban: Active"
-        local banned_ips=$(fail2ban-client status sshd 2>/dev/null | grep "Banned IP list" | cut -d: -f2 | wc -w)
+        local banned_ips
+        banned_ips=$(fail2ban-client status sshd 2>/dev/null | grep "Banned IP list" | cut -d: -f2 | wc -w)
         if [[ $banned_ips -gt 0 ]]; then
             warning "Fail2ban: $banned_ips IPs currently banned"
         fi
@@ -252,14 +269,16 @@ check_security_services() {
     # Check SSH service
     if systemctl is-active --quiet ssh; then
         success "SSH: Running"
-        local ssh_port=$(grep "^Port " /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}' || echo "22")
+        local ssh_port
+        ssh_port=$(grep "^Port " /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}' || echo "22")
         log "SSH Port: $ssh_port"
     else
         error "SSH: Not running"
     fi
 
     # Check firewall status
-    local iptables_rules=$(iptables -L | wc -l)
+    local iptables_rules
+    iptables_rules=$(iptables -L | wc -l)
     if [[ $iptables_rules -gt 10 ]]; then
         success "Firewall: Active ($iptables_rules rules)"
     else

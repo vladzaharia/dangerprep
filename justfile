@@ -7,64 +7,87 @@ default:
 
 # Show detailed help
 help:
-    @echo "DangerPrep Management Commands"
-    @echo "=============================="
+    @echo "DangerPrep Emergency Router & Content Hub"
+    @echo "========================================="
     @echo ""
-    @echo "System Management:"
-    @echo "  deploy     - Deploy/install the entire DangerPrep system"
-    @echo "  cleanup    - Clean up/uninstall DangerPrep system"
-    @echo "  update     - Update system from repository"
-    @echo "  uninstall  - Uninstall system (preserves data)"
+    @echo "🚨 EMERGENCY QUICK SETUP (Priority 1):"
+    @echo "  emergency-router     - Quick setup: ethernet → WiFi hotspot"
+    @echo "  emergency-repeater   - Quick setup: WiFi repeater mode"
+    @echo "  emergency-local      - Quick setup: local network (no internet)"
+    @echo "  emergency-health     - Quick system health check"
+    @echo "  status               - Show system status (services, network, hardware)"
+    @echo "  net-diag             - Run network diagnostics"
     @echo ""
-    @echo "Service Management:"
-    @echo "  start      - Start all Docker services"
-    @echo "  stop       - Stop all Docker services"
-    @echo "  restart    - Restart all Docker services"
-    @echo "  status     - Show service status"
+    @echo "🌐 NETWORK MANAGEMENT:"
+    @echo "  wan-list             - List available network interfaces"
+    @echo "  wan-set <interface>  - Set WAN interface (others become LAN)"
+    @echo "  wan-status           - Show WAN/LAN configuration"
+    @echo "  wifi-scan            - Scan for WiFi networks"
+    @echo "  wifi-connect <ssid> <pass> - Connect to WiFi"
+    @echo "  wifi-ap <ssid> <pass> - Create WiFi access point"
+    @echo "  net-connectivity     - Test internet connectivity"
+    @echo "  net-wifi             - WiFi diagnostics"
     @echo ""
-    @echo "WAN Management:"
-    @echo "  wan-list          - List all available interfaces"
-    @echo "  wan-set <if>      - Set interface as WAN (others become LAN)"
-    @echo "  wan-clear         - Clear WAN (local only mode)"
-    @echo "  wan-status        - Show current WAN/LAN configuration"
+    @echo "🔧 SYSTEM CONTROL:"
+    @echo "  start                - Start all services"
+    @echo "  stop                 - Stop all services"
+    @echo "  restart              - Restart all services"
+    @echo "  route-start          - Start routing services"
+    @echo "  route-stop           - Stop routing services"
+    @echo "  fw-status            - Show firewall status"
+    @echo "  fw-reset             - Reset firewall rules"
     @echo ""
-    @echo "Routing:"
-    @echo "  route-start [ssid] [pass] - Start routing with current WAN config"
-    @echo "  route-stop        - Stop routing"
-    @echo "  route-status      - Show routing status"
-    @echo "  route-restart     - Restart routing"
+    @echo "💾 MAINTENANCE & BACKUP:"
+    @echo "  backup               - Create basic backup"
+    @echo "  backup-encrypted     - Create encrypted backup"
+    @echo "  backup-list          - List available backups"
+    @echo "  system-maintenance   - Run system maintenance"
+    @echo "  system-health        - Quick system health check"
+    @echo "  clean                - Clean up system resources"
+    @echo "  logs                 - Show recent service logs"
     @echo ""
-    @echo "WiFi Management:"
-    @echo "  wifi-scan         - Scan for available WiFi networks"
-    @echo "  wifi-connect <ssid> <pass> - Connect to WiFi network"
-    @echo "  wifi-ap <ssid> <pass>      - Create WiFi access point"
-    @echo "  wifi-status       - Show WiFi interface status"
+    @echo "🔒 SECURITY & MONITORING:"
+    @echo "  security-audit-all   - Run all security checks"
+    @echo "  security-cron        - Run security checks (cron mode)"
+    @echo "  hardware-monitor     - Monitor hardware health"
+    @echo "  fan-status           - Check cooling fan status"
     @echo ""
-    @echo "Firewall Management:"
-    @echo "  fw-status         - Show firewall rules and status"
-    @echo "  fw-reset          - Reset firewall to default rules"
-    @echo "  fw-port-forward <port> <target> - Add port forwarding rule"
+    @echo "⚙️  ADVANCED SETUP:"
+    @echo "  deploy               - Deploy/install entire system"
+    @echo "  update               - Update from repository"
+    @echo "  cleanup              - Uninstall system"
     @echo ""
-    @echo "System Maintenance:"
-    @echo "  clean      - Clean up unused Docker resources"
-    @echo "  backup-create-basic    - Create basic backup"
-    @echo "  backup-create-encrypted - Create encrypted backup"
-    @echo "  backup-list            - List available backups"
-    @echo "  logs       - Show recent service logs"
+
+# Emergency Quick Setup Commands
+# Quick emergency router setup (WAN ethernet → WiFi hotspot)
+emergency-router:
+    @echo "🚨 Setting up emergency router (ethernet → WiFi)..."
+    @just start
+    @just wan-to-wifi
+    @just status
+
+# Quick emergency WiFi repeater setup
+emergency-repeater:
+    @echo "🚨 Setting up emergency WiFi repeater..."
+    @just start
+    @just wifi-repeater
+    @just status
+
+# Emergency local network (no internet)
+emergency-local:
+    @echo "🚨 Setting up emergency local network..."
+    @just start
+    @just local-only
+    @just status
+
+# Quick system health check for emergency scenarios
+emergency-health:
+    @echo "🚨 Emergency system health check..."
+    @just status
     @echo ""
-    @echo "Security & Monitoring:"
-    @echo "  security-audit-all     - Run all security checks"
-    @echo "  monitor-all           - Run all monitoring checks"
-    @echo "  validate-all          - Run all validation checks"
-    @echo "  aide-check            - Run AIDE integrity check"
-    @echo "  antivirus-scan        - Run antivirus scan"
+    @just net-connectivity
     @echo ""
-    @echo "Network Routing:"
-    @echo "  wan-to-wifi           - Setup WAN-to-WiFi routing"
-    @echo "  wifi-repeater         - Setup WiFi repeater mode"
-    @echo "  local-only            - Setup local only network"
-    @echo "  qos-setup             - Setup QoS traffic shaping"
-    @echo ""
+    @just hardware-monitor
 
 # System Management
 deploy:
@@ -79,14 +102,14 @@ update:
     @./scripts/system/system-update.sh
 
 uninstall:
-    @./scripts/system/system-uninstall.sh
+    @./scripts/setup/cleanup-dangerprep.sh --force
 
 # Service management
 start:
-    @./scripts/docker/start-services.sh
+    @./scripts/system/start-services.sh
 
 stop:
-    @./scripts/docker/stop-services.sh
+    @./scripts/system/stop-services.sh
 
 restart:
     @echo "Restarting DangerPrep services..."
@@ -95,7 +118,14 @@ restart:
     @just start
 
 status:
-    @./scripts/docker/service-status.sh
+    @./scripts/system/service-status.sh
+
+olares:
+    @echo "Olares/K3s Status:"
+    @echo "=================="
+    @kubectl get nodes 2>/dev/null || echo "K3s not running"
+    @echo ""
+    @kubectl get pods --all-namespaces 2>/dev/null || echo "No pods found"
 
 # WAN Management
 wan-list:
@@ -163,12 +193,38 @@ fw-port-forward port target:
     @echo "Adding port forwarding {{port}} → {{target}}..."
     @sudo ./scripts/network/firewall-manager.sh port-forward {{port}} {{target}}
 
+# Network Diagnostics
+# Run comprehensive network diagnostics
+net-diag:
+    @./scripts/network/network-diagnostics.sh all
+
+# Test network connectivity
+net-connectivity:
+    @./scripts/network/network-diagnostics.sh connectivity
+
+# Show network interface status
+net-interfaces:
+    @./scripts/network/network-diagnostics.sh interfaces
+
+# Test DNS resolution
+net-dns:
+    @./scripts/network/network-diagnostics.sh dns
+
+# WiFi diagnostics and scanning
+net-wifi:
+    @./scripts/network/network-diagnostics.sh wifi
+
+# Basic network speed test
+net-speed:
+    @./scripts/network/network-diagnostics.sh speed
+
 # System Maintenance
 clean:
-    @echo "Cleaning up Docker resources..."
-    @sudo docker system prune -f
-    @sudo docker volume prune -f
-    @sudo docker network prune -f
+    @echo "Cleaning up system resources..."
+    @sudo systemctl restart k3s 2>/dev/null || echo "K3s not running"
+    @sudo journalctl --vacuum-time=7d
+    @sudo apt autoremove -y
+    @sudo apt autoclean
 
 backup:
     @./scripts/backup/backup-manager.sh create basic
@@ -177,14 +233,17 @@ logs:
     #!/usr/bin/env bash
     echo "Recent service logs:"
     echo "==================="
-    echo "Traefik logs:"
-    sudo docker logs --tail=20 traefik 2>/dev/null || echo "Traefik not running"
+    echo "K3s logs:"
+    sudo journalctl -u k3s --no-pager -n 20 2>/dev/null || echo "K3s not running"
     echo ""
-    echo "Jellyfin logs:"
-    sudo docker logs --tail=20 jellyfin 2>/dev/null || echo "Jellyfin not running"
+    echo "AdGuard Home logs:"
+    sudo journalctl -u adguardhome --no-pager -n 20 2>/dev/null || echo "AdGuard Home not running"
     echo ""
-    echo "Portal logs:"
-    sudo docker logs --tail=20 portal 2>/dev/null || echo "Portal not running"
+    echo "Step-CA logs:"
+    sudo journalctl -u step-ca --no-pager -n 20 2>/dev/null || echo "Step-CA not running"
+    echo ""
+    echo "Tailscale logs:"
+    sudo journalctl -u tailscaled --no-pager -n 20 2>/dev/null || echo "Tailscale not running"
 
 
 
@@ -193,132 +252,151 @@ logs:
 # Certificate Management
 # Show certificate status for Traefik and Step-CA
 certs-status:
-    @scripts/system/certs.sh status
+    @./scripts/system/certs.sh status
 
 # Setup Traefik ACME certificates
 certs-traefik:
-    @scripts/system/certs.sh traefik
+    @./scripts/system/certs.sh traefik
 
 # Setup Step-CA internal certificates
 certs-step-ca:
-    @scripts/system/certs.sh step-ca
+    @./scripts/system/certs.sh step-ca
 
 # Security and Monitoring (Unified Commands)
 # Run all security checks
 security-audit-all:
-    @scripts/security/security-audit-all.sh all
+    @./scripts/security/security-audit-all.sh all
+
+# Run security checks in cron-friendly mode (quiet, logs to file)
+security-cron:
+    @./scripts/security/security-audit-all.sh cron
 
 # Run specific security checks
 aide-check:
-    @scripts/security/security-audit-all.sh aide
+    @./scripts/security/security-audit-all.sh aide
 
 antivirus-scan:
-    @scripts/security/security-audit-all.sh antivirus
+    @./scripts/security/security-audit-all.sh antivirus
 
 security-audit:
-    @scripts/security/security-audit-all.sh audit
+    @./scripts/security/security-audit-all.sh audit
 
 rootkit-scan:
-    @scripts/security/security-audit-all.sh rootkit
+    @./scripts/security/security-audit-all.sh rootkit
 
-suricata-monitor:
-    @scripts/security/security-audit-all.sh suricata
+
 
 # Run all monitoring checks
 monitor-all:
-    @scripts/monitoring/monitor-all.sh all
+    @./scripts/monitoring/monitor-all.sh all
 
 # Run specific monitoring checks
 system-monitor:
-    @scripts/monitoring/monitor-all.sh system
+    @./scripts/monitoring/monitor-all.sh system
 
 hardware-monitor:
-    @scripts/monitoring/monitor-all.sh hardware
+    @./scripts/monitoring/monitor-all.sh hardware
 
 monitor-continuous:
-    @scripts/monitoring/monitor-all.sh continuous
+    @./scripts/monitoring/monitor-all.sh continuous
 
-# Validation Commands (Unified)
-validate-all:
-    @scripts/validation/validate-system.sh all
+# System Maintenance (Consolidated)
+# Run all system maintenance tasks
+system-maintenance:
+    @./scripts/system/system-maintenance.sh all
 
-validate-compose:
-    @scripts/validation/validate-system.sh compose
+# Validate system configuration and dependencies
+system-validate:
+    @./scripts/system/system-maintenance.sh validate
 
-validate-references:
-    @scripts/validation/validate-system.sh references
+# Quick system health check
+system-health:
+    @./scripts/system/system-maintenance.sh health
 
-validate-docker:
-    @scripts/validation/validate-system.sh docker
 
-validate-nfs:
-    @scripts/validation/validate-system.sh nfs
 
-# Check container health
-container-health:
-    @scripts/docker/container-health.sh check
+# Hardware Management
+# Monitor hardware temperature and health
+hardware-monitor:
+    @./scripts/monitoring/hardware-monitor.sh check
+
+# Generate comprehensive hardware report
+hardware-report:
+    @./scripts/monitoring/hardware-monitor.sh report
+
+# FriendlyElec-specific hardware monitoring
+hardware-friendlyelec:
+    @./scripts/monitoring/hardware-monitor.sh friendlyelec
+
+# RK3588 fan control commands
+fan-start:
+    @./scripts/monitoring/rk3588-fan-control.sh start
+
+fan-stop:
+    @./scripts/monitoring/rk3588-fan-control.sh stop
+
+fan-status:
+    @./scripts/monitoring/rk3588-fan-control.sh status
+
+fan-test:
+    @./scripts/monitoring/rk3588-fan-control.sh test
 
 # System utilities
 fix-permissions:
-    @scripts/system/fix-permissions.sh
+    @./scripts/system/system-maintenance.sh permissions
 
-audit-shell-scripts:
-    @scripts/system/audit-shell-scripts.sh
+# Backup Management
+# Create encrypted backup (recommended for production)
+backup-encrypted:
+    @./scripts/backup/backup-manager.sh create encrypted
 
-# Backup Management (Unified)
-# Create different types of backups
-backup-create-basic:
-    @scripts/backup/backup-manager.sh create basic
+# Create full system backup (includes all data)
+backup-full:
+    @./scripts/backup/backup-manager.sh create full
 
-backup-create-encrypted:
-    @scripts/backup/backup-manager.sh create encrypted
-
-backup-create-full:
-    @scripts/backup/backup-manager.sh create full
-
-# Backup management
+# Backup management commands
 backup-list:
-    @scripts/backup/backup-manager.sh list
+    @./scripts/backup/backup-manager.sh list
 
 backup-restore backup:
-    @scripts/backup/backup-manager.sh restore {{backup}}
+    @./scripts/backup/backup-manager.sh restore {{backup}}
 
 backup-cleanup days="30":
-    @scripts/backup/backup-manager.sh cleanup {{days}}
+    @./scripts/backup/backup-manager.sh cleanup {{days}}
 
 backup-verify backup:
-    @scripts/backup/backup-manager.sh verify {{backup}}
+    @./scripts/backup/backup-manager.sh verify {{backup}}
 
-# Legacy backup commands (for cron compatibility)
+# Cron-compatible backup commands (used by automated backups)
 backup-daily:
-    @scripts/backup/backup-manager.sh create encrypted
+    @./scripts/backup/backup-manager.sh create encrypted
 
 backup-weekly:
-    @scripts/backup/backup-manager.sh create full
+    @./scripts/backup/backup-manager.sh create full
 
 backup-monthly:
-    @scripts/backup/backup-manager.sh create full
+    @./scripts/backup/backup-manager.sh create full
 
 # Network Routing
 # Setup WAN-to-WiFi routing
 wan-to-wifi:
-    @scripts/network/wan-to-wifi.sh setup
+    @./scripts/network/wan-to-wifi.sh setup
 
 # Setup WiFi repeater mode
 wifi-repeater:
-    @scripts/network/wifi-repeater.sh setup
+    @./scripts/network/wifi-repeater.sh setup
 
 # Setup local only network
 local-only:
-    @scripts/network/emergency-local.sh setup
+    @./scripts/network/emergency-local.sh setup
 
 # Setup QoS traffic shaping
 qos-setup:
-    @scripts/network/qos.sh setup
+    @./scripts/network/qos.sh setup
 
 # Show QoS status
 qos-status:
-    @scripts/network/qos.sh status
+    @./scripts/network/qos.sh status
 
 # Quick access to common tasks
 alias install := deploy

@@ -18,16 +18,14 @@ GPIO_GROUPS="gpio gpio-admin"
 PWM_GROUPS="gpio pwm"
 I2C_GROUPS="i2c"
 SPI_GROUPS="spi"
-ALLOW_NON_ROOT_GPIO=true
-ALLOW_NON_ROOT_PWM=true
-ALLOW_NON_ROOT_I2C=true
+# Configuration flags (defined for documentation purposes)
 ALLOW_NON_ROOT_SPI=false
 
 # Load configuration
 load_config() {
-    if [[ -f "$CONFIG_FILE" ]]; then
+    if [[ -f "${CONFIG_FILE}" ]]; then
         # shellcheck source=/dev/null
-        source "$CONFIG_FILE"
+        source "${CONFIG_FILE}"
     fi
 }
 
@@ -36,7 +34,7 @@ create_hardware_groups() {
     log "Creating hardware access groups..."
     
     # GPIO groups
-    for group in $GPIO_GROUPS; do
+    for group in ${GPIO_GROUPS}; do
         if ! getent group "$group" >/dev/null 2>&1; then
             groupadd "$group"
             success "Created group: $group"
@@ -46,7 +44,7 @@ create_hardware_groups() {
     done
     
     # PWM groups
-    for group in $PWM_GROUPS; do
+    for group in ${PWM_GROUPS}; do
         if ! getent group "$group" >/dev/null 2>&1; then
             groupadd "$group"
             success "Created group: $group"
@@ -56,7 +54,7 @@ create_hardware_groups() {
     done
     
     # I2C groups
-    for group in $I2C_GROUPS; do
+    for group in ${I2C_GROUPS}; do
         if ! getent group "$group" >/dev/null 2>&1; then
             groupadd "$group"
             success "Created group: $group"
@@ -66,7 +64,7 @@ create_hardware_groups() {
     done
     
     # SPI groups
-    for group in $SPI_GROUPS; do
+    for group in ${SPI_GROUPS}; do
         if ! getent group "$group" >/dev/null 2>&1; then
             groupadd "$group"
             success "Created group: $group"
@@ -168,7 +166,7 @@ configure_spi_access() {
     log "Configuring SPI access..."
     
     # Create udev rules for SPI access
-    if [[ "$ALLOW_NON_ROOT_SPI" == true ]]; then
+    if [[ "${ALLOW_NON_ROOT_SPI}" == true ]]; then
         cat > /etc/udev/rules.d/99-friendlyelec-spi.rules << 'EOF'
 # FriendlyElec SPI access rules (non-root access enabled)
 KERNEL=="spidev*", GROUP="spi", MODE="0664"
@@ -183,7 +181,7 @@ EOF
     # Set permissions for existing SPI devices
     for spi_dev in /dev/spidev*; do
         if [[ -c "$spi_dev" ]]; then
-            if [[ "$ALLOW_NON_ROOT_SPI" == true ]]; then
+            if [[ "${ALLOW_NON_ROOT_SPI}" == true ]]; then
                 chgrp spi "$spi_dev" 2>/dev/null || true
                 chmod 664 "$spi_dev" 2>/dev/null || true
             else
@@ -213,7 +211,8 @@ EOF
 
 # Add user to hardware groups
 add_user_to_groups() {
-    local username="${1:-$SUDO_USER}"
+    local username
+    username=${1:-${SUDO_USER}}
     
     if [[ -z "$username" ]]; then
         warning "No username provided, skipping user group assignment"
@@ -223,23 +222,23 @@ add_user_to_groups() {
     log "Adding user $username to hardware groups..."
     
     # Add to GPIO groups
-    for group in $GPIO_GROUPS; do
+    for group in ${GPIO_GROUPS}; do
         usermod -a -G "$group" "$username" 2>/dev/null || true
     done
     
     # Add to PWM groups
-    for group in $PWM_GROUPS; do
+    for group in ${PWM_GROUPS}; do
         usermod -a -G "$group" "$username" 2>/dev/null || true
     done
     
     # Add to I2C groups
-    for group in $I2C_GROUPS; do
+    for group in ${I2C_GROUPS}; do
         usermod -a -G "$group" "$username" 2>/dev/null || true
     done
     
     # Add to SPI groups (if allowed)
-    if [[ "$ALLOW_NON_ROOT_SPI" == true ]]; then
-        for group in $SPI_GROUPS; do
+    if [[ "${ALLOW_NON_ROOT_SPI}" == true ]]; then
+        for group in ${SPI_GROUPS}; do
             usermod -a -G "$group" "$username" 2>/dev/null || true
         done
     fi
@@ -263,14 +262,16 @@ test_hardware_interfaces() {
     
     # Test PWM
     if [[ -d /sys/class/pwm ]]; then
-        local pwm_chips=$(ls /sys/class/pwm/pwmchip* 2>/dev/null | wc -l)
+        local pwm_chips
+        pwm_chips=$(find /sys/class/pwm/pwmchip* -maxdepth 1 -type f 2>/dev/null | wc -l)
         success "PWM interface available ($pwm_chips chips)"
     else
         warning "PWM interface not available"
     fi
     
     # Test I2C
-    local i2c_buses=$(ls /dev/i2c-* 2>/dev/null | wc -l)
+    local i2c_buses
+    i2c_buses=$(find /dev/i2c-* -maxdepth 1 -type f 2>/dev/null | wc -l)
     if [[ $i2c_buses -gt 0 ]]; then
         success "I2C interface available ($i2c_buses buses)"
     else
@@ -278,7 +279,8 @@ test_hardware_interfaces() {
     fi
     
     # Test SPI
-    local spi_devices=$(ls /dev/spidev* 2>/dev/null | wc -l)
+    local spi_devices
+    spi_devices=$(find /dev/spidev* -maxdepth 1 -type f 2>/dev/null | wc -l)
     if [[ $spi_devices -gt 0 ]]; then
         success "SPI interface available ($spi_devices devices)"
     else

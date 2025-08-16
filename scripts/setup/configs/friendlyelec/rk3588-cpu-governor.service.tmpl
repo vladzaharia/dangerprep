@@ -1,0 +1,11 @@
+[Unit]
+Description=RK3588 CPU Governor Configuration
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'for policy in /sys/devices/system/cpu/cpufreq/policy*; do [ -w "$policy/scaling_governor" ] && echo performance > "$policy/scaling_governor"; done'
+
+[Install]
+WantedBy=multi-user.target

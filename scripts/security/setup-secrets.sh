@@ -7,8 +7,8 @@ set -euo pipefail
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-SECRETS_DIR="$PROJECT_ROOT/secrets"
+PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+SECRETS_DIR="${PROJECT_ROOT}/secrets"
 
 # Colors for output
 RED='\033[0;31m'
@@ -82,7 +82,7 @@ check_prerequisites() {
     log "Checking prerequisites..."
     
     # Check if running from project root or scripts directory
-    if [[ ! -f "$PROJECT_ROOT/docker/infrastructure/traefik/compose.yml" ]]; then
+    if [[ ! -f "${PROJECT_ROOT}/docker/infrastructure/traefik/compose.yml" ]]; then
         error "This script must be run from the DangerPrep project directory"
         exit 1
     fi
@@ -107,17 +107,19 @@ check_prerequisites() {
 backup_env_files() {
     log "Backing up existing environment files..."
     
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN}" == "true" ]]; then
         log "[DRY RUN] Would backup environment files"
         return 0
     fi
     
-    local backup_dir="$PROJECT_ROOT/backups/env-$(date +%Y%m%d-%H%M%S)"
+    local backup_dir
+    backup_dir="${PROJECT_ROOT}/backups/env-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$backup_dir"
     
     # Find and backup all compose.env files
-    find "$PROJECT_ROOT/docker" -name "compose.env" -type f | while read -r env_file; do
-        local relative_path="${env_file#$PROJECT_ROOT/docker/}"
+    find "${PROJECT_ROOT}/docker" -name "compose.env" -type f | while read -r env_file; do
+        local relative_path
+        relative_path=${env_file#"${PROJECT_ROOT}"/docker/}
         local backup_path="$backup_dir/$relative_path"
         mkdir -p "$(dirname "$backup_path")"
         cp "$env_file" "$backup_path"
@@ -132,23 +134,23 @@ generate_all_secrets() {
     log "Generating secrets for all services..."
     
     local generate_args=()
-    if [[ "$FORCE_REGENERATE" == "true" ]]; then
+    if [[ "${FORCE_REGENERATE}" == "true" ]]; then
         generate_args+=("--force")
     fi
     
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN}" == "true" ]]; then
         if [[ ${#generate_args[@]} -gt 0 ]]; then
-            log "[DRY RUN] Would run: $SCRIPT_DIR/generate-secrets.sh ${generate_args[*]}"
+            log "[DRY RUN] Would run: ${SCRIPT_DIR}/generate-secrets.sh ${generate_args[*]}"
         else
-            log "[DRY RUN] Would run: $SCRIPT_DIR/generate-secrets.sh"
+            log "[DRY RUN] Would run: ${SCRIPT_DIR}/generate-secrets.sh"
         fi
         return 0
     fi
 
     if [[ ${#generate_args[@]} -gt 0 ]]; then
-        "$SCRIPT_DIR/generate-secrets.sh" "${generate_args[@]}"
+        "${SCRIPT_DIR}/generate-secrets.sh" "${generate_args[@]}"
     else
-        "$SCRIPT_DIR/generate-secrets.sh"
+        "${SCRIPT_DIR}/generate-secrets.sh"
     fi
 }
 
@@ -157,32 +159,32 @@ update_all_env_files() {
     log "Updating environment files with generated secrets..."
     
     local update_args=()
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN}" == "true" ]]; then
         update_args+=("--dry-run")
     fi
     
-    "$SCRIPT_DIR/update-env-secrets.sh" "${update_args[@]}"
+    "${SCRIPT_DIR}/update-env-secrets.sh" "${update_args[@]}"
 }
 
 # Set secure permissions
 set_secure_permissions() {
     log "Setting secure permissions on secrets and environment files..."
     
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN}" == "true" ]]; then
         log "[DRY RUN] Would set secure permissions on secrets directory"
         log "[DRY RUN] Would set 600 permissions on environment files"
         return 0
     fi
     
     # Secure the secrets directory
-    if [[ -d "$SECRETS_DIR" ]]; then
-        chmod -R 700 "$SECRETS_DIR"
-        find "$SECRETS_DIR" -type f -exec chmod 600 {} \;
-        success "Secured secrets directory: $SECRETS_DIR"
+    if [[ -d "${SECRETS_DIR}" ]]; then
+        chmod -R 700 "${SECRETS_DIR}"
+        find "${SECRETS_DIR}" -type f -exec chmod 600 {} \;
+        success "Secured secrets directory: ${SECRETS_DIR}"
     fi
     
     # Secure environment files
-    find "$PROJECT_ROOT/docker" -name "compose.env" -type f -exec chmod 600 {} \;
+    find "${PROJECT_ROOT}/docker" -name "compose.env" -type f -exec chmod 600 {} \;
     success "Secured environment files"
 }
 
@@ -193,8 +195,8 @@ validate_secrets() {
     local validation_errors=0
     
     # Check if secrets directory exists
-    if [[ ! -d "$SECRETS_DIR" ]]; then
-        error "Secrets directory not found: $SECRETS_DIR"
+    if [[ ! -d "${SECRETS_DIR}" ]]; then
+        error "Secrets directory not found: ${SECRETS_DIR}"
         ((validation_errors++))
         return $validation_errors
     fi
@@ -221,7 +223,7 @@ validate_secrets() {
     
     # Check each required secret
     for secret in "${required_secrets[@]}"; do
-        local secret_file="$SECRETS_DIR/$secret"
+        local secret_file="${SECRETS_DIR}/$secret"
         if [[ ! -f "$secret_file" ]]; then
             error "Missing secret file: $secret"
             ((validation_errors++))
@@ -246,7 +248,7 @@ validate_secrets() {
 show_summary() {
     log "Secret Management Setup Summary"
     echo
-    log "Secrets directory: $SECRETS_DIR"
+    log "Secrets directory: ${SECRETS_DIR}"
     log "Generated secrets for services:"
     log "  • ROMM (auth key, database, Redis)"
     log "  • Step-CA (root password)"
@@ -257,7 +259,7 @@ show_summary() {
     log "  • Jellyfin (certificate password)"
     echo
     log "Next steps:"
-    log "  1. Review generated secrets in $SECRETS_DIR"
+    log "  1. Review generated secrets in ${SECRETS_DIR}"
     log "  2. Replace placeholder API keys with real ones:"
     log "     - Cloudflare API keys in traefik/compose.env"
     log "     - Email passwords in watchtower/compose.env"
@@ -275,8 +277,8 @@ show_summary() {
 # Main execution
 main() {
     log "DangerPrep Secret Management Setup"
-    log "Force regenerate: $FORCE_REGENERATE"
-    log "Dry run: $DRY_RUN"
+    log "Force regenerate: ${FORCE_REGENERATE}"
+    log "Dry run: ${DRY_RUN}"
     echo
     
     check_prerequisites
@@ -285,13 +287,13 @@ main() {
     update_all_env_files
     set_secure_permissions
     
-    if [[ "$DRY_RUN" != "true" ]]; then
+    if [[ "${DRY_RUN}" != "true" ]]; then
         validate_secrets
     fi
     
     show_summary
     
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN}" == "true" ]]; then
         success "Dry run completed - no changes made"
     else
         success "Secret management setup completed successfully!"

@@ -1,69 +1,108 @@
-#!/bin/bash
-# DangerPrep Setup Script - Clean Architecture
-# Complete system setup for Ubuntu 24.04 with 2025 security hardening
-# Uses external configuration templates for maintainability
+#!/usr/bin/env bash
+# DangerPrep Setup Script - Complete System Setup
+#
+# Purpose: Complete system setup for Ubuntu 24.04 with 2025 security hardening
+# Usage: setup-dangerprep.sh [--dry-run] [--verbose] [--config FILE]
+# Dependencies: apt, systemctl, ufw, docker, git, curl, wget
+# Author: DangerPrep Project
+# Version: 2.0
 
-# Modern shell script security and error handling
+# Modern shell script best practices
 set -euo pipefail
-IFS=$'\n\t'
 
-# Enable debug mode if DEBUG environment variable is set
-if [[ "${DEBUG:-}" == "true" ]]; then
-    set -x
-fi
+# Script metadata
+SCRIPT_NAME=""
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
+readonly SCRIPT_NAME
 
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+SCRIPT_DIR=""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
 
-# Logging functions
-log() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
-}
+readonly SCRIPT_VERSION="2.0"
+readonly SCRIPT_DESCRIPTION="DangerPrep Complete System Setup"
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE" >&2
-}
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1" | tee -a "$LOG_FILE"
-}
+# Show help information
+show_help() {
+    cat << EOF
+${SCRIPT_DESCRIPTION} v${SCRIPT_VERSION}
 
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1" | tee -a "$LOG_FILE"
-}
+Usage: ${SCRIPT_NAME} [OPTIONS]
 
-info() {
-    echo -e "${CYAN}[INFO]${NC} $1" | tee -a "$LOG_FILE"
+OPTIONS:
+    --dry-run       Show what would be installed without making changes
+    --verbose       Enable verbose output for debugging
+    --config FILE   Use custom configuration file
+    --skip-docker   Skip Docker installation
+    --skip-network  Skip network configuration
+    -h, --help      Show this help message
+
+DESCRIPTION:
+    Complete system setup for Ubuntu 24.04 with 2025 security hardening.
+    This script will:
+    • Install and configure Docker with security hardening
+    • Set up network configuration (hostapd, dnsmasq, firewall)
+    • Install security tools (AIDE, fail2ban, ClamAV)
+    • Configure hardware monitoring and optimization
+    • Set up backup and monitoring systems
+    • Apply comprehensive security hardening
+
+EXAMPLES:
+    ${SCRIPT_NAME}                    # Full interactive setup
+    ${SCRIPT_NAME} --dry-run          # Preview changes without installation
+    ${SCRIPT_NAME} --verbose          # Enable detailed logging
+    ${SCRIPT_NAME} --skip-docker      # Skip Docker installation
+
+NOTES:
+    - This script must be run as root
+    - Requires Ubuntu 24.04 LTS
+    - Creates backup in: /var/backups/dangerprep-*
+    - Logs to: /var/log/dangerprep-setup.log
+    - Supports both NanoPi R6C and M6 hardware
+
+EXIT CODES:
+    0   Success
+    1   General error
+    2   Invalid arguments
+    3   Unsupported system
+
+For more information, see the DangerPrep documentation.
+EOF
 }
 
 # Configuration variables with validation
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
 
 # Source shared banner utility
-source "$SCRIPT_DIR/../shared/banner.sh"
+# shellcheck source=../shared/banner.sh
+source "${SCRIPT_DIR}/../shared/banner.sh"
 INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-$(pwd)}"
 LOG_FILE="/var/log/dangerprep-setup.log"
 BACKUP_DIR="/var/backups/dangerprep-$(date +%Y%m%d-%H%M%S)"
-CONFIG_DIR="$SCRIPT_DIR/configs"
+
 
 # Secure temporary directory
 TEMP_DIR=""
 create_temp_dir() {
     TEMP_DIR=$(mktemp -d -t dangerprep-setup.XXXXXX)
-    chmod 700 "$TEMP_DIR"
+    chmod 700 "${TEMP_DIR}"
 }
 
 # Cleanup function for temporary files
 cleanup_temp() {
-    if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
-        rm -rf "$TEMP_DIR"
+    if [[ -n "${TEMP_DIR}" && -d "${TEMP_DIR}" ]]; then
+        rm -rf "${TEMP_DIR}"
     fi
 }
 
@@ -72,7 +111,8 @@ validate_ip() {
     local ip="$1"
     if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         local IFS='.'
-        local -a octets=($ip)
+        local -a octets
+        read -ra octets <<< "$ip"
         for octet in "${octets[@]}"; do
             if [[ $octet -gt 255 ]]; then
                 return 1
@@ -104,7 +144,8 @@ validate_path() {
 secure_copy() {
     local src="$1"
     local dest="$2"
-    local mode="${3:-644}"
+    local mode
+    mode=${3:-644}
 
     # Validate paths
     if ! validate_path "$src" || ! validate_path "$dest"; then
@@ -124,25 +165,23 @@ trap 'cleanup_temp; exit 130' INT
 trap 'cleanup_temp; exit 143' TERM
 
 # Load configuration utilities
-source "$SCRIPT_DIR/config-loader.sh"
+# shellcheck source=scripts/setup/config-loader.sh
+source "${SCRIPT_DIR}/config-loader.sh"
 
 # Network configuration
 WIFI_SSID="DangerPrep"
-WIFI_PASSWORD="Buff00n!"
+WIFI_PASSWORD="$(generate_wifi_password)" || {
+    error "Failed to generate WiFi password"
+    exit 1
+}
 LAN_NETWORK="192.168.120.0/22"
 LAN_IP="192.168.120.1"
-DHCP_START="192.168.120.100"
-DHCP_END="192.168.120.200"
-
 # System configuration
 SSH_PORT="2222"
-FAIL2BAN_BANTIME="3600"
-FAIL2BAN_MAXRETRY="3"
-NAS_HOST="100.65.182.27"  # Tailscale NAS IP
 
 # Check if running as root
 check_root() {
-    if [[ $EUID -ne 0 ]]; then
+    if [[ ${EUID} -ne 0 ]]; then
         error "This script must be run as root (use sudo)"
         echo "Usage: sudo $0"
         exit 1
@@ -151,15 +190,15 @@ check_root() {
 
 # Create backup directory and log file
 setup_logging() {
-    mkdir -p "$BACKUP_DIR"
-    mkdir -p "$(dirname "$LOG_FILE")"
-    touch "$LOG_FILE"
-    chmod 640 "$LOG_FILE"
+    mkdir -p "${BACKUP_DIR}"
+    mkdir -p "$(dirname "${LOG_FILE}")"
+    touch "${LOG_FILE}"
+    chmod 640 "${LOG_FILE}"
     
     log "DangerPrep Setup Started"
-    log "Backup directory: $BACKUP_DIR"
-    log "Install root: $INSTALL_ROOT"
-    log "Project root: $PROJECT_ROOT"
+    log "Backup directory: ${BACKUP_DIR}"
+    log "Install root: ${INSTALL_ROOT}"
+    log "Project root: ${PROJECT_ROOT}"
 }
 
 # Display banner
@@ -174,9 +213,9 @@ show_banner() {
     echo
     info "All changes are logged and backed up."
     echo
-    info "Logs: $LOG_FILE"
-    info "Backups: $BACKUP_DIR"
-    info "Install root: $INSTALL_ROOT"
+    info "Logs: ${LOG_FILE}"
+    info "Backups: ${BACKUP_DIR}"
+    info "Install root: ${INSTALL_ROOT}"
 }
 
 # Show system information and detect FriendlyElec hardware
@@ -205,27 +244,27 @@ detect_friendlyelec_platform() {
     # Detect platform from device tree
     if [[ -f /proc/device-tree/model ]]; then
         PLATFORM=$(cat /proc/device-tree/model | tr -d '\0')
-        log "Platform: $PLATFORM"
+        log "Platform: ${PLATFORM}"
 
         # Check for FriendlyElec hardware
-        if [[ "$PLATFORM" =~ (NanoPi|NanoPC|CM3588) ]]; then
+        if [[ "${PLATFORM}" =~ (NanoPi|NanoPC|CM3588) ]]; then
             IS_FRIENDLYELEC=true
             log "FriendlyElec hardware detected"
 
             # Extract model information
-            if [[ "$PLATFORM" =~ NanoPi[[:space:]]*M6 ]]; then
+            if [[ "${PLATFORM}" =~ NanoPi[[:space:]]*M6 ]]; then
                 FRIENDLYELEC_MODEL="NanoPi-M6"
                 IS_RK3588S=true
                 SOC_TYPE="RK3588S"
-            elif [[ "$PLATFORM" =~ NanoPi[[:space:]]*R6[CS] ]]; then
+            elif [[ "${PLATFORM}" =~ NanoPi[[:space:]]*R6[CS] ]]; then
                 FRIENDLYELEC_MODEL="NanoPi-R6C"
                 IS_RK3588S=true
                 SOC_TYPE="RK3588S"
-            elif [[ "$PLATFORM" =~ NanoPC[[:space:]]*T6 ]]; then
+            elif [[ "${PLATFORM}" =~ NanoPC[[:space:]]*T6 ]]; then
                 FRIENDLYELEC_MODEL="NanoPC-T6"
                 IS_RK3588=true
                 SOC_TYPE="RK3588"
-            elif [[ "$PLATFORM" =~ CM3588 ]]; then
+            elif [[ "${PLATFORM}" =~ CM3588 ]]; then
                 FRIENDLYELEC_MODEL="CM3588"
                 IS_RK3588=true
                 SOC_TYPE="RK3588"
@@ -233,15 +272,15 @@ detect_friendlyelec_platform() {
                 FRIENDLYELEC_MODEL="Unknown FriendlyElec"
             fi
 
-            log "Model: $FRIENDLYELEC_MODEL"
-            log "SoC: $SOC_TYPE"
+            log "Model: ${FRIENDLYELEC_MODEL}"
+            log "SoC: ${SOC_TYPE}"
 
             # Detect additional hardware features
             detect_friendlyelec_features
         fi
     else
         PLATFORM="Generic x86_64"
-        log "Platform: $PLATFORM"
+        log "Platform: ${PLATFORM}"
     fi
 
     # Export variables for use in other functions
@@ -263,7 +302,7 @@ detect_friendlyelec_features() {
     fi
 
     # Check for NPU support (RK3588/RK3588S)
-    if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
+    if [[ "${IS_RK3588}" == true || "${IS_RK3588S}" == true ]]; then
         if [[ -d /sys/class/devfreq/fdab0000.npu ]]; then
             features+=("6TOPS NPU")
         fi
@@ -271,7 +310,8 @@ detect_friendlyelec_features() {
 
     # Check for RTC support
     if [[ -f /sys/class/rtc/rtc0/name ]]; then
-        local rtc_name=$(cat /sys/class/rtc/rtc0/name 2>/dev/null)
+        local rtc_name
+        rtc_name=$(cat /sys/class/rtc/rtc0/name 2>/dev/null)
         if [[ "$rtc_name" =~ hym8563 ]]; then
             features+=("HYM8563 RTC")
         fi
@@ -288,35 +328,194 @@ detect_friendlyelec_features() {
     fi
 }
 
-# Pre-flight checks
+# Comprehensive pre-flight validation
 pre_flight_checks() {
-    log "Running pre-flight checks..."
-    
-    # Check Ubuntu version
+    log_section "Comprehensive Pre-flight Validation"
+
+    local validation_errors=0
+    local validation_warnings=0
+
+    # OS Version Validation
+    log_subsection "Operating System Validation"
     if ! lsb_release -d | grep -q "Ubuntu 24.04"; then
-        warning "This script is designed for Ubuntu 24.04. Proceeding anyway..."
+        warning "This script is designed for Ubuntu 24.04. Current OS: $(lsb_release -d | cut -f2)"
+        ((validation_warnings++))
+    else
+        success "✓ Ubuntu 24.04 detected"
     fi
-    
-    # Check internet connectivity
-    if ! ping -c 1 8.8.8.8 >/dev/null 2>&1; then
-        error "No internet connectivity. Please check your connection."
-        exit 1
+
+    # Architecture Validation
+    local arch
+    arch=$(uname -m)
+    if [[ "$arch" != "x86_64" && "$arch" != "aarch64" ]]; then
+        error "✗ Unsupported architecture: $arch"
+        ((validation_errors++))
+    else
+        success "✓ Supported architecture: $arch"
     fi
-    
-    # Check available disk space (minimum 10GB)
+
+    # Hardware Requirements Validation
+    log_subsection "Hardware Requirements"
+
+    # Memory check (minimum 2GB)
+    local memory_kb
+    memory_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    local memory_gb=$((memory_kb / 1024 / 1024))
+    if [[ $memory_gb -lt 2 ]]; then
+        error "✗ Insufficient memory: ${memory_gb}GB (minimum 2GB required)"
+        ((validation_errors++))
+    else
+        success "✓ Memory: ${memory_gb}GB"
+    fi
+
+    # Disk space validation (minimum 20GB for comprehensive setup)
+    local available_space
     available_space=$(df / | tail -1 | awk '{print $4}')
-    if [[ $available_space -lt 10485760 ]]; then  # 10GB in KB
-        error "Insufficient disk space. At least 10GB required."
-        exit 1
+    local available_gb=$((available_space / 1024 / 1024))
+    if [[ $available_gb -lt 20 ]]; then
+        error "✗ Insufficient disk space: ${available_gb}GB (minimum 20GB required)"
+        ((validation_errors++))
+    else
+        success "✓ Disk space: ${available_gb}GB available"
     fi
-    
-    # Validate configuration files
+
+    # Network Validation
+    log_subsection "Network Connectivity"
+
+    # Internet connectivity check
+    local connectivity_targets=("8.8.8.8" "1.1.1.1" "pkgs.tailscale.com")
+    local connectivity_success=0
+
+    for target in "${connectivity_targets[@]}"; do
+        if ping -c 1 -W 3 "$target" >/dev/null 2>&1; then
+            ((connectivity_success++))
+            debug "✓ Connectivity to $target"
+        else
+            debug "✗ No connectivity to $target"
+        fi
+    done
+
+    if [[ $connectivity_success -eq 0 ]]; then
+        error "✗ No internet connectivity detected"
+        ((validation_errors++))
+    elif [[ $connectivity_success -lt 2 ]]; then
+        warning "⚠ Limited internet connectivity ($connectivity_success/3 targets reachable)"
+        ((validation_warnings++))
+    else
+        success "✓ Internet connectivity verified"
+    fi
+
+    # DNS resolution check
+    if ! nslookup google.com >/dev/null 2>&1; then
+        error "✗ DNS resolution failed"
+        ((validation_errors++))
+    else
+        success "✓ DNS resolution working"
+    fi
+
+    # Network interfaces validation
+    local interfaces
+    interfaces=$(ip link show | grep -E '^[0-9]+:' | grep -cv lo)
+    if [[ $interfaces -lt 1 ]]; then
+        error "✗ No network interfaces detected"
+        ((validation_errors++))
+    else
+        success "✓ Network interfaces: $interfaces detected"
+    fi
+
+    # Dependencies Validation
+    log_subsection "System Dependencies"
+
+    local required_commands=(
+        "curl" "wget" "gpg" "openssl" "systemctl"
+        "iptables" "ip" "hostapd" "dnsmasq" "docker"
+    )
+
+    local missing_commands=()
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            missing_commands+=("$cmd")
+        fi
+    done
+
+    if [[ ${#missing_commands[@]} -gt 0 ]]; then
+        warning "⚠ Missing commands will be installed: ${missing_commands[*]}"
+        ((validation_warnings++))
+    else
+        success "✓ All required commands available"
+    fi
+
+    # Permissions Validation
+    log_subsection "Permissions and Access"
+
+    # Root access verification
+    if [[ $EUID -ne 0 ]]; then
+        error "✗ Root privileges required"
+        ((validation_errors++))
+    else
+        success "✓ Root privileges confirmed"
+    fi
+
+    # Write access to critical directories
+    local critical_dirs=("/etc" "/usr/local/bin" "/var/log")
+    for dir in "${critical_dirs[@]}"; do
+        if [[ ! -w "$dir" ]]; then
+            error "✗ No write access to $dir"
+            ((validation_errors++))
+        else
+            debug "✓ Write access to $dir"
+        fi
+    done
+
+    # Configuration Files Validation
+    log_subsection "Configuration Validation"
     if ! validate_config_files; then
-        error "Configuration file validation failed"
-        exit 1
+        error "✗ Configuration file validation failed"
+        ((validation_errors++))
+    else
+        success "✓ Configuration files validated"
     fi
-    
-    success "Pre-flight checks completed"
+
+    # Security Validation
+    log_subsection "Security Prerequisites"
+
+    # Check if system is already hardened
+    if [[ -f /etc/ssh/sshd_config ]] && grep -q "PermitRootLogin no" /etc/ssh/sshd_config; then
+        info "ℹ SSH already hardened"
+    fi
+
+    # Check for conflicting services
+    local conflicting_services=("apache2" "nginx" "bind9")
+    local conflicts=()
+    for service in "${conflicting_services[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            conflicts+=("$service")
+        fi
+    done
+
+    if [[ ${#conflicts[@]} -gt 0 ]]; then
+        warning "⚠ Conflicting services detected: ${conflicts[*]}"
+        warning "These services may interfere with DangerPrep setup"
+        ((validation_warnings++))
+    fi
+
+    # Summary
+    log_subsection "Validation Summary"
+    if [[ $validation_errors -gt 0 ]]; then
+        error "Pre-flight validation failed with $validation_errors errors and $validation_warnings warnings"
+        error "Please resolve the errors before proceeding"
+        exit 1
+    elif [[ $validation_warnings -gt 0 ]]; then
+        warning "Pre-flight validation completed with $validation_warnings warnings"
+        echo
+        read -p "Continue despite warnings? (y/N): " -r
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            info "Setup cancelled by user"
+            exit 0
+        fi
+    else
+        success "✓ All pre-flight checks passed successfully"
+    fi
 }
 
 # Backup original configurations
@@ -336,12 +535,12 @@ backup_original_configs() {
     
     for config in "${configs_to_backup[@]}"; do
         if [[ -e "$config" ]]; then
-            cp -r "$config" "$BACKUP_DIR/" 2>/dev/null || true
+            cp -r "$config" "${BACKUP_DIR}/" 2>/dev/null || true
             log "Backed up: $config"
         fi
     done
     
-    success "Original configurations backed up to $BACKUP_DIR"
+    success "Original configurations backed up to ${BACKUP_DIR}"
 }
 
 # Update system packages
@@ -358,48 +557,58 @@ update_system_packages() {
 # Install essential packages
 install_essential_packages() {
     log "Installing essential packages..."
-    
-    # Define package categories (removing certbot and cloudflared)
+
+    # Define package categories (removing Docker, adding NFS server and Olares requirements)
     local core_packages=(
         "curl" "wget" "git" "vim" "nano" "htop" "tree" "unzip" "zip"
         "software-properties-common" "apt-transport-https" "ca-certificates"
         "gnupg" "lsb-release" "jq" "bc" "rsync" "screen" "tmux"
     )
-    
+
     local network_packages=(
-        "hostapd" "iptables-persistent" "bridge-utils"
+        "hostapd" "dnsmasq" "iptables-persistent" "bridge-utils"
         "wireless-tools" "wpasupplicant" "iw" "rfkill" "netplan.io"
         "iproute2" "tc" "wondershaper" "iperf3"
     )
-    
+
+    local nfs_packages=(
+        "nfs-common"
+    )
+
     local security_packages=(
         "fail2ban" "aide" "rkhunter" "chkrootkit" "clamav" "clamav-daemon"
-        "lynis" "suricata" "apparmor" "apparmor-utils" "libpam-pwquality"
-        "libpam-tmpdir" "acct" "psacct"
+        "lynis" "apparmor" "apparmor-utils" "libpam-pwquality"
+        "libpam-tmpdir" "acct" "psacct" "apache2-utils"
     )
-    
+
     local monitoring_packages=(
         "lm-sensors" "hddtemp" "fancontrol" "sensors-applet"
         "collectd" "collectd-utils" "logwatch" "rsyslog-gnutls"
         "smartmontools"
     )
-    
+
     local backup_packages=(
         "borgbackup" "restic"
     )
-    
+
     local update_packages=(
         "unattended-upgrades"
+    )
+
+    local olares_packages=(
+        "systemd" "systemd-resolved" "systemd-timesyncd"
     )
     
     # Combine all packages
     local all_packages=(
         "${core_packages[@]}"
         "${network_packages[@]}"
+        "${nfs_packages[@]}"
         "${security_packages[@]}"
         "${monitoring_packages[@]}"
         "${backup_packages[@]}"
         "${update_packages[@]}"
+        "${olares_packages[@]}"
     )
     
     # Install packages with error handling
@@ -421,7 +630,7 @@ install_essential_packages() {
     fi
     
     # Install FriendlyElec-specific packages
-    if [[ "$IS_FRIENDLYELEC" == true ]]; then
+    if [[ "${IS_FRIENDLYELEC}" == true ]]; then
         install_friendlyelec_packages
     fi
 
@@ -439,7 +648,7 @@ install_friendlyelec_packages() {
     # FriendlyElec-specific packages for hardware acceleration
     local friendlyelec_packages=()
 
-    if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
+    if [[ "${IS_RK3588}" == true || "${IS_RK3588S}" == true ]]; then
         friendlyelec_packages+=(
             "mesa-utils"           # OpenGL utilities
             "glmark2-es2"         # OpenGL ES benchmark
@@ -475,7 +684,8 @@ install_friendlyelec_kernel_headers() {
 
     # Check for pre-installed kernel headers in /opt/archives/
     if [[ -d /opt/archives ]]; then
-        local kernel_headers=$(find /opt/archives -name "linux-headers-*.deb" | head -1)
+        local kernel_headers
+        kernel_headers=$(find /opt/archives -name "linux-headers-*.deb" | head -1)
         if [[ -n "$kernel_headers" ]]; then
             log "Found FriendlyElec kernel headers: $kernel_headers"
             if dpkg -i "$kernel_headers" 2>/dev/null; then
@@ -491,7 +701,8 @@ install_friendlyelec_kernel_headers() {
     # Try to download latest kernel headers if not found locally
     if ! dpkg -l | grep -q "linux-headers-$(uname -r)"; then
         log "Attempting to download latest kernel headers..."
-        local kernel_version=$(uname -r)
+        local kernel_version
+        kernel_version=$(uname -r)
         local headers_url="http://112.124.9.243/archives/rk3588/linux-headers-${kernel_version}-latest.deb"
 
         if wget -q --spider "$headers_url" 2>/dev/null; then
@@ -520,7 +731,7 @@ configure_friendlyelec_hardware() {
     load_friendlyelec_configs
 
     # Configure GPU settings for RK3588/RK3588S
-    if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
+    if [[ "${IS_RK3588}" == true || "${IS_RK3588S}" == true ]]; then
         configure_rk3588_gpu
     fi
 
@@ -550,19 +761,14 @@ configure_rk3588_gpu() {
     fi
 
     # Configure Mali GPU environment variables
-    cat > /etc/environment.d/mali-gpu.conf << 'EOF'
-# Mali GPU configuration for RK3588/RK3588S
-MALI_OPENCL_DEVICE_TYPE=gpu
-MALI_DUAL_MODE_COMPUTE=1
-EOF
-
-    log "Configured Mali GPU environment"
+    load_rk3588_gpu_config
 }
 
 # Configure FriendlyElec RTC
 configure_friendlyelec_rtc() {
     if [[ -f /sys/class/rtc/rtc0/name ]]; then
-        local rtc_name=$(cat /sys/class/rtc/rtc0/name 2>/dev/null)
+        local rtc_name
+        rtc_name=$(cat /sys/class/rtc/rtc0/name 2>/dev/null)
         if [[ "$rtc_name" =~ hym8563 ]]; then
             log "Configuring HYM8563 RTC..."
 
@@ -580,20 +786,8 @@ configure_friendlyelec_sensors() {
     log "Configuring FriendlyElec sensors..."
 
     # Create sensors configuration for RK3588/RK3588S
-    if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
-        cat > /etc/sensors.d/rk3588.conf << 'EOF'
-# RK3588/RK3588S temperature sensors configuration
-chip "rk3588-thermal-*"
-    label temp1 "SoC Temperature"
-    set temp1_max 85
-    set temp1_crit 95
-
-chip "rk3588s-thermal-*"
-    label temp1 "SoC Temperature"
-    set temp1_max 85
-    set temp1_crit 95
-EOF
-        log "Created RK3588 sensors configuration"
+    if [[ "${IS_RK3588}" == true || "${IS_RK3588S}" == true ]]; then
+        load_rk3588_sensors_config
     fi
 }
 
@@ -614,7 +808,7 @@ configure_ssh_hardening() {
     # Test SSH configuration
     if sshd -t; then
         systemctl restart ssh
-        success "SSH configured on port $SSH_PORT with key-only authentication"
+        success "SSH configured on port ${SSH_PORT} with key-only authentication"
     else
         error "SSH configuration is invalid"
         exit 1
@@ -646,7 +840,7 @@ setup_file_integrity_monitoring() {
     load_aide_config
 
     # Add cron job to run via just
-    echo "0 3 * * * root cd $PROJECT_ROOT && just aide-check" > /etc/cron.d/aide-check
+    echo "0 3 * * * root cd ${PROJECT_ROOT} && just aide-check" > /etc/cron.d/aide-check
 
     success "File integrity monitoring configured"
 }
@@ -658,7 +852,7 @@ setup_hardware_monitoring() {
     load_hardware_monitoring_config
 
     # Add cron job to run via just
-    echo "*/15 * * * * root cd $PROJECT_ROOT && just hardware-monitor" > /etc/cron.d/hardware-monitor
+    echo "*/15 * * * * root cd ${PROJECT_ROOT} && just hardware-monitor" > /etc/cron.d/hardware-monitor
 
     success "Hardware monitoring configured"
 }
@@ -670,83 +864,166 @@ setup_advanced_security_tools() {
     # Configure ClamAV
     if command -v clamscan >/dev/null 2>&1; then
         freshclam || warning "Failed to update ClamAV definitions"
-        echo "0 4 * * * root cd $PROJECT_ROOT && just antivirus-scan" > /etc/cron.d/antivirus-scan
+        echo "0 4 * * * root cd ${PROJECT_ROOT} && just antivirus-scan" > /etc/cron.d/antivirus-scan
     fi
 
-    # Configure Suricata
-    if command -v suricata >/dev/null 2>&1; then
-        echo "*/30 * * * * root cd $PROJECT_ROOT && just suricata-monitor" > /etc/cron.d/suricata-monitor
-    fi
+
 
     # Add cron jobs to run via just
-    echo "0 2 * * 0 root cd $PROJECT_ROOT && just security-audit" > /etc/cron.d/security-audit
-    echo "0 3 * * 6 root cd $PROJECT_ROOT && just rootkit-scan" > /etc/cron.d/rootkit-scan
+    echo "0 2 * * 0 root cd ${PROJECT_ROOT} && just security-audit" > /etc/cron.d/security-audit
+    echo "0 3 * * 6 root cd ${PROJECT_ROOT} && just rootkit-scan" > /etc/cron.d/rootkit-scan
 
     success "Advanced security tools configured"
 }
 
-# Configure rootless Docker
-configure_rootless_docker() {
-    log "Configuring rootless Docker..."
 
-    # Install Docker if not present
-    if ! command -v docker >/dev/null 2>&1; then
-        curl -fsSL https://get.docker.com | sh
-        usermod -aG docker ubuntu
-    fi
 
-    # Install rootless Docker for ubuntu user
-    sudo -u ubuntu bash -c 'curl -fsSL https://get.docker.com/rootless | sh'
-    sudo -u ubuntu bash -c 'echo "export PATH=/home/ubuntu/bin:\$PATH" >> /home/ubuntu/.bashrc'
-    sudo -u ubuntu bash -c 'echo "export DOCKER_HOST=unix:///run/user/1000/docker.sock" >> /home/ubuntu/.bashrc'
+# Setup directory structure for Olares integration
+setup_directory_structure() {
+    log "Setting up directory structure for Olares..."
 
-    success "Rootless Docker configured"
+    # Create base directories
+    mkdir -p "${INSTALL_ROOT}"/{content,nfs,config,data}
+
+    # Create content directories for NFS sharing
+    mkdir -p "${INSTALL_ROOT}/content"/{movies,tv,webtv,music,audiobooks,books,comics,magazines,games/roms,kiwix}
+
+    # Create data directories for host services
+    mkdir -p "${INSTALL_ROOT}/data"/{logs,backups,adguard,step-ca}
+
+    # Set proper permissions for content directories
+    chown -R ubuntu:ubuntu "${INSTALL_ROOT}/content"
+    chmod -R 755 "${INSTALL_ROOT}/content"
+
+    success "Directory structure configured for Olares integration"
 }
 
-# Setup Docker services
-setup_docker_services() {
-    log "Setting up Docker services..."
 
-    # Load Docker daemon configuration
-    load_docker_config
 
-    # Enable and start Docker
-    systemctl enable docker
-    systemctl start docker
+# Olares installation functions
+check_olares_requirements() {
+    log "Checking Olares system requirements..."
 
-    # Create Docker networks
-    docker network create traefik 2>/dev/null || true
+    # Check minimum system requirements
+    local total_memory
+    total_memory=$(free -m | awk '/^Mem:/{print $2}')
+    local cpu_cores
+    cpu_cores=$(nproc)
+    local available_disk
+    available_disk=$(df / | awk 'NR==2{print int($4/1024/1024)}')
 
-    # Set up directory structure
-    mkdir -p "$INSTALL_ROOT"/{docker,data,content,nfs}
-    mkdir -p "$INSTALL_ROOT/data"/{traefik,portainer,jellyfin,komga,kiwix,logs,backups}
-    mkdir -p "$INSTALL_ROOT/content"/{movies,tv,webtv,music,audiobooks,books,comics,magazines,games/roms,kiwix}
-
-    # Copy Docker configurations if they exist
-    if [[ -d "$PROJECT_ROOT/docker" ]]; then
-        log "Copying Docker configurations..."
-        cp -r "$PROJECT_ROOT"/docker/* "$INSTALL_ROOT"/docker/ 2>/dev/null || true
+    if [[ $total_memory -lt 2048 ]]; then
+        error "Insufficient memory: ${total_memory}MB available, 2GB required"
+        return 1
     fi
 
-    # Setup secrets for Docker services
-    setup_docker_secrets
+    if [[ $cpu_cores -lt 2 ]]; then
+        error "Insufficient CPU cores: ${cpu_cores} available, 2 required"
+        return 1
+    fi
 
-    success "Docker services configured"
+    if [[ $available_disk -lt 20 ]]; then
+        error "Insufficient disk space: ${available_disk}GB available, 20GB required"
+        return 1
+    fi
+
+    # Check for systemd
+    if ! command -v systemctl >/dev/null 2>&1; then
+        error "systemd is required for Olares"
+        return 1
+    fi
+
+    # Check Ubuntu version
+    if ! grep -q "Ubuntu 24.04" /etc/os-release; then
+        warning "Olares is tested on Ubuntu 24.04, current version may have compatibility issues"
+    fi
+
+    success "System meets Olares requirements (${total_memory}MB RAM, ${cpu_cores} cores, ${available_disk}GB disk)"
+    return 0
 }
 
-# Setup Docker secrets
-setup_docker_secrets() {
-    log "Setting up Docker secrets..."
+download_olares_installer() {
+    log "Downloading Olares installer..."
 
-    # Run the secret setup script
-    if [[ -f "$PROJECT_ROOT/scripts/security/setup-secrets.sh" ]]; then
-        log "Generating and configuring secrets for all Docker services..."
-        "$PROJECT_ROOT/scripts/security/setup-secrets.sh"
-        success "Docker secrets configured"
+    local installer_url="https://github.com/beclab/olares/releases/latest/download/install.sh"
+    local installer_path="/tmp/olares-install.sh"
+
+    # Download installer
+    if curl -fsSL "$installer_url" -o "$installer_path"; then
+        chmod +x "$installer_path"
+        success "Olares installer downloaded successfully"
+        return 0
     else
-        warning "Secret setup script not found, skipping secret generation"
-        warning "You may need to manually configure secrets for Docker services"
+        error "Failed to download Olares installer"
+        return 1
     fi
+}
+
+prepare_olares_environment() {
+    log "Preparing environment for Olares installation..."
+
+    # Stop any conflicting services
+    systemctl stop docker 2>/dev/null || true
+    systemctl disable docker 2>/dev/null || true
+
+    # Remove Docker if present (Olares uses K3s)
+    if command -v docker >/dev/null 2>&1; then
+        log "Removing Docker to avoid conflicts with K3s..."
+        apt remove -y docker.io docker-ce docker-ce-cli containerd.io 2>/dev/null || true
+        apt autoremove -y
+    fi
+
+    success "Environment prepared for Olares installation"
+    return 0
+}
+
+install_olares() {
+    log "Installing Olares..."
+
+    # Check requirements first
+    if ! check_olares_requirements; then
+        error "System does not meet Olares requirements"
+        return 1
+    fi
+
+    # Download installer
+    if ! download_olares_installer; then
+        error "Failed to download Olares installer"
+        return 1
+    fi
+
+    # Prepare environment
+    if ! prepare_olares_environment; then
+        error "Failed to prepare environment for Olares"
+        return 1
+    fi
+
+    # Run Olares installer (let it handle its own configuration)
+    log "Running Olares installer..."
+    local installer_path="/tmp/olares-install.sh"
+
+    log "Note: Olares will handle its own K3s and service configuration"
+    log "The installer may take several minutes to complete..."
+
+    if bash "$installer_path"; then
+        success "Olares installation completed"
+        log "Olares will continue initializing in the background"
+        log "Use 'just olares' to check status once initialization is complete"
+        return 0
+    else
+        error "Olares installation failed"
+        return 1
+    fi
+}
+
+configure_olares_integration() {
+    log "Configuring Olares integration with DangerPrep..."
+
+    log "Olares will handle its own Tailscale, DNS, and networking configuration"
+    log "Host services (AdGuard Home, Step-CA) will remain available for local use"
+
+    success "Olares integration prepared"
+    return 0
 }
 
 # Setup container health monitoring
@@ -757,7 +1034,7 @@ setup_container_health_monitoring() {
     load_watchtower_config
 
     # Add cron job to run via just
-    echo "*/10 * * * * root cd $PROJECT_ROOT && just container-health" > /etc/cron.d/container-health
+    echo "*/10 * * * * root cd ${PROJECT_ROOT} && just container-health" > /etc/cron.d/container-health
 
     success "Container health monitoring configured"
 }
@@ -785,28 +1062,28 @@ detect_network_interfaces() {
     done < <(iw dev 2>/dev/null | grep Interface | awk '{print $2}')
 
     # FriendlyElec-specific interface selection
-    if [[ "$IS_FRIENDLYELEC" == true ]]; then
+    if [[ "${IS_FRIENDLYELEC}" == true ]]; then
         select_friendlyelec_interfaces "${ethernet_interfaces[@]}" -- "${wifi_interfaces[@]}"
     else
         select_generic_interfaces "${ethernet_interfaces[@]}" -- "${wifi_interfaces[@]}"
     fi
 
     # Validate and set fallbacks
-    if [[ -z "$WAN_INTERFACE" ]]; then
+    if [[ -z "${WAN_INTERFACE}" ]]; then
         warning "No ethernet interface detected"
         WAN_INTERFACE="eth0"  # fallback
     fi
 
-    if [[ -z "$WIFI_INTERFACE" ]]; then
+    if [[ -z "${WIFI_INTERFACE}" ]]; then
         warning "No WiFi interface detected"
         WIFI_INTERFACE="wlan0"  # fallback
     fi
 
-    log "WAN Interface: $WAN_INTERFACE"
-    log "WiFi Interface: $WIFI_INTERFACE"
+    log "WAN Interface: ${WAN_INTERFACE}"
+    log "WiFi Interface: ${WIFI_INTERFACE}"
 
     # Log additional interface information for FriendlyElec
-    if [[ "$IS_FRIENDLYELEC" == true ]]; then
+    if [[ "${IS_FRIENDLYELEC}" == true ]]; then
         log_friendlyelec_interface_details
     fi
 
@@ -840,7 +1117,7 @@ select_friendlyelec_interfaces() {
     log "Found WiFi interfaces: ${wifi_interfaces[*]:-none}"
 
     # FriendlyElec-specific interface selection logic
-    case "$FRIENDLYELEC_MODEL" in
+    case "${FRIENDLYELEC_MODEL}" in
         "NanoPi-M6")
             # NanoPi M6 has 1x Gigabit Ethernet
             WAN_INTERFACE="${ethernet_interfaces[0]:-eth0}"
@@ -882,8 +1159,10 @@ select_r6c_interfaces() {
             ip link set "$iface" up 2>/dev/null || true
             sleep 1
 
-            local speed=$(cat "/sys/class/net/$iface/speed" 2>/dev/null || echo "1000")
-            local driver=$(readlink "/sys/class/net/$iface/device/driver" 2>/dev/null | xargs basename || echo "unknown")
+            local speed
+            speed=$(cat "/sys/class/net/$iface/speed" 2>/dev/null || echo "1000")
+            local driver
+            driver=$(readlink "/sys/class/net/$iface/device/driver" 2>/dev/null | xargs basename || echo "unknown")
 
             log "Interface $iface: ${speed}Mbps, driver: $driver"
 
@@ -903,8 +1182,8 @@ select_r6c_interfaces() {
         if [[ -n "$high_speed_interface" ]]; then
             WAN_INTERFACE="$high_speed_interface"
             LAN_INTERFACE="${standard_interface:-${ethernet_interfaces[1]}}"
-            log "Using 2.5GbE interface $WAN_INTERFACE for WAN"
-            log "Using GbE interface $LAN_INTERFACE for LAN"
+            log "Using 2.5GbE interface ${WAN_INTERFACE} for WAN"
+            log "Using GbE interface ${LAN_INTERFACE} for LAN"
         else
             # Fallback if speed detection fails
             WAN_INTERFACE="${ethernet_interfaces[0]}"
@@ -931,8 +1210,8 @@ select_t6_interfaces() {
         WAN_INTERFACE="${ethernet_interfaces[0]}"
         LAN_INTERFACE="${ethernet_interfaces[1]}"
 
-        log "Using $WAN_INTERFACE for WAN"
-        log "Using $LAN_INTERFACE for LAN"
+        log "Using ${WAN_INTERFACE} for WAN"
+        log "Using ${LAN_INTERFACE} for LAN"
 
         # Export LAN interface for use in configuration
         export LAN_INTERFACE
@@ -956,27 +1235,7 @@ configure_network_bonding() {
     fi
 
     # Create bonding configuration for failover
-    cat > /etc/netplan/99-ethernet-bonding.yaml << EOF
-network:
-  version: 2
-  ethernets:
-    $WAN_INTERFACE:
-      dhcp4: false
-      dhcp6: false
-    $LAN_INTERFACE:
-      dhcp4: false
-      dhcp6: false
-  bonds:
-    bond0:
-      interfaces: [$WAN_INTERFACE, $LAN_INTERFACE]
-      parameters:
-        mode: active-backup
-        primary: $WAN_INTERFACE
-        mii-monitor-interval: 100
-        fail-over-mac-policy: active
-      dhcp4: true
-      dhcp6: false
-EOF
+    load_ethernet_bonding_config
 
     log "Network bonding configuration created"
 }
@@ -1009,26 +1268,30 @@ select_generic_interfaces() {
 # Log detailed interface information for FriendlyElec hardware
 log_friendlyelec_interface_details() {
     # Log ethernet interface details
-    if [[ -n "$WAN_INTERFACE" && -d "/sys/class/net/$WAN_INTERFACE" ]]; then
-        local speed=$(cat "/sys/class/net/$WAN_INTERFACE/speed" 2>/dev/null || echo "unknown")
-        local duplex=$(cat "/sys/class/net/$WAN_INTERFACE/duplex" 2>/dev/null || echo "unknown")
-        local driver=$(readlink "/sys/class/net/$WAN_INTERFACE/device/driver" 2>/dev/null | xargs basename || echo "unknown")
+    if [[ -n "${WAN_INTERFACE}" && -d "/sys/class/net/${WAN_INTERFACE}" ]]; then
+        local speed
+        speed=$(cat "/sys/class/net/${WAN_INTERFACE}/speed" 2>/dev/null || echo "unknown")
+        local duplex
+        duplex=$(cat "/sys/class/net/${WAN_INTERFACE}/duplex" 2>/dev/null || echo "unknown")
+        local driver
+        driver=$(readlink "/sys/class/net/${WAN_INTERFACE}/device/driver" 2>/dev/null | xargs basename || echo "unknown")
 
-        log "Ethernet details: $WAN_INTERFACE (${speed}Mbps, $duplex, driver: $driver)"
+        log "Ethernet details: ${WAN_INTERFACE} (${speed}Mbps, $duplex, driver: $driver)"
     fi
 
     # Log WiFi interface details
-    if [[ -n "$WIFI_INTERFACE" ]] && command -v iw >/dev/null 2>&1; then
-        local wifi_info=$(iw dev "$WIFI_INTERFACE" info 2>/dev/null | grep -E "(wiphy|type)" | tr '\n' ' ' || echo "")
+    if [[ -n "${WIFI_INTERFACE}" ]] && command -v iw >/dev/null 2>&1; then
+        local wifi_info
+        wifi_info=$(iw dev "${WIFI_INTERFACE}" info 2>/dev/null | grep -E "(wiphy|type)" | tr '\n' ' ' || echo "")
         if [[ -n "$wifi_info" ]]; then
-            log "WiFi details: $WIFI_INTERFACE ($wifi_info)"
+            log "WiFi details: ${WIFI_INTERFACE} ($wifi_info)"
         fi
     fi
 }
 
 # Configure FriendlyElec fan control for thermal management
 configure_friendlyelec_fan_control() {
-    if [[ "$IS_RK3588" != true && "$IS_RK3588S" != true ]]; then
+    if [[ "${IS_RK3588}" != true && "${IS_RK3588S}" != true ]]; then
         return 0
     fi
 
@@ -1047,13 +1310,13 @@ configure_friendlyelec_fan_control() {
     load_rk3588_fan_control_config
 
     # Make fan control script executable
-    chmod +x "$PROJECT_ROOT/scripts/monitoring/rk3588-fan-control.sh"
+    chmod +x "${PROJECT_ROOT}/scripts/monitoring/rk3588-fan-control.sh"
 
     # Install and enable fan control service
     install_rk3588_fan_control_service
 
     # Test fan control functionality
-    if "$PROJECT_ROOT/scripts/monitoring/rk3588-fan-control.sh" test >/dev/null 2>&1; then
+    if "${PROJECT_ROOT}/scripts/monitoring/rk3588-fan-control.sh" test >/dev/null 2>&1; then
         success "Fan control test successful"
     else
         warning "Fan control test failed, but service installed"
@@ -1064,7 +1327,7 @@ configure_friendlyelec_fan_control() {
 
 # Configure FriendlyElec GPIO and PWM interfaces
 configure_friendlyelec_gpio_pwm() {
-    if [[ "$IS_FRIENDLYELEC" != true ]]; then
+    if [[ "${IS_FRIENDLYELEC}" != true ]]; then
         return 0
     fi
 
@@ -1074,10 +1337,10 @@ configure_friendlyelec_gpio_pwm() {
     load_gpio_pwm_config
 
     # Make GPIO setup script executable
-    chmod +x "$SCRIPT_DIR/setup-gpio.sh"
+    chmod +x "${SCRIPT_DIR}/setup-gpio.sh"
 
     # Run GPIO/PWM setup
-    if "$SCRIPT_DIR/setup-gpio.sh" setup "$SUDO_USER"; then
+    if "${SCRIPT_DIR}/setup-gpio.sh" setup "${SUDO_USER}"; then
         success "GPIO and PWM interfaces configured"
     else
         warning "GPIO and PWM setup completed with warnings"
@@ -1088,7 +1351,7 @@ configure_friendlyelec_gpio_pwm() {
 
 # Configure RK3588/RK3588S performance optimizations
 configure_rk3588_performance() {
-    if [[ "$IS_RK3588" != true && "$IS_RK3588S" != true ]]; then
+    if [[ "${IS_RK3588}" != true && "${IS_RK3588S}" != true ]]; then
         return 0
     fi
 
@@ -1124,7 +1387,7 @@ configure_rk3588_cpu_governors() {
     )
 
     # Add third cluster for RK3588 (not RK3588S)
-    if [[ "$IS_RK3588" == true ]]; then
+    if [[ "${IS_RK3588}" == true ]]; then
         cpu_policies+=("/sys/devices/system/cpu/cpufreq/policy6")  # A76 cluster 2
     fi
 
@@ -1134,29 +1397,15 @@ configure_rk3588_cpu_governors() {
             local governor_file="$policy/scaling_governor"
             if [[ -w "$governor_file" ]]; then
                 echo "performance" > "$governor_file" 2>/dev/null || true
-                local current_governor=$(cat "$governor_file" 2>/dev/null)
+                local current_governor
+                current_governor=$(cat "$governor_file" 2>/dev/null)
                 log "Set CPU policy $(basename "$policy") governor to: $current_governor"
             fi
         fi
     done
 
     # Create systemd service to maintain CPU governor settings
-    cat > /etc/systemd/system/rk3588-cpu-governor.service << 'EOF'
-[Unit]
-Description=RK3588 CPU Governor Configuration
-After=multi-user.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/bin/bash -c 'for policy in /sys/devices/system/cpu/cpufreq/policy*; do [ -w "$policy/scaling_governor" ] && echo performance > "$policy/scaling_governor"; done'
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    systemctl enable rk3588-cpu-governor.service 2>/dev/null || true
-    log "Created RK3588 CPU governor service"
+    load_rk3588_cpu_governor_service
 }
 
 # Configure GPU performance for RK3588/RK3588S
@@ -1175,7 +1424,8 @@ configure_rk3588_gpu_performance() {
 
         # Set GPU frequency to maximum for better performance
         if [[ -w "$gpu_devfreq/userspace/set_freq" && -r "$gpu_devfreq/available_frequencies" ]]; then
-            local max_freq=$(cat "$gpu_devfreq/available_frequencies" | tr ' ' '\n' | sort -n | tail -1)
+            local max_freq
+            max_freq=$(cat "$gpu_devfreq/available_frequencies" | tr ' ' '\n' | sort -n | tail -1)
             if [[ -n "$max_freq" ]]; then
                 echo "$max_freq" > "$gpu_devfreq/userspace/set_freq" 2>/dev/null || true
                 log "Set GPU frequency to maximum: ${max_freq}Hz"
@@ -1184,15 +1434,7 @@ configure_rk3588_gpu_performance() {
     fi
 
     # Configure Mali GPU environment variables for applications
-    cat > /etc/profile.d/mali-gpu.sh << 'EOF'
-# Mali GPU environment variables for RK3588/RK3588S
-export MALI_OPENCL_DEVICE_TYPE=gpu
-export MALI_DUAL_MODE_COMPUTE=1
-export MALI_DEBUG=0
-export MALI_FPS=1
-EOF
-
-    log "Configured Mali GPU environment variables"
+    load_mali_gpu_env_config
 }
 
 # Configure memory and I/O optimizations for RK3588/RK3588S
@@ -1200,44 +1442,10 @@ configure_rk3588_memory_optimizations() {
     log "Configuring RK3588 memory and I/O optimizations..."
 
     # Add RK3588-specific kernel parameters
-    cat >> /etc/sysctl.d/99-rk3588-optimizations.conf << 'EOF'
-# RK3588/RK3588S memory and I/O optimizations
-
-# Memory management optimizations
-vm.swappiness = 10
-vm.vfs_cache_pressure = 50
-vm.dirty_background_ratio = 5
-vm.dirty_ratio = 10
-
-# Network buffer optimizations for high-speed interfaces
-net.core.rmem_default = 262144
-net.core.rmem_max = 16777216
-net.core.wmem_default = 262144
-net.core.wmem_max = 16777216
-
-# TCP optimizations
-net.ipv4.tcp_rmem = 4096 65536 16777216
-net.ipv4.tcp_wmem = 4096 65536 16777216
-net.ipv4.tcp_congestion_control = bbr
-
-# I/O scheduler optimizations
-# These will be applied via udev rules for NVMe and eMMC
-EOF
+    load_rk3588_performance_config
 
     # Create udev rules for I/O scheduler optimization
-    cat > /etc/udev/rules.d/99-rk3588-io-scheduler.rules << 'EOF'
-# I/O scheduler optimizations for RK3588/RK3588S storage devices
-
-# NVMe drives - use mq-deadline for better performance
-ACTION=="add|change", KERNEL=="nvme[0-9]*", ATTR{queue/scheduler}="mq-deadline"
-
-# eMMC - use deadline scheduler
-ACTION=="add|change", KERNEL=="mmcblk[0-9]*", ATTR{queue/scheduler}="deadline"
-
-# Set read-ahead for storage devices
-ACTION=="add|change", KERNEL=="nvme[0-9]*", ATTR{bdi/read_ahead_kb}="512"
-ACTION=="add|change", KERNEL=="mmcblk[0-9]*", ATTR{bdi/read_ahead_kb}="256"
-EOF
+    load_rk3588_udev_rules
 
     log "Configured RK3588 memory and I/O optimizations"
 }
@@ -1253,11 +1461,7 @@ configure_rk3588_hardware_acceleration() {
         chmod 660 /dev/mpp_service 2>/dev/null || true
         log "Configured VPU device permissions"
 
-        # Create udev rule to maintain VPU permissions
-        cat > /etc/udev/rules.d/99-rk3588-vpu.rules << 'EOF'
-# RK3588/RK3588S VPU device permissions
-KERNEL=="mpp_service", GROUP="video", MODE="0660"
-EOF
+        # VPU permissions are handled by the main udev rules template
     fi
 
     # Configure NPU (Neural Processing Unit) if available
@@ -1283,35 +1487,10 @@ configure_rk3588_video_acceleration() {
     log "Configuring RK3588 video acceleration..."
 
     # Create GStreamer configuration for hardware acceleration
-    mkdir -p /etc/gstreamer-1.0
-    cat > /etc/gstreamer-1.0/rk3588-hardware.conf << 'EOF'
-# GStreamer hardware acceleration configuration for RK3588/RK3588S
-# Enable MPP (Media Process Platform) plugins
-[plugins]
-mpp = true
-rockchipmpp = true
-
-[elements]
-# Hardware video decoders
-mpph264dec = true
-mpph265dec = true
-mppvp8dec = true
-mppvp9dec = true
-
-# Hardware video encoders
-mpph264enc = true
-mpph265enc = true
-EOF
+    load_rk3588_gstreamer_config
 
     # Configure environment variables for video acceleration
-    cat > /etc/profile.d/rk3588-video.sh << 'EOF'
-# RK3588/RK3588S video acceleration environment
-export GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0
-export LIBVA_DRIVER_NAME=rockchip
-export VDPAU_DRIVER=rockchip
-EOF
-
-    log "Configured RK3588 video acceleration"
+    load_rk3588_video_env_config
 }
 
 # Configure WAN interface
@@ -1331,9 +1510,9 @@ setup_network_routing() {
     sysctl -p
 
     # Configure NAT and forwarding rules
-    iptables -t nat -A POSTROUTING -o "$WAN_INTERFACE" -j MASQUERADE
-    iptables -A FORWARD -i "$WAN_INTERFACE" -o "$WIFI_INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
-    iptables -A FORWARD -i "$WIFI_INTERFACE" -o "$WAN_INTERFACE" -j ACCEPT
+    iptables -t nat -A POSTROUTING -o "${WAN_INTERFACE}" -j MASQUERADE
+    iptables -A FORWARD -i "${WAN_INTERFACE}" -o "${WIFI_INTERFACE}" -m state --state RELATED,ESTABLISHED -j ACCEPT
+    iptables -A FORWARD -i "${WIFI_INTERFACE}" -o "${WAN_INTERFACE}" -j ACCEPT
 
     # Save iptables rules
     iptables-save > /etc/iptables/rules.v4
@@ -1350,7 +1529,7 @@ setup_qos_traffic_shaping() {
     sysctl -p
 
     # Apply basic QoS via just
-    cd "$PROJECT_ROOT" && just qos-setup
+    cd "${PROJECT_ROOT}" && just qos-setup
 
     success "QoS traffic shaping configured"
 }
@@ -1360,20 +1539,22 @@ configure_wifi_hotspot() {
     log "Configuring WiFi hotspot..."
 
     # Stop NetworkManager management of WiFi interface
-    nmcli device set "$WIFI_INTERFACE" managed no
+    nmcli device set "${WIFI_INTERFACE}" managed no
 
     # Bring up WiFi interface
-    ip link set "$WIFI_INTERFACE" up
-    ip addr add "$LAN_IP/22" dev "$WIFI_INTERFACE"
+    ip link set "${WIFI_INTERFACE}" up
+    ip addr add "${LAN_IP}/22" dev "${WIFI_INTERFACE}"
 
     # Load hostapd configuration
     load_hostapd_config
 
     # Detect and configure WPA3 if supported
     if iw phy | grep -q "SAE"; then
-        echo "wpa_key_mgmt=WPA-PSK SAE" >> /etc/hostapd/hostapd.conf
-        echo "sae_password=$WIFI_PASSWORD" >> /etc/hostapd/hostapd.conf
-        echo "ieee80211w=2" >> /etc/hostapd/hostapd.conf
+        {
+            echo "wpa_key_mgmt=WPA-PSK SAE"
+            echo "sae_password=${WIFI_PASSWORD}"
+            echo "ieee80211w=2"
+        } >> /etc/hostapd/hostapd.conf
         success "WiFi hotspot configured with WPA3 support"
     else
         success "WiFi hotspot configured with WPA2"
@@ -1394,29 +1575,7 @@ setup_dhcp_dns_server() {
     log "DHCP for WiFi hotspot will use minimal dnsmasq configuration"
 
     # Create minimal dnsmasq config for DHCP only
-    cat > /etc/dnsmasq.conf << 'EOF'
-# Minimal dnsmasq config for WiFi hotspot DHCP only
-# DNS is handled by Docker containers
-
-# Interface to bind to
-interface=wlan0
-
-# DHCP range for WiFi clients
-dhcp-range=192.168.120.100,192.168.120.200,255.255.252.0,24h
-
-# Don't read /etc/hosts
-no-hosts
-
-# Don't read /etc/resolv.conf
-no-resolv
-
-# Forward DNS to Docker DNS service
-server=127.0.0.1#5053
-
-# Log queries for debugging
-log-queries
-log-dhcp
-EOF
+    load_dnsmasq_minimal_config
 
     systemctl enable dnsmasq
     success "DHCP server configured (DNS handled by Docker)"
@@ -1427,12 +1586,12 @@ configure_wifi_routing() {
     log "Configuring WiFi client routing..."
 
     # Allow WiFi clients to access services
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 80 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 443 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 53 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p udp --dport 53 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p udp --dport 67 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p icmp --icmp-type echo-request -j ACCEPT
+    iptables -A INPUT -i "${WIFI_INTERFACE}" -p tcp --dport 80 -j ACCEPT
+    iptables -A INPUT -i "${WIFI_INTERFACE}" -p tcp --dport 443 -j ACCEPT
+    iptables -A INPUT -i "${WIFI_INTERFACE}" -p tcp --dport 53 -j ACCEPT
+    iptables -A INPUT -i "${WIFI_INTERFACE}" -p udp --dport 53 -j ACCEPT
+    iptables -A INPUT -i "${WIFI_INTERFACE}" -p udp --dport 67 -j ACCEPT
+    iptables -A INPUT -i "${WIFI_INTERFACE}" -p icmp --icmp-type echo-request -j ACCEPT
 
     # Save rules
     iptables-save > /etc/iptables/rules.v4
@@ -1447,12 +1606,64 @@ generate_sync_configs() {
     success "Sync service configurations generated"
 }
 
+# Verify Tailscale GPG key
+verify_tailscale_gpg_key() {
+    local expected_fingerprint="2596A99EAAB33821893C0A79"
+    local temp_key
+    temp_key="$(mktemp -t tailscale-key.XXXXXX)"
+    register_temp_file "$temp_key"
+
+    log "Downloading and verifying Tailscale GPG key..."
+
+    # Download the GPG key
+    if ! curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg > "$temp_key"; then
+        error "Failed to download Tailscale GPG key"
+        return 1
+    fi
+
+    # Import the key to a temporary keyring and verify fingerprint
+    local temp_keyring
+    temp_keyring="$(mktemp -d -t tailscale-keyring.XXXXXX)"
+    register_temp_dir "$temp_keyring"
+
+    # Import key and get fingerprint
+    local actual_fingerprint
+    actual_fingerprint=$(gpg --homedir "$temp_keyring" --import "$temp_key" 2>&1 | grep -o '[0-9A-F]\{40\}' | head -1)
+
+    if [[ -z "$actual_fingerprint" ]]; then
+        # Try alternative method to get fingerprint
+        gpg --homedir "$temp_keyring" --import "$temp_key" >/dev/null 2>&1
+        actual_fingerprint=$(gpg --homedir "$temp_keyring" --list-keys --with-fingerprint 2>/dev/null | grep -o '[0-9A-F]\{40\}' | head -1)
+    fi
+
+    # Remove spaces from fingerprint for comparison
+    actual_fingerprint=$(echo "$actual_fingerprint" | tr -d ' ')
+
+    if [[ "$actual_fingerprint" == "$expected_fingerprint" ]]; then
+        # Fingerprint verified, install the key
+        mv "$temp_key" /usr/share/keyrings/tailscale-archive-keyring.gpg
+        chmod 644 /usr/share/keyrings/tailscale-archive-keyring.gpg
+        success "Tailscale GPG key verified and installed"
+        return 0
+    else
+        error "Tailscale GPG key verification failed"
+        error "Expected: $expected_fingerprint"
+        error "Actual: $actual_fingerprint"
+        return 1
+    fi
+}
+
 # Setup Tailscale
 setup_tailscale() {
     log "Setting up Tailscale..."
 
+    # Verify and install Tailscale GPG key
+    if ! verify_tailscale_gpg_key; then
+        error "Failed to verify Tailscale GPG key"
+        return 1
+    fi
+
     # Add Tailscale repository
-    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
     curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | tee /etc/apt/sources.list.d/tailscale.list
 
     # Update and install Tailscale
@@ -1471,39 +1682,187 @@ setup_tailscale() {
     iptables-save > /etc/iptables/rules.v4
 
     success "Tailscale installed and configured"
-    info "Run 'tailscale up --advertise-routes=$LAN_NETWORK --advertise-exit-node' to connect"
+    info "Run 'tailscale up --advertise-routes=${LAN_NETWORK} --advertise-exit-node' to connect"
 }
 
-# Setup advanced DNS (via Docker containers)
-setup_advanced_dns() {
-    log "Setting up advanced DNS..."
+# Setup DNS services (host-based for Olares compatibility)
+setup_dns_services() {
+    log "Setting up host-based DNS services..."
 
-    # Start DNS infrastructure containers
-    log "Starting DNS containers (CoreDNS + AdGuard)..."
-    cd "$PROJECT_ROOT/docker/infrastructure/dns" && docker compose up -d
+    # Install AdGuard Home as host service
+    install_adguard_home_host
 
-    # Wait for containers to be ready
-    sleep 10
+    # Configure DNS resolution chain
+    configure_dns_chain
 
-    success "Advanced DNS configured via Docker containers"
+    success "Host-based DNS services configured"
 }
 
-# Setup certificate management (via Docker containers)
+install_adguard_home_host() {
+    log "Installing AdGuard Home as host service..."
+
+    # Create AdGuard Home user and directories
+    useradd -r -s /bin/false -d /var/lib/adguardhome adguardhome 2>/dev/null || true
+    mkdir -p /var/lib/adguardhome/{work,conf}
+    mkdir -p /etc/adguardhome
+
+    # Download AdGuard Home binary
+    local adguard_version="v0.107.52"  # Use stable version
+    local adguard_url="https://github.com/AdguardTeam/AdGuardHome/releases/download/${adguard_version}/AdGuardHome_linux_amd64.tar.gz"
+
+    if [[ "${IS_ARM64}" == true ]]; then
+        adguard_url="https://github.com/AdguardTeam/AdGuardHome/releases/download/${adguard_version}/AdGuardHome_linux_arm64.tar.gz"
+    fi
+
+    # Download and install
+    cd /tmp
+    curl -fsSL "$adguard_url" -o adguardhome.tar.gz
+    tar -xzf adguardhome.tar.gz
+    cp AdGuardHome/AdGuardHome /usr/local/bin/
+    chmod +x /usr/local/bin/AdGuardHome
+    rm -rf AdGuardHome adguardhome.tar.gz
+
+    # Load configuration
+    load_adguard_config
+
+    # Create systemd service
+    create_adguard_systemd_service
+
+    # Set permissions
+    chown -R adguardhome:adguardhome /var/lib/adguardhome
+    chown -R adguardhome:adguardhome /etc/adguardhome
+
+    # Enable and start service
+    systemctl enable adguardhome
+    systemctl start adguardhome
+
+    # Verify service is running
+    if systemctl is-active --quiet adguardhome; then
+        success "AdGuard Home installed and running as host service"
+    else
+        error "Failed to start AdGuard Home service"
+        return 1
+    fi
+}
+
+create_adguard_systemd_service() {
+    log "Creating AdGuard Home systemd service..."
+
+    load_adguardhome_service_config
+    success "AdGuard Home systemd service created"
+}
+
+configure_dns_chain() {
+    log "Configuring DNS resolution chain..."
+
+    # Configure systemd-resolved to use AdGuard Home
+    load_systemd_resolved_adguard_config
+
+    # Restart systemd-resolved
+    systemctl restart systemd-resolved
+
+    success "DNS chain configured: client → systemd-resolved → AdGuard Home → NextDNS"
+}
+
+# Setup certificate management (host-based for Olares compatibility)
 setup_certificate_management() {
-    log "Setting up certificate management..."
+    log "Setting up host-based certificate management..."
 
-    # Start Traefik for ACME/Let's Encrypt certificates
-    log "Starting Traefik for ACME certificate management..."
-    cd "$PROJECT_ROOT/docker/infrastructure/traefik" && docker compose up -d
+    # Install Step-CA as host service
+    install_step_ca_host
 
-    # Start Step-CA for internal certificate authority
-    log "Starting Step-CA for internal certificates..."
-    cd "$PROJECT_ROOT/docker/infrastructure/step-ca" && docker compose up -d
+    # Configure certificate authority
+    configure_step_ca
 
-    # Wait for containers to be ready
-    sleep 15
+    success "Host-based certificate management configured"
+}
 
-    success "Certificate management configured via Docker containers"
+install_step_ca_host() {
+    log "Installing Step-CA as host service..."
+
+    # Create step user and directories
+    useradd -r -s /bin/false -d /var/lib/step step 2>/dev/null || true
+    mkdir -p /var/lib/step/{config,secrets,certs}
+    mkdir -p /etc/step
+
+    # Download Step CLI and Step-CA
+    local step_version="0.25.2"
+    local step_ca_version="0.25.2"
+
+    # Determine architecture
+    local arch="amd64"
+    if [[ "${IS_ARM64}" == true ]]; then
+        arch="arm64"
+    fi
+
+    # Download Step CLI
+    local step_cli_url="https://github.com/smallstep/cli/releases/download/v${step_version}/step_linux_${step_version}_${arch}.tar.gz"
+    cd /tmp
+    curl -fsSL "$step_cli_url" -o step-cli.tar.gz
+    tar -xzf step-cli.tar.gz
+    cp "step_${step_version}/bin/step" /usr/local/bin/
+    chmod +x /usr/local/bin/step
+    rm -rf step_* step-cli.tar.gz
+
+    # Download Step-CA
+    local step_ca_url="https://github.com/smallstep/certificates/releases/download/v${step_ca_version}/step-ca_linux_${step_ca_version}_${arch}.tar.gz"
+    curl -fsSL "$step_ca_url" -o step-ca.tar.gz
+    tar -xzf step-ca.tar.gz
+    cp "step-ca_${step_ca_version}/bin/step-ca" /usr/local/bin/
+    chmod +x /usr/local/bin/step-ca
+    rm -rf step-ca_* step-ca.tar.gz
+
+    success "Step-CA binaries installed"
+}
+
+configure_step_ca() {
+    log "Configuring Step-CA..."
+
+    # Initialize CA if not already done
+    if [[ ! -f /var/lib/step/config/ca.json ]]; then
+        log "Initializing Step-CA..."
+
+        # Generate CA password
+        local ca_password
+        ca_password=$(openssl rand -base64 32)
+        echo "$ca_password" > /var/lib/step/secrets/password
+        chmod 600 /var/lib/step/secrets/password
+
+        # Initialize CA
+        sudo -u step STEPPATH=/var/lib/step step ca init \
+            --name "DangerPrep Internal CA" \
+            --dns "ca.danger,step-ca.danger,localhost" \
+            --address ":9000" \
+            --provisioner "admin" \
+            --password-file /var/lib/step/secrets/password \
+            --provisioner-password-file /var/lib/step/secrets/password
+    fi
+
+    # Create systemd service
+    create_step_ca_systemd_service
+
+    # Set permissions
+    chown -R step:step /var/lib/step
+    chown -R step:step /etc/step
+
+    # Enable and start service
+    systemctl enable step-ca
+    systemctl start step-ca
+
+    # Verify service is running
+    if systemctl is-active --quiet step-ca; then
+        success "Step-CA configured and running as host service"
+    else
+        error "Failed to start Step-CA service"
+        return 1
+    fi
+}
+
+create_step_ca_systemd_service() {
+    log "Creating Step-CA systemd service..."
+
+    load_step_ca_service_config
+    success "Step-CA systemd service created"
 }
 
 # Install management scripts
@@ -1541,13 +1900,17 @@ setup_system_monitoring() {
 configure_nfs_client() {
     log "Configuring NFS client..."
 
-    # Install NFS client
-    apt install -y nfs-common
+    # Create content and NFS directories
+    mkdir -p "${INSTALL_ROOT}"/{content,nfs,config}
+    mkdir -p "${INSTALL_ROOT}/content"/{movies,tv,webtv,music,audiobooks,books,comics,magazines,games/roms,kiwix}
 
-    # Create NFS mount points
-    mkdir -p "$INSTALL_ROOT/nfs"
+    # NFS client is already installed via packages
+    # Create mount points for external NFS shares
+    mkdir -p "${INSTALL_ROOT}/nfs"
 
     success "NFS client configured"
+    log "Content directories created at ${INSTALL_ROOT}/content"
+    log "NFS mount point available at ${INSTALL_ROOT}/nfs"
 }
 
 # Install maintenance scripts
@@ -1570,15 +1933,7 @@ setup_encrypted_backups() {
     chmod 600 /etc/dangerprep/backup/backup.key
 
     # Add backup cron jobs to run via just
-    cat > /etc/cron.d/dangerprep-backups << 'EOF'
-# DangerPrep Encrypted Backups
-# Daily backup at 1 AM
-0 1 * * * root cd /opt/dangerprep && just backup-daily
-# Weekly backup on Sunday at 2 AM
-0 2 * * 0 root cd /opt/dangerprep && just backup-weekly
-# Monthly backup on 1st at 3 AM
-0 3 1 * * root cd /opt/dangerprep && just backup-monthly
-EOF
+    load_backup_cron_config
 
     success "Encrypted backup system configured"
 }
@@ -1591,8 +1946,7 @@ start_all_services() {
         "ssh"
         "fail2ban"
         "hostapd"
-        "dnsmasq"  # Only for WiFi DHCP, DNS handled by Docker
-        "docker"
+dnsmasq
         "tailscaled"
     )
 
@@ -1638,7 +1992,7 @@ verify_setup() {
     fi
 
     # Test WiFi interface
-    if ip link show "$WIFI_INTERFACE" >/dev/null 2>&1; then
+    if ip link show "${WIFI_INTERFACE}" >/dev/null 2>&1; then
         success "WiFi interface is up"
     else
         warning "WiFi interface not found"
@@ -1655,88 +2009,148 @@ show_final_info() {
 ║                        DangerPrep Setup Complete!                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  WiFi Hotspot: $WIFI_SSID                                                   ║
-║  Password: $WIFI_PASSWORD                                                    ║
-║  Network: $LAN_NETWORK                                                       ║
-║  Gateway: $LAN_IP                                                            ║
+║  WiFi Hotspot: ${WIFI_SSID}                                                   ║
+║  Password: [Stored securely in /etc/dangerprep/wifi-password]              ║
+║  Network: ${LAN_NETWORK}                                                       ║
+║  Gateway: ${LAN_IP}                                                            ║
 ║                                                                              ║
-║  SSH: Port $SSH_PORT (key-only authentication)                              ║
+║  SSH: Port ${SSH_PORT} (key-only authentication)                              ║
 ║  Management: dangerprep --help                                               ║
 ║                                                                              ║
 ║  Services: http://portal.danger                                              ║
 ║  Traefik: http://traefik.danger                                              ║
 ║                                                                              ║
-║  Tailscale: tailscale up --advertise-routes=$LAN_NETWORK                    ║
+║  Tailscale: tailscale up --advertise-routes=${LAN_NETWORK}                    ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 EOF
     echo -e "${NC}"
 
-    info "Logs: $LOG_FILE"
-    info "Backups: $BACKUP_DIR"
-    info "Install root: $INSTALL_ROOT"
+    info "Logs: ${LOG_FILE}"
+    info "Backups: ${BACKUP_DIR}"
+    info "Install root: ${INSTALL_ROOT}"
 }
 
-# Main function
+# Main function with state management
 main() {
     show_banner
     check_root
     setup_logging
+
+    # Initialize state tracking
+    init_state_tracking
+
+    # Check for previous incomplete setup
+    local last_completed
+    last_completed=$(get_last_completed_step)
+    if [[ -n "$last_completed" ]]; then
+        warning "Previous incomplete setup detected"
+        show_setup_progress
+        echo
+        read -p "Continue from where setup left off? (y/n): " -r
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            info "Starting fresh setup..."
+            init_state_tracking  # Reset state
+        else
+            info "Resuming setup from last completed step: $last_completed"
+        fi
+    fi
+
     show_system_info
     pre_flight_checks
     backup_original_configs
-    update_system_packages
-    install_essential_packages
-    setup_automatic_updates
 
-    log "System preparation completed. Continuing with security hardening..."
-    configure_ssh_hardening
-    load_motd_config
-    setup_fail2ban
-    configure_kernel_hardening
-    setup_file_integrity_monitoring
-    setup_hardware_monitoring
-    setup_advanced_security_tools
-
-    log "Security hardening completed. Continuing with Docker setup..."
-    configure_rootless_docker
-    setup_docker_services
-    setup_container_health_monitoring
-
-    log "Docker setup completed. Continuing with network configuration..."
-    detect_network_interfaces
-    configure_wan_interface
-    setup_network_routing
-    setup_qos_traffic_shaping
-    configure_wifi_hotspot
-    setup_dhcp_dns_server
-    configure_wifi_routing
-
-    log "Network configuration completed. Applying hardware optimizations..."
-    # Apply FriendlyElec-specific performance optimizations
-    if [[ "$IS_FRIENDLYELEC" == true ]]; then
-        configure_rk3588_performance
+    # System Update Phase
+    if ! is_step_completed "SYSTEM_UPDATE"; then
+        set_step_state "SYSTEM_UPDATE" "IN_PROGRESS"
+        update_system_packages
+        install_essential_packages
+        setup_automatic_updates
+        set_step_state "SYSTEM_UPDATE" "COMPLETED"
+        log "System preparation completed. Continuing with security hardening..."
+    else
+        info "Skipping system update (already completed)"
     fi
 
-    log "Hardware optimizations completed. Continuing with services..."
-    generate_sync_configs
-    setup_tailscale
-    setup_advanced_dns
-    setup_certificate_management
+    # Security Hardening Phase
+    if ! is_step_completed "SECURITY_HARDENING"; then
+        set_step_state "SECURITY_HARDENING" "IN_PROGRESS"
+        configure_ssh_hardening
+        load_motd_config
+        setup_fail2ban
+        configure_kernel_hardening
+        setup_file_integrity_monitoring
+        setup_hardware_monitoring
+        setup_advanced_security_tools
+        set_step_state "SECURITY_HARDENING" "COMPLETED"
+        log "Security hardening completed. Continuing with directory and NFS setup..."
+    else
+        info "Skipping security hardening (already completed)"
+    fi
 
-    log "Services configured. Installing management tools..."
-    install_management_scripts
-    create_routing_scenarios
-    setup_system_monitoring
-    configure_nfs_client
-    install_maintenance_scripts
-    setup_encrypted_backups
+    # Network Configuration Phase
+    if ! is_step_completed "NETWORK_CONFIG"; then
+        set_step_state "NETWORK_CONFIG" "IN_PROGRESS"
+        setup_directory_structure
+        configure_nfs_client
+        detect_network_interfaces
+        configure_wan_interface
+        setup_network_routing
+        setup_qos_traffic_shaping
+        configure_wifi_hotspot
+        setup_dhcp_dns_server
+        configure_wifi_routing
+        set_step_state "NETWORK_CONFIG" "COMPLETED"
+        log "Network configuration completed. Applying hardware optimizations..."
+    else
+        info "Skipping network configuration (already completed)"
+    fi
 
-    log "Starting services and finalizing..."
-    start_all_services
-    verify_setup
+    # Docker Setup Phase
+    if ! is_step_completed "DOCKER_SETUP"; then
+        set_step_state "DOCKER_SETUP" "IN_PROGRESS"
+        # Apply FriendlyElec-specific performance optimizations
+        if [[ "${IS_FRIENDLYELEC}" == true ]]; then
+            configure_rk3588_performance
+        fi
+        install_olares
+        configure_olares_integration
+        set_step_state "DOCKER_SETUP" "COMPLETED"
+        log "Docker setup completed. Continuing with services..."
+    else
+        info "Skipping Docker setup (already completed)"
+    fi
+
+    # Services Configuration Phase
+    if ! is_step_completed "SERVICES_CONFIG"; then
+        set_step_state "SERVICES_CONFIG" "IN_PROGRESS"
+        generate_sync_configs
+        setup_tailscale
+        setup_dns_services
+        setup_certificate_management
+        set_step_state "SERVICES_CONFIG" "COMPLETED"
+        log "Services configured. Installing management tools..."
+    else
+        info "Skipping services configuration (already completed)"
+    fi
+
+    # Final Setup Phase
+    if ! is_step_completed "FINAL_SETUP"; then
+        set_step_state "FINAL_SETUP" "IN_PROGRESS"
+        install_management_scripts
+        create_routing_scenarios
+        setup_system_monitoring
+        install_maintenance_scripts
+        setup_encrypted_backups
+        start_all_services
+        verify_setup
+        set_step_state "FINAL_SETUP" "COMPLETED"
+        log "Final setup completed successfully!"
+    else
+        info "Skipping final setup (already completed)"
+    fi
+
     show_final_info
-
     success "DangerPrep setup completed successfully!"
 }
 
@@ -1745,7 +2159,7 @@ cleanup_on_error() {
     error "Setup failed. Running comprehensive cleanup..."
 
     # Run the full cleanup script to completely reverse all changes
-    local cleanup_script="$SCRIPT_DIR/cleanup-dangerprep.sh"
+    local cleanup_script="${SCRIPT_DIR}/cleanup-dangerprep.sh"
 
     if [[ -f "$cleanup_script" ]]; then
         warning "Running cleanup script to restore system to original state..."
@@ -1759,11 +2173,11 @@ cleanup_on_error() {
             systemctl stop docker 2>/dev/null || true
 
             # Restore original configurations if they exist
-            if [[ -d "$BACKUP_DIR" ]]; then
-                [[ -f "$BACKUP_DIR/sshd_config" ]] && cp "$BACKUP_DIR/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
-                [[ -f "$BACKUP_DIR/sysctl.conf" ]] && cp "$BACKUP_DIR/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
-                [[ -f "$BACKUP_DIR/dnsmasq.conf" ]] && cp "$BACKUP_DIR/dnsmasq.conf" /etc/dnsmasq.conf 2>/dev/null || true
-                [[ -f "$BACKUP_DIR/iptables.rules" ]] && iptables-restore < "$BACKUP_DIR/iptables.rules" 2>/dev/null || true
+            if [[ -d "${BACKUP_DIR}" ]]; then
+                [[ -f "${BACKUP_DIR}/sshd_config" ]] && cp "${BACKUP_DIR}/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
+                [[ -f "${BACKUP_DIR}/sysctl.conf" ]] && cp "${BACKUP_DIR}/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
+                [[ -f "${BACKUP_DIR}/dnsmasq.conf" ]] && cp "${BACKUP_DIR}/dnsmasq.conf" /etc/dnsmasq.conf 2>/dev/null || true
+                [[ -f "${BACKUP_DIR}/iptables.rules" ]] && iptables-restore < "${BACKUP_DIR}/iptables.rules" 2>/dev/null || true
             fi
         }
 
@@ -1778,15 +2192,15 @@ cleanup_on_error() {
         systemctl stop docker 2>/dev/null || true
 
         # Restore original configurations if they exist
-        if [[ -d "$BACKUP_DIR" ]]; then
-            [[ -f "$BACKUP_DIR/sshd_config" ]] && cp "$BACKUP_DIR/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
-            [[ -f "$BACKUP_DIR/sysctl.conf" ]] && cp "$BACKUP_DIR/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
-            [[ -f "$BACKUP_DIR/dnsmasq.conf" ]] && cp "$BACKUP_DIR/dnsmasq.conf" /etc/dnsmasq.conf 2>/dev/null || true
-            [[ -f "$BACKUP_DIR/iptables.rules" ]] && iptables-restore < "$BACKUP_DIR/iptables.rules" 2>/dev/null || true
+        if [[ -d "${BACKUP_DIR}" ]]; then
+            [[ -f "${BACKUP_DIR}/sshd_config" ]] && cp "${BACKUP_DIR}/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
+            [[ -f "${BACKUP_DIR}/sysctl.conf" ]] && cp "${BACKUP_DIR}/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
+            [[ -f "${BACKUP_DIR}/dnsmasq.conf" ]] && cp "${BACKUP_DIR}/dnsmasq.conf" /etc/dnsmasq.conf 2>/dev/null || true
+            [[ -f "${BACKUP_DIR}/iptables.rules" ]] && iptables-restore < "${BACKUP_DIR}/iptables.rules" 2>/dev/null || true
         fi
     fi
 
-    error "Setup failed. Check $LOG_FILE for details."
+    error "Setup failed. Check ${LOG_FILE} for details."
     error "System has been restored to its pre-installation state"
     info "You can safely re-run the setup script after addressing any issues"
     exit 1
@@ -1794,7 +2208,77 @@ cleanup_on_error() {
 
 trap cleanup_on_error ERR
 
+# Parse command line arguments
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dry-run)
+                enable_dry_run
+                shift
+                ;;
+            --verbose)
+                set_log_level "DEBUG"
+                shift
+                ;;
+            --config)
+                if [[ -n "$2" && ! "$2" =~ ^-- ]]; then
+                    export CONFIG_FILE="$2"
+                    shift 2
+                else
+                    error "Option --config requires a file path"
+                    exit 1
+                fi
+                ;;
+            --skip-docker)
+                export SKIP_DOCKER=true
+                shift
+                ;;
+            --skip-network)
+                export SKIP_NETWORK=true
+                shift
+                ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            *)
+                error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Main execution wrapper
+main_wrapper() {
+    # Parse arguments first
+    parse_arguments "$@"
+
+    # Show dry-run notice if enabled
+    if is_dry_run; then
+        log_section "DRY-RUN MODE"
+        warning "This is a dry-run. No changes will be made to the system."
+        warning "The script will show what would be done without actually doing it."
+        echo
+        read -p "Continue with dry-run? (y/N): " -r
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            info "Dry-run cancelled by user"
+            exit 0
+        fi
+        echo
+    fi
+
+    # Run main setup function
+    main
+
+    # Show dry-run summary if in dry-run mode
+    if is_dry_run; then
+        show_dry_run_summary
+    fi
+}
+
 # Run main function if script is executed directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
+    main_wrapper "$@"
 fi

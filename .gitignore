@@ -77,6 +77,7 @@ out/
 *.bak
 *.backup
 backup-*
+!backup-manager.sh
 
 # SSL certificates and keys
 *.pem

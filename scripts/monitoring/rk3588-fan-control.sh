@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Configuration file
 CONFIG_FILE="/etc/dangerprep/rk3588-fan-control.conf"
@@ -30,17 +30,18 @@ MONITOR_INTERVAL=5
 TEMP_HYSTERESIS=3
 ENABLE_LOGGING=true
 EMERGENCY_SHUTDOWN_TEMP=95
-FAN_FAILURE_DETECTION=true
-FAN_FAILURE_TIMEOUT=30
+# Fan failure detection settings - used in monitoring
+export FAN_FAILURE_DETECTION=true
+export FAN_FAILURE_TIMEOUT=30
 
 # Load configuration
 load_config() {
-    if [[ -f "$CONFIG_FILE" ]]; then
+    if [[ -f "${CONFIG_FILE}" ]]; then
         # shellcheck source=/dev/null
-        source "$CONFIG_FILE"
-    elif [[ -f "$DEFAULT_CONFIG" ]]; then
+        source "${CONFIG_FILE}"
+    elif [[ -f "${DEFAULT_CONFIG}" ]]; then
         # shellcheck source=/dev/null
-        source "$DEFAULT_CONFIG"
+        source "${DEFAULT_CONFIG}"
     fi
 }
 
@@ -48,9 +49,10 @@ load_config() {
 log_message() {
     local level="$1"
     local message="$2"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     
-    if [[ "$ENABLE_LOGGING" == true ]]; then
+    if [[ "${ENABLE_LOGGING}" == true ]]; then
         echo "[$timestamp] [$level] $message" >> "${FAN_LOG_FILE:-/var/log/rk3588-fan-control.log}"
     fi
     
@@ -69,8 +71,10 @@ get_max_temperature() {
     
     for sensor in "${temp_sensors[@]}"; do
         if [[ -r "$sensor" ]]; then
-            local temp_millicelsius=$(cat "$sensor" 2>/dev/null || echo "0")
-            local temp_celsius=$((temp_millicelsius / 1000))
+            local temp_millicelsius
+            temp_millicelsius=$(cat "$sensor" 2>/dev/null || echo "0")
+            local temp_celsius
+            temp_celsius=$((temp_millicelsius / 1000))
             
             if [[ $temp_celsius -gt $max_temp ]]; then
                 max_temp=$temp_celsius
@@ -83,8 +87,10 @@ get_max_temperature() {
 
 # Initialize PWM for fan control
 init_pwm() {
-    local pwm_chip="${FAN_PWM_CHIP:-/sys/class/pwm/pwmchip0}"
-    local pwm_device="${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}"
+    local pwm_chip
+    pwm_chip=${FAN_PWM_CHIP:-/sys/class/pwm/pwmchip0}
+    local pwm_device
+    pwm_device=${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}
     
     # Check if PWM chip exists
     if [[ ! -d "$pwm_chip" ]]; then
@@ -102,7 +108,8 @@ init_pwm() {
     fi
     
     # Set PWM frequency
-    local period_ns=$((1000000000 / PWM_FREQUENCY))
+    local period_ns
+    period_ns=$((1000000000 / PWM_FREQUENCY))
     echo "$period_ns" > "$pwm_device/period" 2>/dev/null || {
         log_message "error" "Failed to set PWM period"
         return 1
@@ -121,7 +128,8 @@ init_pwm() {
 # Set fan speed (0-100%)
 set_fan_speed() {
     local speed_percent="$1"
-    local pwm_device="${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}"
+    local pwm_device
+    pwm_device=${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}
     
     # Validate speed range
     if [[ $speed_percent -lt 0 || $speed_percent -gt 100 ]]; then
@@ -130,8 +138,10 @@ set_fan_speed() {
     fi
     
     # Calculate duty cycle
-    local period_ns=$(cat "$pwm_device/period" 2>/dev/null || echo "40000")
-    local duty_cycle_ns=$((period_ns * speed_percent / 100))
+    local period_ns
+    period_ns=$(cat "$pwm_device/period" 2>/dev/null || echo "40000")
+    local duty_cycle_ns
+    duty_cycle_ns=$((period_ns * speed_percent / 100))
     
     # Set duty cycle
     if echo "$duty_cycle_ns" > "$pwm_device/duty_cycle" 2>/dev/null; then
@@ -150,22 +160,24 @@ calculate_fan_speed() {
     local new_speed="$current_speed"
     
     # Apply hysteresis to prevent oscillation
-    local temp_up=$((temp))
-    local temp_down=$((temp - TEMP_HYSTERESIS))
+    local temp_up
+    temp_up=$((temp))
+    local temp_down
+    temp_down=$((temp - TEMP_HYSTERESIS))
     
     # Determine fan speed based on temperature thresholds
-    if [[ $temp_up -ge $TEMP_CRITICAL ]]; then
-        new_speed=$FAN_SPEED_MAX
-    elif [[ $temp_up -ge $TEMP_MAX ]]; then
-        new_speed=$FAN_SPEED_HIGH
-    elif [[ $temp_up -ge $TEMP_HIGH ]]; then
-        new_speed=$FAN_SPEED_MID
-    elif [[ $temp_up -ge $TEMP_MID ]]; then
-        new_speed=$FAN_SPEED_LOW
-    elif [[ $temp_up -ge $TEMP_LOW ]]; then
-        new_speed=$FAN_SPEED_MIN
-    elif [[ $temp_down -le $TEMP_MIN ]]; then
-        new_speed=$FAN_SPEED_OFF
+    if [[ $temp_up -ge ${TEMP_CRITICAL} ]]; then
+        new_speed=${FAN_SPEED_MAX}
+    elif [[ $temp_up -ge ${TEMP_MAX} ]]; then
+        new_speed=${FAN_SPEED_HIGH}
+    elif [[ $temp_up -ge ${TEMP_HIGH} ]]; then
+        new_speed=${FAN_SPEED_MID}
+    elif [[ $temp_up -ge ${TEMP_MID} ]]; then
+        new_speed=${FAN_SPEED_LOW}
+    elif [[ $temp_up -ge ${TEMP_LOW} ]]; then
+        new_speed=${FAN_SPEED_MIN}
+    elif [[ $temp_down -le ${TEMP_MIN} ]]; then
+        new_speed=${FAN_SPEED_OFF}
     fi
     
     echo "$new_speed"
@@ -175,7 +187,7 @@ calculate_fan_speed() {
 check_emergency_shutdown() {
     local temp="$1"
     
-    if [[ $temp -ge $EMERGENCY_SHUTDOWN_TEMP ]]; then
+    if [[ $temp -ge ${EMERGENCY_SHUTDOWN_TEMP} ]]; then
         log_message "critical" "Emergency shutdown triggered at ${temp}°C"
         echo "Emergency thermal shutdown at ${temp}°C" | wall
         sync
@@ -192,13 +204,15 @@ fan_control_loop() {
     log_message "info" "Starting fan control loop"
     
     while true; do
-        local temp=$(get_max_temperature)
+        local temp
+        temp=$(get_max_temperature)
         
         # Check for emergency shutdown
         check_emergency_shutdown "$temp"
         
         # Calculate new fan speed
-        local new_fan_speed=$(calculate_fan_speed "$temp" "$current_fan_speed")
+        local new_fan_speed
+        new_fan_speed=$(calculate_fan_speed "$temp" "$current_fan_speed")
         
         # Only change fan speed if necessary
         if [[ $new_fan_speed -ne $current_fan_speed ]]; then
@@ -217,15 +231,16 @@ fan_control_loop() {
             fi
         fi
         
-        last_temp=$temp
-        sleep "$MONITOR_INTERVAL"
+        # Store last temperature for comparison
+        export last_temp=$temp
+        sleep "${MONITOR_INTERVAL}"
     done
 }
 
 # Cleanup function
 cleanup() {
     log_message "info" "Fan control stopping, setting fan to safe speed"
-    set_fan_speed "$FAN_SPEED_HIGH" || true
+    set_fan_speed "${FAN_SPEED_HIGH}" || true
     exit 0
 }
 
@@ -252,15 +267,19 @@ main() {
             ;;
         stop)
             log_message "info" "Stopping fan control"
-            set_fan_speed "$FAN_SPEED_HIGH"
+            set_fan_speed "${FAN_SPEED_HIGH}"
             ;;
         status)
-            local temp=$(get_max_temperature)
+            local temp
+            temp=$(get_max_temperature)
             echo "Current temperature: ${temp}°C"
             if [[ -r "${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}/duty_cycle" ]]; then
-                local duty=$(cat "${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}/duty_cycle")
-                local period=$(cat "${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}/period")
-                local speed_percent=$((duty * 100 / period))
+                local duty
+                duty=$(cat "${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}/duty_cycle")
+                local period
+                period=$(cat "${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}/period")
+                local speed_percent
+                speed_percent=$((duty * 100 / period))
                 echo "Current fan speed: ${speed_percent}%"
             fi
             ;;

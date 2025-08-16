@@ -4,14 +4,14 @@
 
 # Source shared banner utility
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
 show_banner_with_title "Certificate Manager" "system"
 echo
 
 DOCKER_DIR="/opt/dangerprep/docker"
-TRAEFIK_DIR="$DOCKER_DIR/infrastructure/traefik"
-STEP_CA_DIR="$DOCKER_DIR/infrastructure/step-ca"
+TRAEFIK_DIR="${DOCKER_DIR}/infrastructure/traefik"
+STEP_CA_DIR="${DOCKER_DIR}/infrastructure/step-ca"
 
 setup_traefik_certificates() {
     echo "Setting up Traefik ACME certificates..."
@@ -19,7 +19,7 @@ setup_traefik_certificates() {
     # Check if Traefik is running
     if ! docker ps | grep -q traefik; then
         echo "Traefik container not running. Starting Traefik..."
-        cd "$TRAEFIK_DIR" && docker compose up -d
+        cd "${TRAEFIK_DIR}" && docker compose up -d
         sleep 10
     fi
 
@@ -34,7 +34,7 @@ setup_step_ca() {
     # Check if Step-CA is running
     if ! docker ps | grep -q step-ca; then
         echo "Step-CA container not running. Starting Step-CA..."
-        cd "$STEP_CA_DIR" && docker compose up -d
+        cd "${STEP_CA_DIR}" && docker compose up -d
         sleep 10
     fi
 
