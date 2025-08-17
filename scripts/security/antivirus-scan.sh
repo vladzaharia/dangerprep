@@ -1,0 +1,311 @@
+#!/usr/bin/env bash
+# DangerPrep ClamAV Antivirus Scanner
+# Performs malware scanning using ClamAV antivirus engine
+# Usage: antivirus-scan.sh {quick|full|update|quarantine|help} [path]
+# Dependencies: clamav, clamav-daemon
+# Author: DangerPrep Project
+# Version: 1.0
+
+set -euo pipefail
+
+# Script metadata
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
+readonly SCRIPT_NAME
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+readonly SCRIPT_VERSION="1.0"
+readonly SCRIPT_DESCRIPTION="ClamAV Antivirus Scanner"
+
+# Source shared utilities
+source "${SCRIPT_DIR}/../shared/logging.sh"
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+source "${SCRIPT_DIR}/../shared/validation.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
+
+# Configuration
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-antivirus-scan.log"
+SCAN_LOG="/var/log/clamav-scan-$(date +%Y%m%d-%H%M%S).log"
+readonly SCAN_LOG
+readonly QUARANTINE_DIR="/var/quarantine"
+readonly CLAMAV_DB_DIR="/var/lib/clamav"
+
+# Cleanup function
+cleanup_on_error() {
+    local exit_code=$?
+    error "Antivirus scan failed with exit code $exit_code"
+    
+    # Kill any running clamscan processes if they exist
+    pkill -f clamscan 2>/dev/null || true
+    
+    exit $exit_code
+}
+
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+    trap cleanup_on_error ERR
+    validate_root_user
+    require_commands clamscan freshclam
+    debug "Antivirus scanner initialized"
+    clear_error_context
+}
+
+# Show help
+show_help() {
+    cat << EOF
+${SCRIPT_DESCRIPTION} v${SCRIPT_VERSION}
+
+USAGE:
+    ${SCRIPT_NAME} {quick|full|update|quarantine|help} [path]
+
+COMMANDS:
+    quick [path]    Quick scan of common locations (default: /home, /tmp, /var/www)
+    full [path]     Full system scan (default: entire filesystem)
+    update          Update virus definitions
+    quarantine      Manage quarantined files
+    help            Show this help message
+
+OPTIONS:
+    path            Custom path to scan (optional)
+
+DESCRIPTION:
+    Performs malware scanning using ClamAV antivirus engine.
+    Infected files can be quarantined for safe handling.
+
+EXAMPLES:
+    ${SCRIPT_NAME} quick                    # Quick scan of common locations
+    ${SCRIPT_NAME} full                     # Full system scan
+    ${SCRIPT_NAME} quick /home/user         # Scan specific directory
+    ${SCRIPT_NAME} update                   # Update virus definitions
+
+EOF
+}
+
+# Check ClamAV configuration
+check_clamav_config() {
+    set_error_context "ClamAV configuration check"
+    
+    # Ensure quarantine directory exists
+    mkdir -p "$QUARANTINE_DIR" 2>/dev/null || true
+    chmod 700 "$QUARANTINE_DIR"
+    
+    # Check if virus definitions exist
+    if [[ ! -d "$CLAMAV_DB_DIR" ]] || [[ -z "$(find "$CLAMAV_DB_DIR" -name "*.cvd" -o -name "*.cld" 2>/dev/null)" ]]; then
+        warning "ClamAV virus definitions not found or outdated"
+        log "Updating virus definitions..."
+        update_virus_definitions
+    fi
+    
+    success "ClamAV configuration validated"
+    clear_error_context
+}
+
+# Update virus definitions
+update_virus_definitions() {
+    set_error_context "Virus definition update"
+    
+    log "Updating ClamAV virus definitions..."
+    log "This may take several minutes depending on connection speed"
+    
+    # Stop clamd if running to avoid conflicts
+    systemctl stop clamav-daemon 2>/dev/null || true
+    
+    if freshclam --verbose; then
+        success "Virus definitions updated successfully"
+        
+        # Restart clamd if it was running
+        if systemctl is-enabled clamav-daemon >/dev/null 2>&1; then
+            systemctl start clamav-daemon
+            log "ClamAV daemon restarted"
+        fi
+    else
+        error "Failed to update virus definitions"
+        return 1
+    fi
+    
+    clear_error_context
+}
+
+# Perform antivirus scan
+perform_scan() {
+    local scan_type="$1"
+    local scan_path="${2:-}"
+    
+    set_error_context "Antivirus scan ($scan_type)"
+    
+    local scan_paths=()
+    local scan_options=(
+        "--verbose"
+        "--log=$SCAN_LOG"
+        "--infected"
+        "--remove=no"
+        "--move=$QUARANTINE_DIR"
+    )
+    
+    # Determine scan paths based on type
+    case "$scan_type" in
+        "quick")
+            if [[ -n "$scan_path" ]]; then
+                scan_paths=("$scan_path")
+            else
+                # Common locations for quick scan
+                scan_paths=(
+                    "/home"
+                    "/tmp"
+                    "/var/tmp"
+                    "/var/www"
+                    "/opt"
+                )
+            fi
+            log "Performing quick antivirus scan..."
+            ;;
+        "full")
+            if [[ -n "$scan_path" ]]; then
+                scan_paths=("$scan_path")
+            else
+                scan_paths=("/")
+                # Exclude system directories that don't need scanning
+                scan_options+=(
+                    "--exclude-dir=/proc"
+                    "--exclude-dir=/sys"
+                    "--exclude-dir=/dev"
+                    "--exclude-dir=/run"
+                    "--exclude-dir=/mnt"
+                    "--exclude-dir=/media"
+                )
+            fi
+            log "Performing full system antivirus scan..."
+            ;;
+        *)
+            error "Unknown scan type: $scan_type"
+            return 1
+            ;;
+    esac
+    
+    # Filter scan paths to only existing directories
+    local existing_paths=()
+    for path in "${scan_paths[@]}"; do
+        if [[ -e "$path" ]]; then
+            existing_paths+=("$path")
+        else
+            warning "Scan path does not exist: $path"
+        fi
+    done
+    
+    if [[ ${#existing_paths[@]} -eq 0 ]]; then
+        error "No valid scan paths found"
+        return 1
+    fi
+    
+    log "Scanning paths: ${existing_paths[*]}"
+    log "Scan log: $SCAN_LOG"
+    
+    # Perform the scan
+    local scan_exit_code=0
+    if clamscan "${scan_options[@]}" "${existing_paths[@]}"; then
+        scan_exit_code=0
+    else
+        scan_exit_code=$?
+    fi
+    
+    # ClamAV exit codes:
+    # 0 = no virus found
+    # 1 = virus found
+    # 2 = some error occurred
+    
+    case $scan_exit_code in
+        0)
+            success "Scan completed - no malware detected"
+            ;;
+        1)
+            warning "Malware detected during scan!"
+            warning "Infected files have been moved to quarantine: $QUARANTINE_DIR"
+            warning "Check scan log for details: $SCAN_LOG"
+            
+            # Show infected file count
+            local infected_count
+            infected_count=$(grep -c "FOUND" "$SCAN_LOG" 2>/dev/null || echo "0")
+            warning "Total infected files: $infected_count"
+            ;;
+        2)
+            error "Scan failed due to errors"
+            error "Check scan log for details: $SCAN_LOG"
+            return 1
+            ;;
+        *)
+            error "Scan failed with unexpected exit code: $scan_exit_code"
+            return 1
+            ;;
+    esac
+    
+    clear_error_context
+    return $scan_exit_code
+}
+
+# Manage quarantined files
+manage_quarantine() {
+    set_error_context "Quarantine management"
+    
+    log "Quarantine directory: $QUARANTINE_DIR"
+    
+    if [[ ! -d "$QUARANTINE_DIR" ]]; then
+        log "No quarantine directory found"
+        return 0
+    fi
+    
+    local quarantined_files
+    quarantined_files=$(find "$QUARANTINE_DIR" -type f 2>/dev/null | wc -l)
+    
+    if [[ "$quarantined_files" -eq 0 ]]; then
+        success "No files in quarantine"
+    else
+        warning "$quarantined_files files in quarantine:"
+        find "$QUARANTINE_DIR" -type f -printf "%TY-%Tm-%Td %TH:%TM  %s bytes  %p\n" 2>/dev/null | sort
+        echo
+        warning "To remove quarantined files: rm -rf $QUARANTINE_DIR/*"
+        warning "To restore a file: mv $QUARANTINE_DIR/filename /original/location"
+    fi
+    
+    clear_error_context
+}
+
+# Main function
+main() {
+    local command="${1:-help}"
+    local scan_path="${2:-}"
+    
+    if [[ "$command" == "help" || "$command" == "--help" || "$command" == "-h" ]]; then
+        show_help
+        exit 0
+    fi
+    
+    init_script
+    
+    show_banner_with_title "ClamAV Antivirus Scanner" "security"
+    echo
+    
+    check_clamav_config
+    
+    case "$command" in
+        quick)
+            perform_scan "quick" "$scan_path"
+            ;;
+        full)
+            perform_scan "full" "$scan_path"
+            ;;
+        update)
+            update_virus_definitions
+            ;;
+        quarantine)
+            manage_quarantine
+            ;;
+        *)
+            error "Unknown command: $command"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

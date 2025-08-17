@@ -18,6 +18,12 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/system-state.sh
+source "${SCRIPT_DIR}/../shared/system-state.sh"
+# shellcheck source=../shared/system-functions.sh
+source "${SCRIPT_DIR}/../shared/system-functions.sh"
+# shellcheck source=../shared/system-intelligence.sh
+source "${SCRIPT_DIR}/../shared/system-intelligence.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-start-services.log"
@@ -136,18 +142,18 @@ verify_services() {
         service=${service_info%%:*}
         local name
         name=${service_info##*:}
-        
-        if systemctl is-active --quiet "$service" 2>/dev/null; then
-            success "$name is running"
+
+        if systemctl is-active --quiet "${service}" 2>/dev/null; then
+            success "${name} is running"
         else
-            warning "$name is not running"
+            warning "${name} is not running"
         fi
     done
 
     # Check K3s
     if systemctl is-active --quiet k3s 2>/dev/null; then
         success "K3s is running"
-        
+
         # Check if kubectl works
         if kubectl get nodes >/dev/null 2>&1; then
             success "Kubernetes API is accessible"
@@ -157,6 +163,44 @@ verify_services() {
     else
         warning "K3s is not running"
     fi
+}
+
+# Update system state after startup
+update_system_state_after_startup() {
+    log "Updating system state after startup..."
+
+    # Update service states
+    if is_k3s_running; then
+        set_service_status "olares" "running"
+    else
+        set_service_status "olares" "stopped"
+    fi
+
+    # Check host services
+    local host_services=("adguardhome" "step-ca" "tailscaled")
+    local running_count=0
+
+    for service in "${host_services[@]}"; do
+        if is_service_running "${service}"; then
+            ((running_count++))
+        fi
+    done
+
+    if [[ ${running_count} -eq ${#host_services[@]} ]]; then
+        set_service_status "host_services" "running"
+    elif [[ ${running_count} -gt 0 ]]; then
+        set_service_status "host_services" "partial"
+    else
+        set_service_status "host_services" "stopped"
+    fi
+
+    # Update system health score
+    local health_score
+    health_score=$(calculate_system_health_score)
+    set_system_health_score "${health_score}"
+
+    # Log system event
+    log_system_event "INFO" "System services startup completed - health score: ${health_score}/100"
 }
 
 main() {
@@ -169,6 +213,9 @@ main() {
 
     log "Starting DangerPrep services..."
 
+    # Set system mode to indicate startup in progress
+    set_system_mode "STARTING"
+
     # Start host services first
     start_host_services
 
@@ -178,9 +225,20 @@ main() {
     # Verify all services
     verify_services
 
+    # Update system state after startup
+    update_system_state_after_startup
+
+    # Set system mode based on auto-mode preference
+    if is_system_auto_mode_enabled; then
+        set_system_mode "AUTO"
+    else
+        set_system_mode "NORMAL"
+    fi
+
     success "DangerPrep services startup completed"
     log "Use 'just status' to check service status"
     log "Use 'just olares' to check Olares/K3s status"
+    log "Use 'just system-diagnostics' for comprehensive analysis"
 }
 
 # Run main function

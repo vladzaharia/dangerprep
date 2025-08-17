@@ -68,7 +68,7 @@ get_scheme_colors() {
             BANNER_SECONDARY='\033[1;32m'  # Green (Prep)
             BANNER_TITLE='\033[1;33m'      # Yellow
             ;;
-        "docker")
+        "packages")
             BANNER_BORDER='\033[1;34m'     # Blue
             BANNER_PRIMARY='\033[1;37m'    # White (Danger)
             BANNER_SECONDARY='\033[1;36m'  # Cyan (Prep)
@@ -322,9 +322,9 @@ show_validation_banner() {
     show_banner_with_title "System Validation" "validation" "$@"
 }
 
-# Convenience function for docker scripts
-show_docker_banner() {
-    show_banner_with_title "Docker Management" "docker" "$@"
+# Convenience function for package scripts
+show_packages_banner() {
+    show_banner_with_title "Package Management" "packages" "$@"
 }
 
 # Function to show banner in MOTD style (more subdued but still colorful)

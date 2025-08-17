@@ -90,9 +90,9 @@ restart_service() {
     fi
 }
 
-# Docker/container management functions
-is_docker_running() {
-    docker info >/dev/null 2>&1
+# Package management functions
+is_package_manager_available() {
+    command -v apt >/dev/null 2>&1 || command -v yum >/dev/null 2>&1 || command -v pacman >/dev/null 2>&1
 }
 
 is_k3s_running() {
@@ -273,7 +273,7 @@ SYSTEM_UPDATE=NOT_STARTED
 PACKAGE_INSTALL=NOT_STARTED
 SECURITY_HARDENING=NOT_STARTED
 NETWORK_CONFIG=NOT_STARTED
-DOCKER_SETUP=NOT_STARTED
+PACKAGE_SETUP=NOT_STARTED
 SERVICES_CONFIG=NOT_STARTED
 FINAL_SETUP=NOT_STARTED
 EOF
@@ -341,7 +341,7 @@ get_last_completed_step() {
         "PACKAGE_INSTALL"
         "SECURITY_HARDENING"
         "NETWORK_CONFIG"
-        "DOCKER_SETUP"
+        "PACKAGE_SETUP"
         "SERVICES_CONFIG"
         "FINAL_SETUP"
     )
@@ -372,7 +372,7 @@ show_setup_progress() {
         "PACKAGE_INSTALL:Package Installation"
         "SECURITY_HARDENING:Security Hardening"
         "NETWORK_CONFIG:Network Configuration"
-        "DOCKER_SETUP:Docker Setup"
+        "PACKAGE_SETUP:Package Setup"
         "SERVICES_CONFIG:Services Configuration"
         "FINAL_SETUP:Final Setup"
     )
@@ -640,7 +640,7 @@ show_dry_run_summary() {
 # Export functions for use in other scripts
 export -f load_config
 export -f is_service_running is_service_enabled start_service stop_service restart_service
-export -f is_docker_running is_k3s_running generate_wifi_password safe_wildcard_cleanup
+export -f is_package_manager_available is_k3s_running generate_wifi_password safe_wildcard_cleanup
 export -f init_state_tracking set_step_state get_step_state is_step_completed
 export -f get_last_completed_step show_setup_progress
 export -f enable_dry_run is_dry_run log_planned_change dry_run_execute

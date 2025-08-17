@@ -18,6 +18,10 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/system-state.sh
+source "${SCRIPT_DIR}/../shared/system-state.sh"
+# shellcheck source=../shared/system-functions.sh
+source "${SCRIPT_DIR}/../shared/system-functions.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-service-status.log"
@@ -49,7 +53,7 @@ init_script() {
     trap cleanup_on_error ERR
 
     # Validate required commands
-    require_commands systemctl docker kubectl
+    require_commands systemctl kubectl
 
     debug "Service status checker initialized"
     clear_error_context
@@ -114,52 +118,48 @@ show_host_services_status() {
 
 }
 
-show_container_health() {
-    echo -e "${BLUE}Container Health:${NC}"
-    echo "================="
+show_package_health() {
+    echo -e "${BLUE}Package Health:${NC}"
+    echo "==============="
 
-    if ! command -v docker >/dev/null 2>&1; then
-        echo "  Docker not available"
-        return
-    fi
+    # Package statistics
+    local package_count
+    package_count=$(get_package_count)
+    echo "  Installed Packages: ${package_count}"
 
-    # Check for unhealthy containers
-    local unhealthy_containers=()
-    while IFS= read -r container; do
-        if [[ -n "$container" ]]; then
-            unhealthy_containers+=("$container")
+    local upgradable_count
+    upgradable_count=$(get_upgradable_packages)
+    if [[ ${upgradable_count} -gt 0 ]]; then
+        if [[ ${upgradable_count} -gt 20 ]]; then
+            echo "  ${RED}●${NC} Updates Available: ${upgradable_count} (many)"
+        elif [[ ${upgradable_count} -gt 5 ]]; then
+            echo "  ${YELLOW}●${NC} Updates Available: ${upgradable_count} (some)"
+        else
+            echo "  ${GREEN}●${NC} Updates Available: ${upgradable_count} (few)"
         fi
-    done < <(docker ps --filter "health=unhealthy" --format "{{.Names}}" 2>/dev/null)
-
-    # Check for stopped containers that should be running
-    local stopped_containers=()
-    while IFS= read -r container; do
-        if [[ -n "$container" ]]; then
-            stopped_containers+=("$container")
-        fi
-    done < <(docker ps -a --filter "status=exited" --filter "restart=unless-stopped" --format "{{.Names}}" 2>/dev/null)
-
-    # Show container status summary
-    local running_count
-    running_count=$(docker ps --format "{{.Names}}" 2>/dev/null | wc -l)
-    echo "  Running Containers: $running_count"
-
-    if [[ ${#unhealthy_containers[@]} -gt 0 ]]; then
-        echo "  ${RED}●${NC} Unhealthy: ${unhealthy_containers[*]}"
+    else
+        echo "  ${GREEN}●${NC} All packages up to date"
     fi
 
-    if [[ ${#stopped_containers[@]} -gt 0 ]]; then
-        echo "  ${YELLOW}●${NC} Stopped: ${stopped_containers[*]}"
-    fi
-
-    if [[ ${#unhealthy_containers[@]} -eq 0 && ${#stopped_containers[@]} -eq 0 ]]; then
-        echo "  ${GREEN}●${NC} All containers healthy"
-    fi
-
-    # Show top resource-consuming containers
+    # Package manager status
     echo
-    echo "Top Resource Usage:"
-    docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" 2>/dev/null | head -6 || echo "  Unable to get container stats"
+    echo "Package Manager:"
+    if command -v apt >/dev/null 2>&1; then
+        echo "  Type: APT (Debian/Ubuntu)"
+        local last_update
+        if [[ -f /var/lib/apt/periodic/update-success-stamp ]]; then
+            last_update=$(stat -c %Y /var/lib/apt/periodic/update-success-stamp 2>/dev/null)
+            if [[ -n "${last_update}" ]]; then
+                local update_date
+                update_date=$(date -d "@${last_update}" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "unknown")
+                echo "  Last Update: ${update_date}"
+            fi
+        fi
+    elif command -v yum >/dev/null 2>&1; then
+        echo "  Type: YUM (Red Hat/CentOS)"
+    else
+        echo "  Type: Unknown"
+    fi
 }
 
 show_system_info() {
@@ -192,32 +192,87 @@ show_system_info() {
     done
 }
 
+# Update system state with current service status
+update_service_states() {
+    # Update Olares status
+    if is_k3s_running; then
+        set_service_status "olares" "running"
+    else
+        set_service_status "olares" "stopped"
+    fi
+
+    # Update host services status
+    local host_services=("adguardhome" "step-ca" "tailscaled")
+    local running_count=0
+    local total_count=${#host_services[@]}
+
+    for service in "${host_services[@]}"; do
+        if is_service_running "${service}"; then
+            ((running_count++))
+        fi
+    done
+
+    if [[ ${running_count} -eq ${total_count} ]]; then
+        set_service_status "host_services" "running"
+    elif [[ ${running_count} -gt 0 ]]; then
+        set_service_status "host_services" "partial"
+    else
+        set_service_status "host_services" "stopped"
+    fi
+
+    # Update system health score
+    local health_score
+    health_score=$(calculate_system_health_score)
+    set_system_health_score "${health_score}"
+}
+
+# Show system health overview
+show_system_health_overview() {
+    echo -e "${BLUE}System Health Overview:${NC}"
+    echo "======================="
+
+    local health_score
+    health_score=$(get_system_health_score)
+    local health_status
+    health_status=$(get_system_health_status)
+
+    echo "  Overall Health:    ${health_score}/100 (${health_status})"
+    echo "  System Mode:       $(get_system_mode)"
+    echo "  Auto Management:   $(is_system_auto_mode_enabled && echo "Enabled" || echo "Disabled")"
+
+    # Show critical issues if any
+    if [[ ${health_score} -lt 60 ]]; then
+        echo "  Critical Issues:"
+        get_system_recommendations | head -3 | while IFS= read -r recommendation; do
+            echo "    ⚠ ${recommendation}"
+        done
+    fi
+}
+
 show_quick_access() {
     echo -e "${BLUE}Quick Access:${NC}"
     echo "============="
-    
+
     # Get LAN IP
     local lan_ip
-    lan_ip=$(ip route get 1.1.1.1 | awk '{print $7; exit}' 2>/dev/null || echo "unknown")
-    
+    lan_ip=$(get_primary_ip)
+
     if [[ "$lan_ip" != "unknown" ]]; then
         echo "  AdGuard Home:      http://${lan_ip}:3000"
         echo "  Step-CA:           https://${lan_ip}:9000"
-        
+
         # Check if Olares is accessible
         if systemctl is-active --quiet k3s 2>/dev/null; then
             echo "  Olares Dashboard:  https://${lan_ip}:6443"
         fi
     fi
-    
+
     echo "  SSH Access:        ssh ubuntu@${lan_ip}:2222"
-    
+
     # Tailscale status
-    if command -v tailscale >/dev/null 2>&1; then
-        local ts_status
-        ts_status=$(tailscale status --json 2>/dev/null | jq -r '.BackendState' 2>/dev/null || echo "unknown")
-        echo "  Tailscale:         $ts_status"
-    fi
+    local ts_status
+    ts_status=$(get_tailscale_status)
+    echo "  Tailscale:         $ts_status"
 }
 
 main() {
@@ -227,28 +282,36 @@ main() {
     # Display banner
     show_banner_with_title "Service Status" "system"
 
+    # Update system state with current service status
+    update_service_states
+
+    # Show system health overview
+    show_system_health_overview
+    echo ""
+
     # Show Olares status
     show_olares_status
     echo ""
-    
+
     # Show host services status
     show_host_services_status
     echo ""
 
-    # Show container health
-    show_container_health
+    # Show package health
+    show_package_health
     echo ""
 
     # Show system information
     show_system_info
     echo ""
-    
+
     # Show quick access information
     show_quick_access
-    
+
     echo ""
     echo "Use 'just logs' to view recent service logs"
     echo "Use 'just olares' for detailed Olares/K3s status"
+    echo "Use 'just system-diagnostics' for comprehensive analysis"
 }
 
 # Run main function

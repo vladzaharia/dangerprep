@@ -24,7 +24,6 @@ readonly DEFAULT_LOG_FILE="/var/log/dangerprep-monitor.log"
 readonly ALERT_THRESHOLD_CPU=80
 readonly ALERT_THRESHOLD_MEMORY=85
 readonly ALERT_THRESHOLD_DISK=90
-readonly ALERT_THRESHOLD_TEMP=75
 
 # Initialize script
 init_script() {
@@ -111,21 +110,7 @@ get_disk_info() {
     echo
 }
 
-get_temperature_info() {
-    echo "--- Temperature Information ---"
-    if [[ -f /sys/class/thermal/thermal_zone0/temp ]]; then
-        local temp
-        temp=$(($(cat /sys/class/thermal/thermal_zone0/temp) / 1000))
-        echo "CPU Temperature: ${temp}°C"
-        
-        if [[ $temp -gt ${ALERT_THRESHOLD_TEMP} ]]; then
-            warning "High CPU temperature detected: ${temp}°C"
-        fi
-    else
-        echo "Temperature monitoring not available"
-    fi
-    echo
-}
+# Temperature monitoring removed - handled by hardware-monitor.sh
 
 get_network_info() {
     echo "--- Network Information ---"
@@ -329,7 +314,7 @@ generate_report() {
         get_cpu_info
         get_memory_info
         get_disk_info
-        get_temperature_info
+        # Temperature monitoring handled by hardware-monitor.sh
         get_network_info
         get_docker_info
         get_storage_health

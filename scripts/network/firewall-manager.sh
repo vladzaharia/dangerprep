@@ -18,6 +18,8 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/network-functions.sh
+source "${SCRIPT_DIR}/../shared/network-functions.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-firewall.log"

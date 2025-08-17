@@ -18,6 +18,8 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/hardware-detection.sh
+source "${SCRIPT_DIR}/../shared/hardware-detection.sh"
 
 # Configuration file
 CONFIG_FILE="/etc/dangerprep/rk3588-fan-control.conf"
@@ -65,29 +67,10 @@ init_script() {
     clear_error_context
 }
 
-# Validate RK3588 hardware platform
+# Validate RK3588 hardware platform using shared detection
 validate_rk3588_hardware() {
-    set_error_context "Hardware platform validation"
-
-    local platform=""
-    if [[ -f /proc/device-tree/model ]]; then
-        platform=$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0' || echo "")
-    fi
-
-    if [[ -z "$platform" ]]; then
-        error "Cannot detect hardware platform"
-        error "This script is designed for RK3588/RK3588S platforms"
-        return 1
-    fi
-
-    if [[ ! "$platform" =~ (RK3588|rk3588) ]]; then
-        warning "Hardware platform may not be RK3588/RK3588S: $platform"
-        warning "Fan control may not work correctly on this platform"
-    else
-        success "RK3588/RK3588S platform detected: $platform"
-    fi
-
-    clear_error_context
+    # Use shared hardware detection and validation
+    validate_rk3588_platform
 }
 
 # Validate PWM hardware availability

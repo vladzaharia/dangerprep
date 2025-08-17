@@ -31,6 +31,8 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/hardware-detection.sh
+source "${SCRIPT_DIR}/../shared/hardware-detection.sh"
 
 # Configuration variables
 readonly ALERT_TEMP_CPU=80
@@ -39,69 +41,8 @@ readonly ALERT_TEMP_NPU=90
 readonly ALERT_DISK_TEMP=50
 readonly LOG_FILE="/var/log/dangerprep-hardware.log"
 
-# Global hardware detection variables
-IS_FRIENDLYELEC=false
-IS_RK3588=false
-IS_RK3588S=false
-FRIENDLYELEC_MODEL=""
-
-# Detect FriendlyElec hardware with proper validation
-detect_friendlyelec_hardware() {
-    set_error_context "Hardware detection"
-
-    # Initialize variables
-    IS_FRIENDLYELEC=false
-    IS_RK3588=false
-    IS_RK3588S=false
-    FRIENDLYELEC_MODEL=""
-
-    # Check if device tree model file exists
-    local model_file="/proc/device-tree/model"
-    if [[ ! -f "$model_file" ]]; then
-        debug "Device tree model file not found: $model_file"
-        clear_error_context
-        return 0
-    fi
-
-    # Read platform information safely
-    local platform
-    if ! platform=$(cat "$model_file" | tr -d '\0' 2>/dev/null); then
-        warning "Failed to read device tree model"
-        clear_error_context
-        return 0
-    fi
-
-    validate_not_empty "$platform" "platform information"
-
-    # Detect FriendlyElec devices
-    if [[ "$platform" =~ (NanoPi|NanoPC|CM3588) ]]; then
-        IS_FRIENDLYELEC=true
-        debug "FriendlyElec hardware detected: $platform"
-
-        # Identify specific models
-        if [[ "$platform" =~ NanoPi[[:space:]]*M6 ]]; then
-            FRIENDLYELEC_MODEL="NanoPi-M6"
-            IS_RK3588S=true
-        elif [[ "$platform" =~ NanoPi[[:space:]]*R6[CS] ]]; then
-            FRIENDLYELEC_MODEL="NanoPi-R6C"
-            IS_RK3588S=true
-        elif [[ "$platform" =~ NanoPC[[:space:]]*T6 ]]; then
-            FRIENDLYELEC_MODEL="NanoPC-T6"
-            IS_RK3588=true
-        elif [[ "$platform" =~ CM3588 ]]; then
-            FRIENDLYELEC_MODEL="CM3588"
-            IS_RK3588=true
-        else
-            FRIENDLYELEC_MODEL="Unknown FriendlyElec"
-        fi
-
-        success "Detected FriendlyElec model: ${FRIENDLYELEC_MODEL}"
-    else
-        debug "Non-FriendlyElec hardware detected: $platform"
-    fi
-
-    clear_error_context
-}
+# Hardware detection variables are now provided by shared/hardware-detection.sh
+# Variables available: IS_FRIENDLYELEC, IS_RK3588, IS_RK3588S, FRIENDLYELEC_MODEL, HARDWARE_PLATFORM
 
 alert() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ALERT: $1" | tee -a "${LOG_FILE}"
@@ -466,6 +407,74 @@ check_rtc_status() {
     fi
 }
 
+# Check fan control status
+check_fan_status() {
+    set_error_context "Fan status check"
+
+    log_subsection "Fan Control Status"
+
+    if [[ -f "${SCRIPT_DIR}/rk3588-fan-control.sh" ]]; then
+        # Get current temperature and fan speed
+        local temp
+        temp=$(get_max_temperature)
+        info "Current temperature: ${temp}°C"
+
+        # Check if fan control is running
+        if pgrep -f "rk3588-fan-control.sh" >/dev/null 2>&1; then
+            success "Fan control daemon: Running"
+        else
+            warning "Fan control daemon: Not running"
+        fi
+
+        # Check current fan speed if PWM device exists
+        local pwm_device="${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}"
+        if [[ -r "$pwm_device/duty_cycle" && -r "$pwm_device/period" ]]; then
+            local duty
+            duty=$(cat "$pwm_device/duty_cycle" 2>/dev/null || echo "0")
+            local period
+            period=$(cat "$pwm_device/period" 2>/dev/null || echo "1")
+            local speed_percent
+            speed_percent=$((duty * 100 / period))
+            info "Current fan speed: ${speed_percent}%"
+
+            log_validation_result "Fan Control" "PASS" "Fan speed: ${speed_percent}%, Temperature: ${temp}°C"
+        else
+            warning "PWM device not accessible for fan speed reading"
+            log_validation_result "Fan Control" "WARN" "PWM device not accessible"
+        fi
+    else
+        warning "Fan control script not found: ${SCRIPT_DIR}/rk3588-fan-control.sh"
+        log_validation_result "Fan Control" "WARN" "Fan control script not available"
+    fi
+
+    clear_error_context
+}
+
+# Get maximum temperature from thermal zones (shared with fan control)
+get_max_temperature() {
+    local max_temp=0
+    local temp_sensors=(
+        "/sys/class/thermal/thermal_zone0/temp"
+        "/sys/class/thermal/thermal_zone1/temp"
+        "/sys/class/thermal/thermal_zone2/temp"
+    )
+
+    for sensor in "${temp_sensors[@]}"; do
+        if [[ -r "$sensor" ]]; then
+            local temp_millicelsius
+            temp_millicelsius=$(cat "$sensor" 2>/dev/null || echo "0")
+            local temp_celsius
+            temp_celsius=$((temp_millicelsius / 1000))
+
+            if [[ $temp_celsius -gt $max_temp ]]; then
+                max_temp=$temp_celsius
+            fi
+        fi
+    done
+
+    echo "$max_temp"
+}
+
 # Cleanup function for hardware monitoring
 cleanup_hardware_monitoring() {
     local exit_code=$?
@@ -497,8 +506,8 @@ init_hardware_monitoring() {
     # Validate optional commands
     validate_optional_commands
 
-    # Detect hardware platform first
-    detect_friendlyelec_hardware
+    # Detect hardware platform using shared detection
+    detect_hardware_platform
 
     # Create log directory if needed
     mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
@@ -556,14 +565,16 @@ ${SCRIPT_DESCRIPTION} v${SCRIPT_VERSION}
 Usage: ${SCRIPT_NAME} [COMMAND]
 
 Commands:
-    check       Run basic hardware checks (default)
+    check       Run basic hardware checks (includes fan status on RK3588)
     report      Generate comprehensive hardware report
     friendlyelec FriendlyElec-specific hardware report
+    fan-test    Test fan control (RK3588 only)
     help        Show this help message
 
 Examples:
-    ${SCRIPT_NAME} check      # Run hardware checks
+    ${SCRIPT_NAME} check      # Run hardware checks (includes fan status)
     ${SCRIPT_NAME} report     # Generate full report
+    ${SCRIPT_NAME} fan-test   # Test fan control
 
 Exit Codes:
     0   Success
@@ -586,12 +597,17 @@ case "${1:-check}" in
             check_gpu_temperature
             check_npu_status
         fi
+
+        # Fan control status on RK3588 platforms
+        if supports_pwm_fan_control; then
+            check_fan_status
+        fi
         ;;
     report)
         log "=== Hardware Status Report ==="
 
-        # Basic system information
-        log "Platform: $(cat /proc/device-tree/model 2>/dev/null | tr -d '\0' || echo "Unknown")"
+        # Basic system information using shared hardware detection
+        get_hardware_summary
         log "Kernel: $(uname -r)"
         log "Uptime: $(uptime -p)"
 
@@ -606,6 +622,11 @@ case "${1:-check}" in
             check_friendlyelec_hardware
             check_gpu_temperature
             check_npu_status
+        fi
+
+        # Fan control status on RK3588 platforms
+        if supports_pwm_fan_control; then
+            check_fan_status
         fi
 
         # Disk information
@@ -640,6 +661,20 @@ case "${1:-check}" in
             check_friendlyelec_hardware
         else
             log "Not running on FriendlyElec hardware"
+        fi
+        ;;
+    fan-test)
+        if supports_pwm_fan_control; then
+            if [[ -f "${SCRIPT_DIR}/rk3588-fan-control.sh" ]]; then
+                bash "${SCRIPT_DIR}/rk3588-fan-control.sh" test
+            else
+                error "Fan control script not found: ${SCRIPT_DIR}/rk3588-fan-control.sh"
+                exit 1
+            fi
+        else
+            error "Fan control not supported on this platform"
+            error "RK3588/RK3588S platform required"
+            exit 1
         fi
         ;;
     help|--help|-h)

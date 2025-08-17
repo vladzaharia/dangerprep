@@ -21,9 +21,9 @@ source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-certs.log"
-readonly DOCKER_DIR="/opt/dangerprep/docker"
-readonly TRAEFIK_DIR="${DOCKER_DIR}/infrastructure/traefik"
-readonly STEP_CA_DIR="${DOCKER_DIR}/infrastructure/step-ca"
+readonly INFRASTRUCTURE_DIR="/opt/dangerprep/docker"
+readonly TRAEFIK_DIR="${INFRASTRUCTURE_DIR}/infrastructure/traefik"
+readonly STEP_CA_DIR="${INFRASTRUCTURE_DIR}/infrastructure/step-ca"
 
 # Cleanup function for error recovery
 cleanup_on_error() {
@@ -45,7 +45,7 @@ init_script() {
     trap cleanup_on_error ERR
 
     # Validate required commands
-    require_commands docker
+    require_commands systemctl
 
     debug "Certificate manager initialized"
     clear_error_context
@@ -56,16 +56,16 @@ setup_traefik_certificates() {
 
     log "Setting up Traefik ACME certificates..."
 
-    # Check if Traefik is running
-    if ! docker ps | grep -q traefik; then
-        log "Traefik container not running. Starting Traefik..."
-        cd "${TRAEFIK_DIR}" && docker compose up -d
-        sleep 10
+    # Check if Traefik service is available
+    if [[ -d "${TRAEFIK_DIR}" ]]; then
+        log "Traefik configuration found at ${TRAEFIK_DIR}"
+        success "Traefik will automatically obtain certificates via ACME when started"
+        log "Check Traefik dashboard for certificate status"
+    else
+        warning "Traefik directory not found at ${TRAEFIK_DIR}"
+        log "Please ensure Traefik is properly configured"
     fi
 
-    # Traefik handles ACME automatically via configuration
-    success "Traefik will automatically obtain certificates via ACME"
-    log "Check Traefik dashboard for certificate status"
     clear_error_context
 }
 
@@ -74,11 +74,15 @@ setup_step_ca() {
 
     log "Setting up Step-CA internal certificate authority..."
 
-    # Check if Step-CA is running
-    if ! docker ps | grep -q step-ca; then
-        log "Step-CA container not running. Starting Step-CA..."
-        cd "${STEP_CA_DIR}" && docker compose up -d
-        sleep 10
+    # Check if Step-CA service is running
+    if systemctl is-active --quiet step-ca 2>/dev/null; then
+        success "Step-CA service is running"
+    elif [[ -d "${STEP_CA_DIR}" ]]; then
+        log "Step-CA configuration found at ${STEP_CA_DIR}"
+        log "Step-CA can be started as a system service"
+    else
+        warning "Step-CA directory not found at ${STEP_CA_DIR}"
+        log "Please ensure Step-CA is properly configured"
     fi
 
     success "Step-CA provides internal certificates for local services"
@@ -92,17 +96,21 @@ show_traefik_certificates() {
     log "Traefik Certificate Status:"
     log "=========================="
 
-    if docker ps | grep -q traefik; then
-        success "Traefik is running"
+    if [[ -d "${TRAEFIK_DIR}" ]]; then
+        success "Traefik configuration available"
 
-        # Check Traefik logs for certificate info
-        log "Recent certificate activity:"
-        docker logs traefik 2>&1 | grep -i "certificate\|acme" | tail -10 || log "No certificate logs found"
+        # Check for certificate files
+        if [[ -d "${TRAEFIK_DIR}/acme" ]]; then
+            log "ACME certificate directory found"
+            local cert_count
+            cert_count=$(find "${TRAEFIK_DIR}/acme" -name "*.crt" 2>/dev/null | wc -l)
+            log "Certificate files: ${cert_count}"
+        fi
 
         echo ""
         log "Access Traefik dashboard at: https://traefik.dangerprep.local"
     else
-        warning "Traefik is not running"
+        warning "Traefik configuration not found"
     fi
     clear_error_context
 }
@@ -113,19 +121,21 @@ show_step_ca_status() {
     log "Step-CA Status:"
     log "==============="
 
-    if docker ps | grep -q step-ca; then
-        success "Step-CA is running"
-
-        # Check Step-CA container logs
-        log "Step-CA container status:"
-        docker ps --filter "name=step-ca" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-        echo ""
-        log "Access Step-CA at: https://ca.dangerprep.local"
-        log "Download root CA: https://ca.dangerprep.local/roots.pem"
+    if systemctl is-active --quiet step-ca 2>/dev/null; then
+        success "Step-CA service is running"
+        local service_status
+        service_status=$(systemctl is-active step-ca 2>/dev/null)
+        log "Service status: ${service_status}"
+    elif [[ -d "${STEP_CA_DIR}" ]]; then
+        warning "Step-CA service is not running but configuration exists"
+        log "Configuration directory: ${STEP_CA_DIR}"
     else
-        warning "Step-CA is not running"
+        warning "Step-CA is not configured"
     fi
+
+    echo ""
+    log "Access Step-CA at: https://ca.dangerprep.local"
+    log "Download root CA: https://ca.dangerprep.local/roots.pem"
     clear_error_context
 }
 
@@ -158,7 +168,7 @@ main() {
             echo "  step-ca  - Setup/check Step-CA internal certificates"
             echo "  status   - Show certificate status for both services"
             echo
-            echo "Note: Certificates are managed by Docker containers:"
+            echo "Note: Certificates are managed by infrastructure services:"
             echo "  - Traefik: ACME/Let's Encrypt for public certificates"
             echo "  - Step-CA: Internal CA for private certificates"
             exit 0

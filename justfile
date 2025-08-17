@@ -18,12 +18,14 @@ help:
     @echo "  status               - Show system status (services, network, hardware)"
     @echo "  net-diag             - Run network diagnostics"
     @echo ""
-    @echo "🌐 NETWORK MANAGEMENT:"
+    @echo "🌐 NETWORK MANAGEMENT (Intelligent & Consolidated):"
+    @echo "  network-auto         - Enable automatic network management"
+    @echo "  network-status       - Show comprehensive network status"
     @echo "  wan-list             - List available network interfaces"
-    @echo "  wan-set <interface>  - Set WAN interface (others become LAN)"
+    @echo "  wan-set <interface> [priority] - Set WAN interface (primary/secondary/available)"
     @echo "  wan-status           - Show WAN/LAN configuration"
     @echo "  wifi-scan            - Scan for WiFi networks"
-    @echo "  wifi-connect <ssid> <pass> - Connect to WiFi"
+    @echo "  wifi-connect <ssid> <pass> - Connect to WiFi (auto-WAN)"
     @echo "  wifi-ap <ssid> <pass> - Create WiFi access point"
     @echo "  net-connectivity     - Test internet connectivity"
     @echo "  net-wifi             - WiFi diagnostics"
@@ -37,6 +39,12 @@ help:
     @echo "  fw-status            - Show firewall status"
     @echo "  fw-reset             - Reset firewall rules"
     @echo ""
+    @echo "🖥️  SYSTEM MANAGEMENT (Intelligent & Consolidated):"
+    @echo "  system-status        - Show comprehensive system status"
+    @echo "  system-auto          - Enable automatic system management"
+    @echo "  system-diagnostics   - Run comprehensive system diagnostics"
+    @echo "  system-optimize      - Optimize system performance"
+    @echo ""
     @echo "💾 MAINTENANCE & BACKUP:"
     @echo "  backup               - Create basic backup"
     @echo "  backup-encrypted     - Create encrypted backup"
@@ -47,8 +55,10 @@ help:
     @echo "  logs                 - Show recent service logs"
     @echo ""
     @echo "🔒 SECURITY & MONITORING:"
-    @echo "  security-audit-all   - Run all security checks"
-    @echo "  security-cron        - Run security checks (cron mode)"
+    @echo "  security-status      - Show comprehensive security status"
+    @echo "  security-audit-all   - Run all security audits"
+    @echo "  secrets-setup        - Set up secret management"
+    @echo "  certs-status         - Show certificate status"
     @echo "  hardware-monitor     - Monitor hardware health"
     @echo "  fan-status           - Check cooling fan status"
     @echo ""
@@ -87,7 +97,7 @@ emergency-health:
     @echo ""
     @just net-connectivity
     @echo ""
-    @just hardware-monitor
+    @./scripts/monitoring/hardware-monitor.sh check
 
 # System Management
 deploy:
@@ -127,22 +137,26 @@ olares:
     @echo ""
     @kubectl get pods --all-namespaces 2>/dev/null || echo "No pods found"
 
-# WAN Management
+# WAN Management (Enhanced with Multiple WAN Support)
 wan-list:
     @echo "Listing available interfaces..."
-    @./scripts/network/interface-manager.sh list
+    @./scripts/network/network-manager.sh list-interfaces
 
-wan-set interface:
-    @echo "Setting {{interface}} as WAN interface..."
-    @sudo ./scripts/network/interface-manager.sh set-wan {{interface}}
+wan-set interface priority="primary":
+    @echo "Setting {{interface}} as {{priority}} WAN interface..."
+    @sudo ./scripts/network/network-manager.sh set-wan {{interface}} {{priority}}
 
-wan-clear:
+wan-clear interface="":
     @echo "Clearing WAN interface designation..."
-    @sudo ./scripts/network/interface-manager.sh clear-wan
+    @sudo ./scripts/network/network-manager.sh clear-wan {{interface}}
 
 wan-status:
-    @echo "Current WAN/LAN configuration..."
-    @./scripts/network/interface-manager.sh config
+    @echo "Current WAN configuration..."
+    @./scripts/network/network-manager.sh query wan-all
+
+wan-show:
+    @echo "Detailed WAN configuration..."
+    @./scripts/network/network-manager.sh show-wan-details
 
 
 
@@ -163,22 +177,34 @@ route-restart *args:
     @echo "Restarting routing..."
     @sudo ./scripts/network/route-manager.sh restart {{args}}
 
-# WiFi Management
+# WiFi Management (Enhanced with Auto-WAN)
 wifi-scan:
     @echo "Scanning for WiFi networks..."
-    @./scripts/network/wifi-manager.sh scan
+    @./scripts/network/network-manager.sh wifi-scan
 
-wifi-connect ssid password:
-    @echo "Connecting to WiFi network {{ssid}}..."
-    @sudo ./scripts/network/wifi-manager.sh connect "{{ssid}}" "{{password}}"
+wifi-connect ssid password interface="wlan0":
+    @echo "Connecting to WiFi network {{ssid}} (auto-WAN enabled)..."
+    @sudo ./scripts/network/network-manager.sh wifi-connect "{{ssid}}" "{{password}}" "{{interface}}"
+
+wifi-disconnect interface="wlan0":
+    @echo "Disconnecting from WiFi..."
+    @sudo ./scripts/network/network-manager.sh wifi-disconnect "{{interface}}"
 
 wifi-ap ssid password:
     @echo "Creating WiFi access point {{ssid}}..."
-    @sudo ./scripts/network/wifi-manager.sh ap "{{ssid}}" "{{password}}"
+    @sudo ./scripts/network/network-manager.sh wifi-ap "{{ssid}}" "{{password}}"
+
+wifi-repeater-start ssid password interface="wlan0":
+    @echo "Starting WiFi repeater for {{ssid}}..."
+    @sudo ./scripts/network/network-manager.sh wifi-repeater-start "{{ssid}}" "{{password}}" "{{interface}}"
+
+wifi-repeater-stop interface="wlan0":
+    @echo "Stopping WiFi repeater..."
+    @sudo ./scripts/network/network-manager.sh wifi-repeater-stop "{{interface}}"
 
 wifi-status:
     @echo "WiFi interface status..."
-    @./scripts/network/wifi-manager.sh status
+    @./scripts/network/network-manager.sh wifi-status
 
 # Firewall Management
 fw-status:
@@ -193,30 +219,30 @@ fw-port-forward port target:
     @echo "Adding port forwarding {{port}} → {{target}}..."
     @sudo ./scripts/network/firewall-manager.sh port-forward {{port}} {{target}}
 
-# Network Diagnostics
+# Network Diagnostics (Integrated with Network Manager)
 # Run comprehensive network diagnostics
 net-diag:
-    @./scripts/network/network-diagnostics.sh all
+    @./scripts/network/network-manager.sh diagnostics all
 
 # Test network connectivity
 net-connectivity:
-    @./scripts/network/network-diagnostics.sh connectivity
+    @./scripts/network/network-manager.sh diagnostics connectivity
 
 # Show network interface status
 net-interfaces:
-    @./scripts/network/network-diagnostics.sh interfaces
+    @./scripts/network/network-manager.sh diagnostics interfaces
 
 # Test DNS resolution
 net-dns:
-    @./scripts/network/network-diagnostics.sh dns
+    @./scripts/network/network-manager.sh diagnostics dns
 
 # WiFi diagnostics and scanning
 net-wifi:
-    @./scripts/network/network-diagnostics.sh wifi
+    @./scripts/network/network-manager.sh diagnostics wifi
 
 # Basic network speed test
 net-speed:
-    @./scripts/network/network-diagnostics.sh speed
+    @./scripts/network/network-manager.sh diagnostics speed
 
 # System Maintenance
 clean:
@@ -249,11 +275,7 @@ logs:
 
 
 
-# Certificate Management
-# Show certificate status for Traefik and Step-CA
-certs-status:
-    @./scripts/system/certs.sh status
-
+# Legacy Certificate Management (System-level)
 # Setup Traefik ACME certificates
 certs-traefik:
     @./scripts/system/certs.sh traefik
@@ -262,29 +284,66 @@ certs-traefik:
 certs-step-ca:
     @./scripts/system/certs.sh step-ca
 
-# Security and Monitoring (Unified Commands)
-# Run all security checks
-security-audit-all:
-    @./scripts/security/security-audit-all.sh all
+# Security Management (Unified Commands via Security Manager)
+# Main security status and overview
+security-status:
+    @./scripts/security/security-manager.sh status
 
-# Run security checks in cron-friendly mode (quiet, logs to file)
+# Security diagnostics and validation
+security-diagnostics:
+    @./scripts/security/security-manager.sh diagnostics
+
+# Secret Management
+secrets-setup:
+    @./scripts/security/security-manager.sh secrets-setup
+
+secrets-generate:
+    @./scripts/security/security-manager.sh secrets-generate
+
+secrets-update:
+    @./scripts/security/security-manager.sh secrets-update
+
+# Security Auditing
+security-audit-all:
+    @./scripts/security/security-manager.sh audit-all
+
 security-cron:
     @./scripts/security/security-audit-all.sh cron
 
-# Run specific security checks
 aide-check:
-    @./scripts/security/security-audit-all.sh aide
+    @./scripts/security/security-manager.sh audit-aide
 
 antivirus-scan:
-    @./scripts/security/security-audit-all.sh antivirus
+    @./scripts/security/security-manager.sh audit-antivirus
 
-security-audit:
-    @./scripts/security/security-audit-all.sh audit
+lynis-audit:
+    @./scripts/security/security-manager.sh audit-lynis
 
 rootkit-scan:
-    @./scripts/security/security-audit-all.sh rootkit
+    @./scripts/security/security-manager.sh audit-rootkit
 
+security-audit:
+    @./scripts/security/security-manager.sh audit-general
 
+# Certificate Management
+certs-status:
+    @./scripts/security/security-manager.sh certs-status
+
+certs-generate:
+    @./scripts/security/security-manager.sh certs-generate
+
+certs-renew:
+    @./scripts/security/security-manager.sh certs-renew
+
+certs-validate:
+    @./scripts/security/security-manager.sh certs-validate
+
+# Security Monitoring
+monitor-suricata:
+    @./scripts/security/security-manager.sh monitor-suricata
+
+monitor-security:
+    @./scripts/security/security-manager.sh monitor-status
 
 # Run all monitoring checks
 monitor-all:
@@ -294,13 +353,27 @@ monitor-all:
 system-monitor:
     @./scripts/monitoring/monitor-all.sh system
 
-hardware-monitor:
-    @./scripts/monitoring/monitor-all.sh hardware
-
 monitor-continuous:
     @./scripts/monitoring/monitor-all.sh continuous
 
-# System Maintenance (Consolidated)
+# System Management (Intelligent & Consolidated)
+# Main system management interface
+system-status:
+    @./scripts/system/system-manager.sh status
+
+system-auto:
+    @./scripts/system/system-manager.sh auto
+
+system-manual:
+    @./scripts/system/system-manager.sh manual
+
+system-diagnostics:
+    @./scripts/system/system-diagnostics.sh all
+
+system-optimize:
+    @./scripts/system/system-optimization.sh all
+
+# System Maintenance (Legacy - use system-manager.sh for new functionality)
 # Run all system maintenance tasks
 system-maintenance:
     @./scripts/system/system-maintenance.sh all
@@ -377,26 +450,52 @@ backup-weekly:
 backup-monthly:
     @./scripts/backup/backup-manager.sh create full
 
-# Network Routing
-# Setup WAN-to-WiFi routing
-wan-to-wifi:
-    @./scripts/network/wan-to-wifi.sh setup
+# Intelligent Network Management
+# Enable automatic network management
+network-auto:
+    @sudo ./scripts/network/network-manager.sh auto
 
-# Setup WiFi repeater mode
+# Disable automatic network management
+network-manual:
+    @sudo ./scripts/network/network-manager.sh manual
+
+# Show network status
+network-status:
+    @./scripts/network/network-manager.sh status
+
+# Force network re-evaluation
+network-evaluate:
+    @sudo ./scripts/network/network-manager.sh evaluate
+
+# Legacy Network Routing (now uses intelligent controller)
+# Setup WAN-to-WiFi routing (intelligent mode)
+wan-to-wifi:
+    @sudo ./scripts/network/network-manager.sh auto
+
+# Setup WiFi repeater mode (deprecated - use wifi-repeater-start instead)
 wifi-repeater:
-    @./scripts/network/wifi-repeater.sh setup
+    @echo "⚠️  This command is deprecated. Use 'just wifi-repeater-start SSID PASSWORD' instead."
+    @echo "Example: just wifi-repeater-start MyUpstreamWiFi mypassword"
 
 # Setup local only network
 local-only:
-    @./scripts/network/emergency-local.sh setup
+    @sudo ./scripts/network/network-manager.sh local-only
 
 # Setup QoS traffic shaping
 qos-setup:
-    @./scripts/network/qos.sh setup
+    @sudo ./scripts/network/qos-manager.sh setup
 
 # Show QoS status
 qos-status:
-    @./scripts/network/qos.sh status
+    @./scripts/network/qos-manager.sh status
+
+# Deprecated - use network-status instead
+network-mode-status:
+    @./scripts/network/network-manager.sh status
+
+# Deprecated - use network-manual instead
+network-mode-stop:
+    @sudo ./scripts/network/network-manager.sh manual
 
 # Quick access to common tasks
 alias install := deploy

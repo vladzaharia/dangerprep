@@ -18,6 +18,8 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/hardware-detection.sh
+source "${SCRIPT_DIR}/../shared/hardware-detection.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-monitoring.log"
@@ -43,14 +45,9 @@ init_script() {
 detect_system_capabilities() {
     set_error_context "System capability detection"
 
-    # Detect hardware platform
-    local platform=""
-    if [[ -f /proc/device-tree/model ]]; then
-        platform=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "Unknown")
-        info "Hardware platform: $platform"
-    else
-        info "Hardware platform: Generic x86_64"
-    fi
+    # Use shared hardware detection
+    detect_hardware_platform
+    get_hardware_summary
 
     # Check for Docker availability
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
@@ -71,6 +68,13 @@ detect_system_capabilities() {
         success "Network interface monitoring: Available"
     else
         warning "Network interface monitoring: Limited"
+    fi
+
+    # Check for fan control capabilities
+    if supports_pwm_fan_control; then
+        success "PWM fan control: Available (RK3588 platform)"
+    else
+        debug "PWM fan control: Not available (non-RK3588 platform)"
     fi
 
     clear_error_context
@@ -102,41 +106,94 @@ show_help() {
 
 # Run system monitoring
 run_system_monitoring() {
+    set_error_context "System monitoring"
     log "Running system monitoring..."
-    
+
     if [[ -f "${SCRIPT_DIR}/system-monitor.sh" ]]; then
-        bash "${SCRIPT_DIR}/system-monitor.sh" report
-        success "System monitoring completed"
+        if bash "${SCRIPT_DIR}/system-monitor.sh" report; then
+            success "System monitoring completed"
+        else
+            error "System monitoring failed"
+            return 1
+        fi
     else
-        warning "System monitor script not found"
+        error "System monitor script not found: ${SCRIPT_DIR}/system-monitor.sh"
+        return 1
     fi
+
+    clear_error_context
 }
 
 # Run hardware monitoring
 run_hardware_monitoring() {
+    set_error_context "Hardware monitoring"
     log "Running hardware monitoring..."
-    
+
     if [[ -f "${SCRIPT_DIR}/hardware-monitor.sh" ]]; then
-        bash "${SCRIPT_DIR}/hardware-monitor.sh" report
-        success "Hardware monitoring completed"
+        if bash "${SCRIPT_DIR}/hardware-monitor.sh" report; then
+            success "Hardware monitoring completed"
+        else
+            error "Hardware monitoring failed"
+            clear_error_context
+            return 1
+        fi
     else
-        warning "Hardware monitor script not found"
+        error "Hardware monitor script not found: ${SCRIPT_DIR}/hardware-monitor.sh"
+        clear_error_context
+        return 1
     fi
+
+    # Check fan control status on RK3588 platforms
+    if supports_pwm_fan_control && [[ -f "${SCRIPT_DIR}/rk3588-fan-control.sh" ]]; then
+        log "Checking fan control status..."
+        if bash "${SCRIPT_DIR}/rk3588-fan-control.sh" status; then
+            success "Fan control status check completed"
+        else
+            warning "Fan control status check failed"
+        fi
+    fi
+
+    clear_error_context
 }
 
 # Run all monitoring checks
 run_all_monitoring() {
+    set_error_context "Comprehensive monitoring"
     log "Running comprehensive system monitoring..."
     echo
-    
-    run_system_monitoring
+
+    local system_status=0
+    local hardware_status=0
+
+    # Run system monitoring
+    if ! run_system_monitoring; then
+        system_status=1
+        warning "System monitoring encountered errors"
+    fi
     echo
-    
-    run_hardware_monitoring
+
+    # Run hardware monitoring
+    if ! run_hardware_monitoring; then
+        hardware_status=1
+        warning "Hardware monitoring encountered errors"
+    fi
     echo
-    
-    success "All monitoring checks completed"
+
+    # Report overall status
+    if [[ $system_status -eq 0 && $hardware_status -eq 0 ]]; then
+        success "All monitoring checks completed successfully"
+    else
+        warning "Some monitoring checks encountered errors"
+        if [[ $system_status -ne 0 ]]; then
+            warning "- System monitoring had issues"
+        fi
+        if [[ $hardware_status -ne 0 ]]; then
+            warning "- Hardware monitoring had issues"
+        fi
+    fi
+
     info "Detailed results available in individual log files"
+    clear_error_context
 }
 
 # Generate comprehensive monitoring report

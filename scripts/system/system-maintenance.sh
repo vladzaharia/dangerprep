@@ -18,6 +18,10 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/system-state.sh
+source "${SCRIPT_DIR}/../shared/system-state.sh"
+# shellcheck source=../shared/system-functions.sh
+source "${SCRIPT_DIR}/../shared/system-functions.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-system-maintenance.log"
@@ -46,7 +50,7 @@ init_script() {
     trap cleanup_on_error ERR
 
     # Validate required commands
-    require_commands docker systemctl df free find
+    require_commands systemctl df free find
 
     debug "System maintenance initialized"
     clear_error_context
@@ -76,20 +80,20 @@ validate_system() {
     
     local issues=0
     
-    # Check Docker Compose files
-    if [[ -d "${DANGERPREP_ROOT}/docker" ]]; then
-        log "Checking Docker Compose files..."
-        while IFS= read -r -d '' compose_file; do
-            if ! docker-compose -f "$compose_file" config >/dev/null 2>&1; then
-                error "Invalid compose file: $compose_file"
+    # Check configuration files
+    if [[ -d "${DANGERPREP_ROOT}/config" ]]; then
+        log "Checking configuration files..."
+        while IFS= read -r -d '' config_file; do
+            if [[ ! -r "$config_file" ]]; then
+                error "Unreadable config file: $config_file"
                 ((issues++))
             fi
-        done < <(find "${DANGERPREP_ROOT}/docker" -name "compose.yml" -print0 2>/dev/null)
+        done < <(find "${DANGERPREP_ROOT}/config" \( -name "*.yml" -o -name "*.yaml" \) -print0 2>/dev/null)
     fi
     
     # Check critical services
     log "Checking critical services..."
-    local critical_services=("docker" "systemd-resolved")
+    local critical_services=("systemd-resolved")
     for service in "${critical_services[@]}"; do
         if ! systemctl is-active --quiet "$service" 2>/dev/null; then
             warning "Critical service not running: $service"
@@ -133,12 +137,12 @@ fix_permissions() {
     
     local fixed_count=0
     
-    # Fix environment file permissions
-    if [[ -d "${DANGERPREP_ROOT}/docker" ]]; then
-        while IFS= read -r -d '' env_file; do
-            chmod 600 "$env_file"
+    # Fix configuration file permissions
+    if [[ -d "${DANGERPREP_ROOT}/config" ]]; then
+        while IFS= read -r -d '' config_file; do
+            chmod 600 "${config_file}"
             ((fixed_count++))
-        done < <(find "${DANGERPREP_ROOT}/docker" -name "compose.env" -print0 2>/dev/null)
+        done < <(find "${DANGERPREP_ROOT}/config" -name "*.env" -print0 2>/dev/null)
     fi
     
     # Fix script permissions
@@ -169,7 +173,7 @@ system_health() {
     
     # Check service status
     echo "Critical Services:"
-    local services=("docker" "systemd-resolved" "ssh")
+    local services=("systemd-resolved" "ssh")
     for service in "${services[@]}"; do
         if systemctl is-active --quiet "$service" 2>/dev/null; then
             echo "  $service: ✓ Running"
@@ -194,18 +198,18 @@ system_health() {
     fi
     echo
     
-    # Check container status if Docker is available
-    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-        echo "Container Status:"
-        local running_containers
-        running_containers=$(docker ps --format "{{.Names}}" 2>/dev/null | wc -l)
-        echo "  Running containers: $running_containers"
-        
-        local unhealthy_containers
-        unhealthy_containers=$(docker ps --filter "health=unhealthy" --format "{{.Names}}" 2>/dev/null | wc -l)
-        if [[ $unhealthy_containers -gt 0 ]]; then
-            echo "  Unhealthy containers: $unhealthy_containers"
-        fi
+    # Check package status
+    echo "Package Status:"
+    local package_count
+    package_count=$(get_package_count)
+    echo "  Installed packages: ${package_count}"
+
+    local upgradable_count
+    upgradable_count=$(get_upgradable_packages)
+    if [[ ${upgradable_count} -gt 0 ]]; then
+        echo "  Available updates: ${upgradable_count}"
+    else
+        echo "  All packages up to date"
     fi
 }
 
@@ -213,17 +217,43 @@ system_health() {
 run_all() {
     log "Running all system maintenance tasks..."
     echo
-    
+
+    # Set maintenance mode
+    set_system_mode "MAINTENANCE"
+
     validate_system
     echo
-    
+
     fix_permissions
     echo
-    
+
     system_health
     echo
-    
+
+    # Update maintenance timestamp
+    local current_time
+    current_time=$(date -Iseconds)
+    local next_week
+    next_week=$(date -d '+1 week' -Iseconds)
+    update_maintenance_status "${current_time}" "${next_week}"
+
+    # Update system health score
+    local health_score
+    health_score=$(calculate_system_health_score)
+    set_system_health_score "${health_score}"
+
+    # Reset system mode
+    if is_system_auto_mode_enabled; then
+        set_system_mode "AUTO"
+    else
+        set_system_mode "NORMAL"
+    fi
+
+    # Log maintenance completion
+    log_system_event "INFO" "System maintenance completed - health score: ${health_score}/100"
+
     success "All maintenance tasks completed"
+    log "System health score: ${health_score}/100"
 }
 
 # Main function

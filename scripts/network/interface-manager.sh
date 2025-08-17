@@ -18,6 +18,12 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/hardware-detection.sh
+source "${SCRIPT_DIR}/../shared/hardware-detection.sh"
+# shellcheck source=../shared/network-state.sh
+source "${SCRIPT_DIR}/../shared/network-state.sh"
+# shellcheck source=../shared/network-intelligence.sh
+source "${SCRIPT_DIR}/../shared/network-intelligence.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-interface-manager.log"
@@ -45,7 +51,10 @@ init_script() {
     validate_root_user
 
     # Validate required commands
-    require_commands ip iw
+    require_commands ip iw jq
+
+    # Initialize network state system
+    init_network_state
 
     debug "Interface manager initialized"
     clear_error_context
@@ -60,13 +69,20 @@ mkdir -p /etc/dangerprep
 
 enumerate_interfaces() {
     log "Enumerating physical network interfaces..."
-    
+
+    # Detect hardware platform first
+    detect_hardware_platform
+
     # Clear existing configuration
     true > "${INTERFACE_CONFIG}"
-    
+
     {
         echo "# DangerPrep Interface Configuration"
         echo "# Generated on $(date)"
+        echo "# Hardware Platform: ${HARDWARE_PLATFORM:-Unknown}"
+        if [[ "${IS_FRIENDLYELEC}" == "true" ]]; then
+            echo "# FriendlyElec Model: ${FRIENDLYELEC_MODEL}"
+        fi
         echo ""
     } >> "${INTERFACE_CONFIG}"
     
@@ -210,38 +226,129 @@ list_interfaces() {
 
 set_wan_interface() {
     local wan_interface="$1"
-    
+    local priority="${2:-primary}"
+
     if [ -z "$wan_interface" ]; then
-        error "Usage: set-wan <interface>"
+        error "Usage: set-wan <interface> [priority]"
         echo "Available interfaces:"
         list_interfaces | grep "Interface:" | awk '{print "  " $2}'
+        echo "Priorities: primary, secondary, available"
         return 1
     fi
-    
+
     # Validate interface exists
     if ! grep -q "_${wan_interface}=" "${INTERFACE_CONFIG}" 2>/dev/null; then
         error "Interface '$wan_interface' not found. Run 'enumerate' first."
         return 1
     fi
-    
-    # Set WAN interface
-    echo "$wan_interface" > "${WAN_CONFIG}"
-    success "Set $wan_interface as WAN interface"
-    
+
+    log "Setting WAN interface: $wan_interface (priority: $priority)"
+
+    # Use network state management for multiple WAN support
+    case "$priority" in
+        primary)
+            set_interface_role "$wan_interface" "$ROLE_WAN_PRIMARY"
+            ;;
+        secondary)
+            set_interface_role "$wan_interface" "$ROLE_WAN_SECONDARY"
+            ;;
+        available)
+            set_interface_role "$wan_interface" "$ROLE_WAN_AVAILABLE"
+            ;;
+        *)
+            error "Invalid priority: $priority (use: primary, secondary, available)"
+            return 1
+            ;;
+    esac
+
+    # Update legacy configuration for backward compatibility
+    if [[ "$priority" == "primary" ]]; then
+        echo "$wan_interface" > "${WAN_CONFIG}"
+    fi
+
+    # Trigger network evaluation if auto mode is enabled
+    if is_auto_mode_enabled; then
+        scan_single_interface_connectivity "$wan_interface"
+        force_network_evaluation
+    fi
+
+    success "Set $wan_interface as $priority WAN interface"
+
     # Show updated configuration
     echo
-    echo "Current Configuration:"
-    echo "  WAN: $wan_interface"
-    echo "  LAN: All other interfaces + Tailscale"
+    show_wan_configuration
 }
 
 clear_wan_interface() {
-    if [ -f "${WAN_CONFIG}" ]; then
-        rm "${WAN_CONFIG}"
-        success "Cleared WAN interface designation"
-        echo "All interfaces are now considered LAN"
+    local interface="$1"
+
+    if [[ -n "$interface" ]]; then
+        # Clear specific interface
+        log "Clearing WAN designation for interface: $interface"
+        clear_interface_role "$interface"
+        success "Cleared WAN designation for $interface"
     else
-        log "No WAN interface was set"
+        # Clear all WAN interfaces
+        log "Clearing all WAN interface designations"
+        set_network_state "wan_primary" "null"
+        set_network_state "wan_secondary" "null"
+        set_network_state_object "wan_available" "[]"
+
+        # Clear legacy configuration
+        if [[ -f "${WAN_CONFIG}" ]]; then
+            rm "${WAN_CONFIG}"
+        fi
+
+        success "Cleared all WAN interface designations"
+    fi
+
+    # Trigger network evaluation if auto mode is enabled
+    if is_auto_mode_enabled; then
+        force_network_evaluation
+    fi
+
+    echo
+    show_wan_configuration
+}
+
+# Show current WAN configuration
+show_wan_configuration() {
+    echo "Current WAN Configuration:"
+    echo "========================="
+
+    local wan_primary
+    wan_primary=$(get_wan_primary)
+    if [[ "$wan_primary" != "null" && -n "$wan_primary" ]]; then
+        echo "  Primary WAN: $wan_primary"
+    fi
+
+    local wan_secondary
+    wan_secondary=$(get_wan_secondary)
+    if [[ "$wan_secondary" != "null" && -n "$wan_secondary" ]]; then
+        echo "  Secondary WAN: $wan_secondary"
+    fi
+
+    local wan_available
+    wan_available=$(get_wan_available)
+    if [[ -n "$wan_available" ]]; then
+        echo "  Available WAN:"
+        echo "$wan_available" | while read -r interface; do
+            echo "    - $interface"
+        done
+    fi
+
+    local lan_interfaces
+    lan_interfaces=$(get_lan_interfaces)
+    if [[ -n "$lan_interfaces" ]]; then
+        echo "  LAN Interfaces:"
+        echo "$lan_interfaces" | while read -r interface; do
+            echo "    - $interface"
+        done
+    fi
+
+    if [[ "$wan_primary" == "null" && "$wan_secondary" == "null" && -z "$wan_available" ]]; then
+        echo "  No WAN interfaces configured"
+        echo "  All interfaces are considered LAN"
     fi
 }
 
@@ -306,31 +413,36 @@ main() {
             list_interfaces
             ;;
         "set-wan")
-            set_wan_interface "$2"
+            set_wan_interface "$2" "$3"
             ;;
         "clear-wan")
-            clear_wan_interface
+            clear_wan_interface "$2"
+            ;;
+        "show-wan")
+            show_wan_configuration
             ;;
         "config"|"show")
             show_current_config
             ;;
         help|--help|-h)
             echo "DangerPrep Interface Manager"
-            echo "Usage: $0 {enumerate|list|set-wan|clear-wan|config}"
+            echo "Usage: $0 {enumerate|list|set-wan|clear-wan|show-wan|config}"
             echo
             echo "Commands:"
-            echo "  enumerate     - Scan and enumerate all physical interfaces"
-            echo "  list          - List all available interfaces with details"
-            echo "  set-wan <if>  - Designate an interface as WAN"
-            echo "  clear-wan     - Clear WAN designation (all interfaces become LAN)"
-            echo "  config        - Show current WAN/LAN configuration"
+            echo "  enumerate              - Scan and enumerate all physical interfaces"
+            echo "  list                   - List all available interfaces with details"
+            echo "  set-wan <if> [priority] - Designate interface as WAN (priority: primary|secondary|available)"
+            echo "  clear-wan [interface]  - Clear WAN designation (specific interface or all)"
+            echo "  show-wan               - Show current WAN configuration"
+            echo "  config                 - Show current WAN/LAN configuration"
             echo
             echo "Examples:"
             echo "  $0 enumerate"
             echo "  $0 list"
-            echo "  $0 set-wan enp1s0"
-            echo "  $0 set-wan wlan0"
-            echo "  $0 clear-wan"
+            echo "  $0 set-wan enp1s0 primary"
+            echo "  $0 set-wan wlan0 secondary"
+            echo "  $0 clear-wan enp1s0"
+            echo "  $0 show-wan"
             exit 0
             ;;
         *)
