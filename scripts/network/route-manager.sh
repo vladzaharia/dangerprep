@@ -1,50 +1,78 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Route Manager
 # Flexible routing based on WAN/LAN interface designation
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Source shared banner utility
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-route-manager.log"
+readonly INTERFACE_CONFIG="/etc/dangerprep/interfaces.conf"
+readonly WAN_CONFIG="/etc/dangerprep/wan.conf"
+readonly ROUTING_STATE="/var/lib/dangerprep/routing-state"
 
-log() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "Route manager failed with exit code $exit_code"
+
+    # Stop any DangerPrep connections
+    nmcli connection show | grep "DangerPrep" | awk '{print $1}' | while read -r conn; do
+        nmcli connection down "${conn}" 2>/dev/null || true
+        nmcli connection delete "${conn}" 2>/dev/null || true
+    done
+
+    # Clear iptables rules
+    iptables -t nat -F POSTROUTING 2>/dev/null || true
+    iptables -F FORWARD 2>/dev/null || true
+
+    # Remove dnsmasq configuration
+    rm -f /etc/dnsmasq.d/dangerprep-routing.conf
+    systemctl restart dnsmasq 2>/dev/null || true
+
+    # Clear routing state
+    rm -f "${ROUTING_STATE}"
+
+    error "Cleanup completed"
+    exit "${exit_code}"
 }
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate root permissions for network operations
+    validate_root_user
+
+    # Validate required commands
+    require_commands ip iptables nmcli systemctl
+
+    # Ensure directories exist
+    mkdir -p /etc/dangerprep /var/lib/dangerprep
+
+    debug "Route manager initialized"
+    clear_error_context
 }
-
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Configuration files
-INTERFACE_CONFIG="/etc/dangerprep/interfaces.conf"
-WAN_CONFIG="/etc/dangerprep/wan.conf"
-ROUTING_STATE="/var/lib/dangerprep/routing-state"
-
-# Ensure directories exist
-mkdir -p /etc/dangerprep /var/lib/dangerprep
 
 check_prerequisites() {
-    if [[ ${EUID} -ne 0 ]]; then
-        error "This script must be run as root"
-        exit 1
-    fi
-    
     if [ ! -f "${INTERFACE_CONFIG}" ]; then
         error "Interface configuration not found. Run 'just net-enumerate' first."
         exit 1
@@ -52,7 +80,7 @@ check_prerequisites() {
 }
 
 get_wan_interface() {
-    if [ -f "${WAN_CONFIG}" ]; then
+    if [[ -f "${WAN_CONFIG}" ]]; then
         cat "${WAN_CONFIG}"
     else
         echo ""
@@ -69,8 +97,8 @@ get_lan_interfaces() {
         if [[ $line =~ ^(ETHERNET|WIFI|TAILSCALE)_([^=]+)=\"(.*)\"$ ]]; then
             local interface
             interface=${BASH_REMATCH[2]}
-            if [ "$interface" != "$wan_interface" ]; then
-                lan_interfaces+=("$interface")
+            if [[ "${interface}" != "${wan_interface}" ]]; then
+                lan_interfaces+=("${interface}")
             fi
         fi
     done < "${INTERFACE_CONFIG}"
@@ -339,34 +367,36 @@ configure_routing() {
 }
 
 start_routing() {
+    set_error_context "Starting dynamic routing"
     check_prerequisites
-    
+
     local wan_interface
     wan_interface=$(get_wan_interface)
-    
-    if [ -z "$wan_interface" ]; then
+
+    if [[ -z "${wan_interface}" ]]; then
         error "No WAN interface configured. Use 'just net-set-wan <interface>' first."
         exit 1
     fi
-    
+
     log "Starting dynamic routing..."
-    log "WAN: $wan_interface"
+    log "WAN: ${wan_interface}"
     log "LAN: $(get_lan_interfaces)"
-    
-    configure_wan_interface "$wan_interface" "$@"
-    configure_lan_interfaces "$wan_interface"
-    configure_routing "$wan_interface"
-    
+
+    configure_wan_interface "${wan_interface}" "$@"
+    configure_lan_interfaces "${wan_interface}"
+    configure_routing "${wan_interface}"
+
     # Save routing state
     cat > "${ROUTING_STATE}" << EOF
-wan_interface=$wan_interface
+wan_interface=${wan_interface}
 lan_interfaces=$(get_lan_interfaces)
 started_at=$(date)
 EOF
-    
+
     success "Dynamic routing started successfully!"
     echo
     show_routing_status
+    clear_error_context
 }
 
 stop_routing() {
@@ -441,44 +471,57 @@ show_routing_status() {
     fi
 }
 
-# Main command handling
-# Show banner for route management
-if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
-    show_banner_with_title "Route Manager" "network"
-    echo
-fi
+# Main function
+main() {
+    # Initialize script
+    init_script
 
-case "${1:-}" in
-    "start")
-        shift
-        start_routing "$@"
-        ;;
-    "stop")
-        stop_routing
-        ;;
-    "status")
-        show_routing_status
-        ;;
-    "restart")
-        stop_routing
-        sleep 3
-        shift
-        start_routing "$@"
-        ;;
-    *)
-        echo "DangerPrep Route Manager"
-        echo "Usage: $0 {start|stop|status|restart} [wifi-ssid] [wifi-password]"
+    # Show banner for route management
+    if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
+        show_banner_with_title "Route Manager" "network"
         echo
-        echo "Commands:"
-        echo "  start [ssid] [pass] - Start routing with current WAN/LAN configuration"
-        echo "  stop                - Stop routing and cleanup"
-        echo "  status              - Show current routing status"
-        echo "  restart [ssid] [pass] - Restart routing"
-        echo
-        echo "Notes:"
-        echo "  - WiFi SSID and password required if WAN interface is WiFi"
-        echo "  - Use 'just net-set-wan <interface>' to configure WAN interface first"
-        echo "  - Tailscale is always considered part of LAN network"
-        exit 1
-        ;;
-esac
+    fi
+
+    case "${1:-}" in
+        "start")
+            shift
+            start_routing "$@"
+            ;;
+        "stop")
+            stop_routing
+            ;;
+        "status")
+            show_routing_status
+            ;;
+        "restart")
+            stop_routing
+            sleep 3
+            shift
+            start_routing "$@"
+            ;;
+        help|--help|-h)
+            echo "DangerPrep Route Manager"
+            echo "Usage: $0 {start|stop|status|restart} [wifi-ssid] [wifi-password]"
+            echo
+            echo "Commands:"
+            echo "  start [ssid] [pass] - Start routing with current WAN/LAN configuration"
+            echo "  stop                - Stop routing and cleanup"
+            echo "  status              - Show current routing status"
+            echo "  restart [ssid] [pass] - Restart routing"
+            echo
+            echo "Notes:"
+            echo "  - WiFi SSID and password required if WAN interface is WiFi"
+            echo "  - Use 'just net-set-wan <interface>' to configure WAN interface first"
+            echo "  - Tailscale is always considered part of LAN network"
+            exit 0
+            ;;
+        *)
+            error "Unknown command: $1"
+            echo "Use '$0 help' for usage information"
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"

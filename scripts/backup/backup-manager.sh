@@ -68,18 +68,87 @@ export DRY_RUN=false
 # Valid backup types
 readonly VALID_BACKUP_TYPES=("basic" "encrypted" "full")
 
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "Backup operation failed with exit code $exit_code"
+
+    # Clean up any temporary files
+    cleanup_temp_files
+
+    # Set fan to safe speed if this was a system backup
+    if [[ -f /sys/class/pwm/pwmchip0/pwm0/duty_cycle ]] && [[ $EUID -eq 0 ]]; then
+        echo "80" > /sys/class/pwm/pwmchip0/pwm0/duty_cycle 2>/dev/null || true
+    fi
+
+    error "Backup cleanup completed"
+    exit $exit_code
+}
+
 # Initialize script
 init_script() {
     set_error_context "Script initialization"
     set_log_file "${DEFAULT_LOG_FILE}"
 
+    # Set up error handling
+    trap cleanup_on_error ERR
+
     # Validate required commands
     require_commands tar gzip find chmod mkdir
+
+    # Validate optional commands based on backup type
+    if [[ "${BACKUP_TYPE}" == "encrypted" ]] || [[ "${ENCRYPT_BACKUP}" == "true" ]]; then
+        if ! command -v gpg >/dev/null 2>&1; then
+            error "GPG is required for encrypted backups but not installed"
+            error "Install GPG: apt-get install gnupg"
+            return 1
+        fi
+
+        if ! command -v openssl >/dev/null 2>&1; then
+            warning "OpenSSL not found - using GPG for key generation"
+        fi
+    fi
 
     # Validate root permissions for backup operations
     validate_root_user
 
+    # Validate storage requirements
+    validate_storage_requirements
+
     debug "Backup manager initialized"
+    clear_error_context
+}
+
+# Validate storage requirements for backups
+validate_storage_requirements() {
+    set_error_context "Storage requirements validation"
+
+    # Check if backup directory parent exists and is writable
+    local backup_parent
+    backup_parent="$(dirname "${BACKUP_DIR}")"
+
+    if [[ ! -d "$backup_parent" ]]; then
+        error "Backup parent directory does not exist: $backup_parent"
+        return 1
+    fi
+
+    if [[ ! -w "$backup_parent" ]]; then
+        error "No write permission to backup parent directory: $backup_parent"
+        return 1
+    fi
+
+    # Check available disk space
+    local available_space
+    available_space=$(df "$backup_parent" | awk 'NR==2 {print $4}')
+    local min_space_kb=1048576  # 1GB minimum
+
+    if [[ $available_space -lt $min_space_kb ]]; then
+        warning "Low disk space for backups: $(( available_space / 1024 ))MB available"
+        warning "Minimum recommended: $(( min_space_kb / 1024 ))MB"
+    else
+        success "Sufficient disk space for backups: $(( available_space / 1024 ))MB available"
+    fi
+
     clear_error_context
 }
 
@@ -492,7 +561,7 @@ verify_backup() {
 main() {
     # Show banner for backup operations
     if [[ "${1:-help}" != "help" ]]; then
-        show_backup_banner "$@"
+        show_banner_with_title "Backup Manager" "backup"
         echo
     fi
 

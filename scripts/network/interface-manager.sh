@@ -1,34 +1,54 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Interface Manager
 # Enumerate and manage physical network interfaces
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Source shared banner utility
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-interface-manager.log"
 
-log() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "Interface manager failed with exit code ${exit_code}"
+
+    # No specific cleanup needed for interface enumeration
+
+    error "Cleanup completed"
+    exit "${exit_code}"
 }
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
 
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
+    # Set up error handling
+    trap cleanup_on_error ERR
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    # Validate root permissions for system operations
+    validate_root_user
+
+    # Validate required commands
+    require_commands ip iw
+
+    debug "Interface manager initialized"
+    clear_error_context
 }
 
 # Configuration files
@@ -267,46 +287,59 @@ show_current_config() {
     echo "Tailscale is always considered part of LAN network"
 }
 
-# Main command handling
-# Show banner for interface management
-if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
-    show_banner_with_title "Interface Manager" "network"
-    echo
-fi
+# Main function
+main() {
+    # Initialize script
+    init_script
 
-case "${1:-}" in
-    "enumerate")
-        enumerate_interfaces
-        ;;
-    "list")
-        list_interfaces
-        ;;
-    "set-wan")
-        set_wan_interface "$2"
-        ;;
-    "clear-wan")
-        clear_wan_interface
-        ;;
-    "config"|"show")
-        show_current_config
-        ;;
-    *)
-        echo "DangerPrep Interface Manager"
-        echo "Usage: $0 {enumerate|list|set-wan|clear-wan|config}"
+    # Show banner for interface management
+    if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
+        show_banner_with_title "Interface Manager" "network"
         echo
-        echo "Commands:"
-        echo "  enumerate     - Scan and enumerate all physical interfaces"
-        echo "  list          - List all available interfaces with details"
-        echo "  set-wan <if>  - Designate an interface as WAN"
-        echo "  clear-wan     - Clear WAN designation (all interfaces become LAN)"
-        echo "  config        - Show current WAN/LAN configuration"
-        echo
-        echo "Examples:"
-        echo "  $0 enumerate"
-        echo "  $0 list"
-        echo "  $0 set-wan enp1s0"
-        echo "  $0 set-wan wlan0"
-        echo "  $0 clear-wan"
-        exit 1
-        ;;
-esac
+    fi
+
+    case "${1:-}" in
+        "enumerate")
+            enumerate_interfaces
+            ;;
+        "list")
+            list_interfaces
+            ;;
+        "set-wan")
+            set_wan_interface "$2"
+            ;;
+        "clear-wan")
+            clear_wan_interface
+            ;;
+        "config"|"show")
+            show_current_config
+            ;;
+        help|--help|-h)
+            echo "DangerPrep Interface Manager"
+            echo "Usage: $0 {enumerate|list|set-wan|clear-wan|config}"
+            echo
+            echo "Commands:"
+            echo "  enumerate     - Scan and enumerate all physical interfaces"
+            echo "  list          - List all available interfaces with details"
+            echo "  set-wan <if>  - Designate an interface as WAN"
+            echo "  clear-wan     - Clear WAN designation (all interfaces become LAN)"
+            echo "  config        - Show current WAN/LAN configuration"
+            echo
+            echo "Examples:"
+            echo "  $0 enumerate"
+            echo "  $0 list"
+            echo "  $0 set-wan enp1s0"
+            echo "  $0 set-wan wlan0"
+            echo "  $0 clear-wan"
+            exit 0
+            ;;
+        *)
+            error "Unknown command: $1"
+            echo "Use '$0 help' for usage information"
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"

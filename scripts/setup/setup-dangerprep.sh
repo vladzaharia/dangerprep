@@ -31,6 +31,8 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/functions.sh
+source "${SCRIPT_DIR}/../shared/functions.sh"
 
 # Show help information
 show_help() {
@@ -84,9 +86,6 @@ EOF
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
 
-# Source shared banner utility
-# shellcheck source=../shared/banner.sh
-source "${SCRIPT_DIR}/../shared/banner.sh"
 INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-$(pwd)}"
 LOG_FILE="/var/log/dangerprep-setup.log"
 BACKUP_DIR="/var/backups/dangerprep-$(date +%Y%m%d-%H%M%S)"
@@ -159,6 +158,95 @@ secure_copy() {
     chown root:root "$dest"
 }
 
+# Validate template variables are properly defined
+validate_template_variables() {
+    log "Validating template variables..."
+
+    local required_vars=(
+        "WIFI_SSID" "WIFI_PASSWORD" "LAN_NETWORK" "LAN_IP"
+        "DHCP_START" "DHCP_END" "SSH_PORT"
+        "FAIL2BAN_BANTIME" "FAIL2BAN_MAXRETRY"
+    )
+
+    local missing_vars=()
+    for var in "${required_vars[@]}"; do
+        if [[ -z "${!var:-}" ]]; then
+            missing_vars+=("$var")
+        fi
+    done
+
+    if [[ ${#missing_vars[@]} -gt 0 ]]; then
+        error "Missing required template variables: ${missing_vars[*]}"
+        return 1
+    fi
+
+    # Validate variable formats
+    if ! validate_ip "$LAN_IP"; then
+        error "Invalid LAN IP address: $LAN_IP"
+        return 1
+    fi
+
+    if ! validate_ip "${DHCP_START}"; then
+        error "Invalid DHCP start address: $DHCP_START"
+        return 1
+    fi
+
+    if ! validate_ip "${DHCP_END}"; then
+        error "Invalid DHCP end address: $DHCP_END"
+        return 1
+    fi
+
+    if [[ ! "$SSH_PORT" =~ ^[0-9]+$ ]] || [[ "$SSH_PORT" -lt 1 ]] || [[ "$SSH_PORT" -gt 65535 ]]; then
+        error "Invalid SSH port: $SSH_PORT"
+        return 1
+    fi
+
+    success "All template variables validated"
+    return 0
+}
+
+# Validate service port assignments to prevent conflicts
+validate_service_ports() {
+    log "Checking for service port conflicts..."
+
+    local port_assignments=(
+        "SSH:${SSH_PORT}"
+        "AdGuard_Home_Web:3000"
+        "AdGuard_Home_DNS:5053"
+        "Step_CA:9000"
+        "dnsmasq_DNS:53"
+        "dnsmasq_DHCP:67"
+    )
+
+    local conflicts=()
+    local used_ports=()
+
+    # Check for duplicate port assignments
+    for assignment in "${port_assignments[@]}"; do
+        local service="${assignment%%:*}"
+        local port="${assignment##*:}"
+
+        if [[ " ${used_ports[*]} " =~ \ ${port}\  ]]; then
+            conflicts+=("Port $port used by multiple services")
+        else
+            used_ports+=("$port")
+        fi
+
+        # Check if port is already in use by other processes
+        if netstat -tuln 2>/dev/null | grep -q ":${port} "; then
+            conflicts+=("Port $port already in use by another process")
+        fi
+    done
+
+    if [[ ${#conflicts[@]} -gt 0 ]]; then
+        warning "Port conflicts detected:"
+        printf '  %s\n' "${conflicts[@]}"
+        return 1
+    fi
+
+    return 0
+}
+
 # Signal handlers for cleanup
 trap cleanup_temp EXIT
 trap 'cleanup_temp; exit 130' INT
@@ -176,8 +264,17 @@ WIFI_PASSWORD="$(generate_wifi_password)" || {
 }
 LAN_NETWORK="192.168.120.0/22"
 LAN_IP="192.168.120.1"
-# System configuration
+DHCP_START="192.168.120.100"
+DHCP_END="192.168.120.200"
+
+# Security configuration
 SSH_PORT="2222"
+FAIL2BAN_BANTIME="3600"
+FAIL2BAN_MAXRETRY="3"
+
+# Export variables for use in templates
+export WIFI_SSID WIFI_PASSWORD LAN_NETWORK LAN_IP DHCP_START DHCP_END
+export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
 
 # Check if running as root
 check_root() {
@@ -188,17 +285,50 @@ check_root() {
     fi
 }
 
-# Create backup directory and log file
+# Enhanced logging setup with comprehensive information
 setup_logging() {
     mkdir -p "${BACKUP_DIR}"
     mkdir -p "$(dirname "${LOG_FILE}")"
     touch "${LOG_FILE}"
     chmod 640 "${LOG_FILE}"
-    
-    log "DangerPrep Setup Started"
+
+    # Log setup start with comprehensive system information
+    log_section "DangerPrep Setup Started"
+    log "Timestamp: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+    log "Script version: ${SCRIPT_VERSION}"
+    log "User: $(whoami)"
+    log "Working directory: $(pwd)"
+    log "Script path: ${BASH_SOURCE[0]}"
     log "Backup directory: ${BACKUP_DIR}"
     log "Install root: ${INSTALL_ROOT}"
     log "Project root: ${PROJECT_ROOT}"
+    log "Log file: ${LOG_FILE}"
+
+    # Log system information
+    log_subsection "System Environment"
+    log "OS: $(lsb_release -d 2>/dev/null | cut -f2 || echo 'Unknown')"
+    log "Kernel: $(uname -r)"
+    log "Architecture: $(uname -m)"
+    log "Hostname: $(hostname)"
+    log "Memory: $(free -h | grep Mem | awk '{print $2}' || echo 'Unknown')"
+    log "Disk space: $(df -h / | tail -1 | awk '{print $4}' || echo 'Unknown') available"
+    log "Shell: ${SHELL}"
+    log "PATH: ${PATH}"
+
+    # Log script arguments (if any were passed to main)
+    if [[ -n "${SCRIPT_ARGS:-}" ]]; then
+        log_subsection "Script Arguments"
+        log "Arguments: ${SCRIPT_ARGS}"
+    fi
+
+    # Log environment variables
+    log_subsection "DangerPrep Environment"
+    log "DANGERPREP_INSTALL_ROOT: ${DANGERPREP_INSTALL_ROOT:-not set}"
+    log "CONFIG_FILE: ${CONFIG_FILE:-not set}"
+    log "DRY_RUN: ${DRY_RUN:-false}"
+    log "LOG_LEVEL: ${LOG_LEVEL:-INFO}"
+
+    success "Logging initialized successfully"
 }
 
 # Display banner
@@ -240,6 +370,19 @@ detect_friendlyelec_platform() {
     IS_RK3588S=false
     FRIENDLYELEC_MODEL=""
     SOC_TYPE=""
+
+    # Detect architecture first
+    case "$(uname -m)" in
+        aarch64|arm64)
+            IS_ARM64=true
+            ;;
+        x86_64|amd64)
+            IS_ARM64=false
+            ;;
+        *)
+            IS_ARM64=false
+            ;;
+    esac
 
     # Detect platform from device tree
     if [[ -f /proc/device-tree/model ]]; then
@@ -284,7 +427,7 @@ detect_friendlyelec_platform() {
     fi
 
     # Export variables for use in other functions
-    export PLATFORM IS_FRIENDLYELEC IS_RK3588 IS_RK3588S FRIENDLYELEC_MODEL SOC_TYPE
+    export PLATFORM IS_FRIENDLYELEC IS_RK3588 IS_RK3588S FRIENDLYELEC_MODEL SOC_TYPE IS_ARM64
 }
 
 # Detect FriendlyElec-specific hardware features
@@ -294,37 +437,63 @@ detect_friendlyelec_features() {
     # Check for hardware acceleration support
     if [[ -d /sys/class/devfreq/fb000000.gpu ]]; then
         features+=("Mali GPU")
+        debug "Mali GPU devfreq interface detected"
+    else
+        debug "Mali GPU devfreq interface not found"
     fi
 
     # Check for VPU/MPP support
     if [[ -c /dev/mpp_service ]]; then
         features+=("Hardware VPU")
+        debug "VPU/MPP device detected"
+    else
+        debug "VPU/MPP device not found"
     fi
 
     # Check for NPU support (RK3588/RK3588S)
     if [[ "${IS_RK3588}" == true || "${IS_RK3588S}" == true ]]; then
         if [[ -d /sys/class/devfreq/fdab0000.npu ]]; then
             features+=("6TOPS NPU")
+            debug "NPU devfreq interface detected"
+        else
+            debug "NPU devfreq interface not found"
         fi
     fi
 
-    # Check for RTC support
+    # Check for RTC support with error handling
     if [[ -f /sys/class/rtc/rtc0/name ]]; then
         local rtc_name
-        rtc_name=$(cat /sys/class/rtc/rtc0/name 2>/dev/null)
-        if [[ "$rtc_name" =~ hym8563 ]]; then
-            features+=("HYM8563 RTC")
+        if rtc_name=$(cat /sys/class/rtc/rtc0/name 2>/dev/null); then
+            if [[ "$rtc_name" =~ hym8563 ]]; then
+                features+=("HYM8563 RTC")
+                debug "HYM8563 RTC detected"
+            else
+                debug "RTC detected but not HYM8563: $rtc_name"
+            fi
+        else
+            debug "Failed to read RTC name"
         fi
+    else
+        debug "RTC interface not found"
     fi
 
     # Check for M.2 interfaces
     if [[ -d /sys/class/nvme ]]; then
-        features+=("M.2 NVMe")
+        local nvme_count
+        nvme_count=$(find /sys/class/nvme -name "nvme*" -type l 2>/dev/null | wc -l)
+        if [[ $nvme_count -gt 0 ]]; then
+            features+=("M.2 NVMe ($nvme_count devices)")
+            debug "M.2 NVMe devices detected: $nvme_count"
+        fi
+    else
+        debug "M.2 NVMe interface not found"
     fi
 
     # Log detected features
     if [[ ${#features[@]} -gt 0 ]]; then
         log "Hardware features: ${features[*]}"
+    else
+        log "No special hardware features detected"
     fi
 }
 
@@ -474,6 +643,24 @@ pre_flight_checks() {
         ((validation_errors++))
     else
         success "✓ Configuration files validated"
+    fi
+
+    # Template Variable Validation
+    log_subsection "Template Variables Validation"
+    if ! validate_template_variables; then
+        error "✗ Template variable validation failed"
+        ((validation_errors++))
+    else
+        success "✓ Template variables validated"
+    fi
+
+    # Service Port Conflict Detection
+    log_subsection "Service Port Conflict Detection"
+    if ! validate_service_ports; then
+        warning "⚠ Potential service port conflicts detected"
+        ((validation_warnings++))
+    else
+        success "✓ No service port conflicts detected"
     fi
 
     # Security Validation
@@ -756,12 +943,19 @@ configure_rk3588_gpu() {
 
     # Set GPU governor to performance for better graphics performance
     if [[ -f /sys/class/devfreq/fb000000.gpu/governor ]]; then
-        echo "performance" > /sys/class/devfreq/fb000000.gpu/governor 2>/dev/null || true
-        log "Set GPU governor to performance mode"
+        if echo "performance" > /sys/class/devfreq/fb000000.gpu/governor 2>/dev/null; then
+            log "Set GPU governor to performance mode"
+        else
+            warning "Failed to set GPU governor to performance mode"
+        fi
+    else
+        debug "GPU devfreq interface not found, skipping GPU governor configuration"
     fi
 
     # Configure Mali GPU environment variables
-    load_rk3588_gpu_config
+    if ! load_rk3588_gpu_config; then
+        warning "Failed to load RK3588 GPU configuration"
+    fi
 }
 
 # Configure FriendlyElec RTC
@@ -1051,7 +1245,7 @@ detect_network_interfaces() {
         if [[ -n "$interface" ]]; then
             ethernet_interfaces+=("$interface")
         fi
-    done < <(ip link show | grep -E "^[0-9]+: (eth|enp|ens|end)" | cut -d: -f2 | tr -d ' ')
+    done < <(ip link show | grep -E "^[0-9]+: (eth|enp|ens|enx)" | cut -d: -f2 | tr -d ' ')
 
     # Detect WiFi interfaces with better detection
     while IFS= read -r interface; do
@@ -1156,10 +1350,16 @@ select_r6c_interfaces() {
         for iface in "${ethernet_interfaces[@]}"; do
             # Wait for interface to be up to read speed
             ip link set "$iface" up 2>/dev/null || true
-            sleep 1
+            sleep 2
 
             local speed
             speed=$(cat "/sys/class/net/$iface/speed" 2>/dev/null || echo "1000")
+
+            # Handle cases where speed is -1 (unknown) or invalid
+            if [[ "$speed" == "-1" || ! "$speed" =~ ^[0-9]+$ ]]; then
+                speed="1000"  # Default to 1Gbps
+            fi
+
             local driver
             driver=$(readlink "/sys/class/net/$iface/device/driver" 2>/dev/null | xargs basename || echo "unknown")
 
@@ -1395,11 +1595,26 @@ configure_rk3588_cpu_governors() {
         if [[ -d "$policy" ]]; then
             local governor_file="$policy/scaling_governor"
             if [[ -w "$governor_file" ]]; then
-                echo "performance" > "$governor_file" 2>/dev/null || true
-                local current_governor
-                current_governor=$(cat "$governor_file" 2>/dev/null)
-                log "Set CPU policy $(basename "$policy") governor to: $current_governor"
+                # Check available governors first
+                local available_governors
+                available_governors=$(cat "$policy/scaling_available_governors" 2>/dev/null || echo "")
+
+                if [[ "$available_governors" =~ performance ]]; then
+                    if echo "performance" > "$governor_file" 2>/dev/null; then
+                        local current_governor
+                        current_governor=$(cat "$governor_file" 2>/dev/null)
+                        log "Set CPU policy $(basename "$policy") governor to: $current_governor"
+                    else
+                        warning "Failed to set performance governor for $(basename "$policy")"
+                    fi
+                else
+                    warning "Performance governor not available for $(basename "$policy"), available: $available_governors"
+                fi
+            else
+                debug "CPU governor file not writable: $governor_file"
             fi
+        else
+            debug "CPU policy directory not found: $policy"
         fi
     done
 
@@ -1620,29 +1835,102 @@ setup_dns_services() {
     success "Host-based DNS services configured"
 }
 
+get_latest_adguard_version() {
+    # Try to get latest version from GitHub API, fallback to stable version
+    local latest_version
+    latest_version=$(curl -s "https://api.github.com/repos/AdguardTeam/AdGuardHome/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' 2>/dev/null)
+
+    if [[ -n "$latest_version" && "$latest_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "$latest_version"
+    else
+        echo "v0.107.52"  # Fallback to known stable version
+    fi
+}
+
 install_adguard_home_host() {
     log "Installing AdGuard Home as host service..."
 
-    # Create AdGuard Home user and directories
-    useradd -r -s /bin/false -d /var/lib/adguardhome adguardhome 2>/dev/null || true
+    # Create AdGuard Home user and directories with proper security
+    if ! id adguardhome >/dev/null 2>&1; then
+        log "Creating adguardhome system user"
+        useradd -r -s /bin/false -d /var/lib/adguardhome -c "AdGuard Home Service" adguardhome || {
+            error "Failed to create adguardhome user"
+            return 1
+        }
+    else
+        log "AdGuard Home user already exists"
+    fi
+
+    # Create directories with secure permissions
     mkdir -p /var/lib/adguardhome/{work,conf}
     mkdir -p /etc/adguardhome
 
-    # Download AdGuard Home binary
-    local adguard_version="v0.107.52"  # Use stable version
-    local adguard_url="https://github.com/AdguardTeam/AdGuardHome/releases/download/${adguard_version}/AdGuardHome_linux_amd64.tar.gz"
+    # Set secure ownership and permissions
+    chown -R adguardhome:adguardhome /var/lib/adguardhome
+    chmod 750 /var/lib/adguardhome
+    chmod 750 /var/lib/adguardhome/{work,conf}
+    chmod 755 /etc/adguardhome
 
+    # Get latest version
+    local adguard_version
+    adguard_version=$(get_latest_adguard_version)
+    log "Using AdGuard Home version: $adguard_version"
+
+    local arch="amd64"
     if [[ "${IS_ARM64}" == true ]]; then
-        adguard_url="https://github.com/AdguardTeam/AdGuardHome/releases/download/${adguard_version}/AdGuardHome_linux_arm64.tar.gz"
+        arch="arm64"
+    fi
+    local adguard_url="https://github.com/AdguardTeam/AdGuardHome/releases/download/${adguard_version}/AdGuardHome_linux_${arch}.tar.gz"
+
+    # Download and install with integrity checks
+    cd /tmp || {
+        error "Cannot change to /tmp directory"
+        return 1
+    }
+
+    log "Downloading AdGuard Home from: $adguard_url"
+    if ! curl -fsSL "$adguard_url" -o adguardhome.tar.gz; then
+        error "Failed to download AdGuard Home"
+        return 1
     fi
 
-    # Download and install
-    cd /tmp
-    curl -fsSL "$adguard_url" -o adguardhome.tar.gz
-    tar -xzf adguardhome.tar.gz
-    cp AdGuardHome/AdGuardHome /usr/local/bin/
+    # Verify download is not empty
+    if [[ ! -s adguardhome.tar.gz ]]; then
+        error "Downloaded AdGuard Home archive is empty"
+        rm -f adguardhome.tar.gz
+        return 1
+    fi
+
+    # Extract and verify
+    if ! tar -xzf adguardhome.tar.gz; then
+        error "Failed to extract AdGuard Home archive"
+        rm -f adguardhome.tar.gz
+        return 1
+    fi
+
+    if [[ ! -f AdGuardHome/AdGuardHome ]]; then
+        error "AdGuard Home binary not found in archive"
+        rm -rf AdGuardHome adguardhome.tar.gz
+        return 1
+    fi
+
+    # Install binary
+    if ! cp AdGuardHome/AdGuardHome /usr/local/bin/; then
+        error "Failed to install AdGuard Home binary"
+        rm -rf AdGuardHome adguardhome.tar.gz
+        return 1
+    fi
+
     chmod +x /usr/local/bin/AdGuardHome
     rm -rf AdGuardHome adguardhome.tar.gz
+
+    # Verify installation
+    if ! /usr/local/bin/AdGuardHome --version >/dev/null 2>&1; then
+        error "AdGuard Home installation verification failed"
+        return 1
+    fi
+
+    success "AdGuard Home binary installed successfully"
 
     # Load configuration
     load_adguard_config
@@ -1650,9 +1938,15 @@ install_adguard_home_host() {
     # Create systemd service
     create_adguard_systemd_service
 
-    # Set permissions
+    # Set secure permissions for AdGuard Home
     chown -R adguardhome:adguardhome /var/lib/adguardhome
     chown -R adguardhome:adguardhome /etc/adguardhome
+
+    # Ensure configuration files have secure permissions
+    if [[ -f /etc/adguardhome/AdGuardHome.yaml ]]; then
+        chmod 640 /etc/adguardhome/AdGuardHome.yaml
+        chown adguardhome:adguardhome /etc/adguardhome/AdGuardHome.yaml
+    fi
 
     # Enable and start service
     systemctl enable adguardhome
@@ -1699,17 +1993,52 @@ setup_certificate_management() {
     success "Host-based certificate management configured"
 }
 
+get_latest_step_version() {
+    local repo="$1"  # "cli" or "certificates"
+    local latest_version
+    latest_version=$(curl -s "https://api.github.com/repos/smallstep/${repo}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' 2>/dev/null)
+
+    if [[ -n "$latest_version" && "$latest_version" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # Remove 'v' prefix if present
+        echo "${latest_version#v}"
+    else
+        echo "0.25.2"  # Fallback to known stable version
+    fi
+}
+
 install_step_ca_host() {
     log "Installing Step-CA as host service..."
 
-    # Create step user and directories
-    useradd -r -s /bin/false -d /var/lib/step step 2>/dev/null || true
+    # Create step user and directories with proper security
+    if ! id step >/dev/null 2>&1; then
+        log "Creating step system user"
+        useradd -r -s /bin/false -d /var/lib/step -c "Step-CA Service" step || {
+            error "Failed to create step user"
+            return 1
+        }
+    else
+        log "Step user already exists"
+    fi
+
+    # Create directories with secure permissions
     mkdir -p /var/lib/step/{config,secrets,certs}
     mkdir -p /etc/step
 
-    # Download Step CLI and Step-CA
-    local step_version="0.25.2"
-    local step_ca_version="0.25.2"
+    # Set secure ownership and permissions
+    chown -R step:step /var/lib/step
+    chmod 750 /var/lib/step
+    chmod 750 /var/lib/step/{config,certs}
+    chmod 700 /var/lib/step/secrets  # Extra secure for secrets
+    chmod 755 /etc/step
+
+    # Get latest versions
+    local step_version
+    step_version=$(get_latest_step_version "cli")
+    local step_ca_version
+    step_ca_version=$(get_latest_step_version "certificates")
+
+    log "Using Step CLI version: $step_version"
+    log "Using Step-CA version: $step_ca_version"
 
     # Determine architecture
     local arch="amd64"
@@ -1717,22 +2046,92 @@ install_step_ca_host() {
         arch="arm64"
     fi
 
-    # Download Step CLI
+    # Download Step CLI with integrity checks
     local step_cli_url="https://github.com/smallstep/cli/releases/download/v${step_version}/step_linux_${step_version}_${arch}.tar.gz"
-    cd /tmp
-    curl -fsSL "$step_cli_url" -o step-cli.tar.gz
-    tar -xzf step-cli.tar.gz
-    cp "step_${step_version}/bin/step" /usr/local/bin/
+    cd /tmp || {
+        error "Cannot change to /tmp directory"
+        return 1
+    }
+
+    log "Downloading Step CLI from: $step_cli_url"
+    if ! curl -fsSL "$step_cli_url" -o step-cli.tar.gz; then
+        error "Failed to download Step CLI"
+        return 1
+    fi
+
+    if [[ ! -s step-cli.tar.gz ]]; then
+        error "Downloaded Step CLI archive is empty"
+        rm -f step-cli.tar.gz
+        return 1
+    fi
+
+    if ! tar -xzf step-cli.tar.gz; then
+        error "Failed to extract Step CLI archive"
+        rm -f step-cli.tar.gz
+        return 1
+    fi
+
+    if [[ ! -f "step_${step_version}/bin/step" ]]; then
+        error "Step CLI binary not found in archive"
+        rm -rf step_* step-cli.tar.gz
+        return 1
+    fi
+
+    if ! cp "step_${step_version}/bin/step" /usr/local/bin/; then
+        error "Failed to install Step CLI binary"
+        rm -rf step_* step-cli.tar.gz
+        return 1
+    fi
+
     chmod +x /usr/local/bin/step
     rm -rf step_* step-cli.tar.gz
 
-    # Download Step-CA
+    # Download Step-CA with integrity checks
     local step_ca_url="https://github.com/smallstep/certificates/releases/download/v${step_ca_version}/step-ca_linux_${step_ca_version}_${arch}.tar.gz"
-    curl -fsSL "$step_ca_url" -o step-ca.tar.gz
-    tar -xzf step-ca.tar.gz
-    cp "step-ca_${step_ca_version}/bin/step-ca" /usr/local/bin/
+
+    log "Downloading Step-CA from: $step_ca_url"
+    if ! curl -fsSL "$step_ca_url" -o step-ca.tar.gz; then
+        error "Failed to download Step-CA"
+        return 1
+    fi
+
+    if [[ ! -s step-ca.tar.gz ]]; then
+        error "Downloaded Step-CA archive is empty"
+        rm -f step-ca.tar.gz
+        return 1
+    fi
+
+    if ! tar -xzf step-ca.tar.gz; then
+        error "Failed to extract Step-CA archive"
+        rm -f step-ca.tar.gz
+        return 1
+    fi
+
+    if [[ ! -f "step-ca_${step_ca_version}/bin/step-ca" ]]; then
+        error "Step-CA binary not found in archive"
+        rm -rf step-ca_* step-ca.tar.gz
+        return 1
+    fi
+
+    if ! cp "step-ca_${step_ca_version}/bin/step-ca" /usr/local/bin/; then
+        error "Failed to install Step-CA binary"
+        rm -rf step-ca_* step-ca.tar.gz
+        return 1
+    fi
+
     chmod +x /usr/local/bin/step-ca
     rm -rf step-ca_* step-ca.tar.gz
+
+    # Verify installations
+    if ! /usr/local/bin/step version >/dev/null 2>&1; then
+        error "Step CLI installation verification failed"
+        return 1
+    fi
+
+    if ! /usr/local/bin/step-ca version >/dev/null 2>&1; then
+        error "Step-CA installation verification failed"
+        return 1
+    fi
 
     success "Step-CA binaries installed"
 }
@@ -1763,9 +2162,20 @@ configure_step_ca() {
     # Create systemd service
     create_step_ca_systemd_service
 
-    # Set permissions
+    # Set secure permissions for Step-CA
     chown -R step:step /var/lib/step
     chown -R step:step /etc/step
+
+    # Ensure CA files have extra secure permissions
+    if [[ -f /var/lib/step/secrets/password ]]; then
+        chmod 600 /var/lib/step/secrets/password
+        chown step:step /var/lib/step/secrets/password
+    fi
+
+    if [[ -f /var/lib/step/config/ca.json ]]; then
+        chmod 640 /var/lib/step/config/ca.json
+        chown step:step /var/lib/step/config/ca.json
+    fi
 
     # Enable and start service
     systemctl enable step-ca
@@ -1868,8 +2278,7 @@ start_all_services() {
         "ssh"
         "fail2ban"
         "hostapd"
-dnsmasq
-        ""
+        "dnsmasq"
     )
 
     for service in "${services[@]}"; do
@@ -1886,41 +2295,165 @@ dnsmasq
     success "All services started"
 }
 
-# Verification and testing
+# Comprehensive verification and testing
 verify_setup() {
-    log "Verifying setup..."
+    log_section "Comprehensive Setup Verification"
+
+    local verification_errors=0
+    local verification_warnings=0
 
     # Check critical services
-    local critical_services=("ssh" "fail2ban" "hostapd" "dnsmasq" "adguardhome")
+    log_subsection "Service Status Verification"
+    local critical_services=("ssh" "fail2ban" "hostapd" "dnsmasq" "adguardhome" "step-ca")
     local failed_services=()
+    local warning_services=()
 
     for service in "${critical_services[@]}"; do
-        if ! systemctl is-active "$service" >/dev/null 2>&1; then
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            if systemctl is-enabled --quiet "$service" 2>/dev/null; then
+                success "✓ $service is running and enabled"
+            else
+                warning "⚠ $service is running but not enabled"
+                warning_services+=("$service")
+                ((verification_warnings++))
+            fi
+        else
+            error "✗ $service is not running"
             failed_services+=("$service")
+            ((verification_errors++))
         fi
     done
 
-    if [[ ${#failed_services[@]} -gt 0 ]]; then
-        warning "Some services failed to start: ${failed_services[*]}"
-    else
-        success "All critical services are running"
-    fi
-
     # Test network connectivity
-    if ping -c 1 8.8.8.8 >/dev/null 2>&1; then
-        success "Internet connectivity verified"
-    else
-        warning "No internet connectivity"
+    log_subsection "Network Connectivity Verification"
+    local connectivity_tests=(
+        "8.8.8.8:Google DNS"
+        "1.1.1.1:Cloudflare DNS"
+        "github.com:GitHub"
+    )
+
+    local connectivity_failures=0
+    for test in "${connectivity_tests[@]}"; do
+        local target="${test%%:*}"
+        local description="${test##*:}"
+
+        if ping -c 1 -W 3 "$target" >/dev/null 2>&1; then
+            success "✓ Connectivity to $description ($target)"
+        else
+            warning "⚠ No connectivity to $description ($target)"
+            ((connectivity_failures++))
+            ((verification_warnings++))
+        fi
+    done
+
+    if [[ $connectivity_failures -eq ${#connectivity_tests[@]} ]]; then
+        error "✗ No internet connectivity detected"
+        ((verification_errors++))
     fi
 
-    # Test WiFi interface
+    # Test network interfaces
+    log_subsection "Network Interface Verification"
     if ip link show "${WIFI_INTERFACE}" >/dev/null 2>&1; then
-        success "WiFi interface is up"
+        local wifi_state
+        wifi_state=$(ip link show "${WIFI_INTERFACE}" | grep -o "state [A-Z]*" | cut -d' ' -f2)
+        if [[ "$wifi_state" == "UP" ]]; then
+            success "✓ WiFi interface ${WIFI_INTERFACE} is up"
+        else
+            warning "⚠ WiFi interface ${WIFI_INTERFACE} is down (state: $wifi_state)"
+            ((verification_warnings++))
+        fi
     else
-        warning "WiFi interface not found"
+        error "✗ WiFi interface ${WIFI_INTERFACE} not found"
+        ((verification_errors++))
     fi
 
-    success "Setup verification completed"
+    if ip link show "${WAN_INTERFACE}" >/dev/null 2>&1; then
+        local wan_state
+        wan_state=$(ip link show "${WAN_INTERFACE}" | grep -o "state [A-Z]*" | cut -d' ' -f2)
+        if [[ "$wan_state" == "UP" ]]; then
+            success "✓ WAN interface ${WAN_INTERFACE} is up"
+        else
+            warning "⚠ WAN interface ${WAN_INTERFACE} is down (state: $wan_state)"
+            ((verification_warnings++))
+        fi
+    else
+        error "✗ WAN interface ${WAN_INTERFACE} not found"
+        ((verification_errors++))
+    fi
+
+    # Test DNS resolution
+    log_subsection "DNS Resolution Verification"
+    if nslookup google.com >/dev/null 2>&1; then
+        success "✓ DNS resolution working"
+    else
+        error "✗ DNS resolution failed"
+        ((verification_errors++))
+    fi
+
+    # Test service ports
+    log_subsection "Service Port Verification"
+    local port_tests=(
+        "22:SSH"
+        "53:DNS"
+        "3000:AdGuard Home Web"
+        "5053:AdGuard Home DNS"
+        "9000:Step-CA"
+    )
+
+    for test in "${port_tests[@]}"; do
+        local port="${test%%:*}"
+        local service="${test##*:}"
+
+        if netstat -tuln 2>/dev/null | grep -q ":${port} "; then
+            success "✓ $service port $port is listening"
+        else
+            warning "⚠ $service port $port is not listening"
+            ((verification_warnings++))
+        fi
+    done
+
+    # Test file permissions
+    log_subsection "File Permission Verification"
+    local permission_tests=(
+        "/etc/ssh/sshd_config:644"
+        "/var/lib/adguardhome:750"
+        "/var/lib/step/secrets:700"
+        "/etc/dangerprep/wifi-password:600"
+    )
+
+    for test in "${permission_tests[@]}"; do
+        local file="${test%%:*}"
+        local expected_perm="${test##*:}"
+
+        if [[ -e "$file" ]]; then
+            local actual_perm
+            actual_perm=$(stat -c "%a" "$file" 2>/dev/null)
+            if [[ "$actual_perm" == "$expected_perm" ]]; then
+                success "✓ $file has correct permissions ($actual_perm)"
+            else
+                warning "⚠ $file has incorrect permissions ($actual_perm, expected $expected_perm)"
+                ((verification_warnings++))
+            fi
+        else
+            debug "File not found (may be optional): $file"
+        fi
+    done
+
+    # Summary
+    log_subsection "Verification Summary"
+    if [[ $verification_errors -gt 0 ]]; then
+        error "Setup verification failed with $verification_errors errors and $verification_warnings warnings"
+        error "Some critical components are not working correctly"
+        return 1
+    elif [[ $verification_warnings -gt 0 ]]; then
+        warning "Setup verification completed with $verification_warnings warnings"
+        warning "System is functional but some components may need attention"
+        return 0
+    else
+        success "✓ All verification checks passed successfully"
+        success "System is fully operational"
+        return 0
+    fi
 }
 
 # Show final information
@@ -1984,6 +2517,7 @@ main() {
 
     # System Update Phase
     if ! is_step_completed "SYSTEM_UPDATE"; then
+        CURRENT_STEP="SYSTEM_UPDATE"
         set_step_state "SYSTEM_UPDATE" "IN_PROGRESS"
         update_system_packages
         install_essential_packages
@@ -1996,6 +2530,7 @@ main() {
 
     # Security Hardening Phase
     if ! is_step_completed "SECURITY_HARDENING"; then
+        CURRENT_STEP="SECURITY_HARDENING"
         set_step_state "SECURITY_HARDENING" "IN_PROGRESS"
         configure_ssh_hardening
         load_motd_config
@@ -2012,6 +2547,7 @@ main() {
 
     # Network Configuration Phase
     if ! is_step_completed "NETWORK_CONFIG"; then
+        CURRENT_STEP="NETWORK_CONFIG"
         set_step_state "NETWORK_CONFIG" "IN_PROGRESS"
         setup_directory_structure
         configure_nfs_client
@@ -2030,6 +2566,7 @@ main() {
 
     # Olares Setup Phase
     if ! is_step_completed "OLARES_SETUP"; then
+        CURRENT_STEP="OLARES_SETUP"
         set_step_state "OLARES_SETUP" "IN_PROGRESS"
         # Apply FriendlyElec-specific performance optimizations
         if [[ "${IS_FRIENDLYELEC}" == true ]]; then
@@ -2045,6 +2582,7 @@ main() {
 
     # Services Configuration Phase
     if ! is_step_completed "SERVICES_CONFIG"; then
+        CURRENT_STEP="SERVICES_CONFIG"
         set_step_state "SERVICES_CONFIG" "IN_PROGRESS"
         generate_sync_configs
 
@@ -2058,6 +2596,7 @@ main() {
 
     # Final Setup Phase
     if ! is_step_completed "FINAL_SETUP"; then
+        CURRENT_STEP="FINAL_SETUP"
         set_step_state "FINAL_SETUP" "IN_PROGRESS"
         install_management_scripts
         create_routing_scenarios
@@ -2076,56 +2615,109 @@ main() {
     success "DangerPrep setup completed successfully!"
 }
 
-# Set up error handling
+# Enhanced error handling and cleanup
 cleanup_on_error() {
-    error "Setup failed. Running comprehensive cleanup..."
+    local exit_code=$?
+    error "Setup failed with exit code $exit_code. Running comprehensive cleanup..."
 
-    # Run the full cleanup script to completely reverse all changes
-    local cleanup_script="${SCRIPT_DIR}/cleanup-dangerprep.sh"
+    # Mark current step as failed
+    if [[ -n "${CURRENT_STEP:-}" ]]; then
+        set_step_state "$CURRENT_STEP" "FAILED" 2>/dev/null || true
+    fi
 
-    if [[ -f "$cleanup_script" ]]; then
-        warning "Running cleanup script to restore system to original state..."
-        # Run cleanup script with --preserve-data to keep any data that might have been created
-        bash "$cleanup_script" --preserve-data 2>/dev/null || {
-            warning "Cleanup script failed, attempting manual cleanup..."
+    # Stop all services that might have been started
+    local services_to_stop=(
+        "hostapd" "dnsmasq" "adguardhome" "step-ca"
+        "fail2ban" "rk3588-fan-control" "rk3588-cpu-governor"
+    )
 
-            # Fallback to basic cleanup if cleanup script fails
-            systemctl stop hostapd 2>/dev/null || true
-            systemctl stop dnsmasq 2>/dev/null || true
-
-
-            # Restore original configurations if they exist
-            if [[ -d "${BACKUP_DIR}" ]]; then
-                [[ -f "${BACKUP_DIR}/sshd_config" ]] && cp "${BACKUP_DIR}/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
-                [[ -f "${BACKUP_DIR}/sysctl.conf" ]] && cp "${BACKUP_DIR}/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
-                [[ -f "${BACKUP_DIR}/dnsmasq.conf" ]] && cp "${BACKUP_DIR}/dnsmasq.conf" /etc/dnsmasq.conf 2>/dev/null || true
-                [[ -f "${BACKUP_DIR}/iptables.rules" ]] && iptables-restore < "${BACKUP_DIR}/iptables.rules" 2>/dev/null || true
-            fi
-        }
-
-        success "System has been restored to its original state"
-    else
-        warning "Cleanup script not found at $cleanup_script"
-        warning "Performing basic cleanup only..."
-
-        # Basic cleanup if cleanup script is not available
-        systemctl stop hostapd 2>/dev/null || true
-        systemctl stop dnsmasq 2>/dev/null || true
-
-
-        # Restore original configurations if they exist
-        if [[ -d "${BACKUP_DIR}" ]]; then
-            [[ -f "${BACKUP_DIR}/sshd_config" ]] && cp "${BACKUP_DIR}/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
-            [[ -f "${BACKUP_DIR}/sysctl.conf" ]] && cp "${BACKUP_DIR}/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
-            [[ -f "${BACKUP_DIR}/dnsmasq.conf" ]] && cp "${BACKUP_DIR}/dnsmasq.conf" /etc/dnsmasq.conf 2>/dev/null || true
-            [[ -f "${BACKUP_DIR}/iptables.rules" ]] && iptables-restore < "${BACKUP_DIR}/iptables.rules" 2>/dev/null || true
+    for service in "${services_to_stop[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            log "Stopping service: $service"
+            systemctl stop "$service" 2>/dev/null || true
         fi
+    done
+
+    # Disable services that were enabled
+    for service in "${services_to_stop[@]}"; do
+        if systemctl is-enabled --quiet "$service" 2>/dev/null; then
+            log "Disabling service: $service"
+            systemctl disable "$service" 2>/dev/null || true
+        fi
+    done
+
+    # Remove systemd service files that were created
+    local service_files=(
+        "/etc/systemd/system/adguardhome.service"
+        "/etc/systemd/system/step-ca.service"
+        "/etc/systemd/system/rk3588-fan-control.service"
+        "/etc/systemd/system/rk3588-cpu-governor.service"
+    )
+
+    for service_file in "${service_files[@]}"; do
+        if [[ -f "$service_file" ]]; then
+            log "Removing service file: $service_file"
+            rm -f "$service_file" 2>/dev/null || true
+        fi
+    done
+
+    systemctl daemon-reload 2>/dev/null || true
+
+    # Remove created users
+    local users_to_remove=("adguardhome" "step")
+    for user in "${users_to_remove[@]}"; do
+        if id "$user" >/dev/null 2>&1; then
+            log "Removing user: $user"
+            userdel "$user" 2>/dev/null || true
+        fi
+    done
+
+    # Restore original configurations if they exist
+    if [[ -d "${BACKUP_DIR}" ]]; then
+        log "Restoring original configurations from ${BACKUP_DIR}"
+
+        local configs_to_restore=(
+            "sshd_config:/etc/ssh/sshd_config"
+            "sysctl.conf:/etc/sysctl.conf"
+            "dnsmasq.conf:/etc/dnsmasq.conf"
+            "hostapd.conf:/etc/hostapd/hostapd.conf"
+        )
+
+        for config_mapping in "${configs_to_restore[@]}"; do
+            local backup_file="${BACKUP_DIR}/${config_mapping%%:*}"
+            local target_file="${config_mapping##*:}"
+
+            if [[ -f "$backup_file" ]]; then
+                log "Restoring $target_file"
+                cp "$backup_file" "$target_file" 2>/dev/null || true
+            fi
+        done
+
+        # Restore iptables rules if they exist
+        if [[ -f "${BACKUP_DIR}/iptables.rules" ]]; then
+            log "Restoring iptables rules"
+            iptables-restore < "${BACKUP_DIR}/iptables.rules" 2>/dev/null || true
+        fi
+    fi
+
+    # Clean up temporary files
+    cleanup_temp
+
+    # Try to run the dedicated cleanup script if it exists
+    local cleanup_script="${SCRIPT_DIR}/cleanup-dangerprep.sh"
+    if [[ -f "$cleanup_script" ]]; then
+        warning "Running dedicated cleanup script..."
+        bash "$cleanup_script" --preserve-data --quiet 2>/dev/null || {
+            warning "Dedicated cleanup script failed, but manual cleanup completed"
+        }
     fi
 
     error "Setup failed. Check ${LOG_FILE} for details."
     error "System has been restored to its pre-installation state"
     info "You can safely re-run the setup script after addressing any issues"
-    exit 1
+
+    # Exit with the original error code
+    exit $exit_code
 }
 
 trap cleanup_on_error ERR
@@ -2171,6 +2763,9 @@ parse_arguments() {
 
 # Main execution wrapper
 main_wrapper() {
+    # Store original arguments for logging
+    SCRIPT_ARGS="$*"
+
     # Parse arguments first
     parse_arguments "$@"
 

@@ -1,59 +1,84 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Unified Monitoring Script
 # Runs all monitoring checks and provides comprehensive reporting
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Source shared banner utility
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-monitoring.log"
+# shellcheck disable=SC2034  # Used in report generation functions
+readonly REPORT_DIR="/tmp"
 
-# Logging functions
-log() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1"
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Validate required commands
+    require_commands bash find systemctl
+
+    # Detect system capabilities
+    detect_system_capabilities
+
+    debug "Monitoring suite initialized"
+    clear_error_context
 }
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1" >&2
+# Detect system monitoring capabilities
+detect_system_capabilities() {
+    set_error_context "System capability detection"
+
+    # Detect hardware platform
+    local platform=""
+    if [[ -f /proc/device-tree/model ]]; then
+        platform=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "Unknown")
+        info "Hardware platform: $platform"
+    else
+        info "Hardware platform: Generic x86_64"
+    fi
+
+    # Check for Docker availability
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        success "Docker monitoring: Available"
+    else
+        warning "Docker monitoring: Not available"
+    fi
+
+    # Check for systemd services
+    if command -v systemctl >/dev/null 2>&1; then
+        success "Systemd service monitoring: Available"
+    else
+        warning "Systemd service monitoring: Not available"
+    fi
+
+    # Check for network monitoring tools
+    if command -v ip >/dev/null 2>&1; then
+        success "Network interface monitoring: Available"
+    else
+        warning "Network interface monitoring: Limited"
+    fi
+
+    clear_error_context
 }
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-info() {
-    echo -e "${CYAN}[INFO]${NC} $1"
-}
-
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-LOG_FILE="/var/log/dangerprep-monitoring.log"
-REPORT_FILE="/tmp/monitoring-report-$(date +%Y%m%d-%H%M%S).txt"
-
-# Show banner
-show_banner() {
-    echo -e "${PURPLE}"
-    cat << 'EOF'
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                    DangerPrep Monitoring Suite                              ║
-║                   Comprehensive System Monitoring                           ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-EOF
-    echo -e "${NC}"
+# Show banner (using shared banner utilities)
+show_monitoring_banner() {
+    show_banner_with_title "Monitoring Suite" "monitoring"
 }
 
 # Show help
@@ -112,13 +137,17 @@ run_all_monitoring() {
     
     success "All monitoring checks completed"
     info "Detailed results available in individual log files"
-    info "Comprehensive report available at: ${REPORT_FILE}"
 }
 
 # Generate comprehensive monitoring report
 generate_report() {
+    set_error_context "Report generation"
+
+    local report_file
+    report_file="/tmp/monitoring-report-$(date +%Y%m%d-%H%M%S).txt"
+
     log "Generating comprehensive monitoring report..."
-    
+
     {
         echo "DangerPrep System Monitoring Report"
         echo "Generated: $(date)"
@@ -178,7 +207,7 @@ generate_report() {
             echo "  Status: Running"
             echo "  Containers: $(docker ps -q | wc -l) running, $(docker ps -aq | wc -l) total"
             echo "  Images: $(docker images -q | wc -l)"
-            echo "  Networks: $(docker network find -q  -maxdepth 1 -type f | wc -l)"
+            echo "  Networks: $(docker network ls -q | wc -l)"
         else
             echo "  Status: Not running or not accessible"
         fi
@@ -224,19 +253,23 @@ generate_report() {
         echo "  System monitor log: /var/log/dangerprep-monitor.log"
         echo "  Hardware monitor log: /var/log/dangerprep-hardware.log"
         echo "  System journal: journalctl -f"
-        
-    } | tee "${REPORT_FILE}"
-    
-    success "Monitoring report generated: ${REPORT_FILE}"
+
+    } | tee "$report_file"
+
+    success "Monitoring report generated: $report_file"
+    clear_error_context
 }
 
 
 
 # Main function
 main() {
+    # Initialize script
+    init_script
+
     # Show banner for comprehensive monitoring
     if [[ "${1:-all}" == "all" ]]; then
-        show_monitoring_banner "$@"
+        show_banner_with_title "Monitoring Suite" "monitoring"
         echo
     fi
 
@@ -248,7 +281,7 @@ main() {
             run_hardware_monitoring
             ;;
         all)
-            show_banner
+            show_monitoring_banner "$@"
             run_all_monitoring
             generate_report
             ;;
@@ -266,10 +299,6 @@ main() {
             ;;
     esac
 }
-
-# Setup logging
-mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
-touch "${LOG_FILE}" 2>/dev/null || true
 
 # Run main function
 main "$@"

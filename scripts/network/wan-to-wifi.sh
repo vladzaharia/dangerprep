@@ -174,10 +174,39 @@ Exit Codes:
 EOF
 }
 
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "WAN-to-WiFi script failed with exit code ${exit_code}"
+
+    # Reset firewall rules
+    iptables -t nat -F 2>/dev/null || true
+    iptables -F 2>/dev/null || true
+    iptables -P INPUT ACCEPT 2>/dev/null || true
+    iptables -P FORWARD ACCEPT 2>/dev/null || true
+    iptables -P OUTPUT ACCEPT 2>/dev/null || true
+
+    # Stop services
+    systemctl stop hostapd 2>/dev/null || true
+    systemctl stop dnsmasq 2>/dev/null || true
+
+    error "Cleanup completed"
+    exit "${exit_code}"
+}
+
 # Initialize script
 init_script() {
+    set_error_context "Script initialization"
     set_log_file "/var/log/dangerprep-wan-to-wifi.log"
+
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate root permissions for network operations
+    validate_root_user
+
     debug "WAN-to-WiFi script initialized"
+    clear_error_context
 }
 
 # Main execution
@@ -189,7 +218,7 @@ main() {
     local command
     command=${1:-setup}
 
-    case "$command" in
+    case "${command}" in
         setup)
             setup_wan_to_wifi
             ;;
@@ -201,7 +230,7 @@ main() {
             exit 0
             ;;
         *)
-            error "Unknown command: $command"
+            error "Unknown command: ${command}"
             error "Use '$0 help' for usage information"
             exit 2
             ;;

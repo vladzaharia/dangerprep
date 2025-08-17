@@ -1,27 +1,71 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep QoS and Traffic Shaping Management
 
-# Source shared banner utility
+# Modern shell script best practices
+set -euo pipefail
+
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
-show_banner_with_title "QoS Manager" "network"
-echo
-
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-qos.log"
 WAN_INTERFACE="${WAN_INTERFACE:-eth0}"
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
 UPLOAD_LIMIT="50mbit"    # Adjust based on your connection
 # DOWNLOAD_LIMIT is used in QoS configuration
 export DOWNLOAD_LIMIT="100mbit" # Adjust based on your connection
 
-# Load configuration if available
-if [[ -f /etc/dangerprep/interfaces.conf ]]; then
-    # shellcheck source=/dev/null
-    source /etc/dangerprep/interfaces.conf
-fi
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "QoS manager failed with exit code ${exit_code}"
+
+    # Clear any partial QoS rules
+    tc qdisc del dev "${WAN_INTERFACE}" root 2>/dev/null || true
+
+    error "Cleanup completed"
+    exit "${exit_code}"
+}
+
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate root permissions for QoS operations
+    validate_root_user
+
+    # Validate required commands
+    require_commands tc ip
+
+    # Load configuration if available
+    if [[ -f /etc/dangerprep/interfaces.conf ]]; then
+        # shellcheck source=/dev/null
+        source /etc/dangerprep/interfaces.conf
+    fi
+
+    debug "QoS manager initialized"
+    clear_error_context
+}
 
 setup_qos() {
-    echo "Setting up QoS on ${WAN_INTERFACE}..."
+    set_error_context "QoS setup"
+
+    log "Setting up QoS on ${WAN_INTERFACE}..."
 
     # Clear existing rules
     tc qdisc del dev "${WAN_INTERFACE}" root 2>/dev/null || true
@@ -56,13 +100,17 @@ setup_qos() {
     tc filter add dev "${WAN_INTERFACE}" parent 1: protocol ip prio 2 u32 match ip dport 80 0xffff flowid 1:20
     tc filter add dev "${WAN_INTERFACE}" parent 1: protocol ip prio 2 u32 match ip dport 443 0xffff flowid 1:20
 
-    echo "QoS configured on ${WAN_INTERFACE}"
+    success "QoS configured on ${WAN_INTERFACE}"
+    clear_error_context
 }
 
 remove_qos() {
-    echo "Removing QoS from ${WAN_INTERFACE}..."
+    set_error_context "QoS removal"
+
+    log "Removing QoS from ${WAN_INTERFACE}..."
     tc qdisc del dev "${WAN_INTERFACE}" root 2>/dev/null || true
-    echo "QoS removed from ${WAN_INTERFACE}"
+    success "QoS removed from ${WAN_INTERFACE}"
+    clear_error_context
 }
 
 show_qos() {
@@ -76,24 +124,50 @@ show_qos() {
     tc filter show dev "${WAN_INTERFACE}"
 }
 
-case "${1:-}" in
-    setup)
-        setup_qos
-        ;;
-    remove)
-        remove_qos
-        ;;
-    status)
-        show_qos
-        ;;
-    *)
-        echo "DangerPrep QoS Management"
-        echo "Usage: $0 {setup|remove|status}"
+# Main function
+main() {
+    # Initialize script
+    init_script
+
+    # Show banner for QoS operations
+    if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
+        show_banner_with_title "QoS Manager" "network"
         echo
-        echo "Commands:"
-        echo "  setup    - Configure QoS traffic shaping"
-        echo "  remove   - Remove QoS configuration"
-        echo "  status   - Show current QoS status"
-        exit 1
-        ;;
-esac
+    fi
+
+    case "${1:-}" in
+        setup)
+            setup_qos
+            ;;
+        remove)
+            remove_qos
+            ;;
+        status)
+            show_qos
+            ;;
+        help|--help|-h)
+            echo "DangerPrep QoS Management"
+            echo "Usage: $0 {setup|remove|status|help}"
+            echo
+            echo "Commands:"
+            echo "  setup    - Configure QoS traffic shaping"
+            echo "  remove   - Remove QoS configuration"
+            echo "  status   - Show current QoS status"
+            echo "  help     - Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "DangerPrep QoS Management"
+            echo "Usage: $0 {setup|remove|status|help}"
+            echo
+            echo "Commands:"
+            echo "  setup    - Configure QoS traffic shaping"
+            echo "  remove   - Remove QoS configuration"
+            echo "  status   - Show current QoS status"
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"

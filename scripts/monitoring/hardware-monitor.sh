@@ -37,6 +37,7 @@ readonly ALERT_TEMP_CPU=80
 readonly ALERT_TEMP_GPU=85
 readonly ALERT_TEMP_NPU=90
 readonly ALERT_DISK_TEMP=50
+readonly LOG_FILE="/var/log/dangerprep-hardware.log"
 
 # Global hardware detection variables
 IS_FRIENDLYELEC=false
@@ -465,11 +466,86 @@ check_rtc_status() {
     fi
 }
 
+# Cleanup function for hardware monitoring
+cleanup_hardware_monitoring() {
+    local exit_code=$?
+    error "Hardware monitoring failed with exit code $exit_code"
+
+    # Clean up any temporary files
+    if [[ -n "${TEMP_FILES:-}" ]]; then
+        for temp_file in $TEMP_FILES; do
+            if [[ -f "$temp_file" ]]; then
+                rm -f "$temp_file" 2>/dev/null || true
+            fi
+        done
+    fi
+
+    error "Hardware monitoring cleanup completed"
+    exit $exit_code
+}
+
+# Initialize hardware monitoring
+init_hardware_monitoring() {
+    set_error_context "Hardware monitoring initialization"
+
+    # Set up error handling
+    trap cleanup_hardware_monitoring ERR
+
+    # Validate required commands
+    require_commands cat find grep awk
+
+    # Validate optional commands
+    validate_optional_commands
+
+    # Detect hardware platform first
+    detect_friendlyelec_hardware
+
+    # Create log directory if needed
+    mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
+    touch "${LOG_FILE}" 2>/dev/null || true
+    chmod 640 "${LOG_FILE}" 2>/dev/null || true
+
+    success "Hardware monitoring initialized"
+    clear_error_context
+}
+
+# Validate optional monitoring commands
+validate_optional_commands() {
+    set_error_context "Optional command validation"
+
+    # Check for temperature monitoring tools
+    if ! command -v sensors >/dev/null 2>&1; then
+        warning "lm-sensors not installed - limited temperature monitoring"
+        warning "Install with: apt-get install lm-sensors"
+    fi
+
+    # Check for disk health monitoring
+    if ! command -v smartctl >/dev/null 2>&1; then
+        warning "smartmontools not installed - no SMART disk monitoring"
+        warning "Install with: apt-get install smartmontools"
+    fi
+
+    # Check for disk temperature monitoring
+    if ! command -v hddtemp >/dev/null 2>&1; then
+        warning "hddtemp not installed - no disk temperature monitoring"
+        warning "Install with: apt-get install hddtemp"
+    fi
+
+    # Check for process monitoring
+    if ! command -v fuser >/dev/null 2>&1; then
+        debug "fuser not available - limited process monitoring"
+    fi
+
+    clear_error_context
+}
+
 # Main monitoring function
 # Show banner for hardware monitoring
 if [[ "${1:-check}" != "help" && "${1:-check}" != "--help" && "${1:-check}" != "-h" ]]; then
     show_banner_with_title "Hardware Monitor" "monitoring"
     echo
+    # Initialize hardware detection
+    init_hardware_monitoring
 fi
 
 # Show help information

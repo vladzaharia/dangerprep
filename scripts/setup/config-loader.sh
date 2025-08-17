@@ -6,15 +6,47 @@
 CONFIG_LOADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="${CONFIG_LOADER_DIR}/configs"
 
-# Generic template processor
+# Source shared utilities if not already sourced
+if [[ -z "${LOGGING_SOURCED:-}" ]]; then
+    # shellcheck source=../shared/logging.sh
+    source "${CONFIG_LOADER_DIR}/../shared/logging.sh"
+fi
+
+if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
+    # shellcheck source=../shared/error-handling.sh
+    source "${CONFIG_LOADER_DIR}/../shared/error-handling.sh"
+fi
+
+if [[ -z "${VALIDATION_SOURCED:-}" ]]; then
+    # shellcheck source=../shared/validation.sh
+    source "${CONFIG_LOADER_DIR}/../shared/validation.sh"
+fi
+
+# Generic template processor with enhanced error handling
 # Usage: process_template <template_file> <output_file> [var1=value1] [var2=value2] ...
 process_template() {
     local template_file="$1"
     local output_file="$2"
     shift 2
 
+    # Validate inputs
+    if [[ -z "$template_file" ]]; then
+        error "Template file path is empty"
+        return 1
+    fi
+
+    if [[ -z "$output_file" ]]; then
+        error "Output file path is empty"
+        return 1
+    fi
+
     if [[ ! -f "$template_file" ]]; then
         error "Template file not found: $template_file"
+        return 1
+    fi
+
+    if [[ ! -r "$template_file" ]]; then
+        error "Template file not readable: $template_file"
         return 1
     fi
 
@@ -23,13 +55,27 @@ process_template() {
 
     # Backup original file if it exists
     if [[ -f "$output_file" ]]; then
-        cp "$output_file" "${BACKUP_DIR}/$(basename "$output_file").backup" 2>/dev/null || true
-        log "Backed up existing file: $output_file"
+        # Ensure backup directory exists
+        local backup_dir="${BACKUP_DIR:-/var/backups/dangerprep}"
+        mkdir -p "$backup_dir" 2>/dev/null || true
+
+        if cp "$output_file" "${backup_dir}/$(basename "$output_file").backup" 2>/dev/null; then
+            log "Backed up existing file: $output_file"
+        else
+            warning "Failed to backup existing file: $output_file"
+        fi
     fi
 
-    # Read template content
+    # Read template content with error handling
     local content
-    content=$(cat "$template_file")
+    if ! content=$(cat "$template_file" 2>/dev/null); then
+        error "Failed to read template file: $template_file"
+        return 1
+    fi
+
+    if [[ -z "$content" ]]; then
+        warning "Template file is empty: $template_file"
+    fi
 
     # Process substitutions from arguments
     for substitution in "$@"; do
@@ -57,9 +103,18 @@ process_template() {
     [[ -n "${FAIL2BAN_MAXRETRY}" ]] && content="${content//\{\{FAIL2BAN_MAXRETRY\}\}/${FAIL2BAN_MAXRETRY}}"
 
     # Write the processed content to output file
-    echo "$content" > "$output_file"
+    if echo "$content" > "$output_file" 2>/dev/null; then
+        log "Generated configuration: $output_file"
+    else
+        error "Failed to write configuration file: $output_file"
+        return 1
+    fi
 
-    log "Generated configuration: $output_file"
+    # Verify the file was created successfully
+    if [[ ! -f "$output_file" ]]; then
+        error "Configuration file was not created: $output_file"
+        return 1
+    fi
 }
 
 # Convenience functions for common configurations
@@ -132,7 +187,8 @@ load_wan_config() {
 
 load_sync_configs() {
     log "Loading sync service configurations..."
-    local sync_config_dir="${INSTALL_ROOT}/config"
+    local install_root="${INSTALL_ROOT:-/opt/dangerprep}"
+    local sync_config_dir="${install_root}/config"
     mkdir -p "$sync_config_dir"
 
     process_template "${CONFIG_DIR}/sync/kiwix-sync.yaml.tmpl" "$sync_config_dir/kiwix-sync.yaml"
@@ -167,6 +223,34 @@ load_network_performance_config() {
 }
 
 
+
+# Validate required environment variables
+validate_required_variables() {
+    log "Validating required environment variables..."
+
+    local missing_vars=()
+    local required_vars=(
+        "WIFI_SSID"
+        "WIFI_PASSWORD"
+        "LAN_IP"
+        "LAN_NETWORK"
+    )
+
+    for var in "${required_vars[@]}"; do
+        if [[ -z "${!var:-}" ]]; then
+            missing_vars+=("$var")
+        fi
+    done
+
+    if [[ ${#missing_vars[@]} -gt 0 ]]; then
+        error "Missing required environment variables: ${missing_vars[*]}"
+        error "Please ensure these variables are set before loading configurations"
+        return 1
+    fi
+
+    success "All required environment variables are set"
+    return 0
+}
 
 # Function to validate all configuration files exist
 validate_config_files() {
@@ -236,6 +320,57 @@ validate_config_files() {
     fi
 
     success "All configuration files validated"
+    return 0
+}
+
+# Comprehensive validation function
+validate_all_requirements() {
+    log_section "Configuration Requirements Validation"
+
+    local validation_errors=0
+
+    # Validate required environment variables
+    if ! validate_required_variables; then
+        ((validation_errors++))
+    fi
+
+    # Validate configuration files exist
+    if ! validate_config_files; then
+        ((validation_errors++))
+    fi
+
+    # Validate backup directory
+    local backup_dir="${BACKUP_DIR:-/var/backups/dangerprep}"
+    if [[ ! -d "$backup_dir" ]]; then
+        if ! mkdir -p "$backup_dir" 2>/dev/null; then
+            error "Cannot create backup directory: $backup_dir"
+            ((validation_errors++))
+        else
+            log "Created backup directory: $backup_dir"
+        fi
+    fi
+
+    # Validate write permissions for common config directories
+    local config_dirs=(
+        "/etc/ssh"
+        "/etc/fail2ban"
+        "/etc/hostapd"
+        "/etc/systemd/system"
+    )
+
+    for dir in "${config_dirs[@]}"; do
+        if [[ -d "$dir" && ! -w "$dir" ]]; then
+            error "No write permission for configuration directory: $dir"
+            ((validation_errors++))
+        fi
+    done
+
+    if [[ $validation_errors -gt 0 ]]; then
+        error "Configuration validation failed with $validation_errors errors"
+        return 1
+    fi
+
+    success "All configuration requirements validated"
     return 0
 }
 

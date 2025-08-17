@@ -1,24 +1,81 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Local Only Network
 # WiFi hotspot with optional ethernet LAN, no internet
 
-# Source shared banner utility
+# Modern shell script best practices
+set -euo pipefail
+
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-emergency-local.log"
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
 ETH_INTERFACE="${ETH_INTERFACE:-eth0}"
 LAN_IP="192.168.120.1"
 LAN_NETWORK="192.168.120.0/22"
 
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "Emergency local network failed with exit code ${exit_code}"
+
+    # Remove bridge if it exists
+    if ip link show br0 >/dev/null 2>&1; then
+        ip link set br0 down 2>/dev/null || true
+        brctl delbr br0 2>/dev/null || true
+    fi
+
+    # Reset firewall rules
+    iptables -F 2>/dev/null || true
+    iptables -t nat -F 2>/dev/null || true
+    iptables -P INPUT ACCEPT 2>/dev/null || true
+    iptables -P FORWARD ACCEPT 2>/dev/null || true
+    iptables -P OUTPUT ACCEPT 2>/dev/null || true
+
+    # Re-enable IP forwarding
+    echo 1 > /proc/sys/net/ipv4/ip_forward 2>/dev/null || true
+
+    error "Cleanup completed"
+    exit "${exit_code}"
+}
+
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate root permissions for network operations
+    validate_root_user
+
+    # Validate required commands
+    require_commands ip iptables brctl systemctl
+
+    debug "Emergency local network initialized"
+    clear_error_context
 }
 
 setup_local_only() {
+    init_script
     show_banner_with_title "Emergency Local Network" "network"
     echo
-    log "Setting up Local Only Network"
+
+    set_error_context "Local network setup"
+    log_section "Setting up Local Only Network"
     
     # Configure WiFi interface as hotspot
     log "Configuring WiFi hotspot: ${WIFI_INTERFACE}"

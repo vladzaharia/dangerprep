@@ -1,45 +1,64 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep WiFi Manager
 # Manage WiFi interfaces, scanning, connections, and AP mode
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Source shared banner utility
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-wifi-manager.log"
+WIFI_INTERFACE=""
+WIFI_SSID="DangerPrep"
+WIFI_PASSWORD="Buff00n!"
+# shellcheck disable=SC2034  # Used in sourced configuration files
+LAN_IP="192.168.120.1"
 
-log() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "WiFi manager failed with exit code ${exit_code}"
+
+    # Stop any hotspot connections
+    nmcli connection show | grep "Hotspot\|DangerPrep-AP" | awk '{print $1}' | while read -r conn; do
+        nmcli connection down "${conn}" 2>/dev/null || true
+        nmcli connection delete "${conn}" 2>/dev/null || true
+    done
+
+    error "Cleanup completed"
+    exit "${exit_code}"
 }
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
 
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
+    # Set up error handling
+    trap cleanup_on_error ERR
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    # Validate required commands
+    require_commands iw ip nmcli ping
+
+    debug "WiFi manager initialized"
+    clear_error_context
 }
 
 # Load DangerPrep configuration
 load_config() {
-    # Default values
-    WIFI_INTERFACE=""
-    WIFI_SSID="DangerPrep"
-    WIFI_PASSWORD="Buff00n!"
-    # LAN_IP is used for hotspot configuration
-    export LAN_IP="192.168.120.1"
-
     # Load from setup script configuration if available
     if [[ -f /etc/dangerprep/interfaces.conf ]]; then
         # shellcheck source=/dev/null
@@ -298,44 +317,57 @@ disconnect_wifi() {
     fi
 }
 
-# Main command handling
-# Show banner for WiFi management
-if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" && "${1:-}" != "" ]]; then
-    show_banner_with_title "WiFi Manager" "network"
-    echo
-fi
+# Main function
+main() {
+    # Initialize script
+    init_script
 
-case "${1:-}" in
-    "scan")
-        scan_networks
-        ;;
-    "connect")
-        connect_to_network "$2" "$3"
-        ;;
-    "ap")
-        create_access_point "$2" "$3"
-        ;;
-    "status")
-        show_wifi_status
-        ;;
-    "disconnect")
-        disconnect_wifi
-        ;;
-    *)
-        echo "DangerPrep WiFi Manager"
-        echo "Usage: $0 {scan|connect|ap|status|disconnect}"
+    # Show banner for WiFi management
+    if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" && "${1:-}" != "" ]]; then
+        show_banner_with_title "WiFi Manager" "network"
         echo
-        echo "Commands:"
-        echo "  scan                    - Scan for available WiFi networks"
-        echo "  connect <ssid> <pass>   - Connect to a WiFi network"
-        echo "  ap <ssid> <pass>        - Create WiFi access point"
-        echo "  status                  - Show WiFi interface status"
-        echo "  disconnect              - Disconnect from current network"
-        echo
-        echo "Examples:"
-        echo "  $0 scan"
-        echo "  $0 connect 'MyNetwork' 'password123'"
-        echo "  $0 ap 'DangerPrep' 'emergency2024'"
-        exit 1
-        ;;
-esac
+    fi
+
+    case "${1:-}" in
+        "scan")
+            scan_networks
+            ;;
+        "connect")
+            connect_to_network "$2" "$3"
+            ;;
+        "ap")
+            create_access_point "$2" "$3"
+            ;;
+        "status")
+            show_wifi_status
+            ;;
+        "disconnect")
+            disconnect_wifi
+            ;;
+        help|--help|-h)
+            echo "DangerPrep WiFi Manager"
+            echo "Usage: $0 {scan|connect|ap|status|disconnect}"
+            echo
+            echo "Commands:"
+            echo "  scan                    - Scan for available WiFi networks"
+            echo "  connect <ssid> <pass>   - Connect to a WiFi network"
+            echo "  ap <ssid> <pass>        - Create WiFi access point"
+            echo "  status                  - Show WiFi interface status"
+            echo "  disconnect              - Disconnect from current network"
+            echo
+            echo "Examples:"
+            echo "  $0 scan"
+            echo "  $0 connect 'MyNetwork' 'password123'"
+            echo "  $0 ap 'DangerPrep' 'emergency2024'"
+            exit 0
+            ;;
+        *)
+            error "Unknown command: $1"
+            echo "Use '$0 help' for usage information"
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"

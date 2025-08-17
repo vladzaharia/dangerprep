@@ -1,19 +1,57 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Service Startup Script
 # Starts all DangerPrep services (Olares + host services)
 
+# Modern shell script best practices
 set -euo pipefail
 
-# Source common functions
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-source "${PROJECT_ROOT}/scripts/shared/functions.sh"
+readonly SCRIPT_DIR
 
-# Load configuration
-load_config
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
+source "${SCRIPT_DIR}/../shared/banner.sh"
 
-# Display banner
-show_banner "Starting DangerPrep Services"
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-start-services.log"
+
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "Service startup failed with exit code ${exit_code}"
+
+    # Stop any services that were started
+    warning "Attempting to stop any services that were started..."
+    systemctl stop adguardhome step-ca hostapd dnsmasq fail2ban 2>/dev/null || true
+
+    error "Cleanup completed"
+    exit "${exit_code}"
+}
+
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate root permissions for service operations
+    validate_root_user
+
+    # Validate required commands
+    require_commands systemctl kubectl
+
+    debug "Service startup script initialized"
+    clear_error_context
+}
 
 start_host_services() {
     log "Starting host services..."
@@ -122,6 +160,13 @@ verify_services() {
 }
 
 main() {
+    # Initialize script
+    init_script
+
+    # Display banner
+    show_banner_with_title "Starting DangerPrep Services" "system"
+    echo
+
     log "Starting DangerPrep services..."
 
     # Start host services first

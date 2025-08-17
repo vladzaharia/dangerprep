@@ -18,7 +18,7 @@ if [[ -z "${SCRIPT_DIR:-}" ]]; then
 fi
 if [[ "${DANGERPREP_LOGGING_LOADED:-}" != "true" ]]; then
     # shellcheck source=./logging.sh
-    source "${SCRIPT_DIR}/logging.sh"
+        source "${SCRIPT_DIR}/logging.sh"
 fi
 
 # Error handling configuration

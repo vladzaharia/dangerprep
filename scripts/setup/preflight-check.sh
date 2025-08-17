@@ -80,13 +80,39 @@ NOTES:
 EOF
 }
 
+# Error cleanup for preflight check
+# shellcheck disable=SC2329  # Function is used by error handler trap
+cleanup_on_error() {
+    local exit_code=$?
+    error "Pre-flight validation failed with exit code $exit_code"
+
+    # Clean up any temporary files that might have been created
+    if [[ -n "${TEMP_FILES:-}" ]]; then
+        for temp_file in $TEMP_FILES; do
+            if [[ -f "$temp_file" ]]; then
+                rm -f "$temp_file" 2>/dev/null || true
+            fi
+        done
+    fi
+
+    error "Pre-flight validation cleanup completed"
+    exit "$exit_code"
+}
+
 # Initialize script
 init_script() {
     set_error_context "Script initialization"
     set_log_file "${DEFAULT_LOG_FILE}"
 
-    # Validate required commands
-    require_commands systemctl apt lscpu free df lsblk
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate required commands with better error messages
+    if ! require_commands systemctl apt lscpu free df lsblk; then
+        error "Missing required system commands for pre-flight validation"
+        error "Please ensure this is running on a supported Ubuntu system"
+        exit 1
+    fi
 
     # Validate root permissions for system checks
     validate_root_user
@@ -159,6 +185,7 @@ check_os_compatibility() {
 
     # Ubuntu version check
     if [[ -f /etc/os-release ]]; then
+        # shellcheck source=/dev/null
         source /etc/os-release
         log "Detected OS: $NAME $VERSION"
         
@@ -225,6 +252,44 @@ check_network_interfaces() {
     return $issues
 }
 
+# Fix conflicting services
+fix_conflicting_services() {
+    log "Attempting to fix conflicting services..."
+
+    local services_fixed=0
+    local conflicting_services=(
+        "docker"
+        "containerd"
+        "k3s"
+        "k3s-agent"
+        "microk8s"
+        "minikube"
+    )
+
+    for service in "${conflicting_services[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            if [[ "$OLARES_MODE" == "true" && ("$service" == "docker" || "$service" == "containerd") ]]; then
+                info "Stopping $service for Olares compatibility..."
+                if systemctl stop "$service" 2>/dev/null && systemctl disable "$service" 2>/dev/null; then
+                    success "Stopped and disabled $service"
+                    ((services_fixed++))
+                else
+                    warning "Failed to stop $service"
+                fi
+            else
+                warning "Service $service is running but not automatically fixable"
+                warning "Please stop $service manually before running DangerPrep setup"
+            fi
+        fi
+    done
+
+    if [[ $services_fixed -gt 0 ]]; then
+        success "Fixed $services_fixed conflicting services"
+    fi
+
+    return 0
+}
+
 # Check for conflicting services
 check_conflicting_services() {
     log_section "Conflicting Services Check"
@@ -244,8 +309,58 @@ check_conflicting_services() {
         if systemctl is-active --quiet "$service" 2>/dev/null; then
             if [[ "$OLARES_MODE" == "true" && ("$service" == "docker" || "$service" == "containerd") ]]; then
                 warning "Service $service is running (will be removed for Olares compatibility)"
+                if [[ "$FIX_ISSUES" == "true" ]]; then
+                    fix_conflicting_services
+                fi
             else
                 error "Conflicting service running: $service"
+                error "Please stop $service before running DangerPrep setup"
+                ((issues++))
+            fi
+        elif systemctl is-enabled --quiet "$service" 2>/dev/null; then
+            warning "Service $service is enabled but not running"
+            if [[ "$FIX_ISSUES" == "true" ]]; then
+                info "Disabling $service..."
+                if systemctl disable "$service" 2>/dev/null; then
+                    success "Disabled $service"
+                else
+                    warning "Failed to disable $service"
+                fi
+            else
+                warning "Consider disabling $service before setup"
+            fi
+        else
+            debug "Service $service is not installed or not enabled"
+        fi
+    done
+
+    ISSUES_FOUND=$((ISSUES_FOUND + issues))
+    return $issues
+}
+
+# Check for conflicting packages
+check_conflicting_packages() {
+    log_section "Conflicting Packages Check"
+    local issues=0
+
+    # Packages that might conflict with DangerPrep
+    local conflicting_packages=(
+        "snap"
+        "snapd"
+        "docker.io"
+        "docker-ce"
+        "containerd.io"
+        "podman"
+        "lxd"
+        "lxc"
+    )
+
+    for package in "${conflicting_packages[@]}"; do
+        if dpkg -l 2>/dev/null | grep -q "^ii.*$package "; then
+            if [[ "$OLARES_MODE" == "true" && ("$package" == "docker.io" || "$package" == "docker-ce" || "$package" == "containerd.io") ]]; then
+                warning "Package $package is installed (will be removed for Olares compatibility)"
+            else
+                warning "Potentially conflicting package installed: $package"
                 ((issues++))
             fi
         fi
@@ -330,6 +445,7 @@ main() {
     check_os_compatibility
     check_network_interfaces
     check_conflicting_services
+    check_conflicting_packages
     check_olares_requirements
     check_hardware_compatibility
     
@@ -355,9 +471,8 @@ main() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         --fix)
-            # shellcheck disable=SC2034  # Variable reserved for future functionality
             FIX_ISSUES=true
-            info "Fix mode enabled (functionality to be implemented)"
+            info "Fix mode enabled - will attempt to resolve detected issues"
             shift
             ;;
         --verbose)

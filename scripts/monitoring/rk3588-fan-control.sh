@@ -1,11 +1,22 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # RK3588/RK3588S PWM Fan Control Script
 # Automatic thermal management with intelligent fan curve control
 
+# Modern shell script best practices
 set -euo pipefail
 
-# Source shared banner utility
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Configuration file
@@ -34,15 +45,97 @@ EMERGENCY_SHUTDOWN_TEMP=95
 export FAN_FAILURE_DETECTION=true
 export FAN_FAILURE_TIMEOUT=30
 
+# Initialize script with validation
+init_script() {
+    set_error_context "Script initialization"
+
+    # Validate root permissions for PWM access
+    validate_root_user
+
+    # Validate required commands
+    require_commands cat echo sleep logger
+
+    # Validate hardware platform
+    validate_rk3588_hardware
+
+    # Validate PWM hardware availability
+    validate_pwm_hardware
+
+    debug "RK3588 fan control initialized"
+    clear_error_context
+}
+
+# Validate RK3588 hardware platform
+validate_rk3588_hardware() {
+    set_error_context "Hardware platform validation"
+
+    local platform=""
+    if [[ -f /proc/device-tree/model ]]; then
+        platform=$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0' || echo "")
+    fi
+
+    if [[ -z "$platform" ]]; then
+        error "Cannot detect hardware platform"
+        error "This script is designed for RK3588/RK3588S platforms"
+        return 1
+    fi
+
+    if [[ ! "$platform" =~ (RK3588|rk3588) ]]; then
+        warning "Hardware platform may not be RK3588/RK3588S: $platform"
+        warning "Fan control may not work correctly on this platform"
+    else
+        success "RK3588/RK3588S platform detected: $platform"
+    fi
+
+    clear_error_context
+}
+
+# Validate PWM hardware availability
+validate_pwm_hardware() {
+    set_error_context "PWM hardware validation"
+
+    local pwm_chip="${FAN_PWM_CHIP:-/sys/class/pwm/pwmchip0}"
+
+    if [[ ! -d "$pwm_chip" ]]; then
+        error "PWM chip not found: $pwm_chip"
+        error "PWM hardware may not be available or kernel module not loaded"
+        error "Try: modprobe pwm-rockchip"
+        return 1
+    fi
+
+    if [[ ! -w "$pwm_chip" ]]; then
+        error "No write access to PWM chip: $pwm_chip"
+        error "This script must be run as root for PWM access"
+        return 1
+    fi
+
+    success "PWM hardware validated: $pwm_chip"
+    clear_error_context
+}
+
 # Load configuration
 load_config() {
+    set_error_context "Configuration loading"
+
     if [[ -f "${CONFIG_FILE}" ]]; then
         # shellcheck source=/dev/null
-        source "${CONFIG_FILE}"
+        if source "${CONFIG_FILE}" 2>/dev/null; then
+            info "Configuration loaded from: ${CONFIG_FILE}"
+        else
+            warning "Failed to load configuration from: ${CONFIG_FILE}"
+        fi
     elif [[ -f "${DEFAULT_CONFIG}" ]]; then
         # shellcheck source=/dev/null
-        source "${DEFAULT_CONFIG}"
+        if source "${DEFAULT_CONFIG}" 2>/dev/null; then
+            info "Configuration loaded from: ${DEFAULT_CONFIG}"
+        else
+            warning "Failed to load configuration from: ${DEFAULT_CONFIG}"
+        fi
+    else
+        info "No configuration file found, using defaults"
     fi
+
+    clear_error_context
 }
 
 # Logging function
@@ -237,7 +330,25 @@ fan_control_loop() {
     done
 }
 
-# Cleanup function
+# Error cleanup function
+cleanup_on_error() {
+    local exit_code=$?
+    log_message "error" "Fan control failed with exit code $exit_code"
+
+    # Set fan to safe speed
+    set_fan_speed "${FAN_SPEED_HIGH}" || true
+
+    # Clean up PWM if needed
+    local pwm_device="${FAN_PWM_DEVICE:-/sys/class/pwm/pwmchip0/pwm0}"
+    if [[ -w "$pwm_device/enable" ]]; then
+        echo "0" > "$pwm_device/enable" 2>/dev/null || true
+    fi
+
+    log_message "error" "Fan control cleanup completed"
+    exit $exit_code
+}
+
+# Normal cleanup function
 cleanup() {
     log_message "info" "Fan control stopping, setting fan to safe speed"
     set_fan_speed "${FAN_SPEED_HIGH}" || true
@@ -246,6 +357,7 @@ cleanup() {
 
 # Signal handlers
 trap cleanup SIGTERM SIGINT
+trap cleanup_on_error ERR
 
 # Main function
 main() {
@@ -257,6 +369,7 @@ main() {
 
     case "${1:-start}" in
         start)
+            init_script
             load_config
             if init_pwm; then
                 fan_control_loop
@@ -270,6 +383,8 @@ main() {
             set_fan_speed "${FAN_SPEED_HIGH}"
             ;;
         status)
+            init_script
+            load_config
             local temp
             temp=$(get_max_temperature)
             echo "Current temperature: ${temp}°C"
@@ -284,6 +399,7 @@ main() {
             fi
             ;;
         test)
+            init_script
             load_config
             init_pwm
             echo "Testing fan speeds..."
@@ -293,8 +409,20 @@ main() {
                 sleep 2
             done
             ;;
+        help|--help|-h)
+            echo "RK3588/RK3588S PWM Fan Control Script"
+            echo "Usage: $0 {start|stop|status|test|help}"
+            echo ""
+            echo "Commands:"
+            echo "  start   - Start fan control daemon"
+            echo "  stop    - Stop fan control and set safe speed"
+            echo "  status  - Show current temperature and fan speed"
+            echo "  test    - Test fan speed control"
+            echo "  help    - Show this help message"
+            exit 0
+            ;;
         *)
-            echo "Usage: $0 {start|stop|status|test}"
+            echo "Usage: $0 {start|stop|status|test|help}"
             exit 1
             ;;
     esac

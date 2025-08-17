@@ -1,45 +1,41 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep System Monitor
 # Comprehensive system health monitoring and alerting
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Source shared banner utility
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
-LOG_FILE="/var/log/dangerprep-monitor.log"
-ALERT_THRESHOLD_CPU=80
-ALERT_THRESHOLD_MEMORY=85
-ALERT_THRESHOLD_DISK=90
-ALERT_THRESHOLD_TEMP=75
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-monitor.log"
+readonly ALERT_THRESHOLD_CPU=80
+readonly ALERT_THRESHOLD_MEMORY=85
+readonly ALERT_THRESHOLD_DISK=90
+readonly ALERT_THRESHOLD_TEMP=75
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
 
-# Logging function
-log() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "${LOG_FILE}"
-}
+    # Validate required commands
+    require_commands top free df systemctl
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1" >&2
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" >> "${LOG_FILE}"
-}
-
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] SUCCESS: $1" >> "${LOG_FILE}"
-}
-
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1" >> "${LOG_FILE}"
+    debug "System monitor initialized"
+    clear_error_context
 }
 
 # System information functions
@@ -62,8 +58,15 @@ get_cpu_info() {
     echo "Load Average: $load_avg"
     
     # Check CPU threshold
-    if (( $(echo "$cpu_usage > ${ALERT_THRESHOLD_CPU}" | bc -l) )); then
-        warning "High CPU usage detected: ${cpu_usage}%"
+    if command -v bc >/dev/null 2>&1; then
+        if (( $(echo "$cpu_usage > ${ALERT_THRESHOLD_CPU}" | bc -l) )); then
+            warning "High CPU usage detected: ${cpu_usage}%"
+        fi
+    else
+        # Fallback comparison without bc
+        if [[ ${cpu_usage%.*} -gt ${ALERT_THRESHOLD_CPU} ]]; then
+            warning "High CPU usage detected: ${cpu_usage}%"
+        fi
     fi
     echo
 }
@@ -79,8 +82,15 @@ get_memory_info() {
     echo "Memory Usage: ${mem_usage}%"
     
     # Check memory threshold
-    if (( $(echo "$mem_usage > ${ALERT_THRESHOLD_MEMORY}" | bc -l) )); then
-        warning "High memory usage detected: ${mem_usage}%"
+    if command -v bc >/dev/null 2>&1; then
+        if (( $(echo "$mem_usage > ${ALERT_THRESHOLD_MEMORY}" | bc -l) )); then
+            warning "High memory usage detected: ${mem_usage}%"
+        fi
+    else
+        # Fallback comparison without bc
+        if [[ ${mem_usage%.*} -gt ${ALERT_THRESHOLD_MEMORY} ]]; then
+            warning "High memory usage detected: ${mem_usage}%"
+        fi
     fi
     echo
 }
@@ -349,24 +359,32 @@ show_help() {
     echo "  help     - Show this help message"
 }
 
-# Main script logic
-# Show banner for monitoring operations
-if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
-    show_banner "monitoring"
-    echo
-fi
+# Main function
+main() {
+    # Initialize script
+    init_script
 
-case "$1" in
-    report)
-        generate_report
-        ;;
-    monitor)
-        monitor_continuous
-        ;;
-    help|--help|-h)
-        show_help
-        ;;
-    *)
-        generate_report
-        ;;
-esac
+    # Show banner for monitoring operations
+    if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
+        show_banner_with_title "System Monitor" "monitoring"
+        echo
+    fi
+
+    case "${1:-report}" in
+        report)
+            generate_report
+            ;;
+        monitor)
+            monitor_continuous
+            ;;
+        help|--help|-h)
+            show_help
+            ;;
+        *)
+            generate_report
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"

@@ -1,41 +1,57 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Firewall Manager
 # Manage iptables rules, port forwarding, and firewall status
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Source shared banner utility
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-firewall.log"
 
-log() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "Firewall manager failed with exit code ${exit_code}"
+
+    # Restore basic firewall rules to prevent lockout
+    iptables -P INPUT ACCEPT 2>/dev/null || true
+    iptables -P FORWARD ACCEPT 2>/dev/null || true
+    iptables -P OUTPUT ACCEPT 2>/dev/null || true
+
+    error "Cleanup completed"
+    exit "${exit_code}"
 }
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
 
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
+    # Set up error handling
+    trap cleanup_on_error ERR
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+    # Validate root permissions for firewall operations
+    validate_root_user
 
-check_root() {
-    if [[ ${EUID} -ne 0 ]]; then
-        error "This script must be run as root"
-        exit 1
-    fi
+    # Validate required commands
+    require_commands iptables iptables-save
+
+    debug "Firewall manager initialized"
+    clear_error_context
 }
 
 # Load DangerPrep configuration
@@ -125,7 +141,7 @@ check_port_status() {
 }
 
 reset_firewall() {
-    check_root
+    set_error_context "Firewall reset"
     load_config
 
     log "Resetting firewall to default DangerPrep rules..."
@@ -208,8 +224,8 @@ reset_firewall() {
 add_port_forward() {
     local external_port="$1"
     local target="$2"
-    
-    check_root
+
+    set_error_context "Port forwarding setup"
     
     if [ -z "$external_port" ] || [ -z "$target" ]; then
         error "Usage: port-forward <external_port> <target_ip:port>"
@@ -260,26 +276,27 @@ add_port_forward() {
 
 remove_port_forward() {
     local external_port="$1"
-    
-    check_root
-    
-    if [ -z "$external_port" ]; then
+
+    set_error_context "Port forwarding removal"
+
+    if [[ -z "${external_port}" ]]; then
         error "Usage: remove-port-forward <external_port>"
         exit 1
     fi
-    
-    log "Removing port forwarding rules for port $external_port..."
-    
+
+    log "Removing port forwarding rules for port ${external_port}..."
+
     # Remove DNAT rules
-    iptables -t nat -D PREROUTING -p tcp --dport "$external_port" -j DNAT --to-destination 2>/dev/null || true
-    
+    iptables -t nat -D PREROUTING -p tcp --dport "${external_port}" -j DNAT --to-destination 2>/dev/null || true
+
     # Remove INPUT rules
-    iptables -D INPUT -p tcp --dport "$external_port" -j ACCEPT 2>/dev/null || true
-    
+    iptables -D INPUT -p tcp --dport "${external_port}" -j ACCEPT 2>/dev/null || true
+
     # Save rules
     iptables-save > /etc/iptables/rules.v4
-    
-    success "Port forwarding rules removed for port $external_port"
+
+    success "Port forwarding rules removed for port ${external_port}"
+    clear_error_context
 }
 
 list_port_forwards() {
@@ -311,56 +328,62 @@ list_port_forwards() {
 
 block_port() {
     local port="$1"
-    
-    check_root
-    
-    if [ -z "$port" ]; then
+
+    set_error_context "Port blocking"
+
+    if [[ -z "${port}" ]]; then
         error "Usage: block-port <port>"
         exit 1
     fi
-    
-    log "Blocking port $port..."
-    
+
+    log "Blocking port ${port}..."
+
     # Add DROP rule for the port
-    iptables -A INPUT -p tcp --dport "$port" -j DROP
-    iptables -A INPUT -p udp --dport "$port" -j DROP
-    
+    iptables -A INPUT -p tcp --dport "${port}" -j DROP
+    iptables -A INPUT -p udp --dport "${port}" -j DROP
+
     # Save rules
     iptables-save > /etc/iptables/rules.v4
-    
-    success "Port $port blocked"
+
+    success "Port ${port} blocked"
+    clear_error_context
 }
 
 allow_port() {
     local port="$1"
-    
-    check_root
-    
-    if [ -z "$port" ]; then
+
+    set_error_context "Port allowing"
+
+    if [[ -z "${port}" ]]; then
         error "Usage: allow-port <port>"
         exit 1
     fi
-    
-    log "Allowing port $port..."
-    
+
+    log "Allowing port ${port}..."
+
     # Add ACCEPT rule for the port
-    iptables -A INPUT -p tcp --dport "$port" -j ACCEPT
-    iptables -A INPUT -p udp --dport "$port" -j ACCEPT
-    
+    iptables -A INPUT -p tcp --dport "${port}" -j ACCEPT
+    iptables -A INPUT -p udp --dport "${port}" -j ACCEPT
+
     # Save rules
     iptables-save > /etc/iptables/rules.v4
-    
-    success "Port $port allowed"
+
+    success "Port ${port} allowed"
+    clear_error_context
 }
 
-# Main command handling
-# Show banner for firewall operations
-if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
-    show_banner_with_title "Firewall Manager" "security"
-    echo
-fi
+# Main function
+main() {
+    # Initialize script
+    init_script
 
-case "${1:-}" in
+    # Show banner for firewall operations
+    if [[ "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
+        show_banner_with_title "Firewall Manager" "security"
+        echo
+    fi
+
+    case "${1:-}" in
     "status")
         load_config
         show_firewall_status
@@ -410,4 +433,8 @@ case "${1:-}" in
         echo "      and SSH port from /etc/ssh/sshd_config"
         exit 1
         ;;
-esac
+    esac
+}
+
+# Run main function
+main "$@"

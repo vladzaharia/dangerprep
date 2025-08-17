@@ -21,9 +21,13 @@ readonly SCRIPT_VERSION="1.0"
 readonly SCRIPT_DESCRIPTION="[Brief description]"
 
 # Source shared utilities
+# shellcheck source=./../shared/logging.sh
 source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=./../shared/error-handling.sh
 source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=./../shared/validation.sh
 source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=./../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Configuration variables (with defaults)

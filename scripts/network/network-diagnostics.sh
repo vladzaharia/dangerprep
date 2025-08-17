@@ -1,15 +1,52 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Network Diagnostics Script
 # Essential network troubleshooting tools for emergency router scenarios
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Source shared functions
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../shared/functions.sh"
+readonly SCRIPT_DIR
 
-# Initialize environment
-init_environment
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
+source "${SCRIPT_DIR}/../shared/banner.sh"
+
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-network-diagnostics.log"
+
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "Network diagnostics failed with exit code ${exit_code}"
+
+    # No specific cleanup needed for diagnostics
+
+    error "Cleanup completed"
+    exit "${exit_code}"
+}
+
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate required commands
+    require_commands ping ip iptables systemctl
+
+    debug "Network diagnostics initialized"
+    clear_error_context
+}
 
 # Show help
 show_help() {
@@ -250,7 +287,7 @@ speed_test() {
 
 # Run all diagnostics
 run_all() {
-    show_banner "DangerPrep Network Diagnostics"
+    show_banner_with_title "Network Diagnostics" "network"
     echo
     
     test_connectivity
@@ -279,6 +316,15 @@ run_all() {
 
 # Main function
 main() {
+    # Initialize script
+    init_script
+
+    # Show banner for network diagnostics
+    if [[ "${1:-all}" != "help" && "${1:-all}" != "--help" && "${1:-all}" != "-h" ]]; then
+        show_banner_with_title "Network Diagnostics" "network"
+        echo
+    fi
+
     case "${1:-all}" in
         connectivity)
             test_connectivity

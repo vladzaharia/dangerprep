@@ -1,26 +1,79 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep WiFi Repeater Mode
 # Connect to existing WiFi and repeat signal
 
-# Source shared banner utility
+# Modern shell script best practices
+set -euo pipefail
+
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-wifi-repeater.log"
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
 UPSTREAM_SSID="${UPSTREAM_SSID:-}"
 UPSTREAM_PASSWORD="${UPSTREAM_PASSWORD:-}"
 LAN_IP="192.168.120.1"
 
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "WiFi repeater failed with exit code ${exit_code}"
+
+    # Stop services
+    systemctl stop hostapd 2>/dev/null || true
+    systemctl stop dnsmasq 2>/dev/null || true
+
+    # Remove virtual interface
+    iw dev "${WIFI_INTERFACE}_ap" del 2>/dev/null || true
+
+    # Disconnect from upstream WiFi
+    killall wpa_supplicant 2>/dev/null || true
+
+    # Reset hostapd configuration
+    sed -i "s/interface=.*/interface=${WIFI_INTERFACE}/" /etc/hostapd/hostapd.conf 2>/dev/null || true
+
+    error "Cleanup completed"
+    exit "${exit_code}"
+}
+
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate root permissions for network operations
+    validate_root_user
+
+    # Validate required commands
+    require_commands iw ip iptables wpa_passphrase wpa_supplicant dhclient systemctl
+
+    debug "WiFi repeater initialized"
+    clear_error_context
 }
 
 setup_wifi_repeater() {
+    set_error_context "WiFi repeater setup"
+
     log "Setting up WiFi Repeater Mode"
-    
+
     if [[ -z "${UPSTREAM_SSID}" ]]; then
-        echo "Error: UPSTREAM_SSID not set"
-        echo "Usage: UPSTREAM_SSID='network_name' UPSTREAM_PASSWORD='password' $0 setup"
+        error "UPSTREAM_SSID not set"
+        error "Usage: UPSTREAM_SSID='network_name' UPSTREAM_PASSWORD='password' $0 setup"
         exit 1
     fi
     
@@ -68,6 +121,7 @@ setup_wifi_repeater() {
     log "WiFi Repeater Mode configured successfully"
     log "Upstream: ${WIFI_INTERFACE} (connected to ${UPSTREAM_SSID})"
     log "Hotspot: ${WIFI_INTERFACE}_ap (${LAN_IP})"
+    clear_error_context
 }
 
 show_status() {
@@ -114,23 +168,37 @@ cleanup_wifi_repeater() {
     log "WiFi Repeater Mode cleanup completed"
 }
 
-case "${1:-setup}" in
-    setup)
-        setup_wifi_repeater
-        ;;
-    status)
-        show_status
-        ;;
-    cleanup)
-        cleanup_wifi_repeater
-        ;;
-    *)
-        echo "Usage: $0 {setup|status|cleanup}"
-        echo
-        echo "WiFi Repeater Mode: Connect to existing WiFi and repeat signal"
-        echo "Environment variables:"
-        echo "  UPSTREAM_SSID     - WiFi network to connect to"
-        echo "  UPSTREAM_PASSWORD - WiFi network password"
-        exit 1
-        ;;
-esac
+# Main function
+main() {
+    # Initialize script
+    init_script
+
+    case "${1:-setup}" in
+        setup)
+            setup_wifi_repeater
+            ;;
+        status)
+            show_status
+            ;;
+        cleanup)
+            cleanup_wifi_repeater
+            ;;
+        help|--help|-h)
+            echo "Usage: $0 {setup|status|cleanup}"
+            echo
+            echo "WiFi Repeater Mode: Connect to existing WiFi and repeat signal"
+            echo "Environment variables:"
+            echo "  UPSTREAM_SSID     - WiFi network to connect to"
+            echo "  UPSTREAM_PASSWORD - WiFi network password"
+            exit 0
+            ;;
+        *)
+            error "Unknown command: $1"
+            echo "Use '$0 help' for usage information"
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"

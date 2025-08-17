@@ -1,107 +1,88 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Unified Security Audit Script
 # Runs all security checks and provides comprehensive reporting
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Source shared banner utility
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-security-audit.log"
+# shellcheck disable=SC2034  # Used in sourced configuration files and exported for subprocesses
+PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+readonly PROJECT_ROOT
+export PROJECT_ROOT
+REPORT_FILE="/tmp/security-audit-$(date +%Y%m%d-%H%M%S).txt"
+readonly REPORT_FILE
+readonly CRON_LOG_FILE="/var/log/dangerprep-security-cron.log"
+readonly ALERT_THRESHOLD_FILE="/tmp/dangerprep-security-alerts"
 
-# Logging functions
-log() {
-    local message
-    message="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
-    if [[ "$CRON_MODE" == "true" ]]; then
-        echo "$message" >> "$CRON_LOG_FILE"
-    else
-        echo -e "${BLUE}${message}${NC}"
-    fi
+# Cron mode flag
+CRON_MODE=false
+
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "Security audit failed with exit code ${exit_code}"
+
+    # Clean up temporary files
+    rm -f "${REPORT_FILE}.tmp" 2>/dev/null || true
+
+    error "Cleanup completed"
+    exit "${exit_code}"
 }
 
-error() {
-    local message="[ERROR] $1"
-    if [[ "$CRON_MODE" == "true" ]]; then
-        echo "$message" >> "$CRON_LOG_FILE"
-        logger -t "DANGERPREP-SECURITY" -p daemon.error "$1"
-    else
-        echo -e "${RED}${message}${NC}" >&2
-    fi
-}
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
 
-success() {
-    local message="[SUCCESS] $1"
-    if [[ "$CRON_MODE" == "true" ]]; then
-        echo "$message" >> "$CRON_LOG_FILE"
-    else
-        echo -e "${GREEN}${message}${NC}"
-    fi
-}
+    # Set up error handling
+    trap cleanup_on_error ERR
 
-warning() {
-    local message="[WARNING] $1"
-    if [[ "$CRON_MODE" == "true" ]]; then
-        echo "$message" >> "$CRON_LOG_FILE"
-        logger -t "DANGERPREP-SECURITY" -p daemon.warning "$1"
-    else
-        echo -e "${YELLOW}${message}${NC}"
-    fi
-}
+    # Validate required commands
+    require_commands logger find ss
 
-info() {
-    local message="[INFO] $1"
-    if [[ "$CRON_MODE" == "true" ]]; then
-        echo "$message" >> "$CRON_LOG_FILE"
-    else
-        echo -e "${CYAN}${message}${NC}"
-    fi
+    # Ensure log directories exist
+    mkdir -p "$(dirname "${DEFAULT_LOG_FILE}")" 2>/dev/null || true
+    mkdir -p "$(dirname "${CRON_LOG_FILE}")" 2>/dev/null || true
+    mkdir -p "$(dirname "${ALERT_THRESHOLD_FILE}")" 2>/dev/null || true
+
+    debug "Security audit initialized"
+    clear_error_context
 }
 
 # Alert function for critical issues
 alert() {
     local message="[ALERT] $1"
-    echo "$message" >> "$CRON_LOG_FILE"
-    echo "$(date '+%Y-%m-%d %H:%M:%S'): $1" >> "$ALERT_THRESHOLD_FILE"
+    echo "${message}" >> "${CRON_LOG_FILE}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S'): $1" >> "${ALERT_THRESHOLD_FILE}"
     logger -t "DANGERPREP-SECURITY" -p daemon.alert "$1"
 
     # In interactive mode, also display
-    if [[ "$CRON_MODE" != "true" ]]; then
-        echo -e "${RED}${message}${NC}" >&2
+    if [[ "${CRON_MODE}" != "true" ]]; then
+        error "${message}"
     fi
 }
 
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# PROJECT_ROOT is used by sourced scripts
-PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
-export PROJECT_ROOT
-LOG_FILE="/var/log/dangerprep-security-audit.log"
-REPORT_FILE="/tmp/security-audit-$(date +%Y%m%d-%H%M%S).txt"
-CRON_LOG_FILE="/var/log/dangerprep-security-cron.log"
-ALERT_THRESHOLD_FILE="/tmp/dangerprep-security-alerts"
-
-# Cron mode flag
-CRON_MODE=false
-
-# Show banner
-show_banner() {
-    echo -e "${PURPLE}"
-    cat << 'EOF'
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                    DangerPrep Security Audit Suite                          ║
-║                     Comprehensive Security Assessment                       ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-EOF
-    echo -e "${NC}"
+# Show security audit banner
+show_security_banner() {
+    show_banner_with_title "Security Audit Suite" "security"
+    echo
+    log "Comprehensive security scanning and monitoring for emergency networks"
 }
 
 # Show help
@@ -288,6 +269,9 @@ generate_report() {
 
 # Main function
 main() {
+    # Initialize script
+    init_script
+
     # Show banner for comprehensive security audit
     if [[ "${1:-all}" == "all" ]]; then
         show_security_banner "$@"
@@ -311,7 +295,7 @@ main() {
             run_security_audit
             ;;
         all)
-            show_banner
+            show_security_banner "$@"
             run_all_checks
             generate_report
             ;;
@@ -325,9 +309,9 @@ main() {
             run_all_checks
 
             # Check for critical alerts
-            if [[ -f "$ALERT_THRESHOLD_FILE" ]] && [[ -s "$ALERT_THRESHOLD_FILE" ]]; then
+            if [[ -f "${ALERT_THRESHOLD_FILE}" ]] && [[ -s "${ALERT_THRESHOLD_FILE}" ]]; then
                 # Send alert notification (could be extended to email, etc.)
-                logger -t "DANGERPREP-SECURITY" -p daemon.alert "Critical security issues detected. Check $ALERT_THRESHOLD_FILE"
+                logger -t "DANGERPREP-SECURITY" -p daemon.alert "Critical security issues detected. Check ${ALERT_THRESHOLD_FILE}"
             fi
             ;;
         report)
@@ -344,10 +328,6 @@ main() {
             ;;
     esac
 }
-
-# Setup logging
-mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
-touch "${LOG_FILE}" 2>/dev/null || true
 
 # Run main function
 main "$@"

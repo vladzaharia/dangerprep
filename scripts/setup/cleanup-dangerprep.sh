@@ -31,6 +31,8 @@ source "${SCRIPT_DIR}/../shared/error-handling.sh"
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
 source "${SCRIPT_DIR}/../shared/banner.sh"
+# shellcheck source=../shared/functions.sh
+source "${SCRIPT_DIR}/../shared/functions.sh"
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-cleanup.log"
 readonly DEFAULT_INSTALL_ROOT="/opt/dangerprep"
@@ -200,6 +202,55 @@ safe_remove() {
     clear_error_context
 }
 
+# Safe wildcard cleanup function
+safe_wildcard_cleanup() {
+    local pattern="$1"
+    local directory="$2"
+    local description
+    description=${3:-files}
+
+    set_error_context "Safe wildcard cleanup: ${description}"
+
+    # Validate inputs
+    validate_not_empty "${pattern}" "cleanup pattern"
+    validate_not_empty "${directory}" "cleanup directory"
+
+    if [[ ! -d "${directory}" ]]; then
+        debug "Directory does not exist (skipping): ${directory}"
+        clear_error_context
+        return 0
+    fi
+
+    # Show what would be removed
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        local matches
+        matches=$(find "${directory}" -maxdepth 1 -name "${pattern}" 2>/dev/null | wc -l)
+        info "[DRY RUN] Would remove ${matches} ${description} matching ${pattern} in ${directory}"
+        clear_error_context
+        return 0
+    fi
+
+    # Find and remove matching files
+    local removed_count=0
+    while IFS= read -r -d '' file; do
+        if [[ -f "$file" || -d "$file" ]]; then
+            if rm -rf "$file" 2>/dev/null; then
+                ((removed_count++))
+                debug "Removed: $file"
+            else
+                warning "Failed to remove: $file"
+            fi
+        fi
+    done < <(find "${directory}" -maxdepth 1 -name "${pattern}" -print0 2>/dev/null)
+
+    if [[ $removed_count -gt 0 ]]; then
+        success "Removed ${removed_count} ${description} matching ${pattern}"
+    else
+        debug "No ${description} found matching ${pattern} in ${directory}"
+    fi
+
+    clear_error_context
+}
 
 # Confirm cleanup operation
 confirm_cleanup() {
@@ -235,7 +286,7 @@ setup_logging() {
     
     log "DangerPrep Cleanup Started"
     log "Backup directory: ${BACKUP_DIR}"
-    log "Preserve data: ${PRESERVE_DATA}"
+    log "Preserve data: ${KEEP_DATA}"
 }
 
 # Stop all services
@@ -293,7 +344,6 @@ stop_services() {
         "fail2ban"
         "clamav-daemon"
         "clamav-freshclam"
-        ""
         "unattended-upgrades"
         "adguardhome"
         "step-ca"
@@ -304,7 +354,15 @@ stop_services() {
     for service in "${services_to_stop[@]}"; do
         if systemctl is-active --quiet "$service" 2>/dev/null; then
             log "Stopping $service..."
-            systemctl stop "$service" 2>/dev/null || true
+            if systemctl stop "$service" 2>/dev/null; then
+                success "Stopped $service"
+            else
+                warning "Failed to stop $service"
+            fi
+        elif systemctl is-enabled --quiet "$service" 2>/dev/null; then
+            log "Service $service is not running but is enabled"
+        else
+            debug "Service $service is not installed or not enabled"
         fi
     done
 
@@ -313,7 +371,6 @@ stop_services() {
         "hostapd"
         "dnsmasq"
         "fail2ban"
-        ""
         "unattended-upgrades"
         "adguardhome"
         "step-ca"
@@ -768,7 +825,7 @@ remove_packages() {
 
 # Remove data directories
 remove_data() {
-    if [[ "${PRESERVE_DATA}" == "true" ]]; then
+    if [[ "${KEEP_DATA}" == "true" ]]; then
         log "Preserving data directories as requested"
         return 0
     fi
@@ -941,7 +998,7 @@ show_completion() {
     echo "  • FriendlyElec/RK3588 specific configurations removed"
     echo "  • MOTD banner removed and Ubuntu defaults restored"
     echo "  • Hardware acceleration settings reset to defaults"
-    if [[ "${PRESERVE_DATA}" == "true" ]]; then
+    if [[ "${KEEP_DATA}" == "true" ]]; then
         echo "  • Data directories preserved"
     else
         echo "  • Data directories removed"
@@ -962,9 +1019,9 @@ show_completion() {
 
 # Main function
 main() {
-    parse_args "$@"
-    show_banner
-    check_root
+    parse_arguments "$@"
+    show_banner "DangerPrep Cleanup"
+    validate_root_user
     confirm_cleanup
     setup_logging
 

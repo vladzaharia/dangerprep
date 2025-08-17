@@ -1,15 +1,56 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep System Maintenance Script
 # Consolidated validation, permission fixes, and system health checks
 
-set -e
+# Modern shell script best practices
+set -euo pipefail
 
-# Source shared functions
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../shared/functions.sh"
+readonly SCRIPT_DIR
 
-# Initialize environment
-init_environment
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
+source "${SCRIPT_DIR}/../shared/banner.sh"
+
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-system-maintenance.log"
+PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+readonly PROJECT_ROOT
+readonly DANGERPREP_ROOT="${PROJECT_ROOT}"
+readonly DANGERPREP_DATA_DIR="${PROJECT_ROOT}/data"
+
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "System maintenance failed with exit code ${exit_code}"
+
+    # No specific cleanup needed for maintenance operations
+
+    error "Cleanup completed"
+    exit "${exit_code}"
+}
+
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate required commands
+    require_commands docker systemctl df free find
+
+    debug "System maintenance initialized"
+    clear_error_context
+}
 
 # Show help
 show_help() {
@@ -187,6 +228,9 @@ run_all() {
 
 # Main function
 main() {
+    # Initialize script
+    init_script
+
     case "${1:-all}" in
         validate)
             validate_system
@@ -198,7 +242,7 @@ main() {
             system_health
             ;;
         all)
-            show_banner "DangerPrep System Maintenance"
+            show_banner_with_title "System Maintenance" "system"
             run_all
             ;;
         help|--help|-h)

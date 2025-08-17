@@ -1,27 +1,59 @@
-#!/bin/bash
-set -euo pipefail
-
+#!/usr/bin/env bash
 # DangerPrep Secret Management Setup
 # Sets up the complete secret management system for Docker services
-# Usage: ./setup-secrets.sh [--force] [--dry-run]
 
-# Configuration
+# Modern shell script best practices
+set -euo pipefail
+
+# Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# Source shared utilities
+# shellcheck source=../shared/logging.sh
+source "${SCRIPT_DIR}/../shared/logging.sh"
+# shellcheck source=../shared/error-handling.sh
+source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/validation.sh
+source "${SCRIPT_DIR}/../shared/validation.sh"
+# shellcheck source=../shared/banner.sh
+source "${SCRIPT_DIR}/../shared/banner.sh"
+
+# Configuration variables
+readonly DEFAULT_LOG_FILE="/var/log/dangerprep-setup-secrets.log"
 PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
-SECRETS_DIR="${PROJECT_ROOT}/secrets"
+readonly PROJECT_ROOT
+readonly SECRETS_DIR="${PROJECT_ROOT}/secrets"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Cleanup function for error recovery
+cleanup_on_error() {
+    local exit_code=$?
+    error "Secrets setup failed with exit code ${exit_code}"
 
-# Logging functions
-log() { echo -e "${BLUE}[INFO]${NC} $1"; }
-success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1"; }
+    # Remove any partially created secret files
+    rm -f "${SECRETS_DIR}/.env.tmp" 2>/dev/null || true
+
+    error "Cleanup completed"
+    exit "${exit_code}"
+}
+
+# Initialize script
+init_script() {
+    set_error_context "Script initialization"
+    set_log_file "${DEFAULT_LOG_FILE}"
+
+    # Set up error handling
+    trap cleanup_on_error ERR
+
+    # Validate root permissions for secrets management
+    validate_root_user
+
+    # Validate required commands
+    require_commands openssl base64
+
+    debug "Secrets setup initialized"
+    clear_error_context
+}
 
 # Help function
 show_help() {
@@ -256,7 +288,12 @@ show_summary() {
 
 # Main execution
 main() {
-    log "DangerPrep Secret Management Setup"
+    # Initialize script
+    init_script
+
+    show_banner_with_title "Secret Management Setup" "security"
+    echo
+
     log "Force regenerate: ${FORCE_REGENERATE}"
     log "Dry run: ${DRY_RUN}"
     echo
