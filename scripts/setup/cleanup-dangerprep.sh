@@ -3,7 +3,7 @@
 #
 # Purpose: Safely removes DangerPrep configuration and restores original system state
 # Usage: cleanup-dangerprep.sh [--force] [--keep-data] [--dry-run]
-# Dependencies: systemctl, docker, rm, find, sed, awk
+# Dependencies: systemctl, rm, find, sed, awk
 # Author: DangerPrep Project
 # Version: 2.0
 
@@ -81,7 +81,7 @@ OPTIONS:
 DESCRIPTION:
     Safely removes DangerPrep configuration and restores original system state.
     This script will:
-    • Stop all DangerPrep services (Docker, hostapd, dnsmasq, etc.)
+    • Stop all DangerPrep services (Olares, hostapd, dnsmasq, etc.)
     • Remove DangerPrep configurations and files
     • Restore original system configurations
     • Clean up temporary files and logs
@@ -272,13 +272,18 @@ stop_services() {
         systemctl stop step-ca 2>/dev/null || true
     fi
 
-    # Legacy Docker cleanup (in case Docker was previously installed)
-    if command -v docker >/dev/null 2>&1; then
-        log "Stopping any remaining Docker containers..."
-        docker stop "$(docker ps -q)" 2>/dev/null || true
-        docker rm "$(docker ps -aq)" 2>/dev/null || true
-        docker network rm traefik 2>/dev/null || true
-        success "Docker services stopped"
+    # Olares cleanup (use official uninstall if available)
+    if command -v olares-cli >/dev/null 2>&1; then
+        log "Uninstalling Olares using official CLI..."
+        if olares-cli uninstall --all 2>/dev/null; then
+            success "Olares uninstalled successfully"
+        else
+            warning "Olares CLI uninstall failed, proceeding with manual cleanup"
+            manual_olares_cleanup
+        fi
+    else
+        log "Olares CLI not found, performing manual cleanup..."
+        manual_olares_cleanup
     fi
 
     # Stop system services installed by setup script
@@ -288,7 +293,7 @@ stop_services() {
         "fail2ban"
         "clamav-daemon"
         "clamav-freshclam"
-        "tailscaled"
+        ""
         "unattended-upgrades"
         "adguardhome"
         "step-ca"
@@ -308,7 +313,7 @@ stop_services() {
         "hostapd"
         "dnsmasq"
         "fail2ban"
-        "tailscaled"
+        ""
         "unattended-upgrades"
         "adguardhome"
         "step-ca"
@@ -324,6 +329,59 @@ stop_services() {
     done
 
     success "System services stopped and disabled"
+}
+
+# Manual Olares cleanup when CLI is not available
+manual_olares_cleanup() {
+    log "Performing manual Olares cleanup..."
+
+    # Stop K3s services
+    local k3s_services=("k3s" "k3s-agent")
+    for service in "${k3s_services[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            log "Stopping $service..."
+            systemctl stop "$service" 2>/dev/null || true
+            systemctl disable "$service" 2>/dev/null || true
+        fi
+    done
+
+    # Remove K3s installation
+    if [[ -f /usr/local/bin/k3s-uninstall.sh ]]; then
+        log "Running K3s uninstall script..."
+        /usr/local/bin/k3s-uninstall.sh 2>/dev/null || true
+    fi
+
+    # Clean up Olares directories
+    local olares_dirs=(
+        "/var/lib/rancher"
+        "/etc/rancher"
+        "/opt/olares"
+        "/var/lib/olares"
+        "/etc/olares"
+    )
+
+    for dir in "${olares_dirs[@]}"; do
+        if [[ -d "$dir" ]]; then
+            log "Removing $dir..."
+            rm -rf "$dir" 2>/dev/null || true
+        fi
+    done
+
+    # Remove Olares binaries
+    local olares_binaries=(
+        "/usr/local/bin/olares-cli"
+        "/usr/local/bin/k3s"
+        "/usr/local/bin/kubectl"
+    )
+
+    for binary in "${olares_binaries[@]}"; do
+        if [[ -f "$binary" ]]; then
+            log "Removing $binary..."
+            rm -f "$binary" 2>/dev/null || true
+        fi
+    done
+
+    success "Manual Olares cleanup completed"
 }
 
 # Restore network configuration
@@ -393,13 +451,7 @@ restore_network() {
         done
     fi
 
-    # Remove subuid/subgid entries for rootless Docker
-    if [[ -f /etc/subuid ]]; then
-        sed -i '/^ubuntu:/d' /etc/subuid 2>/dev/null || true
-    fi
-    if [[ -f /etc/subgid ]]; then
-        sed -i '/^ubuntu:/d' /etc/subgid 2>/dev/null || true
-    fi
+
 
     # Disable lingering for ubuntu user
     loginctl disable-linger ubuntu 2>/dev/null || true
@@ -522,13 +574,9 @@ remove_configurations() {
     [[ -f /etc/apt/apt.conf.d/50unattended-upgrades ]] && rm -f /etc/apt/apt.conf.d/50unattended-upgrades 2>/dev/null || true
     [[ -f /etc/apt/apt.conf.d/20auto-upgrades ]] && rm -f /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null || true
 
-    # Remove Tailscale repository (optimistic cleanup)
-    [[ -f /etc/apt/sources.list.d/tailscale.list ]] && rm -f /etc/apt/sources.list.d/tailscale.list 2>/dev/null || true
-    [[ -f /usr/share/keyrings/tailscale-archive-keyring.gpg ]] && rm -f /usr/share/keyrings/tailscale-archive-keyring.gpg 2>/dev/null || true
 
-    # Remove Docker daemon configuration (optimistic cleanup)
-    [[ -f /etc/docker/daemon.json ]] && rm -f /etc/docker/daemon.json 2>/dev/null || true
-    [[ -f /etc/docker/seccomp.json ]] && rm -f /etc/docker/seccomp.json 2>/dev/null || true
+
+
 
     # Remove backup encryption key
     safe_remove "/etc/dangerprep/backup" "backup encryption key directory"
@@ -662,8 +710,7 @@ remove_packages() {
         "borgbackup"
         "restic"
 
-        # Tailscale
-        "tailscale"
+
 
         # Automatic updates
         "unattended-upgrades"
@@ -777,30 +824,22 @@ remove_data() {
 cleanup_user_configs() {
     log "Cleaning up user configurations..."
 
-    # Clean up ubuntu user's rootless Docker configuration
+    # Clean up ubuntu user's DangerPrep configuration
     if [[ -d /home/ubuntu ]]; then
-        log "Cleaning ubuntu user rootless Docker configuration..."
+        log "Cleaning ubuntu user DangerPrep configuration..."
 
-        # Stop rootless Docker service for ubuntu user
-        sudo -u ubuntu systemctl --user stop docker 2>/dev/null || true
-        sudo -u ubuntu systemctl --user disable docker 2>/dev/null || true
-
-        # Remove rootless Docker files
-        rm -rf /home/ubuntu/.config/systemd/user/docker.service 2>/dev/null || true
-        rm -rf /home/ubuntu/bin/docker* 2>/dev/null || true
-
-        # Clean up .bashrc modifications
+        # Clean up .bashrc modifications (remove any DangerPrep-added paths)
         if [[ -f /home/ubuntu/.bashrc ]]; then
             grep -v "export PATH=/home/ubuntu/bin:\${PATH}" /home/ubuntu/.bashrc > /tmp/bashrc.tmp 2>/dev/null && mv /tmp/bashrc.tmp /home/ubuntu/.bashrc || true
-            sed -i '/export DOCKER_HOST=unix:\/\/\/run\/user\/1000\/docker.sock/d' /home/ubuntu/.bashrc 2>/dev/null || true
+            sed -i '/# DangerPrep additions/d' /home/ubuntu/.bashrc 2>/dev/null || true
         fi
+
+        # Remove any DangerPrep user directories
+        safe_remove "/home/ubuntu/.dangerprep" "DangerPrep user configuration"
+        safe_remove "/home/ubuntu/.config/dangerprep" "DangerPrep user config directory"
 
         success "Ubuntu user configuration cleaned"
     fi
-
-    # Remove any remaining Docker socket files
-    safe_remove "/run/user/1000/docker.sock" "Docker socket file"
-    safe_remove "/run/user/1000/docker" "Docker runtime directory"
 
     clear_error_context
 }
@@ -840,7 +879,8 @@ final_cleanup() {
 
     # Remove systemd user services for ubuntu user (optimistic cleanup)
     if [[ -d /home/ubuntu/.config/systemd/user ]]; then
-        [[ -f /home/ubuntu/.config/systemd/user/docker.service ]] && rm -f /home/ubuntu/.config/systemd/user/docker.service 2>/dev/null || true
+        # Remove any DangerPrep systemd user services
+        find /home/ubuntu/.config/systemd/user -name "*dangerprep*" -type f -delete 2>/dev/null || true
         # Remove directory if empty
         rmdir /home/ubuntu/.config/systemd/user 2>/dev/null || true
         rmdir /home/ubuntu/.config/systemd 2>/dev/null || true
@@ -893,8 +933,8 @@ show_completion() {
     echo "  • All DangerPrep services stopped and disabled"
     echo "  • Network configuration restored to original state"
     echo "  • All DangerPrep configurations and scripts removed"
-    echo "  • User configurations cleaned (rootless Docker, etc.)"
-    echo "  • Docker containers and networks removed"
+    echo "  • User configurations cleaned"
+    echo "  • Olares and K3s components removed"
     echo "  • Security tools configurations removed"
     echo "  • Firewall rules reset to default"
     echo "  • Cron jobs and automated tasks removed"
@@ -911,7 +951,7 @@ show_completion() {
     echo "  • SSH configuration has been restored (check port settings)"
     echo "  • Some packages may have been removed (check if other apps are affected)"
     echo "  • Network interfaces have been reset to NetworkManager control"
-    echo "  • Tailscale may need to be reconfigured if you plan to use it again"
+    echo "  • Olares may need to be reinstalled if you plan to use it again"
     echo
     echo -e "${CYAN}Log file: ${LOG_FILE}${NC}"
     echo -e "${CYAN}Backup created: ${BACKUP_DIR}${NC}"

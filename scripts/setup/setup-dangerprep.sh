@@ -3,7 +3,7 @@
 #
 # Purpose: Complete system setup for Ubuntu 24.04 with 2025 security hardening
 # Usage: setup-dangerprep.sh [--dry-run] [--verbose] [--config FILE]
-# Dependencies: apt, systemctl, ufw, docker, git, curl, wget
+# Dependencies: apt, systemctl, ufw, git, curl, wget
 # Author: DangerPrep Project
 # Version: 2.0
 
@@ -43,14 +43,14 @@ OPTIONS:
     --dry-run       Show what would be installed without making changes
     --verbose       Enable verbose output for debugging
     --config FILE   Use custom configuration file
-    --skip-docker   Skip Docker installation
+
     --skip-network  Skip network configuration
     -h, --help      Show this help message
 
 DESCRIPTION:
     Complete system setup for Ubuntu 24.04 with 2025 security hardening.
     This script will:
-    • Install and configure Docker with security hardening
+    • Install and configure system-level network services
     • Set up network configuration (hostapd, dnsmasq, firewall)
     • Install security tools (AIDE, fail2ban, ClamAV)
     • Configure hardware monitoring and optimization
@@ -61,7 +61,7 @@ EXAMPLES:
     ${SCRIPT_NAME}                    # Full interactive setup
     ${SCRIPT_NAME} --dry-run          # Preview changes without installation
     ${SCRIPT_NAME} --verbose          # Enable detailed logging
-    ${SCRIPT_NAME} --skip-docker      # Skip Docker installation
+
 
 NOTES:
     - This script must be run as root
@@ -209,7 +209,7 @@ show_banner() {
     info "• WiFi Hotspot: DangerPrep (WPA3/WPA2)"
     info "• Network: 192.168.120.0/22"
     info "• Security: 2025 Hardening Standards"
-    info "• Services: Docker + Traefik + Sync"
+    info "• Services: AdGuard Home + Step-CA + Sync"
     echo
     info "All changes are logged and backed up."
     echo
@@ -383,7 +383,7 @@ pre_flight_checks() {
     log_subsection "Network Connectivity"
 
     # Internet connectivity check
-    local connectivity_targets=("8.8.8.8" "1.1.1.1" "pkgs.tailscale.com")
+    local connectivity_targets=("8.8.8.8" "1.1.1.1" "archive.ubuntu.com")
     local connectivity_success=0
 
     for target in "${connectivity_targets[@]}"; do
@@ -428,7 +428,7 @@ pre_flight_checks() {
 
     local required_commands=(
         "curl" "wget" "gpg" "openssl" "systemctl"
-        "iptables" "ip" "hostapd" "dnsmasq" "docker"
+        "iptables" "ip" "hostapd" "dnsmasq"
     )
 
     local missing_commands=()
@@ -1030,8 +1030,7 @@ configure_olares_integration() {
 setup_container_health_monitoring() {
     log "Setting up container health monitoring..."
 
-    # Load Watchtower configuration
-    load_watchtower_config
+
 
     # Add cron job to run via just
     echo "*/10 * * * * root cd ${PROJECT_ROOT} && just container-health" > /etc/cron.d/container-health
@@ -1565,20 +1564,20 @@ configure_wifi_hotspot() {
     systemctl enable hostapd
 }
 
-# Setup DHCP and DNS server (via Docker)
+# Setup DHCP server (DNS handled by AdGuard Home)
 setup_dhcp_dns_server() {
-    log "Setting up DHCP and DNS server..."
+    log "Setting up DHCP server..."
 
-    # DNS is handled by Docker containers (CoreDNS/AdGuard)
-    # DHCP for WiFi hotspot is still handled by dnsmasq for simplicity
-    log "DNS will be handled by Docker containers"
+    # DNS is handled by AdGuard Home system service
+    # DHCP for WiFi hotspot is handled by dnsmasq for simplicity
+    log "DNS will be handled by AdGuard Home system service"
     log "DHCP for WiFi hotspot will use minimal dnsmasq configuration"
 
     # Create minimal dnsmasq config for DHCP only
     load_dnsmasq_minimal_config
 
     systemctl enable dnsmasq
-    success "DHCP server configured (DNS handled by Docker)"
+    success "DHCP server configured (DNS handled by AdGuard Home)"
 }
 
 # Configure WiFi routing
@@ -1606,84 +1605,7 @@ generate_sync_configs() {
     success "Sync service configurations generated"
 }
 
-# Verify Tailscale GPG key
-verify_tailscale_gpg_key() {
-    local expected_fingerprint="2596A99EAAB33821893C0A79"
-    local temp_key
-    temp_key="$(mktemp -t tailscale-key.XXXXXX)"
-    register_temp_file "$temp_key"
 
-    log "Downloading and verifying Tailscale GPG key..."
-
-    # Download the GPG key
-    if ! curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg > "$temp_key"; then
-        error "Failed to download Tailscale GPG key"
-        return 1
-    fi
-
-    # Import the key to a temporary keyring and verify fingerprint
-    local temp_keyring
-    temp_keyring="$(mktemp -d -t tailscale-keyring.XXXXXX)"
-    register_temp_dir "$temp_keyring"
-
-    # Import key and get fingerprint
-    local actual_fingerprint
-    actual_fingerprint=$(gpg --homedir "$temp_keyring" --import "$temp_key" 2>&1 | grep -o '[0-9A-F]\{40\}' | head -1)
-
-    if [[ -z "$actual_fingerprint" ]]; then
-        # Try alternative method to get fingerprint
-        gpg --homedir "$temp_keyring" --import "$temp_key" >/dev/null 2>&1
-        actual_fingerprint=$(gpg --homedir "$temp_keyring" --list-keys --with-fingerprint 2>/dev/null | grep -o '[0-9A-F]\{40\}' | head -1)
-    fi
-
-    # Remove spaces from fingerprint for comparison
-    actual_fingerprint=$(echo "$actual_fingerprint" | tr -d ' ')
-
-    if [[ "$actual_fingerprint" == "$expected_fingerprint" ]]; then
-        # Fingerprint verified, install the key
-        mv "$temp_key" /usr/share/keyrings/tailscale-archive-keyring.gpg
-        chmod 644 /usr/share/keyrings/tailscale-archive-keyring.gpg
-        success "Tailscale GPG key verified and installed"
-        return 0
-    else
-        error "Tailscale GPG key verification failed"
-        error "Expected: $expected_fingerprint"
-        error "Actual: $actual_fingerprint"
-        return 1
-    fi
-}
-
-# Setup Tailscale
-setup_tailscale() {
-    log "Setting up Tailscale..."
-
-    # Verify and install Tailscale GPG key
-    if ! verify_tailscale_gpg_key; then
-        error "Failed to verify Tailscale GPG key"
-        return 1
-    fi
-
-    # Add Tailscale repository
-    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | tee /etc/apt/sources.list.d/tailscale.list
-
-    # Update and install Tailscale
-    apt update
-    DEBIAN_FRONTEND=noninteractive apt install -y tailscale
-
-    # Enable Tailscale service
-    systemctl enable tailscaled
-    systemctl start tailscaled
-
-    # Configure firewall for Tailscale
-    iptables -A INPUT -p udp --dport 41641 -j ACCEPT
-    iptables -A INPUT -i tailscale0 -j ACCEPT
-    iptables -A FORWARD -i tailscale0 -j ACCEPT
-    iptables -A FORWARD -o tailscale0 -j ACCEPT
-    iptables-save > /etc/iptables/rules.v4
-
-    success "Tailscale installed and configured"
-    info "Run 'tailscale up --advertise-routes=${LAN_NETWORK} --advertise-exit-node' to connect"
-}
 
 # Setup DNS services (host-based for Olares compatibility)
 setup_dns_services() {
@@ -1947,7 +1869,7 @@ start_all_services() {
         "fail2ban"
         "hostapd"
 dnsmasq
-        "tailscaled"
+        ""
     )
 
     for service in "${services[@]}"; do
@@ -1969,7 +1891,7 @@ verify_setup() {
     log "Verifying setup..."
 
     # Check critical services
-    local critical_services=("ssh" "fail2ban" "hostapd" "dnsmasq" "docker")
+    local critical_services=("ssh" "fail2ban" "hostapd" "dnsmasq" "adguardhome")
     local failed_services=()
 
     for service in "${critical_services[@]}"; do
@@ -2018,9 +1940,9 @@ show_final_info() {
 ║  Management: dangerprep --help                                               ║
 ║                                                                              ║
 ║  Services: http://portal.danger                                              ║
-║  Traefik: http://traefik.danger                                              ║
+║  AdGuard Home: http://adguard.danger                                         ║
 ║                                                                              ║
-║  Tailscale: tailscale up --advertise-routes=${LAN_NETWORK}                    ║
+║  Olares: Access through Olares desktop interface                             ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 EOF
@@ -2106,26 +2028,26 @@ main() {
         info "Skipping network configuration (already completed)"
     fi
 
-    # Docker Setup Phase
-    if ! is_step_completed "DOCKER_SETUP"; then
-        set_step_state "DOCKER_SETUP" "IN_PROGRESS"
+    # Olares Setup Phase
+    if ! is_step_completed "OLARES_SETUP"; then
+        set_step_state "OLARES_SETUP" "IN_PROGRESS"
         # Apply FriendlyElec-specific performance optimizations
         if [[ "${IS_FRIENDLYELEC}" == true ]]; then
             configure_rk3588_performance
         fi
         install_olares
         configure_olares_integration
-        set_step_state "DOCKER_SETUP" "COMPLETED"
-        log "Docker setup completed. Continuing with services..."
+        set_step_state "OLARES_SETUP" "COMPLETED"
+        log "Olares setup completed. Continuing with services..."
     else
-        info "Skipping Docker setup (already completed)"
+        info "Skipping Olares setup (already completed)"
     fi
 
     # Services Configuration Phase
     if ! is_step_completed "SERVICES_CONFIG"; then
         set_step_state "SERVICES_CONFIG" "IN_PROGRESS"
         generate_sync_configs
-        setup_tailscale
+
         setup_dns_services
         setup_certificate_management
         set_step_state "SERVICES_CONFIG" "COMPLETED"
@@ -2170,7 +2092,7 @@ cleanup_on_error() {
             # Fallback to basic cleanup if cleanup script fails
             systemctl stop hostapd 2>/dev/null || true
             systemctl stop dnsmasq 2>/dev/null || true
-            systemctl stop docker 2>/dev/null || true
+
 
             # Restore original configurations if they exist
             if [[ -d "${BACKUP_DIR}" ]]; then
@@ -2189,7 +2111,7 @@ cleanup_on_error() {
         # Basic cleanup if cleanup script is not available
         systemctl stop hostapd 2>/dev/null || true
         systemctl stop dnsmasq 2>/dev/null || true
-        systemctl stop docker 2>/dev/null || true
+
 
         # Restore original configurations if they exist
         if [[ -d "${BACKUP_DIR}" ]]; then
@@ -2229,10 +2151,7 @@ parse_arguments() {
                     exit 1
                 fi
                 ;;
-            --skip-docker)
-                export SKIP_DOCKER=true
-                shift
-                ;;
+
             --skip-network)
                 export SKIP_NETWORK=true
                 shift

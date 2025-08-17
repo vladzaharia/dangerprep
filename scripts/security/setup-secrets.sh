@@ -82,7 +82,7 @@ check_prerequisites() {
     log "Checking prerequisites..."
     
     # Check if running from project root or scripts directory
-    if [[ ! -f "${PROJECT_ROOT}/docker/infrastructure/traefik/compose.yml" ]]; then
+    if [[ ! -f "${PROJECT_ROOT}/docker/sync/README.md" ]]; then
         error "This script must be run from the DangerPrep project directory"
         exit 1
     fi
@@ -203,22 +203,10 @@ validate_secrets() {
     
     # Define required secret files
     local required_secrets=(
-        "romm/auth_secret_key"
-        "romm/db_password"
-        "romm/redis_password"
-        "step-ca/ca_password"
-        "portainer/admin_password"
-        "arcane/session_secret"
-        "traefik/auth_password"
-        "traefik/auth_users"
-        "watchtower/api_token"
-        "watchtower/email_password"
-        "watchtower/gotify_token"
-        "komga/keystore_password"
-        "jellyfin/certificate_password"
-        "docmost/app_secret"
-        "docmost/db_password"
-        "onedev/db_password"
+        "shared/db_root_password"
+        "shared/db_user_password"
+        "shared/redis_password"
+        "shared/jwt_secret"
     )
     
     # Check each required secret
@@ -249,23 +237,15 @@ show_summary() {
     log "Secret Management Setup Summary"
     echo
     log "Secrets directory: ${SECRETS_DIR}"
-    log "Generated secrets for services:"
-    log "  • ROMM (auth key, database, Redis)"
-    log "  • Step-CA (root password)"
-    log "  • Portainer (admin password)"
-    log "  • Traefik (basic auth)"
-    log "  • Watchtower (API token, notifications)"
-    log "  • Komga (keystore password)"
-    log "  • Jellyfin (certificate password)"
+    log "Generated secrets for sync services:"
+    log "  • Shared database credentials"
+    log "  • Redis authentication"
+    log "  • JWT signing keys"
     echo
     log "Next steps:"
     log "  1. Review generated secrets in ${SECRETS_DIR}"
-    log "  2. Replace placeholder API keys with real ones:"
-    log "     - Cloudflare API keys in traefik/compose.env"
-    log "     - Email passwords in watchtower/compose.env"
-    log "     - External service API keys in romm/compose.env"
-    log "  3. Start Docker services: just deploy"
-    log "  4. Verify services are working correctly"
+    log "  2. Start sync services: just sync-deploy"
+    log "  3. Verify services are working correctly"
     echo
     warning "Important security notes:"
     warning "  • Keep the secrets directory secure (700 permissions)"

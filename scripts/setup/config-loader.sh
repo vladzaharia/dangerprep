@@ -166,18 +166,7 @@ load_network_performance_config() {
     cat "${CONFIG_DIR}/network/network_performance.conf.tmpl" >> /etc/sysctl.conf
 }
 
-load_docker_config() {
-    log "Loading Docker daemon configuration..."
-    mkdir -p /etc/docker
-    process_template "${CONFIG_DIR}/docker/daemon.json.tmpl" "/etc/docker/daemon.json"
-}
 
-load_watchtower_config() {
-    log "Loading Watchtower configuration..."
-    local watchtower_dir="${INSTALL_ROOT}/docker/infrastructure/watchtower"
-    mkdir -p "$watchtower_dir"
-    process_template "${CONFIG_DIR}/docker/watchtower.compose.yml.tmpl" "$watchtower_dir/compose.yml"
-}
 
 # Function to validate all configuration files exist
 validate_config_files() {
@@ -215,9 +204,7 @@ validate_config_files() {
         "${CONFIG_DIR}/system/20auto-upgrades.tmpl"
         "${CONFIG_DIR}/system/01-dangerprep-banner"
 
-        # Docker configs
-        "${CONFIG_DIR}/docker/daemon.json.tmpl"
-        "${CONFIG_DIR}/docker/watchtower.compose.yml.tmpl"
+
 
         # FriendlyElec configs
         "${CONFIG_DIR}/friendlyelec/mali-gpu-env.sh.tmpl"
