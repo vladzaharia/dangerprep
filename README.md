@@ -2,33 +2,68 @@
 
 A comprehensive emergency router and content hub system built as a TypeScript monorepo with Docker services, designed for travel and emergency scenarios. Supports multiple FriendlyElec hardware platforms running Ubuntu 24.04 LTS.
 
-## 🚀 Quick Start
+## 🚀 Quick Installation
+
+### Option 1: Latest Release (Recommended)
+
+```bash
+# One-liner installation (downloads latest stable release)
+curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | bash
+```
+
+### Option 2: Latest Development (Main Branch)
+
+```bash
+# Clone and install from main branch
+git clone https://github.com/vladzaharia/dangerprep.git
+cd dangerprep
+sudo ./scripts/setup/setup-dangerprep.sh
+```
 
 ### Prerequisites
 
 - **Hardware**: FriendlyElec NanoPi M6, R6C, NanoPC-T6, or CM3588 (or generic x86_64)
 - **OS**: Ubuntu 24.04 LTS (Ubuntu Noble Desktop recommended for FriendlyElec hardware)
 - **Storage**: 2TB NVMe SSD (portable installation - can be deployed anywhere)
-- **Software**: Docker and Docker Compose (automatically installed by setup script)
-- **Access**: Root access (sudo) to the system
+- **Access**: Root access (sudo) required for system-level installation
+- **Network**: Internet connection for initial setup and package downloads
 
-### One-Command Deployment
+### What Gets Installed
+
+The installation process will:
+
+- Install to `/dangerprep` by default (requires root)
+- Set up emergency router and content hub system
+- Configure network services (WiFi hotspot, DNS, DHCP)
+- Apply comprehensive security hardening
+- Install hardware optimization for supported devices
+- Download and configure all required dependencies
+
+### After Installation
+
+Once installed, you can manage the system using the bundled `just` command runner:
+
 ```bash
-# Clone the repository
-git clone https://github.com/vladzaharia/dangerprep.git dangerprep
-cd dangerprep
+# Navigate to installation directory
+cd /dangerprep
 
-# Deploy the entire system using bundled just
-./lib/just/just deploy
+# Deploy all services
+just deploy
+
+# Check system status
+just status
+
+# View all available commands
+just --list
 ```
 
-### System Requirements
+### Development Requirements
 
-- **Just Command Runner**: Bundled in `lib/just/` (auto-downloaded)
-- **Installation Location**: Can be deployed anywhere (not tied to /opt)
-- **Environment Variable**: Set `DANGERPREP_INSTALL_ROOT` to customize installation directory
+For TypeScript development and customization:
+
 - **Node.js**: 22+ (for TypeScript monorepo development)
 - **Yarn**: 4.5.3+ (package manager)
+- **Just Command Runner**: Bundled in `lib/just/` (auto-downloaded)
 
 ## 📋 System Overview
 
