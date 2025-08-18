@@ -48,7 +48,7 @@ show_banner() {
     echo -e "${BLUE}: :    ${CYAN}|::.. . /                             ${PURPLE}|::.|                         ${BLUE}: :${NC}"
     echo -e "${BLUE}: :    ${CYAN}\`------'                              ${PURPLE}\`---'                         ${BLUE}: :${NC}"
     echo -e "${BLUE}: :                                                                        : :${NC}"
-    echo -e "${BLUE}: :${YELLOW}                     Bootstrap Installation Script                      ${BLUE}: :${NC}"
+    echo -e "${BLUE}: :${YELLOW}                      Strapping boots since 2025                        ${BLUE}: :${NC}"
     echo -e "${BLUE}: :                                                                        : :${NC}"
     echo -e "${PURPLE}'·:........................................................................:·'${NC}"
     echo ""

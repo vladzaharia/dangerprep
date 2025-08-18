@@ -37,15 +37,16 @@ jobs:
       - name: Download package artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: dangerprep-package-*
+          pattern: dangerprep-*
           merge-multiple: true
       
       - name: Get version information
         id: versions
         run: |
-          just_version=$(cat lib/just/VERSION 2>/dev/null || echo "unknown")
-          gum_version=$(cat lib/gum/VERSION 2>/dev/null || echo "unknown")
-          
+          # Get latest versions from GitHub API
+          just_version=$(curl -s https://api.github.com/repos/casey/just/releases/latest | jq -r '.tag_name')
+          gum_version=$(curl -s https://api.github.com/repos/charmbracelet/gum/releases/latest | jq -r '.tag_name')
+
           echo "just_version=$just_version" >> $GITHUB_OUTPUT
           echo "gum_version=$gum_version" >> $GITHUB_OUTPUT
       
@@ -91,7 +92,7 @@ jobs:
             
             ### What's New:
             See the [commit history](https://github.com/${{ github.repository }}/commits/${{ steps.validate.outputs.tag_name }}) for detailed changes.
-          files: dangerprep-package-*.tar.gz
+          files: dangerprep-*.tar.gz
           draft: false
           prerelease: false
       
@@ -104,7 +105,7 @@ jobs:
           echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Release Asset:" >> $GITHUB_STEP_SUMMARY
-          ls -la dangerprep-package-*.tar.gz | awk '{print "- " $9 " (" $5 " bytes)"}' >> $GITHUB_STEP_SUMMARY
+          ls -la dangerprep-*.tar.gz | awk '{print "- " $9 " (" $5 " bytes)"}' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Installation Commands:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY

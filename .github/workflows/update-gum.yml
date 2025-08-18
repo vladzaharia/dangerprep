@@ -1,14 +1,11 @@
 name: Update Gum Binaries
 
 on:
-  schedule:
-    # Run daily at 6 AM UTC
-    - cron: '0 6 * * *'
-  workflow_dispatch:
-    # Allow manual triggering
+  workflow_call:
+    # Allow being called by other workflows
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   update-gum:
@@ -18,57 +15,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get current version
-        id: current
-        run: |
-          if [ -f lib/gum/VERSION ]; then
-            echo "version=$(cat lib/gum/VERSION)" >> $GITHUB_OUTPUT
-          else
-            echo "version=" >> $GITHUB_OUTPUT
-          fi
-
       - name: Get latest gum version
         id: latest
         run: |
           latest=$(curl -s https://api.github.com/repos/charmbracelet/gum/releases/latest | jq -r '.tag_name')
           echo "version=$latest" >> $GITHUB_OUTPUT
 
-      - name: Compare versions
-        id: compare
-        run: |
-          current="${{ steps.current.outputs.version }}"
-          latest="${{ steps.latest.outputs.version }}"
-
-          if [ "$current" != "$latest" ]; then
-            echo "update_needed=true" >> $GITHUB_OUTPUT
-            echo "Current version: $current"
-            echo "Latest version: $latest"
-            echo "Update needed!"
-          else
-            echo "update_needed=false" >> $GITHUB_OUTPUT
-            echo "Already up to date: $current"
-          fi
-
-      - name: Download new gum binaries
-        if: steps.compare.outputs.update_needed == 'true'
+      - name: Download gum binaries
         run: |
           cd lib/gum
           ./download.sh --force --version ${{ steps.latest.outputs.version }}
 
-      - name: Commit and push changes
-        if: steps.compare.outputs.update_needed == 'true'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add lib/gum/VERSION
-          git commit -m "chore: update gum version to ${{ steps.latest.outputs.version }}"
-          git push
-
       - name: Create summary
-        if: steps.compare.outputs.update_needed == 'true'
         run: |
-          echo "## Gum Version Updated" >> $GITHUB_STEP_SUMMARY
-          echo "Updated from ${{ steps.current.outputs.version }} to ${{ steps.latest.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Gum Binaries Downloaded" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${{ steps.latest.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Available Platforms:" >> $GITHUB_STEP_SUMMARY
           echo "- linux-x86_64, linux-aarch64, linux-armv7, linux-arm" >> $GITHUB_STEP_SUMMARY

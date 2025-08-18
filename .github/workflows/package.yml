@@ -1,9 +1,6 @@
 name: Package DangerPrep
 
 on:
-  push:
-    branches:
-      - '*'
   pull_request:
     branches:
       - '*'
@@ -16,28 +13,26 @@ permissions:
   contents: read
 
 jobs:
+  update-just:
+    uses: ./.github/workflows/update-just.yml
+
+  update-gum:
+    uses: ./.github/workflows/update-gum.yml
+
   package:
+    needs: [update-just, update-gum]
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download just binaries
-        run: |
-          cd lib/just
-          ./download.sh --force
-      
-      - name: Download gum binaries
-        run: |
-          cd lib/gum
-          ./download.sh --force
-      
       - name: Get version information
         id: versions
         run: |
-          just_version=$(cat lib/just/VERSION 2>/dev/null || echo "unknown")
-          gum_version=$(cat lib/gum/VERSION 2>/dev/null || echo "unknown")
+          # Get latest versions from GitHub API
+          just_version=$(curl -s https://api.github.com/repos/casey/just/releases/latest | jq -r '.tag_name')
+          gum_version=$(curl -s https://api.github.com/repos/charmbracelet/gum/releases/latest | jq -r '.tag_name')
 
           echo "just_version=$just_version" >> $GITHUB_OUTPUT
           echo "gum_version=$gum_version" >> $GITHUB_OUTPUT
@@ -79,7 +74,7 @@ jobs:
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dangerprep-package-${{ steps.versions.outputs.package_tag }}
+          name: dangerprep-${{ steps.versions.outputs.package_tag }}
           path: dangerprep-${{ steps.versions.outputs.package_tag }}.tar.gz
           retention-days: 30
       
@@ -90,12 +85,6 @@ jobs:
           echo "Just version: ${{ steps.versions.outputs.just_version }}" >> $GITHUB_STEP_SUMMARY
           echo "Gum version: ${{ steps.versions.outputs.gum_version }}" >> $GITHUB_STEP_SUMMARY
           echo "Commit: $(git rev-parse HEAD)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Package Contents:" >> $GITHUB_STEP_SUMMARY
-          echo "- Complete DangerPrep codebase" >> $GITHUB_STEP_SUMMARY
-          echo "- Cross-platform just binaries" >> $GITHUB_STEP_SUMMARY
-          echo "- Cross-platform gum binaries" >> $GITHUB_STEP_SUMMARY
-          echo "- Bootstrap installation script" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Artifact:" >> $GITHUB_STEP_SUMMARY
           echo "- dangerprep-${{ steps.versions.outputs.package_tag }}.tar.gz" >> $GITHUB_STEP_SUMMARY
