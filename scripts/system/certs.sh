@@ -12,8 +12,8 @@ readonly SCRIPT_DIR
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
 source "${SCRIPT_DIR}/../shared/logging.sh"
-# shellcheck source=../shared/error-handling.sh
-source "${SCRIPT_DIR}/../shared/error-handling.sh"
+# shellcheck source=../shared/errors.sh
+source "${SCRIPT_DIR}/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
 source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh

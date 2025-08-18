@@ -8,8 +8,8 @@ FUNCTIONS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source all shared utilities
 # shellcheck source=./logging.sh
 source "${FUNCTIONS_DIR}/logging.sh"
-# shellcheck source=./error-handling.sh
-source "${FUNCTIONS_DIR}/error-handling.sh"
+# shellcheck source=./errors.sh
+source "${FUNCTIONS_DIR}/errors.sh"
 # shellcheck source=./validation.sh
 source "${FUNCTIONS_DIR}/validation.sh"
 # shellcheck source=./banner.sh
