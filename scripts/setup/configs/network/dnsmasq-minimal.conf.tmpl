@@ -1,0 +1,21 @@
+# Minimal dnsmasq config for WiFi hotspot DHCP only
+# DNS is handled by Docker containers
+
+# Interface to bind to
+interface={{WIFI_INTERFACE}}
+
+# DHCP range for WiFi clients
+dhcp-range={{DHCP_START}},{{DHCP_END}},255.255.252.0,24h
+
+# Don't read /etc/hosts
+no-hosts
+
+# Don't read /etc/resolv.conf
+no-resolv
+
+# Forward DNS to Docker DNS service
+server=127.0.0.1#5053
+
+# Log queries for debugging
+log-queries
+log-dhcp

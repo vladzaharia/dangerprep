@@ -1,59 +1,93 @@
-# DangerPrep Secret Management System
+# DangerPrep Security Management System
 
-This directory contains the secret management system for DangerPrep Docker services. All passwords, API keys, and sensitive configuration values are automatically generated with strong randomness and stored securely.
+This directory contains the comprehensive security management system for DangerPrep.
+It provides intelligent security management with automatic threat detection, certificate
+management, secret handling, and comprehensive security auditing.
 
-## Overview
+## Architecture Overview
 
-The secret management system provides:
+The security system follows the same intelligent, event-driven architecture as the network
+scripts, with:
 
-- **Automatic secret generation** for all Docker services
-- **Secure file-based storage** with proper permissions (600)
-- **Docker secrets integration** where supported
-- **Environment file updates** with generated secrets
-- **Backup and validation** of secret configurations
+- **`security-manager.sh`** - Main intelligent controller (single entry point)
+- **Specialized security tools** - Domain-specific functionality
+- **Shared security utilities** - Common security functions and state management
+- **Comprehensive auditing** - Multiple security scanning tools
+- **Certificate management** - Step-CA integration and SSL/TLS handling
+- **Secret management** - Secure generation and storage of credentials
 
-## Scripts
+## Core Components
 
-### `generate-secrets.sh`
-Generates random passwords and secrets for all Docker services.
+### Main Controller
+- **`security-manager.sh`** - Central entry point for all security operations
+
+### Security Auditing
+- **`security-audit-all.sh`** - Unified security audit orchestrator
+- **`aide-check.sh`** - File integrity monitoring using AIDE
+- **`antivirus-scan.sh`** - Malware scanning using ClamAV
+- **`lynis-audit.sh`** - System security audit using Lynis
+- **`rootkit-scan.sh`** - Rootkit detection using rkhunter/chkrootkit
+- **`security-audit.sh`** - General security configuration checks
+
+### Certificate Management
+- **`certificate-manager.sh`** - SSL/TLS certificate management and Step-CA integration
+
+### Secret Management
+- **`setup-secrets.sh`** - Complete secret management setup
+- **`update-env-secrets.sh`** - Environment file secret updates
+
+### Monitoring & Diagnostics
+- **`suricata-monitor.sh`** - IDS monitoring and alerting
+- **`security-diagnostics.sh`** - Security validation and status reporting
+
+### Shared Utilities
+- **`security-functions.sh`** - Common security utilities and functions
+- **`security-state.sh`** - Centralized security state management
+
+## Usage
+
+### Main Security Manager Commands
+
+The security manager provides a unified interface for all security operations:
 
 ```bash
-# Generate all missing secrets
-./generate-secrets.sh
+# Show comprehensive security status
+just security-status
 
-# Regenerate all secrets (overwrite existing)
-./generate-secrets.sh --force
+# Run complete security audit
+just security-audit-all
 
-# Generate secrets for specific service only
-./generate-secrets.sh --service romm
+# Set up secret management
+just secrets-setup
+
+# Check certificate status
+just certs-status
+
+# Run security diagnostics
+just security-diagnostics
 ```
 
-### `update-env-secrets.sh`
-Updates Docker compose.env files with generated secrets.
+### Direct Script Usage
+
+You can also run scripts directly for specific operations:
 
 ```bash
-# Update all environment files
-./update-env-secrets.sh
+# Security auditing
+./scripts/security/aide-check.sh check
+./scripts/security/antivirus-scan.sh quick
+./scripts/security/lynis-audit.sh audit
+./scripts/security/rootkit-scan.sh scan
 
-# Preview changes without applying
-./update-env-secrets.sh --dry-run
+# Certificate management
+./scripts/security/certificate-manager.sh status
+./scripts/security/certificate-manager.sh generate
 
-# Update specific service only
-./update-env-secrets.sh --service traefik
-```
+# Secret management
+./scripts/security/setup-secrets.sh
+./scripts/security/update-env-secrets.sh
 
-### `setup-secrets.sh`
-Complete secret management setup (combines generation and updates).
-
-```bash
-# Set up all secrets (recommended)
-./setup-secrets.sh
-
-# Force regenerate all secrets
-./setup-secrets.sh --force
-
-# Preview what would be done
-./setup-secrets.sh --dry-run
+# Security diagnostics
+./scripts/security/security-diagnostics.sh validate
 ```
 
 ## Generated Secrets

@@ -29,7 +29,6 @@ warning() {
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION_FILE="$SCRIPT_DIR/VERSION"
 GITHUB_REPO="casey/just"
 GITHUB_API_URL="https://api.github.com/repos/$GITHUB_REPO"
 
@@ -209,21 +208,14 @@ main() {
     
     log "Target version: $target_version"
     
-    # Check if we need to download
-    if [[ -f "$VERSION_FILE" ]] && [[ ! "$force_download" == true ]]; then
-        local current_version=$(cat "$VERSION_FILE" 2>/dev/null || echo "")
-        if [[ "$current_version" == "$target_version" ]]; then
-            log "Already have version $target_version, use --force to re-download"
-            exit 0
-        fi
+    # Download all platform binaries (force download removes existing binaries)
+    if [[ "$force_download" == true ]]; then
+        log "Force download enabled, removing existing binaries..."
+        rm -f "$SCRIPT_DIR"/just-*
     fi
-    
-    # Download all platform binaries
+
     download_all_platforms "$target_version"
-    
-    # Update version file
-    echo "$target_version" > "$VERSION_FILE"
-    
+
     success "All binaries downloaded for version $target_version"
 }
 

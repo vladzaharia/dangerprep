@@ -90,10 +90,10 @@ sudo ./scripts/setup/cleanup-dangerprep.sh
 - **Routing**: Full internet access for WiFi clients with internal service access
 
 ### Services Deployed
-- **Traefik**: Reverse proxy with automatic HTTPS
-- **Jellyfin**: Media server
-- **Komga**: Book/comic server
+- **AdGuard Home**: DNS filtering and ad blocking
+- **Step-CA**: Internal certificate authority
 - **Kiwix**: Offline Wikipedia and content
+- **Olares**: Kubernetes-based personal cloud platform
 
 - **Sync Services**: NFS, Kiwix, and offline sync capabilities
 
@@ -153,9 +153,10 @@ The setup script automatically creates sensible configuration files for all sync
 
 3. **Access Services**:
    - Management Portal: https://portal.danger
-   - Jellyfin Media: https://jellyfin.danger
-   - Books: https://komga.danger
+   - AdGuard Home: https://adguard.danger
+   - Step-CA: https://step-ca.danger
    - Offline Content: https://kiwix.danger
+   - Olares Desktop: Access through Olares interface
 
 
 4. **Configure NFS** (if using central NAS):

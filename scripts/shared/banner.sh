@@ -9,7 +9,7 @@ BANNER_NC='\033[0m'             # No color reset
 # Banner elements
 BANNER_TOP_BORDER=".·:'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''':·."
 BANNER_BOTTOM_BORDER="·:........................................................................:·"
-BANNER_SIDE_BORDER=': :'
+
 BANNER_EMPTY_LINE=': :                                                                        : :'
 
 # ASCII art lines for the DangerPrep logo
@@ -28,7 +28,8 @@ BANNER_SPLIT_POS=45
 
 # Get colors for a specific scheme
 get_scheme_colors() {
-    local scheme="${1:-default}"
+    local scheme
+    scheme=${1:-default}
 
     case "$scheme" in
         "security")
@@ -67,7 +68,7 @@ get_scheme_colors() {
             BANNER_SECONDARY='\033[1;32m'  # Green (Prep)
             BANNER_TITLE='\033[1;33m'      # Yellow
             ;;
-        "docker")
+        "packages")
             BANNER_BORDER='\033[1;34m'     # Blue
             BANNER_PRIMARY='\033[1;37m'    # White (Danger)
             BANNER_SECONDARY='\033[1;36m'  # Cyan (Prep)
@@ -86,32 +87,36 @@ get_scheme_colors() {
 
 # Render top border
 render_top_border() {
-    local use_color="${1:-true}"
+    local use_color
+    use_color=${1:-true}
     if [[ "$use_color" == "true" ]]; then
         echo -e "${BANNER_BORDER}${BANNER_TOP_BORDER}${BANNER_NC}"
     else
-        echo "$BANNER_TOP_BORDER"
+        echo "${BANNER_TOP_BORDER}"
     fi
 }
 
 # Render bottom border
 render_bottom_border() {
-    local use_color="${1:-true}"
+    local use_color
+    use_color=${1:-true}
     if [[ "$use_color" == "true" ]]; then
         echo -e "${BANNER_BORDER}'${BANNER_BOTTOM_BORDER}'${BANNER_NC}"
     else
-        echo "'$BANNER_BOTTOM_BORDER'"
+        echo "'${BANNER_BOTTOM_BORDER}'"
     fi
 }
 
 # Render empty line with side borders
 render_empty_line() {
-    local use_color="${1:-true}"
-    local side_color="${2:-$BANNER_SECONDARY}"
+    local use_color
+    use_color=${1:-true}
+    local side_color
+    side_color=${2:-${BANNER_SECONDARY}}
     if [[ "$use_color" == "true" ]]; then
         echo -e "${side_color}${BANNER_EMPTY_LINE}${BANNER_NC}"
     else
-        echo "$BANNER_EMPTY_LINE"
+        echo "${BANNER_EMPTY_LINE}"
     fi
 }
 
@@ -119,32 +124,42 @@ render_empty_line() {
 get_side_color() {
     local line_num="$1"
     if [[ $((line_num % 2)) -eq 1 ]]; then
-        echo "$BANNER_PRIMARY"
+        echo "${BANNER_PRIMARY}"
     else
-        echo "$BANNER_SECONDARY"
+        echo "${BANNER_SECONDARY}"
     fi
 }
 
 # Render ASCII art line with two-color support and alternating side borders
 render_ascii_line() {
     local line="$1"
-    local use_color="${2:-true}"
-    local side_color="${3:-$BANNER_SECONDARY}"
+    local use_color
+    use_color=${2:-true}
+    local side_color
+    side_color=${3:-${BANNER_SECONDARY}}
 
     if [[ "$use_color" == "true" ]]; then
         # Split line at the original position 45 for two-color rendering
-        local danger_part="${line:0:$BANNER_SPLIT_POS}"     # Danger part (positions 0-44)
-        local prep_part="${line:$BANNER_SPLIT_POS}"         # Prep part (positions 45+)
+        local danger_part
+        danger_part=${line:0:${BANNER_SPLIT_POS}}     # Danger part (positions 0-44)
+        local prep_part
+        prep_part=${line:${BANNER_SPLIT_POS}}         # Prep part (positions 45+)
 
         # Extract side borders from each part
-        local left_border="${danger_part:0:4}"              # ": : " from danger part
-        local danger_content="${danger_part:4}"             # Content from danger part (without left border)
+        local left_border
+        left_border=${danger_part:0:4}              # ": : " from danger part
+        local danger_content
+        danger_content=${danger_part:4}             # Content from danger part (without left border)
 
         # Calculate prep content length (total prep part minus right border)
-        local prep_part_len=${#prep_part}
-        local prep_content_len=$((prep_part_len - 4))
-        local prep_content="${prep_part:0:$prep_content_len}" # Content from prep part (without right border)
-        local right_border="${prep_part: -4}"               # " : :" from prep part
+        local prep_part_len
+        prep_part_len=${#prep_part}
+        local prep_content_len
+        prep_content_len=$((prep_part_len - 4))
+        local prep_content
+        prep_content=${prep_part:0:$prep_content_len} # Content from prep part (without right border)
+        local right_border
+        right_border=${prep_part: -4}               # " : :" from prep part
 
         echo -e "${side_color}${left_border}${BANNER_PRIMARY}${danger_content}${BANNER_SECONDARY}${prep_content}${side_color}${right_border}${BANNER_NC}"
     else
@@ -155,12 +170,15 @@ render_ascii_line() {
 # Render title line with proper centering and coloring
 render_title_line() {
     local title="$1"
-    local use_color="${2:-true}"
-    local side_color="${3:-$BANNER_SECONDARY}"
+    local use_color
+    use_color=${2:-true}
+    local side_color
+    side_color=${3:-${BANNER_SECONDARY}}
 
     # Calculate proper centering and padding for title
     local content_width=72  # Width between ": :" markers
-    local title_length=${#title}
+    local title_length
+    title_length=${#title}
 
     # Truncate title if too long
     if [[ $title_length -gt 66 ]]; then
@@ -168,14 +186,18 @@ render_title_line() {
         title_length=${#title}
     fi
 
-    local padding_total=$((content_width - title_length))
-    local padding_left=$((padding_total / 2))
-    local padding_right=$((padding_total - padding_left))
+    local padding_total
+    padding_total=$((content_width - title_length))
+    local padding_left
+    padding_left=$((padding_total / 2))
+    local padding_right
+    padding_right=$((padding_total - padding_left))
 
     # Build properly padded title line
     printf -v spaces_left "%*s" $padding_left ""
     printf -v spaces_right "%*s" $padding_right ""
-    local title_content="${spaces_left}${title}${spaces_right}"
+    local title_content
+    title_content=${spaces_left}${title}${spaces_right}
 
     if [[ "$use_color" == "true" ]]; then
         echo -e "${side_color}: :${BANNER_TITLE}${title_content}${side_color}: :${BANNER_NC}"
@@ -188,8 +210,10 @@ render_title_line() {
 
 # Show banner without title (for utility scripts)
 show_banner() {
-    local scheme="${1:-default}"
-    local use_color="${2:-true}"
+    local scheme
+    scheme=${1:-default}
+    local use_color
+    use_color=${2:-true}
 
     # Set colors for the scheme
     get_scheme_colors "$scheme"
@@ -222,8 +246,10 @@ show_banner() {
 # Show banner with custom title (for major scripts)
 show_banner_with_title() {
     local title="$1"
-    local scheme="${2:-default}"
-    local use_color="${3:-true}"
+    local scheme
+    scheme=${2:-default}
+    local use_color
+    use_color=${3:-true}
 
     # Set colors for the scheme
     get_scheme_colors "$scheme"
@@ -296,30 +322,31 @@ show_validation_banner() {
     show_banner_with_title "System Validation" "validation" "$@"
 }
 
-# Convenience function for docker scripts
-show_docker_banner() {
-    show_banner_with_title "Docker Management" "docker" "$@"
+# Convenience function for package scripts
+show_packages_banner() {
+    show_banner_with_title "Package Management" "packages" "$@"
 }
 
 # Function to show banner in MOTD style (more subdued but still colorful)
 show_motd_banner() {
-    local scheme="${1:-default}"
+    local scheme
+    scheme=${1:-default}
 
     # Set colors for the scheme
     get_scheme_colors "$scheme"
 
     # Render banner elements dynamically with subdued styling (all sides use BANNER_SECONDARY)
     render_top_border "true"
-    render_empty_line "true" "$BANNER_SECONDARY"
-    render_empty_line "true" "$BANNER_SECONDARY"
+    render_empty_line "true" "${BANNER_SECONDARY}"
+    render_empty_line "true" "${BANNER_SECONDARY}"
 
     # Render ASCII art lines with two-color support
     for line in "${BANNER_ASCII_LINES[@]}"; do
-        render_ascii_line "$line" "true" "$BANNER_SECONDARY"
+        render_ascii_line "$line" "true" "${BANNER_SECONDARY}"
     done
 
-    render_empty_line "true" "$BANNER_SECONDARY"
-    render_empty_line "true" "$BANNER_SECONDARY"
+    render_empty_line "true" "${BANNER_SECONDARY}"
+    render_empty_line "true" "${BANNER_SECONDARY}"
     render_bottom_border "true"
 }
 
@@ -338,7 +365,7 @@ test_banner() {
     show_banner "network"
     echo
     echo "4. Setup banner:"
-    show_setup_banner
+    show_setup_banner "$@"
     echo
     echo "5. MOTD banner:"
     show_motd_banner
@@ -349,5 +376,5 @@ test_banner() {
 
 # If script is run directly, show test
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    test_banner
+    test_banner "$@"
 fi
