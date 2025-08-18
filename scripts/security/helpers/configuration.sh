@@ -13,8 +13,8 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-readonly SCRIPT_VERSION="1.0"
-readonly SCRIPT_DESCRIPTION="General Security Audit"
+SCRIPT_VERSION="1.0"
+SCRIPT_DESCRIPTION="General Security Audit"
 
 # Source shared utilities
 source "${SCRIPT_DIR}/../shared/logging.sh"
@@ -23,7 +23,7 @@ source "${SCRIPT_DIR}/../shared/validation.sh"
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Configuration
-readonly DEFAULT_LOG_FILE="/var/log/dangerprep-security-audit.log"
+DEFAULT_LOG_FILE="/var/log/dangerprep-security-audit.log"
 AUDIT_REPORT="/tmp/security-audit-report-$(date +%Y%m%d-%H%M%S).txt"
 readonly AUDIT_REPORT
 

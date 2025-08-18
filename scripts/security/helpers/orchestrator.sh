@@ -20,7 +20,7 @@ source "${SCRIPT_DIR}/../shared/validation.sh"
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Configuration variables
-readonly DEFAULT_LOG_FILE="/var/log/dangerprep-security-audit.log"
+DEFAULT_LOG_FILE="/var/log/dangerprep-security-audit.log"
 # shellcheck disable=SC2034  # Used in sourced configuration files and exported for subprocesses
 PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
 readonly PROJECT_ROOT

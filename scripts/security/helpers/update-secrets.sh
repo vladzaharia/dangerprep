@@ -23,7 +23,7 @@ source "${SCRIPT_DIR}/../shared/banner.sh"
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-update-env-secrets.log"
 PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
 readonly PROJECT_ROOT
-readonly SECRETS_DIR="${PROJECT_ROOT}/secrets"
+SECRETS_DIR="${PROJECT_ROOT}/secrets"
 readonly DOCKER_DIR="${PROJECT_ROOT}/docker"
 
 # Cleanup function for error recovery

@@ -13,8 +13,8 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-readonly SCRIPT_VERSION="1.0"
-readonly SCRIPT_DESCRIPTION="AIDE File Integrity Monitoring"
+SCRIPT_VERSION="1.0"
+SCRIPT_DESCRIPTION="AIDE File Integrity Monitoring"
 
 # Source shared utilities
 source "${SCRIPT_DIR}/../shared/logging.sh"

@@ -11,9 +11,9 @@ fi
 readonly SECURITY_FUNCTIONS_LOADED="true"
 
 # Security configuration
-readonly SECURITY_STATE_DIR="/var/lib/dangerprep/security"
+SECURITY_STATE_DIR="/var/lib/dangerprep/security"
 readonly SECURITY_LOG_DIR="/var/log/dangerprep"
-readonly SECRETS_DIR="/opt/dangerprep/secrets"
+SECRETS_DIR="/opt/dangerprep/secrets"
 
 # Ensure security directories exist
 ensure_security_directories() {

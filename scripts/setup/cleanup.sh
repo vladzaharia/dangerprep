@@ -14,8 +14,8 @@ set -euo pipefail
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-readonly SCRIPT_VERSION="2.0"
-readonly SCRIPT_DESCRIPTION="DangerPrep System Cleanup"
+SCRIPT_VERSION="2.0"
+SCRIPT_DESCRIPTION="DangerPrep System Cleanup"
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
@@ -30,8 +30,8 @@ source "${SCRIPT_DIR}/../shared/banner.sh"
 source "${SCRIPT_DIR}/../shared/functions.sh"
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-cleanup.log"
-readonly DEFAULT_INSTALL_ROOT="/opt/dangerprep"
-readonly INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-${DEFAULT_INSTALL_ROOT}}"
+DEFAULT_INSTALL_ROOT="/opt/dangerprep"
+INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-${DEFAULT_INSTALL_ROOT}}"
 
 # Global variables
 FORCE_CLEANUP=false

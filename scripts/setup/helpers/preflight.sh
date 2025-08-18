@@ -14,8 +14,8 @@ set -euo pipefail
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-readonly SCRIPT_VERSION="2.0"
-readonly SCRIPT_DESCRIPTION="DangerPrep Pre-flight Validation"
+SCRIPT_VERSION="2.0"
+SCRIPT_DESCRIPTION="DangerPrep Pre-flight Validation"
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh

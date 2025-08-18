@@ -26,8 +26,8 @@ source "${SCRIPT_DIR}/../shared/validation.sh"
 source "${SCRIPT_DIR}/../shared/banner.sh"
 
 # Configuration variables
-readonly DEFAULT_INSTALL_ROOT="/opt/dangerprep"
-readonly INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-${DEFAULT_INSTALL_ROOT}}"
+DEFAULT_INSTALL_ROOT="/opt/dangerprep"
+INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-${DEFAULT_INSTALL_ROOT}}"
 readonly BACKUP_DIR="/var/backups/dangerprep"
 readonly BACKUP_KEY_DIR="/etc/dangerprep/backup"
 readonly BACKUP_KEY="${BACKUP_KEY_DIR}/backup.key"

@@ -14,8 +14,8 @@ set -euo pipefail
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-readonly SCRIPT_VERSION="1.0"
-readonly SCRIPT_DESCRIPTION="Hardware Monitoring with FriendlyElec Support"
+SCRIPT_VERSION="1.0"
+SCRIPT_DESCRIPTION="Hardware Monitoring with FriendlyElec Support"
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh

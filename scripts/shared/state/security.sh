@@ -16,7 +16,7 @@ source "${SCRIPT_DIR}/logging.sh"
 source "${SCRIPT_DIR}/errors.sh"
 
 # Security state configuration
-readonly SECURITY_STATE_DIR="/var/lib/dangerprep/security"
+SECURITY_STATE_DIR="/var/lib/dangerprep/security"
 readonly SECURITY_STATE_FILE="${SECURITY_STATE_DIR}/security-state.json"
 readonly SECURITY_LOCK_FILE="/var/run/dangerprep-security.lock"
 readonly SECURITY_LOCK_TIMEOUT=30

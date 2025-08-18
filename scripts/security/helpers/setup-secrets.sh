@@ -23,7 +23,7 @@ source "${SCRIPT_DIR}/../shared/banner.sh"
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-setup-secrets.log"
 PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
 readonly PROJECT_ROOT
-readonly SECRETS_DIR="${PROJECT_ROOT}/secrets"
+SECRETS_DIR="${PROJECT_ROOT}/secrets"
 
 # Cleanup function for error recovery
 cleanup_on_error() {
