@@ -26,6 +26,13 @@ jobs:
           cd lib/just
           ./download.sh --force --version ${{ steps.latest.outputs.version }}
 
+      - name: Upload just binaries artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: just-binaries
+          path: lib/just/just-*
+          retention-days: 1
+
       - name: Create summary
         run: |
           echo "## Just Binaries Downloaded" >> $GITHUB_STEP_SUMMARY

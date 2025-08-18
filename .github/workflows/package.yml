@@ -27,6 +27,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Download just binaries artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: just-binaries
+          path: lib/just/
+
+      - name: Download gum binaries artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gum-binaries
+          path: lib/gum/
+
       - name: Get version information
         id: versions
         run: |

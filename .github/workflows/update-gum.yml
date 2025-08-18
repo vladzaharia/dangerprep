@@ -26,6 +26,13 @@ jobs:
           cd lib/gum
           ./download.sh --force --version ${{ steps.latest.outputs.version }}
 
+      - name: Upload gum binaries artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gum-binaries
+          path: lib/gum/gum-*
+          retention-days: 1
+
       - name: Create summary
         run: |
           echo "## Gum Binaries Downloaded" >> $GITHUB_STEP_SUMMARY
