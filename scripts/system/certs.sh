@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Script metadata
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly SCRIPT_DIR
+
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh

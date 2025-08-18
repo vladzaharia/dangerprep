@@ -12,7 +12,7 @@ set -euo pipefail
 
 # Script metadata
 # Script directory
-readonly SCRIPT_DIR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities

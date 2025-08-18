@@ -12,9 +12,7 @@ set -euo pipefail
 
 # Script metadata
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
-readonly SCRIPT_NAME
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly SCRIPT_DIR
 
 readonly SCRIPT_VERSION="2.0"
 readonly SCRIPT_DESCRIPTION="DangerPrep Pre-flight Validation"
