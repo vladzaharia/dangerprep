@@ -17,11 +17,11 @@ SCRIPT_VERSION="1.0"
 SCRIPT_DESCRIPTION="Security Diagnostics"
 
 # Source shared utilities
-source "${SCRIPT_DIR}/../shared/logging.sh"
-source "${SCRIPT_DIR}/../shared/errors.sh"
-source "${SCRIPT_DIR}/../shared/validation.sh"
-source "${SCRIPT_DIR}/../shared/banner.sh"
-source "${SCRIPT_DIR}/../shared/security.sh"
+source "${SCRIPT_DIR}/../../shared/logging.sh"
+source "${SCRIPT_DIR}/../../shared/errors.sh"
+source "${SCRIPT_DIR}/../../shared/validation.sh"
+source "${SCRIPT_DIR}/../../shared/banner.sh"
+source "${SCRIPT_DIR}/../../shared/security.sh"
 
 # Configuration
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-security-diagnostics.log"

@@ -18,16 +18,16 @@ SCRIPT_VERSION="1.0"
 SCRIPT_DESCRIPTION="Hardware Monitoring with FriendlyElec Support"
 
 # Source shared utilities
-# shellcheck source=../shared/logging.sh
-source "${SCRIPT_DIR}/../shared/logging.sh"
-# shellcheck source=../shared/errors.sh
-source "${SCRIPT_DIR}/../shared/errors.sh"
-# shellcheck source=../shared/validation.sh
-source "${SCRIPT_DIR}/../shared/validation.sh"
-# shellcheck source=../shared/banner.sh
-source "${SCRIPT_DIR}/../shared/banner.sh"
-# shellcheck source=../shared/hardware.sh
-source "${SCRIPT_DIR}/../shared/hardware.sh"
+# shellcheck source=../../shared/logging.sh
+source "${SCRIPT_DIR}/../../shared/logging.sh"
+# shellcheck source=../../shared/errors.sh
+source "${SCRIPT_DIR}/../../shared/errors.sh"
+# shellcheck source=../../shared/validation.sh
+source "${SCRIPT_DIR}/../../shared/validation.sh"
+# shellcheck source=../../shared/banner.sh
+source "${SCRIPT_DIR}/../../shared/banner.sh"
+# shellcheck source=../../shared/hardware.sh
+source "${SCRIPT_DIR}/../../shared/hardware.sh"
 
 # Configuration variables
 readonly ALERT_TEMP_CPU=80

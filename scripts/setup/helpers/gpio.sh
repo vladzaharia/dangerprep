@@ -8,13 +8,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities if available
-if [[ -f "${SCRIPT_DIR}/../shared/logging.sh" ]]; then
-    # shellcheck source=../shared/logging.sh
-    source "${SCRIPT_DIR}/../shared/logging.sh"
-    # shellcheck source=../shared/errors.sh
-    source "${SCRIPT_DIR}/../shared/errors.sh"
-    # shellcheck source=../shared/validation.sh
-    source "${SCRIPT_DIR}/../shared/validation.sh"
+if [[ -f "${SCRIPT_DIR}/../../shared/logging.sh" ]]; then
+    # shellcheck source=../../shared/logging.sh
+    source "${SCRIPT_DIR}/../../shared/logging.sh"
+    # shellcheck source=../../shared/errors.sh
+    source "${SCRIPT_DIR}/../../shared/errors.sh"
+    # shellcheck source=../../shared/validation.sh
+    source "${SCRIPT_DIR}/../../shared/validation.sh"
 else
     # Fallback logging functions if shared utilities not available
     log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
