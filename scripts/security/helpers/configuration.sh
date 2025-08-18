@@ -277,7 +277,7 @@ check_network_security() {
 }
 
 # Run comprehensive security audit
-run_comprehensive_audit() {
+run_audit() {
     set_error_context "Comprehensive security audit"
     
     log "Starting comprehensive security audit..."
@@ -372,7 +372,7 @@ main() {
     
     case "$command" in
         audit)
-            run_comprehensive_audit
+            run_audit
             ;;
         permissions)
             check_permissions

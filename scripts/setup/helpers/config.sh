@@ -1,26 +1,33 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DangerPrep Configuration Loader
-# Flexible template processing system
+# Centralized configuration loading and template processing system
+# Version: 2.0
+
+# Modern shell script best practices
+set -euo pipefail
 
 # Get the directory where this script is located
 CONFIG_LOADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="${CONFIG_LOADER_DIR}/configs"
+CONFIG_DIR="${CONFIG_LOADER_DIR}/../configs"
 
 # Source shared utilities if not already sourced
 if [[ -z "${LOGGING_SOURCED:-}" ]]; then
-    # shellcheck source=../shared/logging.sh
-    source "${CONFIG_LOADER_DIR}/../shared/logging.sh"
+    # shellcheck source=../../shared/logging.sh
+    source "${CONFIG_LOADER_DIR}/../../shared/logging.sh"
 fi
 
 if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
-    # shellcheck source=../shared/errors.sh
-    source "${CONFIG_LOADER_DIR}/../shared/errors.sh"
+    # shellcheck source=../../shared/errors.sh
+    source "${CONFIG_LOADER_DIR}/../../shared/errors.sh"
 fi
 
-if [[ -z "${VALIDATION_SOURCED:-}" ]]; then
-    # shellcheck source=../shared/validation.sh
-    source "${CONFIG_LOADER_DIR}/../shared/validation.sh"
+if [[ -z "${VALIDATION_HELPER_SOURCED:-}" ]]; then
+    # shellcheck source=./validation.sh
+    source "${CONFIG_LOADER_DIR}/validation.sh"
 fi
+
+# Mark this file as sourced
+export CONFIG_HELPER_SOURCED=true
 
 # Generic template processor with enhanced error handling
 # Usage: process_template <template_file> <output_file> [var1=value1] [var2=value2] ...
@@ -655,5 +662,187 @@ load_backup_cron_config() {
         log "Loaded backup cron configuration"
     else
         warning "Backup cron template not found: $template"
+    fi
+}
+
+#
+# Centralized Configuration Loading Functions
+#
+
+# Load all system configurations in the correct order
+# Usage: load_all_system_configs
+load_all_system_configs() {
+    log "Loading all system configurations..."
+
+    # Security configurations
+    load_ssh_config
+    load_fail2ban_config
+    load_kernel_hardening_config
+    load_aide_config
+
+    # System configurations
+    load_unattended_upgrades_config
+    load_hardware_monitoring_config
+    load_motd_config
+
+    success "All system configurations loaded"
+}
+
+# Load all network configurations
+# Usage: load_all_network_configs
+load_all_network_configs() {
+    log "Loading all network configurations..."
+
+    # Network interface configurations
+    load_wan_config
+    load_hostapd_config
+    load_dnsmasq_minimal_config
+    load_network_performance_config
+
+    # DNS configurations
+    load_systemd_resolved_adguard_config
+
+    success "All network configurations loaded"
+}
+
+# Load all service configurations
+# Usage: load_all_service_configs
+load_all_service_configs() {
+    log "Loading all service configurations..."
+
+    # Core services
+    load_adguard_config
+    load_adguardhome_service_config
+    load_step_ca_service_config
+
+    # Sync services
+    load_sync_configs
+
+    # Backup services
+    load_backup_cron_config
+
+    success "All service configurations loaded"
+}
+
+# Load FriendlyElec-specific configurations
+# Usage: load_friendlyelec_configs
+load_friendlyelec_configs() {
+    if [[ "${IS_FRIENDLYELEC:-false}" != true ]]; then
+        return 0
+    fi
+
+    log "Loading FriendlyElec-specific configurations..."
+
+    # Hardware-specific configurations
+    if [[ "${IS_RK3588:-false}" == true || "${IS_RK3588S:-false}" == true ]]; then
+        load_rk3588_performance_config
+        load_rk3588_udev_rules
+        load_rk3588_cpu_governor_service
+        load_mali_gpu_env_config
+        load_rk3588_gstreamer_config
+        load_rk3588_video_env_config
+        load_rk3588_sensors_config
+        load_rk3588_fan_control_config
+    fi
+
+    # GPIO/PWM configurations
+    load_gpio_pwm_config
+
+    success "FriendlyElec configurations loaded"
+}
+
+# Load configuration by category
+# Usage: load_configs_by_category "security" | "network" | "services" | "hardware"
+load_configs_by_category() {
+    local category="$1"
+
+    if [[ -z "$category" ]]; then
+        error "Configuration category is required"
+        return 1
+    fi
+
+    case "$category" in
+        "security")
+            load_ssh_config
+            load_fail2ban_config
+            load_kernel_hardening_config
+            load_aide_config
+            ;;
+        "network")
+            load_all_network_configs
+            ;;
+        "services")
+            load_all_service_configs
+            ;;
+        "hardware")
+            load_friendlyelec_configs
+            ;;
+        "system")
+            load_unattended_upgrades_config
+            load_hardware_monitoring_config
+            load_motd_config
+            ;;
+        *)
+            error "Unknown configuration category: $category"
+            return 1
+            ;;
+    esac
+
+    success "Loaded $category configurations"
+}
+
+#
+# Missing Configuration Loading Functions
+#
+
+# Load RK3588 sensors configuration
+load_rk3588_sensors_config() {
+    local template="${CONFIG_DIR}/hardware/rk3588-sensors.conf.tmpl"
+    local output="/etc/sensors.d/rk3588.conf"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        debug "Loaded RK3588 sensors configuration"
+    else
+        debug "RK3588 sensors template not found: $template"
+    fi
+}
+
+# Load RK3588 fan control configuration
+load_rk3588_fan_control_config() {
+    local template="${CONFIG_DIR}/hardware/rk3588-fan-control.conf.tmpl"
+    local output="/etc/dangerprep/fan-control.conf"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        debug "Loaded RK3588 fan control configuration"
+    else
+        debug "RK3588 fan control template not found: $template"
+    fi
+}
+
+# Load GPIO/PWM configuration
+load_gpio_pwm_config() {
+    local template="${CONFIG_DIR}/hardware/gpio-pwm.conf.tmpl"
+    local output="/etc/dangerprep/gpio-pwm.conf"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        debug "Loaded GPIO/PWM configuration"
+    else
+        debug "GPIO/PWM template not found: $template"
+    fi
+}
+
+# Load ethernet bonding configuration
+load_ethernet_bonding_config() {
+    local template="${CONFIG_DIR}/network/bonding.conf.tmpl"
+    local output="/etc/systemd/network/10-bond0.netdev"
+
+    if [[ -f "$template" ]]; then
+        process_template "$template" "$output"
+        debug "Loaded ethernet bonding configuration"
+    else
+        debug "Ethernet bonding template not found: $template"
     fi
 }
