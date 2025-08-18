@@ -272,7 +272,7 @@ main() {
     
     # Parse release information
     tag_name=$(echo "$release_info" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    download_url=$(echo "$release_info" | grep '"browser_download_url":.*dangerprep-package.*\.tar\.gz"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+    download_url=$(echo "$release_info" | grep '"browser_download_url":.*dangerprep.*\.tar\.gz"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
     if [[ -z "$tag_name" || -z "$download_url" ]]; then
         error "Failed to parse release information"

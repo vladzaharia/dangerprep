@@ -50,19 +50,19 @@ jobs:
           echo "gum_version=$gum_version" >> $GITHUB_OUTPUT
 
           # Create a package tag based on commit SHA
-          package_tag="package-$(git rev-parse --short HEAD)"
+          package_tag="$(git rev-parse --short HEAD)"
           echo "package_tag=$package_tag" >> $GITHUB_OUTPUT
       
       - name: Create package
         run: |
           # Create a comprehensive package with all binaries and scripts
-          mkdir -p dangerprep-package
+          mkdir -p dangerprep
 
           # Copy the entire repository structure
-          rsync -av --exclude='.git' --exclude='dangerprep-package' . dangerprep-package/
+          rsync -av --exclude='.git' --exclude='dangerprep' . dangerprep/
 
           # Create package info
-          cat > dangerprep-package/PACKAGE_INFO << EOF
+          cat > dangerprep/PACKAGE_INFO << EOF
           DangerPrep Package
           Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
           Commit: $(git rev-parse HEAD)
@@ -81,7 +81,7 @@ jobs:
           EOF
 
           # Create the package archive
-          tar -czf dangerprep-${{ steps.versions.outputs.package_tag }}.tar.gz dangerprep-package/
+          tar -czf dangerprep-${{ steps.versions.outputs.package_tag }}.tar.gz dangerprep/
       
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
