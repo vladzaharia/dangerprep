@@ -37,52 +37,7 @@ readonly OLARES_MOUNT_POINT="/olares"
 readonly CONTENT_MOUNT_POINT="/content"
 readonly MIN_DEVICE_SIZE_GB=300  # 256GB for Olares + 44GB minimum for content
 
-#
-# Utility Functions
-#
 
-# Parse storage size string and convert to GB
-# Usage: parse_storage_size "1.8T" or parse_storage_size "500G"
-# Returns: size in GB as integer
-parse_storage_size() {
-    local size_str="$1"
-    local size_num
-    local size_unit
-
-    # Extract numeric part and unit
-    size_num=$(echo "${size_str}" | sed 's/[^0-9.]//g')
-    size_unit=$(echo "${size_str}" | sed 's/[0-9.]//g' | tr '[:lower:]' '[:upper:]')
-
-    # Handle empty or invalid input
-    if [[ -z "${size_num}" ]]; then
-        echo "0"
-        return
-    fi
-
-    # Convert to GB based on unit
-    case "${size_unit}" in
-        "T"|"TB")
-            # Terabytes to GB (multiply by 1024)
-            echo "${size_num}" | awk '{printf "%.0f", $1 * 1024}'
-            ;;
-        "G"|"GB"|"")
-            # Already in GB or no unit (assume GB)
-            echo "${size_num}" | awk '{printf "%.0f", $1}'
-            ;;
-        "M"|"MB")
-            # Megabytes to GB (divide by 1024)
-            echo "${size_num}" | awk '{printf "%.0f", $1 / 1024}'
-            ;;
-        "K"|"KB")
-            # Kilobytes to GB (divide by 1024^2)
-            echo "${size_num}" | awk '{printf "%.0f", $1 / 1048576}'
-            ;;
-        *)
-            # Unknown unit, assume GB
-            echo "${size_num}" | awk '{printf "%.0f", $1}'
-            ;;
-    esac
-}
 
 #
 # NVMe Device Detection Functions
@@ -536,7 +491,8 @@ setup_nvme_storage() {
 
     # Detect NVMe devices
     if ! detect_nvme_devices; then
-        warning "No suitable NVMe device found - continuing with existing storage"
+        info "No NVMe devices found - continuing with existing storage"
+        info "NVMe SSD can be added later for expanded storage capacity"
         clear_error_context
         return 0  # Not an error, just continue without NVMe setup
     fi

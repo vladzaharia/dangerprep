@@ -190,31 +190,8 @@ check_system_requirements() {
                 local device_size_gb
                 device_size_str=$(lsblk -d -n -o SIZE "${device}" 2>/dev/null || echo "0")
 
-                # Parse size using storage helper function if available, otherwise fallback
-                if command -v parse_storage_size >/dev/null 2>&1; then
-                    device_size_gb=$(parse_storage_size "${device_size_str}")
-                else
-                    # Fallback parsing for when storage helper isn't loaded
-                    local size_num
-                    local size_unit
-                    size_num=$(echo "${device_size_str}" | sed 's/[^0-9.]//g')
-                    size_unit=$(echo "${device_size_str}" | sed 's/[0-9.]//g' | tr '[:lower:]' '[:upper:]')
-
-                    case "${size_unit}" in
-                        "T"|"TB")
-                            device_size_gb=$(echo "${size_num}" | awk '{printf "%.0f", $1 * 1024}')
-                            ;;
-                        "G"|"GB"|"")
-                            device_size_gb=$(echo "${size_num}" | awk '{printf "%.0f", $1}')
-                            ;;
-                        "M"|"MB")
-                            device_size_gb=$(echo "${size_num}" | awk '{printf "%.0f", $1 / 1024}')
-                            ;;
-                        *)
-                            device_size_gb=$(echo "${size_num}" | awk '{printf "%.0f", $1}')
-                            ;;
-                    esac
-                fi
+                # Parse storage size using shared function
+                device_size_gb=$(parse_storage_size "${device_size_str}")
 
                 if [[ ${device_size_gb} -ge 300 ]]; then
                     success "  ${device}: ${device_size_gb}GB (✓)"
@@ -226,10 +203,9 @@ check_system_requirements() {
             fi
         done <<< "${nvme_devices}"
     else
-        warning "No NVMe devices found"
-        warning "Setup will continue with existing storage, but NVMe is recommended"
-        warning "Consider adding an NVMe SSD for optimal performance"
-        ((issues++))
+        info "No NVMe devices found"
+        info "Setup will continue with existing storage"
+        info "NVMe SSD can be added later for expanded storage capacity"
     fi
 
     ISSUES_FOUND=$((ISSUES_FOUND + issues))

@@ -637,6 +637,49 @@ show_dry_run_summary() {
     info "To perform the actual setup, run the script without --dry-run"
 }
 
+# Parse storage size string and convert to GB
+# Usage: parse_storage_size "1.8T" or parse_storage_size "500G"
+# Returns: size in GB as integer
+parse_storage_size() {
+    local size_str="$1"
+    local size_num
+    local size_unit
+
+    # Extract numeric part and unit
+    size_num=$(echo "${size_str}" | sed 's/[^0-9.]//g')
+    size_unit=$(echo "${size_str}" | sed 's/[0-9.]//g' | tr '[:lower:]' '[:upper:]')
+
+    # Handle empty or invalid input
+    if [[ -z "${size_num}" ]]; then
+        echo "0"
+        return
+    fi
+
+    # Convert to GB based on unit
+    case "${size_unit}" in
+        "T"|"TB")
+            # Terabytes to GB (multiply by 1024)
+            echo "${size_num}" | awk '{printf "%.0f", $1 * 1024}'
+            ;;
+        "G"|"GB"|"")
+            # Already in GB or no unit (assume GB)
+            echo "${size_num}" | awk '{printf "%.0f", $1}'
+            ;;
+        "M"|"MB")
+            # Megabytes to GB (divide by 1024)
+            echo "${size_num}" | awk '{printf "%.0f", $1 / 1024}'
+            ;;
+        "K"|"KB")
+            # Kilobytes to GB (divide by 1024^2)
+            echo "${size_num}" | awk '{printf "%.0f", $1 / 1048576}'
+            ;;
+        *)
+            # Unknown unit, assume GB
+            echo "${size_num}" | awk '{printf "%.0f", $1}'
+            ;;
+    esac
+}
+
 # Export functions for use in other scripts
 export -f load_config
 export -f is_service_running is_service_enabled start_service stop_service restart_service
@@ -647,3 +690,4 @@ export -f enable_dry_run is_dry_run log_planned_change dry_run_execute
 export -f dry_run_file_op dry_run_service_op dry_run_package_op show_dry_run_summary
 export -f get_default_interface get_interface_ip
 export -f backup_file get_system_info detect_hardware init_environment
+export -f parse_storage_size
