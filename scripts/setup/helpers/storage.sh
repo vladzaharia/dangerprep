@@ -9,14 +9,24 @@ if [[ "${STORAGE_HELPER_SOURCED:-}" == "true" ]]; then
     return 0
 fi
 
-# Source required dependencies
-STORAGE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../../shared/logging.sh
-source "${STORAGE_SCRIPT_DIR}/../../shared/logging.sh"
-# shellcheck source=../../shared/errors.sh
-source "${STORAGE_SCRIPT_DIR}/../../shared/errors.sh"
-# shellcheck source=../../shared/validation.sh
-source "${STORAGE_SCRIPT_DIR}/../../shared/validation.sh"
+# Get the directory where this script is located
+STORAGE_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source shared utilities if not already sourced
+if [[ -z "${LOGGING_SOURCED:-}" ]]; then
+    # shellcheck source=../../shared/logging.sh
+    source "${STORAGE_HELPER_DIR}/../../shared/logging.sh"
+fi
+
+if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
+    # shellcheck source=../../shared/errors.sh
+    source "${STORAGE_HELPER_DIR}/../../shared/errors.sh"
+fi
+
+if [[ -z "${VALIDATION_SOURCED:-}" ]]; then
+    # shellcheck source=../../shared/validation.sh
+    source "${STORAGE_HELPER_DIR}/../../shared/validation.sh"
+fi
 
 # Mark this file as sourced
 export STORAGE_HELPER_SOURCED=true
@@ -26,6 +36,53 @@ readonly OLARES_PARTITION_SIZE="256GB"
 readonly OLARES_MOUNT_POINT="/olares"
 readonly CONTENT_MOUNT_POINT="/content"
 readonly MIN_DEVICE_SIZE_GB=300  # 256GB for Olares + 44GB minimum for content
+
+#
+# Utility Functions
+#
+
+# Parse storage size string and convert to GB
+# Usage: parse_storage_size "1.8T" or parse_storage_size "500G"
+# Returns: size in GB as integer
+parse_storage_size() {
+    local size_str="$1"
+    local size_num
+    local size_unit
+
+    # Extract numeric part and unit
+    size_num=$(echo "${size_str}" | sed 's/[^0-9.]//g')
+    size_unit=$(echo "${size_str}" | sed 's/[0-9.]//g' | tr '[:lower:]' '[:upper:]')
+
+    # Handle empty or invalid input
+    if [[ -z "${size_num}" ]]; then
+        echo "0"
+        return
+    fi
+
+    # Convert to GB based on unit
+    case "${size_unit}" in
+        "T"|"TB")
+            # Terabytes to GB (multiply by 1024)
+            echo "${size_num}" | awk '{printf "%.0f", $1 * 1024}'
+            ;;
+        "G"|"GB"|"")
+            # Already in GB or no unit (assume GB)
+            echo "${size_num}" | awk '{printf "%.0f", $1}'
+            ;;
+        "M"|"MB")
+            # Megabytes to GB (divide by 1024)
+            echo "${size_num}" | awk '{printf "%.0f", $1 / 1024}'
+            ;;
+        "K"|"KB")
+            # Kilobytes to GB (divide by 1024^2)
+            echo "${size_num}" | awk '{printf "%.0f", $1 / 1048576}'
+            ;;
+        *)
+            # Unknown unit, assume GB
+            echo "${size_num}" | awk '{printf "%.0f", $1}'
+            ;;
+    esac
+}
 
 #
 # NVMe Device Detection Functions
@@ -81,8 +138,10 @@ detect_nvme_devices() {
     fi
 
     # Validate device size
+    local device_size_str
     local device_size_gb
-    device_size_gb=$(lsblk -d -n -o SIZE "${NVME_DEVICE}" | sed 's/[^0-9.]//g' | cut -d'.' -f1)
+    device_size_str=$(lsblk -d -n -o SIZE "${NVME_DEVICE}")
+    device_size_gb=$(parse_storage_size "${device_size_str}")
 
     if [[ ${device_size_gb} -lt ${MIN_DEVICE_SIZE_GB} ]]; then
         error "Device ${NVME_DEVICE} is too small (${device_size_gb}GB < ${MIN_DEVICE_SIZE_GB}GB required)"
@@ -123,47 +182,57 @@ check_existing_partitions() {
     fi
 }
 
-# Check if content partition has existing data
-# Usage: check_content_data "$content_partition"
+# Check if partition has existing data
+# Usage: check_partition_data "$partition" "$partition_name"
 # Returns: 0 if data exists, 1 if empty/no filesystem
-check_content_data() {
+check_partition_data() {
     local partition="$1"
-    set_error_context "Content data check"
-    
-    if [[ -z "$partition" ]]; then
+    local partition_name="${2:-partition}"
+    set_error_context "${partition_name} data check"
+
+    if [[ -z "${partition}" ]]; then
         clear_error_context
         return 1
     fi
-    
+
     # Check if partition has a filesystem
-    if ! blkid "$partition" >/dev/null 2>&1; then
-        debug "No filesystem on $partition"
+    if ! blkid "${partition}" >/dev/null 2>&1; then
+        debug "No filesystem on ${partition}"
         clear_error_context
         return 1
     fi
-    
+
     # Try to mount temporarily to check for data
     local temp_mount
     temp_mount=$(mktemp -d)
-    
-    if mount "$partition" "$temp_mount" 2>/dev/null; then
+
+    if mount "${partition}" "${temp_mount}" 2>/dev/null; then
         local file_count
-        file_count=$(find "$temp_mount" -type f 2>/dev/null | wc -l)
-        umount "$temp_mount" 2>/dev/null || true
-        rmdir "$temp_mount" 2>/dev/null || true
-        
-        if [[ $file_count -gt 0 ]]; then
-            log "Found $file_count files on content partition"
+        local dir_count
+        file_count=$(find "${temp_mount}" -type f 2>/dev/null | wc -l)
+        dir_count=$(find "${temp_mount}" -mindepth 1 -type d 2>/dev/null | wc -l)
+        umount "${temp_mount}" 2>/dev/null || true
+        rmdir "${temp_mount}" 2>/dev/null || true
+
+        if [[ ${file_count} -gt 0 || ${dir_count} -gt 0 ]]; then
+            log "Found ${file_count} files and ${dir_count} directories on ${partition_name}"
             clear_error_context
             return 0
         fi
     else
-        rmdir "$temp_mount" 2>/dev/null || true
+        rmdir "${temp_mount}" 2>/dev/null || true
     fi
-    
-    debug "No data found on content partition"
+
+    debug "No data found on ${partition_name}"
     clear_error_context
     return 1
+}
+
+# Check if content partition has existing data (backward compatibility)
+# Usage: check_content_data "$content_partition"
+# Returns: 0 if data exists, 1 if empty/no filesystem
+check_content_data() {
+    check_partition_data "$1" "content partition"
 }
 
 #
@@ -484,21 +553,46 @@ setup_nvme_storage() {
         if [[ -b "${olares_partition}" && -b "${content_partition}" ]]; then
             log "Found existing Olares and Content partitions"
 
-            # Check for existing data on content partition
-            if check_content_data "${content_partition}"; then
+            # Check for existing data on both partitions
+            local olares_has_data=false
+            local content_has_data=false
+            local data_warning_shown=false
+
+            if check_partition_data "${olares_partition}" "Olares partition"; then
+                olares_has_data=true
+                warning "Olares partition contains existing data"
+                data_warning_shown=true
+            fi
+
+            if check_partition_data "${content_partition}" "Content partition"; then
+                content_has_data=true
                 warning "Content partition contains existing data"
+                data_warning_shown=true
+            fi
+
+            # If any data found, warn and ask for confirmation
+            if [[ "${data_warning_shown}" == "true" ]]; then
                 if ! is_dry_run; then
                     echo
-                    read -p "Reformat content partition? This will DELETE ALL DATA! (yes/no): " -r
+                    warning "DESTRUCTIVE OPERATION WARNING:"
+                    if [[ "${olares_has_data}" == "true" ]]; then
+                        warning "• Olares partition will be reformatted (all data lost)"
+                    fi
+                    if [[ "${content_has_data}" == "true" ]]; then
+                        warning "• Content partition will be reformatted (all data lost)"
+                    fi
+                    echo
+                    read -p "Continue and reformat partitions? This will DELETE ALL DATA! (yes/no): " -r
                     if [[ ! ${REPLY} =~ ^[Yy][Ee][Ss]$ ]]; then
-                        log "Preserving existing content partition data"
-                        # Still need to mount the partitions
+                        log "Preserving existing partition data - attempting to mount as-is"
+                        # Try to mount existing partitions without reformatting
                         if mount_partitions "${device}" && setup_persistent_mounts "${device}"; then
-                            success "Using existing NVMe storage with preserved content"
+                            success "Using existing NVMe storage with preserved data"
                             clear_error_context
                             return 0
                         else
                             error "Failed to mount existing partitions"
+                            error "Partitions may need reformatting to work properly"
                             clear_error_context
                             return 1
                         fi
@@ -516,8 +610,28 @@ setup_nvme_storage() {
         else
             # Existing partitions but not our layout - need to repartition
             warning "Existing partition layout does not match DangerPrep requirements"
+
+            # Check for data on any existing partitions
+            local existing_data=false
+            log "Checking existing partitions for data..."
+            for part in "${device}"*; do
+                if [[ -b "${part}" && "${part}" != "${device}" ]]; then
+                    local part_name
+                    part_name=$(basename "${part}")
+                    if check_partition_data "${part}" "${part_name}"; then
+                        existing_data=true
+                    fi
+                fi
+            done
+
             if ! is_dry_run; then
                 echo
+                if [[ "${existing_data}" == "true" ]]; then
+                    warning "DESTRUCTIVE OPERATION WARNING:"
+                    warning "• Existing partitions contain data that will be PERMANENTLY LOST"
+                    warning "• Device will be completely repartitioned for DangerPrep use"
+                    echo
+                fi
                 read -p "Repartition device? This will DELETE ALL DATA! (yes/no): " -r
                 if [[ ! ${REPLY} =~ ^[Yy][Ee][Ss]$ ]]; then
                     warning "Cannot proceed without repartitioning - skipping NVMe setup"
@@ -633,6 +747,6 @@ cleanup_storage_mounts() {
 }
 
 # Export functions for use in other scripts
-export -f detect_nvme_devices check_existing_partitions check_content_data
+export -f detect_nvme_devices check_existing_partitions check_partition_data check_content_data
 export -f partition_nvme_device format_partitions mount_partitions
 export -f setup_persistent_mounts setup_nvme_storage cleanup_storage_mounts

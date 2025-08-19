@@ -244,6 +244,77 @@ show_system_info() {
     detect_friendlyelec_platform
 }
 
+# Confirm installation start after preflight checks
+confirm_installation_start() {
+    log_section "Installation Confirmation"
+
+    # Skip confirmation in dry-run mode
+    if is_dry_run; then
+        log "Dry-run mode: Skipping installation confirmation"
+        return 0
+    fi
+
+    log "Pre-flight checks completed successfully!"
+    echo
+    warning "IMPORTANT: This installation will make significant changes to your system:"
+    warning "• Install and configure system services (hostapd, dnsmasq, AdGuard Home)"
+    warning "• Modify network configuration and firewall rules"
+    warning "• Install security tools and apply system hardening"
+    warning "• Set up Olares container platform"
+
+    # Check for NVMe storage and warn about partitioning
+    if command -v detect_nvme_devices >/dev/null 2>&1; then
+        local nvme_devices
+        nvme_devices=$(lsblk -d -n -o NAME,SIZE,TYPE | grep nvme | awk '{print "/dev/" $1}' || true)
+
+        if [[ -n "${nvme_devices}" ]]; then
+            echo
+            warning "NVMe Storage Setup:"
+            warning "• NVMe SSD will be partitioned for Olares (256GB) and Content storage"
+
+            # Check for existing data on NVMe devices
+            local data_found=false
+            while IFS= read -r device; do
+                if [[ -n "${device}" ]]; then
+                    # Check existing partitions for data
+                    for part in "${device}"*; do
+                        if [[ -b "${part}" && "${part}" != "${device}" ]]; then
+                            if command -v check_partition_data >/dev/null 2>&1; then
+                                if check_partition_data "${part}" "$(basename "${part}")" >/dev/null 2>&1; then
+                                    data_found=true
+                                    break
+                                fi
+                            fi
+                        fi
+                    done
+                fi
+            done <<< "${nvme_devices}"
+
+            if [[ "${data_found}" == "true" ]]; then
+                warning "• EXISTING DATA DETECTED on NVMe partitions"
+                warning "• You will be prompted before any data is deleted"
+            else
+                warning "• Existing data on NVMe partitions may be affected"
+            fi
+            warning "• You will be prompted before any destructive operations"
+        fi
+    fi
+
+    echo
+    log "Installation will create backups in: ${BACKUP_DIR}"
+    log "Installation logs will be saved to: ${LOG_FILE}"
+    echo
+
+    read -p "Do you want to proceed with the installation? (yes/no): " -r
+    if [[ ! ${REPLY} =~ ^[Yy][Ee][Ss]$ ]]; then
+        info "Installation cancelled by user"
+        info "You can run this script again when ready to proceed"
+        exit 0
+    fi
+
+    success "Installation confirmed - proceeding with setup"
+}
+
 # Configure NFS client
 configure_nfs_client() {
     log "Configuring NFS client..."
@@ -316,6 +387,7 @@ main() {
 
     show_system_info
     run_preflight_checks
+    confirm_installation_start
     backup_original_configs
 
     # System Update Phase

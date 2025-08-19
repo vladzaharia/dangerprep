@@ -186,8 +186,35 @@ check_system_requirements() {
         # Check each device size
         while IFS= read -r device; do
             if [[ -n "${device}" ]]; then
+                local device_size_str
                 local device_size_gb
-                device_size_gb=$(lsblk -d -n -o SIZE "${device}" 2>/dev/null | sed 's/[^0-9.]//g' | cut -d'.' -f1 || echo "0")
+                device_size_str=$(lsblk -d -n -o SIZE "${device}" 2>/dev/null || echo "0")
+
+                # Parse size using storage helper function if available, otherwise fallback
+                if command -v parse_storage_size >/dev/null 2>&1; then
+                    device_size_gb=$(parse_storage_size "${device_size_str}")
+                else
+                    # Fallback parsing for when storage helper isn't loaded
+                    local size_num
+                    local size_unit
+                    size_num=$(echo "${device_size_str}" | sed 's/[^0-9.]//g')
+                    size_unit=$(echo "${device_size_str}" | sed 's/[0-9.]//g' | tr '[:lower:]' '[:upper:]')
+
+                    case "${size_unit}" in
+                        "T"|"TB")
+                            device_size_gb=$(echo "${size_num}" | awk '{printf "%.0f", $1 * 1024}')
+                            ;;
+                        "G"|"GB"|"")
+                            device_size_gb=$(echo "${size_num}" | awk '{printf "%.0f", $1}')
+                            ;;
+                        "M"|"MB")
+                            device_size_gb=$(echo "${size_num}" | awk '{printf "%.0f", $1 / 1024}')
+                            ;;
+                        *)
+                            device_size_gb=$(echo "${size_num}" | awk '{printf "%.0f", $1}')
+                            ;;
+                    esac
+                fi
 
                 if [[ ${device_size_gb} -ge 300 ]]; then
                     success "  ${device}: ${device_size_gb}GB (✓)"
