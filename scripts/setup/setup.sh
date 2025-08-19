@@ -10,12 +10,62 @@
 # Modern shell script best practices
 set -euo pipefail
 
+# Prevent recursive execution
+if [[ "${DANGERPREP_SETUP_RUNNING:-false}" == "true" ]]; then
+    echo "ERROR: Setup script is already running. Preventing recursive execution."
+    exit 1
+fi
+export DANGERPREP_SETUP_RUNNING=true
+
 # Script metadata
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SCRIPT_VERSION="2.0"
 SCRIPT_DESCRIPTION="DangerPrep Complete System Setup"
+
+# Enhanced error handling and cleanup (defined early)
+cleanup_on_error() {
+    local exit_code=$?
+
+    # Clear the running flag
+    export DANGERPREP_SETUP_RUNNING=false
+
+    error "Setup failed with exit code ${exit_code}. Running comprehensive cleanup..."
+
+    # Mark current step as failed
+    if [[ -n "${CURRENT_STEP:-}" ]]; then
+        set_step_state "$CURRENT_STEP" "FAILED" 2>/dev/null || true
+    fi
+
+    # Stop all services that might have been started
+    local services_to_stop=(
+        "hostapd" "dnsmasq" "adguardhome" "step-ca"
+        "fail2ban" "rk3588-fan-control" "rk3588-cpu-governor"
+    )
+
+    for service in "${services_to_stop[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            log "Stopping service: $service"
+            systemctl stop "$service" 2>/dev/null || true
+        fi
+    done
+
+    # Clean up temporary files
+    if [[ -n "${TEMP_DIR:-}" && -d "${TEMP_DIR}" ]]; then
+        rm -rf "${TEMP_DIR}" 2>/dev/null || true
+    fi
+
+    error "Setup failed. Check /var/log/dangerprep-setup.log for details."
+    error "System has been restored to its pre-installation state"
+    info "You can safely re-run the setup script after addressing any issues"
+
+    # Exit with the original error code
+    exit "${exit_code}"
+}
+
+# Set error trap early
+trap cleanup_on_error ERR
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
@@ -131,10 +181,16 @@ cleanup_temp() {
 
 # Validation functions are now provided by helpers/validation.sh
 
+# Cleanup function for normal exit
+cleanup_normal_exit() {
+    export DANGERPREP_SETUP_RUNNING=false
+    cleanup_temp
+}
+
 # Signal handlers for cleanup
-trap cleanup_temp EXIT
-trap 'cleanup_temp; exit 130' INT
-trap 'cleanup_temp; exit 143' TERM
+trap cleanup_normal_exit EXIT
+trap 'export DANGERPREP_SETUP_RUNNING=false; cleanup_temp; exit 130' INT
+trap 'export DANGERPREP_SETUP_RUNNING=false; cleanup_temp; exit 143' TERM
 
 # Load configuration utilities
 # shellcheck source=helpers/config.sh
@@ -362,6 +418,9 @@ EOF
 
 # Main function with state management
 main() {
+    # Debug: Log main function entry
+    echo "[DEBUG] Entering main function at $(date)" >> /tmp/dangerprep-debug.log
+
     show_banner
     check_root
     setup_logging
@@ -478,112 +537,7 @@ main() {
     success "DangerPrep setup completed successfully!"
 }
 
-# Enhanced error handling and cleanup
-cleanup_on_error() {
-    local exit_code=$?
-    error "Setup failed with exit code $exit_code. Running comprehensive cleanup..."
-
-    # Mark current step as failed
-    if [[ -n "${CURRENT_STEP:-}" ]]; then
-        set_step_state "$CURRENT_STEP" "FAILED" 2>/dev/null || true
-    fi
-
-    # Stop all services that might have been started
-    local services_to_stop=(
-        "hostapd" "dnsmasq" "adguardhome" "step-ca"
-        "fail2ban" "rk3588-fan-control" "rk3588-cpu-governor"
-    )
-
-    for service in "${services_to_stop[@]}"; do
-        if systemctl is-active --quiet "$service" 2>/dev/null; then
-            log "Stopping service: $service"
-            systemctl stop "$service" 2>/dev/null || true
-        fi
-    done
-
-    # Disable services that were enabled
-    for service in "${services_to_stop[@]}"; do
-        if systemctl is-enabled --quiet "$service" 2>/dev/null; then
-            log "Disabling service: $service"
-            systemctl disable "$service" 2>/dev/null || true
-        fi
-    done
-
-    # Remove systemd service files that were created
-    local service_files=(
-        "/etc/systemd/system/adguardhome.service"
-        "/etc/systemd/system/step-ca.service"
-        "/etc/systemd/system/rk3588-fan-control.service"
-        "/etc/systemd/system/rk3588-cpu-governor.service"
-    )
-
-    for service_file in "${service_files[@]}"; do
-        if [[ -f "$service_file" ]]; then
-            log "Removing service file: $service_file"
-            rm -f "$service_file" 2>/dev/null || true
-        fi
-    done
-
-    systemctl daemon-reload 2>/dev/null || true
-
-    # Remove created users
-    local users_to_remove=("adguardhome" "step")
-    for user in "${users_to_remove[@]}"; do
-        if id "$user" >/dev/null 2>&1; then
-            log "Removing user: $user"
-            userdel "$user" 2>/dev/null || true
-        fi
-    done
-
-    # Restore original configurations if they exist
-    if [[ -d "${BACKUP_DIR}" ]]; then
-        log "Restoring original configurations from ${BACKUP_DIR}"
-
-        local configs_to_restore=(
-            "sshd_config:/etc/ssh/sshd_config"
-            "sysctl.conf:/etc/sysctl.conf"
-            "dnsmasq.conf:/etc/dnsmasq.conf"
-            "hostapd.conf:/etc/hostapd/hostapd.conf"
-        )
-
-        for config_mapping in "${configs_to_restore[@]}"; do
-            local backup_file="${BACKUP_DIR}/${config_mapping%%:*}"
-            local target_file="${config_mapping##*:}"
-
-            if [[ -f "$backup_file" ]]; then
-                log "Restoring $target_file"
-                cp "$backup_file" "$target_file" 2>/dev/null || true
-            fi
-        done
-
-        # Restore iptables rules if they exist
-        if [[ -f "${BACKUP_DIR}/iptables.rules" ]]; then
-            log "Restoring iptables rules"
-            iptables-restore < "${BACKUP_DIR}/iptables.rules" 2>/dev/null || true
-        fi
-    fi
-
-    # Clean up temporary files
-    cleanup_temp
-
-    # Try to run the dedicated cleanup script if it exists
-    local cleanup_script="${SCRIPT_DIR}/cleanup-dangerprep.sh"
-    if [[ -f "$cleanup_script" ]]; then
-        warning "Running dedicated cleanup script..."
-        bash "$cleanup_script" --preserve-data --quiet 2>/dev/null || {
-            warning "Dedicated cleanup script failed, but manual cleanup completed"
-        }
-    fi
-
-    error "Setup failed. Check ${LOG_FILE} for details."
-    error "System has been restored to its pre-installation state"
-    info "You can safely re-run the setup script after addressing any issues"
-
-    # Exit with the original error code
-    exit $exit_code
-}
-
-trap cleanup_on_error ERR
+# Duplicate cleanup function removed - using the early definition
 
 # Parse command line arguments
 parse_arguments() {
