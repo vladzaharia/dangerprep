@@ -7,17 +7,30 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
+# Prevent multiple sourcing
+if [[ -n "${SHARED_NETWORK_SOURCED:-}" ]]; then
+    return 0
+fi
+
 # Modern shell script best practices
 set -euo pipefail
 
-# Network configuration defaults
-readonly DEFAULT_LAN_NETWORK="192.168.120.0/22"
-# shellcheck disable=SC2034  # Used by external scripts
-readonly DEFAULT_LAN_IP="192.168.120.1"
-# shellcheck disable=SC2034  # Used by external scripts
-readonly DEFAULT_WIFI_SSID="DangerPrep"
-# shellcheck disable=SC2034  # Used by external scripts
-readonly DEFAULT_WIFI_PASSWORD="Buff00n!"
+# Network configuration defaults (only declare if not already set)
+if [[ -z "${DEFAULT_LAN_NETWORK:-}" ]]; then
+    readonly DEFAULT_LAN_NETWORK="192.168.120.0/22"
+fi
+if [[ -z "${DEFAULT_LAN_IP:-}" ]]; then
+    # shellcheck disable=SC2034  # Used by external scripts
+    readonly DEFAULT_LAN_IP="192.168.120.1"
+fi
+if [[ -z "${DEFAULT_WIFI_SSID:-}" ]]; then
+    # shellcheck disable=SC2034  # Used by external scripts
+    readonly DEFAULT_WIFI_SSID="DangerPrep"
+fi
+if [[ -z "${DEFAULT_WIFI_PASSWORD:-}" ]]; then
+    # shellcheck disable=SC2034  # Used by external scripts
+    readonly DEFAULT_WIFI_PASSWORD="Buff00n!"
+fi
 
 # Validate network interface exists
 validate_interface() {
@@ -405,3 +418,6 @@ remove_bridge() {
     
     clear_error_context
 }
+
+# Mark this file as sourced
+export SHARED_NETWORK_SOURCED=true
