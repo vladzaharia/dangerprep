@@ -18,6 +18,8 @@ source "${SCRIPT_DIR}/../../shared/errors.sh"
 source "${SCRIPT_DIR}/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
 source "${SCRIPT_DIR}/../../shared/banner.sh"
+# shellcheck source=../../shared/network.sh
+source "${SCRIPT_DIR}/../../shared/network.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-network-diagnostics.log"
@@ -225,8 +227,10 @@ wifi_diagnostics() {
     # Find WiFi interfaces
     local wifi_interfaces=()
     while IFS= read -r interface; do
-        wifi_interfaces+=("$interface")
-    done < <(iw dev 2>/dev/null | grep Interface | awk '{print $2}' || true)
+        if [[ -n "${interface}" ]]; then
+            wifi_interfaces+=("${interface}")
+        fi
+    done < <(detect_wifi_interfaces)
     
     if [[ ${#wifi_interfaces[@]} -eq 0 ]]; then
         echo "No WiFi interfaces found"

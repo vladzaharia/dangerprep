@@ -245,12 +245,77 @@ check_internet_connectivity() {
     return 1
 }
 
+# Detect WiFi interfaces using multiple fallback methods
+# Returns: Array of WiFi interface names (one per line)
+detect_wifi_interfaces() {
+    local wifi_interfaces=()
+
+    # Method 1: Check /sys/class/net/*/wireless directories (most reliable)
+    if [[ -d /sys/class/net ]]; then
+        for interface_path in /sys/class/net/*/wireless; do
+            if [[ -d "${interface_path}" ]]; then
+                local interface
+                interface=$(basename "$(dirname "${interface_path}")")
+                wifi_interfaces+=("${interface}")
+            fi
+        done
+    fi
+
+    # Method 2: Use iw if available and no interfaces found yet
+    if [[ ${#wifi_interfaces[@]} -eq 0 ]] && command -v iw >/dev/null 2>&1; then
+        while IFS= read -r interface; do
+            if [[ -n "${interface}" ]]; then
+                wifi_interfaces+=("${interface}")
+            fi
+        done < <(iw dev 2>/dev/null | grep Interface | awk '{print $2}' || true)
+    fi
+
+    # Method 3: Use nmcli if available and no interfaces found yet
+    if [[ ${#wifi_interfaces[@]} -eq 0 ]] && command -v nmcli >/dev/null 2>&1; then
+        while IFS= read -r interface; do
+            if [[ -n "${interface}" ]]; then
+                wifi_interfaces+=("${interface}")
+            fi
+        done < <(nmcli device status 2>/dev/null | awk '$2 == "wifi" {print $1}' || true)
+    fi
+
+    # Method 4: Fallback to /proc/net/wireless if still no interfaces found
+    if [[ ${#wifi_interfaces[@]} -eq 0 && -f /proc/net/wireless ]]; then
+        while IFS= read -r interface; do
+            if [[ -n "${interface}" ]]; then
+                wifi_interfaces+=("${interface}")
+            fi
+        done < <(awk 'NR > 2 && NF > 0 {print $1}' /proc/net/wireless 2>/dev/null | sed 's/:$//' || true)
+    fi
+
+    # Output interfaces (one per line)
+    if [[ ${#wifi_interfaces[@]} -gt 0 ]]; then
+        printf '%s\n' "${wifi_interfaces[@]}"
+    fi
+}
+
+# Count WiFi interfaces
+count_wifi_interfaces() {
+    local count=0
+    while IFS= read -r interface; do
+        if [[ -n "${interface}" ]]; then
+            ((count++))
+        fi
+    done < <(detect_wifi_interfaces)
+    echo "${count}"
+}
+
+# Get first available WiFi interface
+get_first_wifi_interface() {
+    detect_wifi_interfaces | head -1
+}
+
 # Get interface IP address
 get_interface_ip() {
     local interface="$1"
-    
+
     validate_interface "$interface"
-    
+
     ip addr show "$interface" | grep -oP 'inet \K[\d.]+' | head -1
 }
 

@@ -30,6 +30,11 @@ if [[ -z "${CONFIG_HELPER_SOURCED:-}" ]]; then
     source "${NETWORK_HELPER_DIR}/config.sh"
 fi
 
+if [[ -z "${SHARED_NETWORK_SOURCED:-}" ]]; then
+    # shellcheck source=../../shared/network.sh
+    source "${NETWORK_HELPER_DIR}/../../shared/network.sh"
+fi
+
 # Mark this file as sourced
 export NETWORK_HELPER_SOURCED=true
 
@@ -59,7 +64,7 @@ detect_network_interfaces() {
         if [[ -n "$interface" ]]; then
             wifi_interfaces+=("$interface")
         fi
-    done < <(iw dev 2>/dev/null | grep Interface | awk '{print $2}')
+    done < <(detect_wifi_interfaces)
 
     # FriendlyElec-specific interface selection
     if [[ "${IS_FRIENDLYELEC:-false}" == true ]]; then

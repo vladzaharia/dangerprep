@@ -77,13 +77,7 @@ load_config() {
 
 # Get first available WiFi interface
 get_wifi_interface() {
-    local wifi_interfaces=()
-    mapfile -t wifi_interfaces < <(iw dev | grep Interface | awk '{print $2}')
-    if [ ${#wifi_interfaces[@]} -gt 0 ]; then
-        echo "${wifi_interfaces[0]}"
-    else
-        echo ""
-    fi
+    get_first_wifi_interface
 }
 
 scan_networks() {
@@ -227,10 +221,14 @@ create_access_point() {
 show_wifi_status() {
     echo "WiFi Interface Status:"
     echo "====================="
-    
+
     local wifi_interfaces=()
-    mapfile -t wifi_interfaces < <(iw dev | grep Interface | awk '{print $2}')
-    
+    while IFS= read -r interface; do
+        if [[ -n "${interface}" ]]; then
+            wifi_interfaces+=("${interface}")
+        fi
+    done < <(detect_wifi_interfaces)
+
     if [ ${#wifi_interfaces[@]} -eq 0 ]; then
         warning "No WiFi interfaces found"
         return 1

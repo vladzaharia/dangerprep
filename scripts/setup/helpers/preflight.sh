@@ -26,6 +26,8 @@ source "${SCRIPT_DIR}/../../shared/errors.sh"
 source "${SCRIPT_DIR}/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
 source "${SCRIPT_DIR}/../../shared/banner.sh"
+# shellcheck source=../../shared/network.sh
+source "${SCRIPT_DIR}/../../shared/network.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-preflight.log"
@@ -234,13 +236,14 @@ check_network_interfaces() {
 
     # WiFi interface check
     local wifi_interfaces
-    wifi_interfaces=$(iw dev 2>/dev/null | grep -c Interface || echo "0")
-    if [[ $wifi_interfaces -eq 0 ]]; then
+    wifi_interfaces=$(count_wifi_interfaces)
+
+    if [[ ${wifi_interfaces} -eq 0 ]]; then
         warning "No WiFi interfaces detected"
         warning "Hotspot functionality will not be available"
         ((issues++))
     else
-        success "WiFi interfaces: $wifi_interfaces (✓)"
+        success "WiFi interfaces: ${wifi_interfaces} (✓)"
     fi
 
     ISSUES_FOUND=$((ISSUES_FOUND + issues))

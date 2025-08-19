@@ -20,6 +20,8 @@ source "${SCRIPT_DIR}/../../shared/validation.sh"
 source "${SCRIPT_DIR}/../../shared/banner.sh"
 # shellcheck source=../../shared/hardware.sh
 source "${SCRIPT_DIR}/../../shared/hardware.sh"
+# shellcheck source=../../shared/network.sh
+source "${SCRIPT_DIR}/../../shared/network.sh"
 # shellcheck source=../../shared/state/network.sh
 source "${SCRIPT_DIR}/../../shared/state/network.sh"
 # shellcheck source=../../shared/intelligence/network.sh
@@ -113,7 +115,11 @@ enumerate_interfaces() {
     # Enumerate WiFi interfaces
     log "Detecting WiFi interfaces..."
     local wifi_interfaces=()
-    mapfile -t wifi_interfaces < <(iw dev | grep Interface | awk '{print $2}')
+    while IFS= read -r interface; do
+        if [[ -n "${interface}" ]]; then
+            wifi_interfaces+=("${interface}")
+        fi
+    done < <(detect_wifi_interfaces)
     
     for interface in "${wifi_interfaces[@]}"; do
         local mac
