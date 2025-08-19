@@ -58,6 +58,8 @@ source "${SCRIPT_DIR}/helpers/verification.sh"
 source "${SCRIPT_DIR}/helpers/preflight.sh"
 # shellcheck source=helpers/monitoring.sh
 source "${SCRIPT_DIR}/helpers/monitoring.sh"
+# shellcheck source=helpers/storage.sh
+source "${SCRIPT_DIR}/helpers/storage.sh"
 
 # Show help information
 show_help() {
@@ -77,6 +79,7 @@ OPTIONS:
 DESCRIPTION:
     Complete system setup for Ubuntu 24.04 with 2025 security hardening.
     This script will:
+    • Detect and partition NVMe SSD for Olares (256GB) and Content storage
     • Install and configure system-level network services
     • Set up network configuration (hostapd, dnsmasq, firewall)
     • Install security tools (AIDE, fail2ban, ClamAV)
@@ -343,6 +346,7 @@ main() {
     if ! is_step_completed "NETWORK_CONFIG"; then
         CURRENT_STEP="NETWORK_CONFIG"
         set_step_state "NETWORK_CONFIG" "IN_PROGRESS"
+        setup_nvme_storage
         setup_olares_directory_structure
         configure_nfs_client
         detect_network_interfaces

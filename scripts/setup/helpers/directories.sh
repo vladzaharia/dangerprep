@@ -118,30 +118,44 @@ create_content_directories() {
     
     # Create main structure directories
     local base_dirs=(
-        "${install_root}/content"
         "${install_root}/nfs"
         "${install_root}/config"
         "${install_root}/data"
     )
-    
+
+    # Only create content directory if not using mounted storage
+    if ! mountpoint -q "/content" 2>/dev/null; then
+        base_dirs+=("${install_root}/content")
+    fi
+
     if ! create_secure_directories "755" "root:root" "${base_dirs[@]}"; then
         return 1
     fi
-    
+
+    # Determine content directory path (mounted or local)
+    local content_base
+    if mountpoint -q "/content" 2>/dev/null; then
+        content_base="/content"
+        log "Using mounted content storage at /content"
+    else
+        content_base="${install_root}/content"
+        log "Using local content storage at ${content_base}"
+    fi
+
     # Create content subdirectories
     local content_dirs=(
-        "${install_root}/content/movies"
-        "${install_root}/content/tv"
-        "${install_root}/content/webtv"
-        "${install_root}/content/music"
-        "${install_root}/content/audiobooks"
-        "${install_root}/content/books"
-        "${install_root}/content/comics"
-        "${install_root}/content/magazines"
-        "${install_root}/content/games/roms"
-        "${install_root}/content/kiwix"
+        "${content_base}/movies"
+        "${content_base}/tv"
+        "${content_base}/webtv"
+        "${content_base}/music"
+        "${content_base}/audiobooks"
+        "${content_base}/books"
+        "${content_base}/comics"
+        "${content_base}/magazines"
+        "${content_base}/games/roms"
+        "${content_base}/kiwix"
     )
-    
+
     if ! create_secure_directories "755" "ubuntu:ubuntu" "${content_dirs[@]}"; then
         return 1
     fi

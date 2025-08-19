@@ -28,6 +28,8 @@ source "${PREFLIGHT_SCRIPT_DIR}/../../shared/validation.sh"
 source "${PREFLIGHT_SCRIPT_DIR}/../../shared/banner.sh"
 # shellcheck source=../../shared/network.sh
 source "${PREFLIGHT_SCRIPT_DIR}/../../shared/network.sh"
+# shellcheck source=./storage.sh
+source "${PREFLIGHT_SCRIPT_DIR}/storage.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-preflight.log"
@@ -169,6 +171,38 @@ check_system_requirements() {
         ((issues++))
     else
         success "Root filesystem on SSD (✓)"
+    fi
+
+    # NVMe storage check
+    log_subsection "NVMe Storage Detection"
+    local nvme_devices
+    nvme_devices=$(lsblk -d -n -o NAME,SIZE,TYPE | grep nvme | awk '{print "/dev/" $1}' || true)
+
+    if [[ -n "${nvme_devices}" ]]; then
+        local device_count
+        device_count=$(echo "${nvme_devices}" | wc -l)
+        success "NVMe devices: ${device_count} found (✓)"
+
+        # Check each device size
+        while IFS= read -r device; do
+            if [[ -n "${device}" ]]; then
+                local device_size_gb
+                device_size_gb=$(lsblk -d -n -o SIZE "${device}" 2>/dev/null | sed 's/[^0-9.]//g' | cut -d'.' -f1 || echo "0")
+
+                if [[ ${device_size_gb} -ge 300 ]]; then
+                    success "  ${device}: ${device_size_gb}GB (✓)"
+                else
+                    warning "  ${device}: ${device_size_gb}GB (too small for optimal partitioning)"
+                    warning "  Minimum 300GB recommended (256GB Olares + 44GB Content)"
+                    ((issues++))
+                fi
+            fi
+        done <<< "${nvme_devices}"
+    else
+        warning "No NVMe devices found"
+        warning "Setup will continue with existing storage, but NVMe is recommended"
+        warning "Consider adding an NVMe SSD for optimal performance"
+        ((issues++))
     fi
 
     ISSUES_FOUND=$((ISSUES_FOUND + issues))

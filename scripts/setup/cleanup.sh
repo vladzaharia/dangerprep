@@ -28,6 +28,8 @@ source "${SETUP_CLEANUP_SCRIPT_DIR}/../shared/validation.sh"
 source "${SETUP_CLEANUP_SCRIPT_DIR}/../shared/banner.sh"
 # shellcheck source=../shared/functions.sh
 source "${SETUP_CLEANUP_SCRIPT_DIR}/../shared/functions.sh"
+# shellcheck source=helpers/storage.sh
+source "${SETUP_CLEANUP_SCRIPT_DIR}/helpers/storage.sh"
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-cleanup.log"
 DEFAULT_INSTALL_ROOT="/opt/dangerprep"
@@ -1026,6 +1028,7 @@ main() {
     cleanup_user_configs
     remove_packages
     remove_data
+    cleanup_storage_mounts "${KEEP_DATA}"
     final_cleanup
     show_completion
 }

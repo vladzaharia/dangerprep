@@ -224,8 +224,15 @@ prepare_olares_environment_safe() {
     create_content_directories "${INSTALL_ROOT:-/dangerprep}"
 
     # Set up environment variables for Olares
-    export OLARES_INSTALL_ROOT="${INSTALL_ROOT:-/dangerprep}"
-    export OLARES_DATA_DIR="${INSTALL_ROOT:-/dangerprep}/data"
+    # Use mounted /olares directory if available, otherwise fall back to install root
+    if mountpoint -q "/olares" 2>/dev/null; then
+        export OLARES_INSTALL_ROOT="/olares"
+        log "Using mounted Olares storage at /olares"
+    else
+        export OLARES_INSTALL_ROOT="${INSTALL_ROOT:-/dangerprep}"
+        log "Using local Olares storage at ${OLARES_INSTALL_ROOT}"
+    fi
+    export OLARES_DATA_DIR="${OLARES_INSTALL_ROOT}/data"
 
     success "Environment prepared for Olares installation"
     return 0
