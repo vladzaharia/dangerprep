@@ -450,18 +450,30 @@ main() {
     # Summary
     log_section "Validation Summary"
     
-    if [[ $CRITICAL_ISSUES -gt 0 ]]; then
-        error "Critical issues found: $CRITICAL_ISSUES"
+    if [[ ${CRITICAL_ISSUES} -gt 0 ]]; then
+        error "Critical issues found: ${CRITICAL_ISSUES}"
         error "System does not meet minimum requirements"
-        exit 1
-    elif [[ $ISSUES_FOUND -gt 0 ]]; then
-        warning "Non-critical issues found: $ISSUES_FOUND"
+        if [[ "${CALLED_FROM_SETUP:-false}" == "true" ]]; then
+            return 1
+        else
+            exit 1
+        fi
+    elif [[ ${ISSUES_FOUND} -gt 0 ]]; then
+        warning "Non-critical issues found: ${ISSUES_FOUND}"
         warning "Installation may proceed but with limitations"
-        exit 2
+        if [[ "${CALLED_FROM_SETUP:-false}" == "true" ]]; then
+            return 2
+        else
+            exit 2
+        fi
     else
         success "All pre-flight checks passed!"
         success "System is ready for DangerPrep installation"
-        exit 0
+        if [[ "${CALLED_FROM_SETUP:-false}" == "true" ]]; then
+            return 0
+        else
+            exit 0
+        fi
     fi
 }
 
@@ -496,5 +508,14 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Run main function
-main "$@"
+# Function to run preflight checks when called from setup script
+run_preflight_checks() {
+    # Set flag to indicate we're being called from another script
+    local CALLED_FROM_SETUP=true
+    main
+}
+
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
