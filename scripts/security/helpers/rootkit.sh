@@ -9,18 +9,18 @@
 set -euo pipefail
 
 # Script metadata
-SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
+SCRIPT_NAME_SECURITY_ROOTKIT="$(basename "${BASH_SOURCE[0]}" .sh)"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SECURITY_ROOTKIT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SCRIPT_VERSION="1.0"
-SCRIPT_DESCRIPTION="Rootkit Detection Scanner"
+SCRIPT_VERSION_SECURITY_ROOTKIT="1.0"
+SCRIPT_DESCRIPTION_SECURITY_ROOTKIT="Rootkit Detection Scanner"
 
 # Source shared utilities
-source "${SCRIPT_DIR}/../../shared/logging.sh"
-source "${SCRIPT_DIR}/../../shared/errors.sh"
-source "${SCRIPT_DIR}/../../shared/validation.sh"
-source "${SCRIPT_DIR}/../../shared/banner.sh"
+source "${SECURITY_ROOTKIT_SCRIPT_DIR}/../../shared/logging.sh"
+source "${SECURITY_ROOTKIT_SCRIPT_DIR}/../../shared/errors.sh"
+source "${SECURITY_ROOTKIT_SCRIPT_DIR}/../../shared/validation.sh"
+source "${SECURITY_ROOTKIT_SCRIPT_DIR}/../../shared/banner.sh"
 
 # Configuration
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-rootkit-scan.log"

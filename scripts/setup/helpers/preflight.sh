@@ -11,23 +11,23 @@
 set -euo pipefail
 
 # Script metadata
-SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_NAME_PREFLIGHT="$(basename "${BASH_SOURCE[0]}" .sh)"
+PREFLIGHT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SCRIPT_VERSION="2.0"
-SCRIPT_DESCRIPTION="DangerPrep Pre-flight Validation"
+SCRIPT_VERSION_PREFLIGHT="2.0"
+SCRIPT_DESCRIPTION_PREFLIGHT="DangerPrep Pre-flight Validation"
 
 # Source shared utilities
 # shellcheck source=../../shared/logging.sh
-source "${SCRIPT_DIR}/../../shared/logging.sh"
+source "${PREFLIGHT_SCRIPT_DIR}/../../shared/logging.sh"
 # shellcheck source=../../shared/errors.sh
-source "${SCRIPT_DIR}/../../shared/errors.sh"
+source "${PREFLIGHT_SCRIPT_DIR}/../../shared/errors.sh"
 # shellcheck source=../../shared/validation.sh
-source "${SCRIPT_DIR}/../../shared/validation.sh"
+source "${PREFLIGHT_SCRIPT_DIR}/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
-source "${SCRIPT_DIR}/../../shared/banner.sh"
+source "${PREFLIGHT_SCRIPT_DIR}/../../shared/banner.sh"
 # shellcheck source=../../shared/network.sh
-source "${SCRIPT_DIR}/../../shared/network.sh"
+source "${PREFLIGHT_SCRIPT_DIR}/../../shared/network.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-preflight.log"

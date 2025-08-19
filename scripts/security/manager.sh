@@ -9,19 +9,19 @@
 set -euo pipefail
 
 # Script metadata
-SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
+SCRIPT_NAME_SECURITY_MANAGER="$(basename "${BASH_SOURCE[0]}" .sh)"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SECURITY_MANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SCRIPT_VERSION="1.0"
-SCRIPT_DESCRIPTION="Security Manager - Main Controller"
+SCRIPT_VERSION_SECURITY_MANAGER="1.0"
+SCRIPT_DESCRIPTION_SECURITY_MANAGER="Security Manager - Main Controller"
 
 # Source shared utilities
-source "${SCRIPT_DIR}/../shared/logging.sh"
-source "${SCRIPT_DIR}/../shared/errors.sh"
-source "${SCRIPT_DIR}/../shared/validation.sh"
-source "${SCRIPT_DIR}/../shared/banner.sh"
-source "${SCRIPT_DIR}/../shared/security.sh"
+source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/logging.sh"
+source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/errors.sh"
+source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/validation.sh"
+source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/banner.sh"
+source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/security.sh"
 
 # Configuration
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-security-manager.log"
@@ -94,7 +94,7 @@ show_security_status() {
     echo
     
     # Run security diagnostics
-    "${SCRIPT_DIR}/security-diagnostics.sh" status
+    "${SECURITY_MANAGER_SCRIPT_DIR}/security-diagnostics.sh" status
     
     clear_error_context
 }
@@ -106,7 +106,7 @@ run_security_diagnostics() {
     show_banner_with_title "Security Diagnostics" "security"
     echo
     
-    "${SCRIPT_DIR}/security-diagnostics.sh" validate
+    "${SECURITY_MANAGER_SCRIPT_DIR}/security-diagnostics.sh" validate
     
     clear_error_context
 }
@@ -122,22 +122,22 @@ manage_secrets() {
             show_banner_with_title "Secret Generation" "security"
             echo
             # Check if generate-secrets.sh exists, if not use helpers/setup-secrets.sh
-            if [[ -f "${SCRIPT_DIR}/generate-secrets.sh" ]]; then
-                "${SCRIPT_DIR}/generate-secrets.sh"
+            if [[ -f "${SECURITY_MANAGER_SCRIPT_DIR}/generate-secrets.sh" ]]; then
+                "${SECURITY_MANAGER_SCRIPT_DIR}/generate-secrets.sh"
             else
                 log "Using helpers/setup-secrets.sh for secret generation"
-                "${SCRIPT_DIR}/helpers/setup-secrets.sh" --force
+                "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/setup-secrets.sh" --force
             fi
             ;;
         "update")
             show_banner_with_title "Secret Environment Update" "security"
             echo
-            "${SCRIPT_DIR}/helpers/update-secrets.sh"
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/update-secrets.sh"
             ;;
         "setup")
             show_banner_with_title "Secret Management Setup" "security"
             echo
-            "${SCRIPT_DIR}/helpers/setup-secrets.sh"
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/setup-secrets.sh"
             ;;
         *)
             error "Unknown secret operation: $operation"
@@ -158,32 +158,32 @@ run_security_audit() {
         "all")
             show_banner_with_title "Comprehensive Security Audit" "security"
             echo
-            "${SCRIPT_DIR}/helpers/orchestrator.sh" all
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/orchestrator.sh" all
             ;;
         "aide")
             show_banner_with_title "AIDE File Integrity Check" "security"
             echo
-            "${SCRIPT_DIR}/helpers/integrity.sh" check
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/integrity.sh" check
             ;;
         "antivirus")
             show_banner_with_title "Antivirus Scan" "security"
             echo
-            "${SCRIPT_DIR}/helpers/malware.sh" quick
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/malware.sh" quick
             ;;
         "lynis")
             show_banner_with_title "Lynis Security Audit" "security"
             echo
-            "${SCRIPT_DIR}/helpers/compliance.sh" audit
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/compliance.sh" audit
             ;;
         "rootkit")
             show_banner_with_title "Rootkit Detection" "security"
             echo
-            "${SCRIPT_DIR}/helpers/rootkit.sh" scan
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/rootkit.sh" scan
             ;;
         "general")
             show_banner_with_title "General Security Audit" "security"
             echo
-            "${SCRIPT_DIR}/helpers/configuration.sh" audit
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/configuration.sh" audit
             ;;
         *)
             error "Unknown audit type: $audit_type"
@@ -204,22 +204,22 @@ manage_certificates() {
         "status")
             show_banner_with_title "Certificate Status" "security"
             echo
-            "${SCRIPT_DIR}/helpers/certificates.sh" status
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/certificates.sh" status
             ;;
         "generate")
             show_banner_with_title "Certificate Generation" "security"
             echo
-            "${SCRIPT_DIR}/helpers/certificates.sh" generate
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/certificates.sh" generate
             ;;
         "renew")
             show_banner_with_title "Certificate Renewal" "security"
             echo
-            "${SCRIPT_DIR}/helpers/certificates.sh" renew
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/certificates.sh" renew
             ;;
         "validate")
             show_banner_with_title "Certificate Validation" "security"
             echo
-            "${SCRIPT_DIR}/helpers/certificates.sh" validate
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/certificates.sh" validate
             ;;
         *)
             error "Unknown certificate operation: $operation"
@@ -240,7 +240,7 @@ manage_monitoring() {
         "suricata")
             show_banner_with_title "Suricata IDS Monitor" "security"
             echo
-            "${SCRIPT_DIR}/helpers/intrusion.sh"
+            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/intrusion.sh"
             ;;
         "status")
             show_banner_with_title "Monitoring Status" "security"

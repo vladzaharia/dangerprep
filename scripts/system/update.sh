@@ -5,22 +5,22 @@
 set -euo pipefail
 
 # Script metadata
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SYSTEM_UPDATE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
-source "${SCRIPT_DIR}/../shared/logging.sh"
+source "${SYSTEM_UPDATE_SCRIPT_DIR}/../shared/logging.sh"
 # shellcheck source=../shared/errors.sh
-source "${SCRIPT_DIR}/../shared/errors.sh"
+source "${SYSTEM_UPDATE_SCRIPT_DIR}/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
-source "${SCRIPT_DIR}/../shared/validation.sh"
+source "${SYSTEM_UPDATE_SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
-source "${SCRIPT_DIR}/../shared/banner.sh"
+source "${SYSTEM_UPDATE_SCRIPT_DIR}/../shared/banner.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-system-update.log"
-PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+PROJECT_ROOT="$(dirname "$(dirname "${SYSTEM_UPDATE_SCRIPT_DIR}")")"
 readonly PROJECT_ROOT
 
 # Cleanup function for error recovery

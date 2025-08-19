@@ -13,17 +13,17 @@ set -euo pipefail
 # Script metadata
 # Script directory
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_MANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
-source "${SCRIPT_DIR}/../shared/logging.sh"
+source "${BACKUP_MANAGER_SCRIPT_DIR}/../shared/logging.sh"
 # shellcheck source=../shared/errors.sh
-source "${SCRIPT_DIR}/../shared/errors.sh"
+source "${BACKUP_MANAGER_SCRIPT_DIR}/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
-source "${SCRIPT_DIR}/../shared/validation.sh"
+source "${BACKUP_MANAGER_SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
-source "${SCRIPT_DIR}/../shared/banner.sh"
+source "${BACKUP_MANAGER_SCRIPT_DIR}/../shared/banner.sh"
 
 # Configuration variables
 DEFAULT_INSTALL_ROOT="/opt/dangerprep"

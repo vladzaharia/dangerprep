@@ -6,22 +6,22 @@
 set -euo pipefail
 
 # Script metadata
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SERVICE_STATUS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
-source "${SCRIPT_DIR}/../shared/logging.sh"
+source "${SERVICE_STATUS_SCRIPT_DIR}/../shared/logging.sh"
 # shellcheck source=../shared/errors.sh
-source "${SCRIPT_DIR}/../shared/errors.sh"
+source "${SERVICE_STATUS_SCRIPT_DIR}/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
-source "${SCRIPT_DIR}/../shared/validation.sh"
+source "${SERVICE_STATUS_SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
-source "${SCRIPT_DIR}/../shared/banner.sh"
+source "${SERVICE_STATUS_SCRIPT_DIR}/../shared/banner.sh"
 # shellcheck source=../shared/state/system.sh
-source "${SCRIPT_DIR}/../shared/state/system.sh"
+source "${SERVICE_STATUS_SCRIPT_DIR}/../shared/state/system.sh"
 # shellcheck source=../shared/system.sh
-source "${SCRIPT_DIR}/../shared/system.sh"
+source "${SERVICE_STATUS_SCRIPT_DIR}/../shared/system.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-service-status.log"

@@ -11,9 +11,9 @@ fi
 readonly SECURITY_STATE_LOADED="true"
 
 # Source dependencies
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/logging.sh"
-source "${SCRIPT_DIR}/errors.sh"
+SECURITY_STATE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SECURITY_STATE_SCRIPT_DIR}/logging.sh"
+source "${SECURITY_STATE_SCRIPT_DIR}/errors.sh"
 
 # Security state configuration
 SECURITY_STATE_DIR="/var/lib/dangerprep/security"

@@ -9,16 +9,16 @@
 set -euo pipefail
 
 # Script metadata
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SYSTEM_OPTIMIZATION_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
-source "${SCRIPT_DIR}/../../shared/logging.sh"
-source "${SCRIPT_DIR}/../../shared/errors.sh"
-source "${SCRIPT_DIR}/../../shared/validation.sh"
-source "${SCRIPT_DIR}/../../shared/banner.sh"
-source "${SCRIPT_DIR}/../../shared/state/system.sh"
-source "${SCRIPT_DIR}/../../shared/system.sh"
+source "${SYSTEM_OPTIMIZATION_SCRIPT_DIR}/../../shared/logging.sh"
+source "${SYSTEM_OPTIMIZATION_SCRIPT_DIR}/../../shared/errors.sh"
+source "${SYSTEM_OPTIMIZATION_SCRIPT_DIR}/../../shared/validation.sh"
+source "${SYSTEM_OPTIMIZATION_SCRIPT_DIR}/../../shared/banner.sh"
+source "${SYSTEM_OPTIMIZATION_SCRIPT_DIR}/../../shared/state/system.sh"
+source "${SYSTEM_OPTIMIZATION_SCRIPT_DIR}/../../shared/system.sh"
 
 # Configuration
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-system-optimization.log"
