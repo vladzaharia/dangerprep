@@ -569,7 +569,7 @@ done
 # Function to run preflight checks when called from setup script
 run_preflight_checks() {
     # Set flag to indicate we're being called from another script
-    local CALLED_FROM_SETUP=true
+    export CALLED_FROM_SETUP=true
     main
 }
 
