@@ -10,13 +10,13 @@ if [[ "${STORAGE_HELPER_SOURCED:-}" == "true" ]]; then
 fi
 
 # Source required dependencies
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STORAGE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../shared/logging.sh
-source "${SCRIPT_DIR}/../../shared/logging.sh"
+source "${STORAGE_SCRIPT_DIR}/../../shared/logging.sh"
 # shellcheck source=../../shared/errors.sh
-source "${SCRIPT_DIR}/../../shared/errors.sh"
+source "${STORAGE_SCRIPT_DIR}/../../shared/errors.sh"
 # shellcheck source=../../shared/validation.sh
-source "${SCRIPT_DIR}/../../shared/validation.sh"
+source "${STORAGE_SCRIPT_DIR}/../../shared/validation.sh"
 
 # Mark this file as sourced
 export STORAGE_HELPER_SOURCED=true
