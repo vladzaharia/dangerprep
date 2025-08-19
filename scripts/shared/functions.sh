@@ -645,39 +645,73 @@ parse_storage_size() {
     local size_num
     local size_unit
 
-    # Extract numeric part and unit
-    size_num=$(echo "${size_str}" | sed 's/[^0-9.]//g')
-    size_unit=$(echo "${size_str}" | sed 's/[0-9.]//g' | tr '[:lower:]' '[:upper:]')
+    # Debug logging if DEBUG is enabled
+    if [[ "${DEBUG:-false}" == "true" ]]; then
+        debug "parse_storage_size: input='${size_str}'"
+    fi
 
     # Handle empty or invalid input
-    if [[ -z "${size_num}" ]]; then
+    if [[ -z "${size_str}" ]]; then
+        debug "parse_storage_size: empty input, returning 0"
+        echo "0"
+        return
+    fi
+
+    # Clean the input string - remove whitespace and handle locale issues
+    size_str=$(echo "${size_str}" | tr -d '[:space:]' | tr ',' '.')
+
+    # Extract numeric part and unit using more robust regex
+    size_num=$(echo "${size_str}" | sed -E 's/^([0-9]+\.?[0-9]*).*$/\1/')
+    size_unit=$(echo "${size_str}" | sed -E 's/^[0-9]+\.?[0-9]*(.*)$/\1/' | tr '[:lower:]' '[:upper:]')
+
+    # Debug logging
+    if [[ "${DEBUG:-false}" == "true" ]]; then
+        debug "parse_storage_size: cleaned='${size_str}', num='${size_num}', unit='${size_unit}'"
+    fi
+
+    # Validate numeric part
+    if [[ -z "${size_num}" ]] || ! [[ "${size_num}" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+        warning "parse_storage_size: invalid numeric part '${size_num}' from '${size_str}'"
         echo "0"
         return
     fi
 
     # Convert to GB based on unit
+    local result
     case "${size_unit}" in
         "T"|"TB")
             # Terabytes to GB (multiply by 1024)
-            echo "${size_num}" | awk '{printf "%.0f", $1 * 1024}'
+            result=$(echo "${size_num}" | awk '{printf "%.0f", $1 * 1024}')
             ;;
         "G"|"GB"|"")
             # Already in GB or no unit (assume GB)
-            echo "${size_num}" | awk '{printf "%.0f", $1}'
+            result=$(echo "${size_num}" | awk '{printf "%.0f", $1}')
             ;;
         "M"|"MB")
             # Megabytes to GB (divide by 1024)
-            echo "${size_num}" | awk '{printf "%.0f", $1 / 1024}'
+            result=$(echo "${size_num}" | awk '{printf "%.0f", $1 / 1024}')
             ;;
         "K"|"KB")
             # Kilobytes to GB (divide by 1024^2)
-            echo "${size_num}" | awk '{printf "%.0f", $1 / 1048576}'
+            result=$(echo "${size_num}" | awk '{printf "%.0f", $1 / 1048576}')
+            ;;
+        "B"|"BYTES")
+            # Bytes to GB (divide by 1024^3)
+            result=$(echo "${size_num}" | awk '{printf "%.0f", $1 / 1073741824}')
             ;;
         *)
-            # Unknown unit, assume GB
-            echo "${size_num}" | awk '{printf "%.0f", $1}'
+            # Unknown unit, log warning and assume GB
+            warning "parse_storage_size: unknown unit '${size_unit}' from '${size_str}', assuming GB"
+            result=$(echo "${size_num}" | awk '{printf "%.0f", $1}')
             ;;
     esac
+
+    # Debug logging
+    if [[ "${DEBUG:-false}" == "true" ]]; then
+        debug "parse_storage_size: result='${result}' GB"
+    fi
+
+    echo "${result}"
 }
 
 # Export functions for use in other scripts

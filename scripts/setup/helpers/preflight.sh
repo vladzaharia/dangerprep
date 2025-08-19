@@ -190,16 +190,28 @@ check_system_requirements() {
             if [[ -n "${device}" ]]; then
                 local device_size_str
                 local device_size_gb
+
+                # Get raw size from lsblk
                 device_size_str=$(lsblk -d -n -o SIZE "${device}" 2>/dev/null || echo "0")
+
+                # Debug logging for troubleshooting
+                debug "NVMe device ${device}: raw lsblk output='${device_size_str}'"
 
                 # Parse storage size using shared function
                 device_size_gb=$(parse_storage_size "${device_size_str}")
+
+                # Additional debug logging
+                debug "NVMe device ${device}: parsed size=${device_size_gb}GB"
 
                 if [[ ${device_size_gb} -ge 300 ]]; then
                     success "  ${device}: ${device_size_gb}GB (✓)"
                 else
                     warning "  ${device}: ${device_size_gb}GB (too small for optimal partitioning)"
                     warning "  Minimum 300GB recommended (256GB Olares + 44GB Content)"
+                    # Show raw lsblk output for debugging
+                    if [[ "${VERBOSE:-false}" == "true" ]]; then
+                        info "  Debug: lsblk raw output was '${device_size_str}'"
+                    fi
                     ((issues++))
                 fi
             fi
@@ -471,11 +483,18 @@ check_hardware_compatibility() {
 # Main validation function
 main() {
     init_script
-    
-    show_banner "DangerPrep Pre-flight Check"
-    
+
+    # Only show banner when running directly, not when called from setup script
+    if [[ "${CALLED_FROM_SETUP:-false}" != "true" ]]; then
+        show_banner "DangerPrep Pre-flight Check"
+    fi
+
     log "Starting pre-flight validation..."
-    log "Mode: $([ "$OLARES_MODE" == "true" ] && echo "Olares Integration" || echo "Standard")"
+    if [[ "${OLARES_MODE}" == "true" ]]; then
+        log "Mode: Olares Integration"
+    else
+        log "Mode: Standard"
+    fi
     
     # Run all checks
     check_system_requirements

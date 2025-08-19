@@ -96,10 +96,18 @@ detect_nvme_devices() {
     local device_size_str
     local device_size_gb
     device_size_str=$(lsblk -d -n -o SIZE "${NVME_DEVICE}")
+
+    # Debug logging for troubleshooting
+    debug "NVMe device ${NVME_DEVICE}: raw lsblk output='${device_size_str}'"
+
     device_size_gb=$(parse_storage_size "${device_size_str}")
+
+    # Additional debug logging
+    debug "NVMe device ${NVME_DEVICE}: parsed size=${device_size_gb}GB"
 
     if [[ ${device_size_gb} -lt ${MIN_DEVICE_SIZE_GB} ]]; then
         error "Device ${NVME_DEVICE} is too small (${device_size_gb}GB < ${MIN_DEVICE_SIZE_GB}GB required)"
+        error "Debug: lsblk raw output was '${device_size_str}'"
         clear_error_context
         return 1
     fi
