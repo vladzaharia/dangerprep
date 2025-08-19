@@ -22,6 +22,8 @@ SCRIPT_DESCRIPTION_PREFLIGHT="DangerPrep Pre-flight Validation"
 source "${PREFLIGHT_SCRIPT_DIR}/../../shared/logging.sh"
 # shellcheck source=../../shared/errors.sh
 source "${PREFLIGHT_SCRIPT_DIR}/../../shared/errors.sh"
+# shellcheck source=../../shared/functions.sh
+source "${PREFLIGHT_SCRIPT_DIR}/../../shared/functions.sh"
 # shellcheck source=../../shared/validation.sh
 source "${PREFLIGHT_SCRIPT_DIR}/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
