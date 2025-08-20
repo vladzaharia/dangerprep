@@ -189,9 +189,5 @@ supports_rk3588_thermal_zones() {
     [[ "${IS_RK3588}" == "true" || "${IS_RK3588S}" == "true" ]]
 }
 
-# Initialize hardware detection on source
-# This ensures variables are available immediately when script is sourced
-if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-    # Script is being sourced, run detection automatically
-    detect_hardware_platform >/dev/null 2>&1 || true
-fi
+# Note: Hardware detection is now called explicitly by scripts that need it
+# This prevents automatic execution during sourcing which could cause issues

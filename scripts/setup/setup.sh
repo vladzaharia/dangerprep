@@ -208,10 +208,24 @@ cleanup_normal_exit() {
     cleanup_temp
 }
 
-# Signal handlers for cleanup
+# Enhanced signal handlers for debugging and cleanup
+debug_signal_handler() {
+    local signal="$1"
+    echo "[DEBUG] Received signal $signal at $(date), PID=$$" >> /tmp/dangerprep-debug.log
+    echo "[DEBUG] Call stack:" >> /tmp/dangerprep-debug.log
+    caller 0 >> /tmp/dangerprep-debug.log 2>&1 || echo "[DEBUG] No call stack available" >> /tmp/dangerprep-debug.log
+    export DANGERPREP_SETUP_RUNNING=false
+    cleanup_temp
+    exit $((128 + signal))
+}
+
+# Signal handlers for cleanup with debugging
 trap cleanup_normal_exit EXIT
-trap 'export DANGERPREP_SETUP_RUNNING=false; cleanup_temp; exit 130' INT
-trap 'export DANGERPREP_SETUP_RUNNING=false; cleanup_temp; exit 143' TERM
+trap 'debug_signal_handler 2' INT
+trap 'debug_signal_handler 15' TERM
+trap 'debug_signal_handler 9' KILL 2>/dev/null || true
+trap 'debug_signal_handler 1' HUP
+trap 'debug_signal_handler 3' QUIT
 
 # Load configuration utilities
 # shellcheck source=helpers/config.sh
@@ -318,7 +332,9 @@ show_system_info() {
     log "Disk: $(df -h / | tail -1 | awk '{print $2}')"
 
     # Detect platform and set FriendlyElec-specific flags
-    detect_friendlyelec_platform
+    if ! detect_friendlyelec_platform; then
+        warning "Hardware detection completed with warnings, continuing with generic setup"
+    fi
 }
 
 # Confirm installation start after preflight checks
@@ -439,9 +455,6 @@ EOF
 
 # Main function with state management
 main() {
-    # Debug: Log main function entry
-    echo "[DEBUG] Entering main function at $(date)" >> /tmp/dangerprep-debug.log
-
     show_banner
     check_root
     setup_logging
@@ -468,13 +481,10 @@ main() {
     show_system_info
 
     # Run preflight checks with explicit error handling
-    echo "[DEBUG] About to run preflight checks at $(date)" >> /tmp/dangerprep-debug.log
     if ! run_preflight_checks; then
         error "Preflight checks failed. Exiting setup."
-        echo "[DEBUG] Preflight checks failed at $(date)" >> /tmp/dangerprep-debug.log
         exit 1
     fi
-    echo "[DEBUG] Preflight checks completed successfully at $(date)" >> /tmp/dangerprep-debug.log
 
     confirm_installation_start
     backup_original_configs
