@@ -10,7 +10,28 @@
 # Modern shell script best practices
 set -euo pipefail
 
-# Prevent recursive execution
+# Prevent recursive execution and rapid restarts
+LOCKFILE="/tmp/dangerprep-setup.lock"
+if [[ -f "$LOCKFILE" ]]; then
+    LOCK_PID=$(cat "$LOCKFILE" 2>/dev/null || echo "")
+    if [[ -n "$LOCK_PID" ]] && kill -0 "$LOCK_PID" 2>/dev/null; then
+        echo "ERROR: Setup script is already running (PID: $LOCK_PID). Preventing recursive execution."
+        exit 1
+    else
+        echo "WARNING: Stale lock file found, removing it."
+        rm -f "$LOCKFILE"
+    fi
+fi
+
+# Create lock file with current PID
+echo $$ > "$LOCKFILE"
+
+# Cleanup lock file on exit
+cleanup_lock() {
+    rm -f "$LOCKFILE" 2>/dev/null || true
+}
+trap cleanup_lock EXIT
+
 if [[ "${DANGERPREP_SETUP_RUNNING:-false}" == "true" ]]; then
     echo "ERROR: Setup script is already running. Preventing recursive execution."
     exit 1
@@ -445,7 +466,16 @@ main() {
     fi
 
     show_system_info
-    run_preflight_checks
+
+    # Run preflight checks with explicit error handling
+    echo "[DEBUG] About to run preflight checks at $(date)" >> /tmp/dangerprep-debug.log
+    if ! run_preflight_checks; then
+        error "Preflight checks failed. Exiting setup."
+        echo "[DEBUG] Preflight checks failed at $(date)" >> /tmp/dangerprep-debug.log
+        exit 1
+    fi
+    echo "[DEBUG] Preflight checks completed successfully at $(date)" >> /tmp/dangerprep-debug.log
+
     confirm_installation_start
     backup_original_configs
 
