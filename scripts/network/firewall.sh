@@ -6,20 +6,19 @@
 set -euo pipefail
 
 # Script metadata
-NETWORK_FIREWALL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
-source "${NETWORK_FIREWALL_SCRIPT_DIR}/../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/logging.sh"
 # shellcheck source=../shared/errors.sh
-source "${NETWORK_FIREWALL_SCRIPT_DIR}/../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
-source "${NETWORK_FIREWALL_SCRIPT_DIR}/../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
-source "${NETWORK_FIREWALL_SCRIPT_DIR}/../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/banner.sh"
 # shellcheck source=../shared/network.sh
-source "${NETWORK_FIREWALL_SCRIPT_DIR}/../shared/network.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/network.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-firewall.log"

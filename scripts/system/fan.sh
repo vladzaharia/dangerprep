@@ -6,20 +6,19 @@
 set -euo pipefail
 
 # Script metadata
-SYSTEM_FAN_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
-source "${SYSTEM_FAN_SCRIPT_DIR}/../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/logging.sh"
 # shellcheck source=../shared/errors.sh
-source "${SYSTEM_FAN_SCRIPT_DIR}/../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
-source "${SYSTEM_FAN_SCRIPT_DIR}/../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
-source "${SYSTEM_FAN_SCRIPT_DIR}/../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/banner.sh"
 # shellcheck source=../shared/hardware.sh
-source "${SYSTEM_FAN_SCRIPT_DIR}/../shared/hardware.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/hardware.sh"
 
 # Configuration file
 CONFIG_FILE="/etc/dangerprep/rk3588-fan-control.conf"

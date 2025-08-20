@@ -13,23 +13,22 @@ readonly SECURITY_HELPERS_ORCHESTRATOR_LOADED="true"
 set -euo pipefail
 
 # Script metadata
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
 # shellcheck source=../../shared/logging.sh
-source "${SCRIPT_DIR}/../../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 # shellcheck source=../../shared/errors.sh
-source "${SCRIPT_DIR}/../../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 # shellcheck source=../../shared/validation.sh
-source "${SCRIPT_DIR}/../../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
-source "${SCRIPT_DIR}/../../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/banner.sh"
 
 # Configuration variables
 DEFAULT_LOG_FILE="/var/log/dangerprep-security-audit.log"
 # shellcheck disable=SC2034  # Used in sourced configuration files and exported for subprocesses
-PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+PROJECT_ROOT="$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")"")")"
 readonly PROJECT_ROOT
 export PROJECT_ROOT
 REPORT_FILE="/tmp/security-audit-$(date +%Y%m%d-%H%M%S).txt"
@@ -120,8 +119,8 @@ run_aide_check() {
     log "Running AIDE integrity check..."
     
     if command -v aide >/dev/null 2>&1; then
-        if [[ -f "${SCRIPT_DIR}/helpers/integrity.sh" ]]; then
-            bash "${SCRIPT_DIR}/helpers/integrity.sh"
+        if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/integrity.sh" ]]; then
+            bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/integrity.sh"
             success "AIDE check completed"
         else
             warning "AIDE check script not found"
@@ -136,8 +135,8 @@ run_antivirus_scan() {
     log "Running ClamAV antivirus scan..."
     
     if command -v clamscan >/dev/null 2>&1; then
-        if [[ -f "${SCRIPT_DIR}/helpers/malware.sh" ]]; then
-            bash "${SCRIPT_DIR}/helpers/malware.sh"
+        if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/malware.sh" ]]; then
+            bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/malware.sh"
             success "Antivirus scan completed"
         else
             warning "Antivirus scan script not found"
@@ -152,8 +151,8 @@ run_lynis_audit() {
     log "Running Lynis security audit..."
     
     if command -v lynis >/dev/null 2>&1; then
-        if [[ -f "${SCRIPT_DIR}/helpers/compliance.sh" ]]; then
-            bash "${SCRIPT_DIR}/helpers/compliance.sh"
+        if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/compliance.sh" ]]; then
+            bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/compliance.sh"
             success "Lynis audit completed"
         else
             warning "Lynis audit script not found"
@@ -168,8 +167,8 @@ run_rootkit_scan() {
     log "Running rootkit detection scan..."
     
     if command -v rkhunter >/dev/null 2>&1 || command -v chkrootkit >/dev/null 2>&1; then
-        if [[ -f "${SCRIPT_DIR}/helpers/rootkit.sh" ]]; then
-            bash "${SCRIPT_DIR}/helpers/rootkit.sh"
+        if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/rootkit.sh" ]]; then
+            bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/rootkit.sh"
             success "Rootkit scan completed"
         else
             warning "Rootkit scan script not found"
@@ -183,8 +182,8 @@ run_rootkit_scan() {
 run_security_audit() {
     log "Running general security audit..."
     
-    if [[ -f "${SCRIPT_DIR}/helpers/configuration.sh" ]]; then
-        bash "${SCRIPT_DIR}/helpers/configuration.sh"
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/configuration.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/configuration.sh"
         success "Security audit completed"
     else
         warning "Security audit script not found"

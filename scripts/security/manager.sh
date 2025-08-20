@@ -11,17 +11,16 @@ set -euo pipefail
 # Script metadata
 SCRIPT_NAME_SECURITY_MANAGER="$(basename "${BASH_SOURCE[0]}" .sh)"
 
-SECURITY_MANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SCRIPT_VERSION_SECURITY_MANAGER="1.0"
 SCRIPT_DESCRIPTION_SECURITY_MANAGER="Security Manager - Main Controller"
 
 # Source shared utilities
-source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/logging.sh"
-source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/errors.sh"
-source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/validation.sh"
-source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/banner.sh"
-source "${SECURITY_MANAGER_SCRIPT_DIR}/../shared/security.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/security.sh"
 
 # Configuration
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-security-manager.log"
@@ -94,7 +93,7 @@ show_security_status() {
     echo
     
     # Run security diagnostics
-    "${SECURITY_MANAGER_SCRIPT_DIR}/security-diagnostics.sh" status
+    "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/security-diagnostics.sh" status
     
     clear_error_context
 }
@@ -106,7 +105,7 @@ run_security_diagnostics() {
     show_banner_with_title "Security Diagnostics" "security"
     echo
     
-    "${SECURITY_MANAGER_SCRIPT_DIR}/security-diagnostics.sh" validate
+    "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/security-diagnostics.sh" validate
     
     clear_error_context
 }
@@ -122,22 +121,22 @@ manage_secrets() {
             show_banner_with_title "Secret Generation" "security"
             echo
             # Check if generate-secrets.sh exists, if not use helpers/setup-secrets.sh
-            if [[ -f "${SECURITY_MANAGER_SCRIPT_DIR}/generate-secrets.sh" ]]; then
-                "${SECURITY_MANAGER_SCRIPT_DIR}/generate-secrets.sh"
+            if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/generate-secrets.sh" ]]; then
+                "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/generate-secrets.sh"
             else
                 log "Using helpers/setup-secrets.sh for secret generation"
-                "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/setup-secrets.sh" --force
+                "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/setup-secrets.sh" --force
             fi
             ;;
         "update")
             show_banner_with_title "Secret Environment Update" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/update-secrets.sh"
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/update-secrets.sh"
             ;;
         "setup")
             show_banner_with_title "Secret Management Setup" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/setup-secrets.sh"
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/setup-secrets.sh"
             ;;
         *)
             error "Unknown secret operation: $operation"
@@ -158,32 +157,32 @@ run_security_audit() {
         "all")
             show_banner_with_title "Comprehensive Security Audit" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/orchestrator.sh" all
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/orchestrator.sh" all
             ;;
         "aide")
             show_banner_with_title "AIDE File Integrity Check" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/integrity.sh" check
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/integrity.sh" check
             ;;
         "antivirus")
             show_banner_with_title "Antivirus Scan" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/malware.sh" quick
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/malware.sh" quick
             ;;
         "lynis")
             show_banner_with_title "Lynis Security Audit" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/compliance.sh" audit
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/compliance.sh" audit
             ;;
         "rootkit")
             show_banner_with_title "Rootkit Detection" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/rootkit.sh" scan
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/rootkit.sh" scan
             ;;
         "general")
             show_banner_with_title "General Security Audit" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/configuration.sh" audit
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/configuration.sh" audit
             ;;
         *)
             error "Unknown audit type: $audit_type"
@@ -204,22 +203,22 @@ manage_certificates() {
         "status")
             show_banner_with_title "Certificate Status" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/certificates.sh" status
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/certificates.sh" status
             ;;
         "generate")
             show_banner_with_title "Certificate Generation" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/certificates.sh" generate
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/certificates.sh" generate
             ;;
         "renew")
             show_banner_with_title "Certificate Renewal" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/certificates.sh" renew
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/certificates.sh" renew
             ;;
         "validate")
             show_banner_with_title "Certificate Validation" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/certificates.sh" validate
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/certificates.sh" validate
             ;;
         *)
             error "Unknown certificate operation: $operation"
@@ -240,7 +239,7 @@ manage_monitoring() {
         "suricata")
             show_banner_with_title "Suricata IDS Monitor" "security"
             echo
-            "${SECURITY_MANAGER_SCRIPT_DIR}/helpers/intrusion.sh"
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/intrusion.sh"
             ;;
         "status")
             show_banner_with_title "Monitoring Status" "security"

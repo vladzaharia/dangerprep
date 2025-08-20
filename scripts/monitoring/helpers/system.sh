@@ -13,18 +13,17 @@ readonly MONITORING_HELPERS_SYSTEM_LOADED="true"
 set -euo pipefail
 
 # Script metadata
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
 # shellcheck source=../../shared/logging.sh
-source "${SCRIPT_DIR}/../../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 # shellcheck source=../../shared/errors.sh
-source "${SCRIPT_DIR}/../../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 # shellcheck source=../../shared/validation.sh
-source "${SCRIPT_DIR}/../../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
-source "${SCRIPT_DIR}/../../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/banner.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-monitor.log"

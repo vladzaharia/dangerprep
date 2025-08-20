@@ -12,22 +12,21 @@ set -euo pipefail
 
 # Script metadata
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
-MONITORING_HARDWARE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SCRIPT_VERSION="1.0"
 SCRIPT_DESCRIPTION="Hardware Monitoring with FriendlyElec Support"
 
 # Source shared utilities
 # shellcheck source=../../shared/logging.sh
-source "${MONITORING_HARDWARE_SCRIPT_DIR}/../../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 # shellcheck source=../../shared/errors.sh
-source "${MONITORING_HARDWARE_SCRIPT_DIR}/../../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 # shellcheck source=../../shared/validation.sh
-source "${MONITORING_HARDWARE_SCRIPT_DIR}/../../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
-source "${MONITORING_HARDWARE_SCRIPT_DIR}/../../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/banner.sh"
 # shellcheck source=../../shared/hardware.sh
-source "${MONITORING_HARDWARE_SCRIPT_DIR}/../../shared/hardware.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/hardware.sh"
 
 # Configuration variables
 readonly ALERT_TEMP_CPU=80
@@ -408,7 +407,7 @@ check_fan_status() {
 
     log_subsection "Fan Control Status"
 
-    if [[ -f "${MONITORING_HARDWARE_SCRIPT_DIR}/rk3588-fan-control.sh" ]]; then
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/rk3588-fan-control.sh" ]]; then
         # Get current temperature and fan speed
         local temp
         temp=$(get_max_temperature)
@@ -438,7 +437,7 @@ check_fan_status() {
             log_validation_result "Fan Control" "WARN" "PWM device not accessible"
         fi
     else
-        warning "Fan control script not found: ${MONITORING_HARDWARE_SCRIPT_DIR}/rk3588-fan-control.sh"
+        warning "Fan control script not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/rk3588-fan-control.sh"
         log_validation_result "Fan Control" "WARN" "Fan control script not available"
     fi
 
@@ -660,10 +659,10 @@ case "${1:-check}" in
         ;;
     fan-test)
         if supports_pwm_fan_control; then
-            if [[ -f "${MONITORING_HARDWARE_SCRIPT_DIR}/rk3588-fan-control.sh" ]]; then
-                bash "${MONITORING_HARDWARE_SCRIPT_DIR}/rk3588-fan-control.sh" test
+            if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/rk3588-fan-control.sh" ]]; then
+                bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/rk3588-fan-control.sh" test
             else
-                error "Fan control script not found: ${MONITORING_HARDWARE_SCRIPT_DIR}/rk3588-fan-control.sh"
+                error "Fan control script not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/rk3588-fan-control.sh"
                 exit 1
             fi
         else

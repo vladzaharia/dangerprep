@@ -28,7 +28,6 @@ warning() {
 }
 
 # Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GITHUB_REPO="casey/just"
 GITHUB_API_URL="https://api.github.com/repos/$GITHUB_REPO"
 
@@ -107,9 +106,9 @@ download_just() {
     
     # Download archive
     if command -v curl > /dev/null 2>&1; then
-        curl -L -o "$SCRIPT_DIR/$archive_name" "$download_url"
+        curl -L -o "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" "$download_url"
     elif command -v wget > /dev/null 2>&1; then
-        wget -O "$SCRIPT_DIR/$archive_name" "$download_url"
+        wget -O "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" "$download_url"
     else
         error "Neither curl nor wget found. Cannot download binary."
         exit 1
@@ -119,11 +118,11 @@ download_just() {
     log "Extracting $archive_name..."
     case "$archive_ext" in
         tar.gz)
-            tar -xzf "$SCRIPT_DIR/$archive_name" -C "$SCRIPT_DIR" "$binary_name"
+            tar -xzf "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" -C "$(dirname "$(realpath "${BASH_SOURCE[0]}")"" "$binary_name"
             ;;
         zip)
             if command -v unzip > /dev/null 2>&1; then
-                unzip -j "$SCRIPT_DIR/$archive_name" "$binary_name" -d "$SCRIPT_DIR"
+                unzip -j "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" "$binary_name" -d "$(dirname "$(realpath "${BASH_SOURCE[0]}")""
             else
                 error "unzip not found. Cannot extract Windows binary."
                 exit 1
@@ -132,11 +131,11 @@ download_just() {
     esac
     
     # Rename binary to platform-specific name
-    mv "$SCRIPT_DIR/$binary_name" "$SCRIPT_DIR/$output_name"
-    chmod +x "$SCRIPT_DIR/$output_name"
+    mv "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$binary_name" "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$output_name"
+    chmod +x "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$output_name"
     
     # Clean up archive
-    rm "$SCRIPT_DIR/$archive_name"
+    rm "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name"
     
     success "Downloaded and extracted $output_name"
 }
@@ -156,7 +155,7 @@ download_all_platforms() {
     )
     
     for platform in "${platforms[@]}"; do
-        if [[ -f "$SCRIPT_DIR/just-$platform" ]]; then
+        if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/just-$platform" ]]; then
             log "Binary for $platform already exists, skipping..."
             continue
         fi
@@ -211,7 +210,7 @@ main() {
     # Download all platform binaries (force download removes existing binaries)
     if [[ "$force_download" == true ]]; then
         log "Force download enabled, removing existing binaries..."
-        rm -f "$SCRIPT_DIR"/just-*
+        rm -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")""/just-*
     fi
 
     download_all_platforms "$target_version"

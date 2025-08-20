@@ -17,17 +17,16 @@ readonly VALIDATION_HELPER_LOADED="true"
 set -euo pipefail
 
 # Get the directory where this script is located
-VALIDATION_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities if not already sourced
 if [[ -z "${LOGGING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/logging.sh
-    source "${VALIDATION_HELPER_DIR}/../../shared/logging.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 fi
 
 if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/errors.sh
-    source "${VALIDATION_HELPER_DIR}/../../shared/errors.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 fi
 
 # Mark this file as sourced
@@ -247,7 +246,7 @@ validate_service_ports() {
 validate_config_files() {
     log "Validating configuration files..."
     
-    local config_base="${VALIDATION_HELPER_DIR}/../configs"
+    local config_base="$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../configs"
     local required_configs=(
         "system/sysctl.conf.template"
         "security/ssh_config.template"

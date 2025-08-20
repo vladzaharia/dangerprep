@@ -12,24 +12,23 @@ set -euo pipefail
 
 # Script metadata
 SCRIPT_NAME_SETUP_CLEANUP="$(basename "${BASH_SOURCE[0]}" .sh)"
-SETUP_CLEANUP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SCRIPT_VERSION_SETUP_CLEANUP="2.0"
 SCRIPT_DESCRIPTION_SETUP_CLEANUP="DangerPrep System Cleanup"
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
-source "${SETUP_CLEANUP_SCRIPT_DIR}/../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/logging.sh"
 # shellcheck source=../shared/errors.sh
-source "${SETUP_CLEANUP_SCRIPT_DIR}/../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
-source "${SETUP_CLEANUP_SCRIPT_DIR}/../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
-source "${SETUP_CLEANUP_SCRIPT_DIR}/../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/banner.sh"
 # shellcheck source=../shared/functions.sh
-source "${SETUP_CLEANUP_SCRIPT_DIR}/../shared/functions.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/functions.sh"
 # shellcheck source=helpers/storage.sh
-source "${SETUP_CLEANUP_SCRIPT_DIR}/helpers/storage.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/storage.sh"
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-cleanup.log"
 DEFAULT_INSTALL_ROOT="/opt/dangerprep"

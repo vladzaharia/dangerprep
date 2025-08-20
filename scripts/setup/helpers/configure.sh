@@ -18,27 +18,26 @@ readonly CONFIGURE_HELPER_LOADED="true"
 set -euo pipefail
 
 # Get the directory where this script is located
-CONFIGURE_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities if not already sourced
 if [[ -z "${LOGGING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/logging.sh
-    source "${CONFIGURE_HELPER_DIR}/../../shared/logging.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 fi
 
 if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/errors.sh
-    source "${CONFIGURE_HELPER_DIR}/../../shared/errors.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 fi
 
 if [[ -z "${CONFIG_HELPER_SOURCED:-}" ]]; then
     # shellcheck source=./config.sh
-    source "${CONFIGURE_HELPER_DIR}/config.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/config.sh"
 fi
 
 if [[ -z "${SERVICES_HELPER_SOURCED:-}" ]]; then
     # shellcheck source=./services.sh
-    source "${CONFIGURE_HELPER_DIR}/services.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/services.sh"
 fi
 
 # Mark this file as sourced

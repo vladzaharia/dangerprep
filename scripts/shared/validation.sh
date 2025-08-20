@@ -14,11 +14,11 @@ set -euo pipefail
 
 # Source required utilities if not already loaded
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    readonly SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 fi
 if [[ "${DANGERPREP_LOGGING_LOADED:-}" != "true" ]]; then
     # shellcheck source=./logging.sh
-        source "${SCRIPT_DIR}/logging.sh"
+        source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/logging.sh"
 fi
 
 # Validation configuration
@@ -494,12 +494,30 @@ disable_strict_validation() {
 }
 
 # Export functions for use in other scripts
-export -f validate_not_empty validate_string_length validate_email validate_ipv4
-export -f validate_port validate_domain validate_url validate_numeric validate_numeric_range
-export -f validate_file_exists validate_directory_exists validate_file_readable
-export -f validate_file_writable validate_file_executable validate_directory_writable
-export -f validate_command_exists validate_user_exists validate_group_exists
-export -f validate_root_user validate_not_root_user validate_disk_space
-export -f validate_network_connectivity validate_port_available
-export -f validate_script_args validate_script_environment
-export -f enable_strict_validation disable_strict_validation
+export -f validate_not_empty
+export -f validate_string_length
+export -f validate_email
+export -f validate_ipv4
+export -f validate_port
+export -f validate_domain
+export -f validate_url
+export -f validate_numeric
+export -f validate_numeric_range
+export -f validate_file_exists
+export -f validate_directory_exists
+export -f validate_file_readable
+export -f validate_file_writable
+export -f validate_file_executable
+export -f validate_directory_writable
+export -f validate_command_exists
+export -f validate_user_exists
+export -f validate_group_exists
+export -f validate_root_user
+export -f validate_not_root_user
+export -f validate_disk_space
+export -f validate_network_connectivity
+export -f validate_port_available
+export -f validate_script_args
+export -f validate_script_environment
+export -f enable_strict_validation
+export -f disable_strict_validation

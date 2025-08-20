@@ -12,16 +12,15 @@ readonly GPIO_SETUP_LOADED="true"
 set -euo pipefail
 
 # Script metadata
-GPIO_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities if available
-if [[ -f "${GPIO_SCRIPT_DIR}/../../shared/logging.sh" ]]; then
+if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh" ]]; then
     # shellcheck source=../../shared/logging.sh
-    source "${GPIO_SCRIPT_DIR}/../../shared/logging.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
     # shellcheck source=../../shared/errors.sh
-    source "${GPIO_SCRIPT_DIR}/../../shared/errors.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
     # shellcheck source=../../shared/validation.sh
-    source "${GPIO_SCRIPT_DIR}/../../shared/validation.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
 else
     # Fallback logging functions if shared utilities not available
     log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }

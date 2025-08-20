@@ -12,28 +12,27 @@ set -euo pipefail
 
 # Script metadata
 SCRIPT_NAME_NETWORK_MANAGER="$(basename "${BASH_SOURCE[0]}" .sh)"
-NETWORK_MANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SCRIPT_VERSION_NETWORK_MANAGER="1.0"
 SCRIPT_DESCRIPTION_NETWORK_MANAGER="Intelligent Network Controller"
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
-source "${NETWORK_MANAGER_SCRIPT_DIR}/../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/logging.sh"
 # shellcheck source=../shared/errors.sh
-source "${NETWORK_MANAGER_SCRIPT_DIR}/../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
-source "${NETWORK_MANAGER_SCRIPT_DIR}/../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
-source "${NETWORK_MANAGER_SCRIPT_DIR}/../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/banner.sh"
 # shellcheck source=../shared/hardware.sh
-source "${NETWORK_MANAGER_SCRIPT_DIR}/../shared/hardware.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/hardware.sh"
 # shellcheck source=../shared/network.sh
-source "${NETWORK_MANAGER_SCRIPT_DIR}/../shared/network.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/network.sh"
 # shellcheck source=../shared/state/network.sh
-source "${NETWORK_MANAGER_SCRIPT_DIR}/../shared/state/network.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/state/network.sh"
 # shellcheck source=../shared/intelligence/network.sh
-source "${NETWORK_MANAGER_SCRIPT_DIR}/../shared/intelligence/network.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/intelligence/network.sh"
 
 # Configuration
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-network-manager.log"
@@ -228,10 +227,10 @@ wifi_connect() {
     info "Connecting to WiFi: $ssid on $interface"
     
     # Use wifi-manager to connect
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" connect "$ssid" "$password" "$interface"
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" connect "$ssid" "$password" "$interface"
     else
-        error "WiFi manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh"
+        error "WiFi manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh"
         clear_error_context
         return 1
     fi
@@ -254,8 +253,8 @@ wifi_disconnect() {
     info "Disconnecting WiFi interface: $interface"
     
     # Use wifi-manager to disconnect
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" disconnect "$interface"
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" disconnect "$interface"
     else
         warning "WiFi manager not found, using basic disconnection"
         ip link set "$interface" down 2>/dev/null || true
@@ -282,9 +281,9 @@ wifi_repeater_start() {
     
     # TODO: Implement WiFi repeater functionality
     # For now, use existing script if available
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-repeater.sh" ]]; then
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-repeater.sh" ]]; then
         UPSTREAM_SSID="$upstream_ssid" UPSTREAM_PASSWORD="$upstream_password" \
-            bash "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-repeater.sh" setup
+            bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-repeater.sh" setup
     else
         error "WiFi repeater functionality not yet implemented"
         error "Use the existing wifi-repeater.sh script for now"
@@ -371,10 +370,10 @@ list_interfaces() {
 
     log_section "Network Interface Listing"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh" list
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh" list
     else
-        error "Interface manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh"
+        error "Interface manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh"
         clear_error_context
         return 1
     fi
@@ -389,10 +388,10 @@ show_wan_details() {
 
     log_section "Detailed WAN Configuration"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh" show-wan
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh" show-wan
     else
-        error "Interface manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh"
+        error "Interface manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh"
         clear_error_context
         return 1
     fi
@@ -407,10 +406,10 @@ wifi_scan() {
 
     log_section "WiFi Network Scanning"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" scan
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" scan
     else
-        error "WiFi manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh"
+        error "WiFi manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh"
         clear_error_context
         return 1
     fi
@@ -428,10 +427,10 @@ wifi_create_ap() {
 
     log_section "Creating WiFi Access Point"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ap "$ssid" "$password"
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ap "$ssid" "$password"
     else
-        error "WiFi manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh"
+        error "WiFi manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh"
         clear_error_context
         return 1
     fi
@@ -446,10 +445,10 @@ wifi_show_status() {
 
     log_section "WiFi Interface Status"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" status
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" status
     else
-        error "WiFi manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh"
+        error "WiFi manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh"
         clear_error_context
         return 1
     fi
@@ -512,10 +511,10 @@ list_interfaces() {
 
     log_section "Network Interface Listing"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh" list
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh" list
     else
-        error "Interface manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh"
+        error "Interface manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh"
         clear_error_context
         return 1
     fi
@@ -529,10 +528,10 @@ show_wan_details() {
 
     log_section "Detailed WAN Configuration"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh" show-wan
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh" show-wan
     else
-        error "Interface manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/interface-manager.sh"
+        error "Interface manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/interface-manager.sh"
         clear_error_context
         return 1
     fi
@@ -546,10 +545,10 @@ wifi_scan() {
 
     log_section "WiFi Network Scanning"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" scan
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" scan
     else
-        error "WiFi manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh"
+        error "WiFi manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh"
         clear_error_context
         return 1
     fi
@@ -568,8 +567,8 @@ wifi_create_ap() {
 
     info "Creating WiFi access point: $ssid"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ap "$ssid" "$password"
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ap "$ssid" "$password"
 
         # After creating AP, trigger network evaluation if auto mode is enabled
         if is_auto_mode_enabled; then
@@ -577,7 +576,7 @@ wifi_create_ap() {
             force_network_evaluation
         fi
     else
-        error "WiFi manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh"
+        error "WiFi manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh"
         clear_error_context
         return 1
     fi
@@ -592,10 +591,10 @@ wifi_show_status() {
 
     log_section "WiFi Interface Status"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" ]]; then
-        bash "${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh" status
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" ]]; then
+        bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh" status
     else
-        error "WiFi manager not found: ${NETWORK_MANAGER_SCRIPT_DIR}/wifi-manager.sh"
+        error "WiFi manager not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/wifi-manager.sh"
         clear_error_context
         return 1
     fi
@@ -611,10 +610,10 @@ run_diagnostics() {
 
     log_section "Network Diagnostics: $diagnostic_type"
 
-    if [[ -f "${NETWORK_MANAGER_SCRIPT_DIR}/network-diagnostics.sh" ]]; then
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/network-diagnostics.sh" ]]; then
         case "$diagnostic_type" in
             all|connectivity|interfaces|dns|wifi|speed)
-                bash "${NETWORK_MANAGER_SCRIPT_DIR}/network-diagnostics.sh" "$diagnostic_type"
+                bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/network-diagnostics.sh" "$diagnostic_type"
                 ;;
             *)
                 error "Unknown diagnostic type: $diagnostic_type"
@@ -624,7 +623,7 @@ run_diagnostics() {
                 ;;
         esac
     else
-        error "Network diagnostics not found: ${NETWORK_MANAGER_SCRIPT_DIR}/network-diagnostics.sh"
+        error "Network diagnostics not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/network-diagnostics.sh"
         clear_error_context
         return 1
     fi

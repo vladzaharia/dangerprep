@@ -9,16 +9,15 @@
 set -euo pipefail
 
 # Script metadata
-SYSTEM_MANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
-source "${SYSTEM_MANAGER_SCRIPT_DIR}/../shared/logging.sh"
-source "${SYSTEM_MANAGER_SCRIPT_DIR}/../shared/errors.sh"
-source "${SYSTEM_MANAGER_SCRIPT_DIR}/../shared/validation.sh"
-source "${SYSTEM_MANAGER_SCRIPT_DIR}/../shared/banner.sh"
-source "${SYSTEM_MANAGER_SCRIPT_DIR}/../shared/state/system.sh"
-source "${SYSTEM_MANAGER_SCRIPT_DIR}/../shared/system.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/state/system.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/system.sh"
 
 # Configuration
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-system-manager.log"
@@ -242,13 +241,13 @@ run_system_diagnostics() {
     
     # Service diagnostics
     log "Checking service health..."
-    "${SCRIPT_DIR}/service-status.sh" >/dev/null 2>&1
+    "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/service-status.sh" >/dev/null 2>&1
     success "Service diagnostics completed"
     echo
     
     # System maintenance check
     log "Running system maintenance check..."
-    "${SCRIPT_DIR}/system-maintenance.sh" validate >/dev/null 2>&1
+    "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/system-maintenance.sh" validate >/dev/null 2>&1
     success "System maintenance check completed"
     echo
     
@@ -395,24 +394,24 @@ main() {
             optimize_system
             ;;
         "start")
-            "${SCRIPT_DIR}/start-services.sh"
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/start-services.sh"
             ;;
         "stop")
-            "${SCRIPT_DIR}/stop-services.sh"
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/stop-services.sh"
             ;;
         "restart")
-            "${SCRIPT_DIR}/stop-services.sh"
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/stop-services.sh"
             sleep 5
-            "${SCRIPT_DIR}/start-services.sh"
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/start-services.sh"
             ;;
         "service-status")
-            "${SCRIPT_DIR}/service-status.sh"
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/service-status.sh"
             ;;
         "maintenance")
-            "${SCRIPT_DIR}/system-maintenance.sh" all
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/system-maintenance.sh" all
             ;;
         "update")
-            "${SCRIPT_DIR}/system-update.sh"
+            "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/system-update.sh"
             ;;
         "backup")
             log "System backup functionality - use backup-manager.sh for advanced options"

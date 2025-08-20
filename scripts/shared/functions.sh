@@ -9,17 +9,16 @@ fi
 readonly FUNCTIONS_SHARED_LOADED="true"
 
 # Get the directory where this script is located
-FUNCTIONS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source all shared utilities
 # shellcheck source=./logging.sh
-source "${FUNCTIONS_DIR}/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/logging.sh"
 # shellcheck source=./errors.sh
-source "${FUNCTIONS_DIR}/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/errors.sh"
 # shellcheck source=./validation.sh
-source "${FUNCTIONS_DIR}/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/validation.sh"
 # shellcheck source=./banner.sh
-source "${FUNCTIONS_DIR}/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/banner.sh"
 
 # Configuration loading function
 load_config() {
@@ -722,12 +721,33 @@ parse_storage_size() {
 
 # Export functions for use in other scripts
 export -f load_config
-export -f is_service_running is_service_enabled start_service stop_service restart_service
-export -f is_package_manager_available is_k3s_running generate_wifi_password safe_wildcard_cleanup
-export -f init_state_tracking set_step_state get_step_state is_step_completed
-export -f get_last_completed_step show_setup_progress
-export -f enable_dry_run is_dry_run log_planned_change dry_run_execute
-export -f dry_run_file_op dry_run_service_op dry_run_package_op show_dry_run_summary
-export -f get_default_interface get_interface_ip
-export -f backup_file get_system_info detect_hardware init_environment
+export -f is_service_running
+export -f is_service_enabled
+export -f start_service
+export -f stop_service
+export -f restart_service
+export -f is_package_manager_available
+export -f is_k3s_running
+export -f get_default_interface
+export -f get_interface_ip
+export -f backup_file
+export -f get_system_info
+export -f detect_hardware
+export -f init_environment
+export -f generate_wifi_password
+export -f safe_wildcard_cleanup
+export -f init_state_tracking
+export -f set_step_state
+export -f get_step_state
+export -f is_step_completed
+export -f get_last_completed_step
+export -f show_setup_progress
+export -f enable_dry_run
+export -f is_dry_run
+export -f log_planned_change
+export -f dry_run_execute
+export -f dry_run_file_op
+export -f dry_run_service_op
+export -f dry_run_package_op
+export -f show_dry_run_summary
 export -f parse_storage_size

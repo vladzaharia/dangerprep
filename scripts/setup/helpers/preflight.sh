@@ -18,26 +18,25 @@ set -euo pipefail
 
 # Script metadata
 SCRIPT_NAME_PREFLIGHT="$(basename "${BASH_SOURCE[0]}" .sh)"
-PREFLIGHT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SCRIPT_VERSION_PREFLIGHT="2.0"
 SCRIPT_DESCRIPTION_PREFLIGHT="DangerPrep Pre-flight Validation"
 
 # Source shared utilities
 # shellcheck source=../../shared/logging.sh
-source "${PREFLIGHT_SCRIPT_DIR}/../../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 # shellcheck source=../../shared/errors.sh
-source "${PREFLIGHT_SCRIPT_DIR}/../../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 # shellcheck source=../../shared/functions.sh
-source "${PREFLIGHT_SCRIPT_DIR}/../../shared/functions.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/functions.sh"
 # shellcheck source=../../shared/validation.sh
-source "${PREFLIGHT_SCRIPT_DIR}/../../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
-source "${PREFLIGHT_SCRIPT_DIR}/../../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/banner.sh"
 # shellcheck source=../../shared/network.sh
-source "${PREFLIGHT_SCRIPT_DIR}/../../shared/network.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/network.sh"
 # shellcheck source=./storage.sh
-source "${PREFLIGHT_SCRIPT_DIR}/storage.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/storage.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-preflight.log"

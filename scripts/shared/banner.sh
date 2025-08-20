@@ -357,12 +357,22 @@ show_motd_banner() {
 }
 
 # Export functions for use in other scripts
+export -f get_scheme_colors
+export -f render_top_border
+export -f render_bottom_border
+export -f render_empty_line
+export -f get_side_color
+export -f render_ascii_line
+export -f render_title_line
 export -f show_banner
 export -f show_banner_with_title
 export -f show_setup_banner
+export -f show_cleanup_banner
+export -f show_monitoring_banner
+export -f show_security_banner
+export -f show_backup_banner
+export -f show_network_banner
+export -f show_system_banner
+export -f show_validation_banner
+export -f show_packages_banner
 export -f show_motd_banner
-export -f render_top_border
-export -f render_bottom_border
-export -f render_title_line
-export -f render_content_line
-export -f render_empty_line

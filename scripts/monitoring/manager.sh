@@ -6,20 +6,19 @@
 set -euo pipefail
 
 # Script metadata
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
-source "${SCRIPT_DIR}/../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/logging.sh"
 # shellcheck source=../shared/errors.sh
-source "${SCRIPT_DIR}/../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
-source "${SCRIPT_DIR}/../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
-source "${SCRIPT_DIR}/../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/banner.sh"
 # shellcheck source=../shared/hardware.sh
-source "${SCRIPT_DIR}/../shared/hardware.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/hardware.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-monitoring.log"
@@ -114,15 +113,15 @@ run_system_monitoring() {
     set_error_context "System monitoring"
     log "Running system monitoring..."
 
-    if [[ -f "${SCRIPT_DIR}/system-monitor.sh" ]]; then
-        if bash "${SCRIPT_DIR}/system-monitor.sh" report; then
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/system-monitor.sh" ]]; then
+        if bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/system-monitor.sh" report; then
             success "System monitoring completed"
         else
             error "System monitoring failed"
             return 1
         fi
     else
-        error "System monitor script not found: ${SCRIPT_DIR}/system-monitor.sh"
+        error "System monitor script not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/system-monitor.sh"
         return 1
     fi
 
@@ -135,8 +134,8 @@ run_hardware_monitoring() {
     set_error_context "Hardware monitoring ($subcommand)"
     log "Running hardware monitoring: $subcommand"
 
-    if [[ -f "${SCRIPT_DIR}/helpers/hardware.sh" ]]; then
-        if bash "${SCRIPT_DIR}/helpers/hardware.sh" "$subcommand"; then
+    if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/hardware.sh" ]]; then
+        if bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/hardware.sh" "$subcommand"; then
             success "Hardware monitoring ($subcommand) completed"
         else
             error "Hardware monitoring ($subcommand) failed"
@@ -144,7 +143,7 @@ run_hardware_monitoring() {
             return 1
         fi
     else
-        error "Hardware monitor script not found: ${SCRIPT_DIR}/helpers/hardware.sh"
+        error "Hardware monitor script not found: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/hardware.sh"
         clear_error_context
         return 1
     fi

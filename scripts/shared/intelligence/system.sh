@@ -10,6 +10,12 @@ if [[ "${INTELLIGENCE_SYSTEM_SHARED_LOADED:-}" == "true" ]]; then
 fi
 readonly INTELLIGENCE_SYSTEM_SHARED_LOADED="true"
 
+# Source dependencies
+# shellcheck source=../system.sh
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../system.sh"
+# shellcheck source=../state/system.sh
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../state/system.sh"
+
 # System intelligence configuration
 readonly SYSTEM_HEALTH_THRESHOLD_CRITICAL=40
 readonly SYSTEM_HEALTH_THRESHOLD_WARNING=60

@@ -18,17 +18,16 @@ readonly DIRECTORIES_HELPER_LOADED="true"
 set -euo pipefail
 
 # Get the directory where this script is located
-DIRECTORIES_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities if not already sourced
 if [[ -z "${LOGGING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/logging.sh
-    source "${DIRECTORIES_HELPER_DIR}/../../shared/logging.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 fi
 
 if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/errors.sh
-    source "${DIRECTORIES_HELPER_DIR}/../../shared/errors.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 fi
 
 # Mark this file as sourced

@@ -15,16 +15,15 @@ readonly SYSTEM_DIAGNOSTICS_LOADED="true"
 set -euo pipefail
 
 # Script metadata
-SYSTEM_DIAGNOSTICS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
-source "${SYSTEM_DIAGNOSTICS_SCRIPT_DIR}/../../shared/logging.sh"
-source "${SYSTEM_DIAGNOSTICS_SCRIPT_DIR}/../../shared/errors.sh"
-source "${SYSTEM_DIAGNOSTICS_SCRIPT_DIR}/../../shared/validation.sh"
-source "${SYSTEM_DIAGNOSTICS_SCRIPT_DIR}/../../shared/banner.sh"
-source "${SYSTEM_DIAGNOSTICS_SCRIPT_DIR}/../../shared/state/system.sh"
-source "${SYSTEM_DIAGNOSTICS_SCRIPT_DIR}/../../shared/system.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/state/system.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/system.sh"
 
 # Configuration
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-system-diagnostics.log"

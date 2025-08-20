@@ -11,22 +11,21 @@ fi
 readonly STORAGE_HELPER_LOADED="true"
 
 # Get the directory where this script is located
-STORAGE_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities if not already sourced
-if [[ -z "${LOGGING_SOURCED:-}" ]]; then
+if [[ "${DANGERPREP_LOGGING_LOADED:-}" != "true" ]]; then
     # shellcheck source=../../shared/logging.sh
-    source "${STORAGE_HELPER_DIR}/../../shared/logging.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 fi
 
-if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
+if [[ "${DANGERPREP_ERROR_HANDLING_LOADED:-}" != "true" ]]; then
     # shellcheck source=../../shared/errors.sh
-    source "${STORAGE_HELPER_DIR}/../../shared/errors.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 fi
 
-if [[ -z "${VALIDATION_SOURCED:-}" ]]; then
+if [[ "${DANGERPREP_VALIDATION_LOADED:-}" != "true" ]]; then
     # shellcheck source=../../shared/validation.sh
-    source "${STORAGE_HELPER_DIR}/../../shared/validation.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
 fi
 
 # Mark this file as sourced
@@ -712,6 +711,13 @@ cleanup_storage_mounts() {
 }
 
 # Export functions for use in other scripts
-export -f detect_nvme_devices check_existing_partitions check_partition_data check_content_data
-export -f partition_nvme_device format_partitions mount_partitions
-export -f setup_persistent_mounts setup_nvme_storage cleanup_storage_mounts
+export -f detect_nvme_devices
+export -f check_existing_partitions
+export -f check_partition_data
+export -f check_content_data
+export -f partition_nvme_device
+export -f format_partitions
+export -f mount_partitions
+export -f setup_persistent_mounts
+export -f setup_nvme_storage
+export -f cleanup_storage_mounts

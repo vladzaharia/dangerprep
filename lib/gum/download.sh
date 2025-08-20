@@ -28,7 +28,6 @@ warning() {
 }
 
 # Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GITHUB_REPO="charmbracelet/gum"
 GITHUB_API_URL="https://api.github.com/repos/$GITHUB_REPO"
 
@@ -107,9 +106,9 @@ download_gum() {
 
     # Download archive
     if command -v curl > /dev/null 2>&1; then
-        curl -L -o "$SCRIPT_DIR/$archive_name" "$download_url"
+        curl -L -o "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" "$download_url"
     elif command -v wget > /dev/null 2>&1; then
-        wget -O "$SCRIPT_DIR/$archive_name" "$download_url"
+        wget -O "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" "$download_url"
     else
         error "Neither curl nor wget found. Cannot download binary."
         exit 1
@@ -120,11 +119,11 @@ download_gum() {
     case "$archive_ext" in
         tar.gz)
             # Extract the entire archive and find the binary
-            tar -xzf "$SCRIPT_DIR/$archive_name" -C "$SCRIPT_DIR"
+            tar -xzf "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" -C "$(dirname "$(realpath "${BASH_SOURCE[0]}")""
             # Find the binary in the extracted directory
-            local extracted_dir="$SCRIPT_DIR/gum_${version#v}_${release_platform}"
+            local extracted_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")"/gum_${version#v}_${release_platform}"
             if [[ -f "$extracted_dir/$binary_name" ]]; then
-                mv "$extracted_dir/$binary_name" "$SCRIPT_DIR/$binary_name"
+                mv "$extracted_dir/$binary_name" "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$binary_name"
                 rm -rf "$extracted_dir"
             else
                 error "Binary not found in extracted archive"
@@ -134,13 +133,13 @@ download_gum() {
         zip)
             if command -v unzip > /dev/null 2>&1; then
                 # Extract and find binary
-                local temp_dir="$SCRIPT_DIR/temp_extract"
+                local temp_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")"/temp_extract"
                 mkdir -p "$temp_dir"
-                unzip "$SCRIPT_DIR/$archive_name" -d "$temp_dir"
+                unzip "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" -d "$temp_dir"
                 local binary_path
                 binary_path=$(find "$temp_dir" -name "$binary_name" -type f | head -1)
                 if [[ -n "$binary_path" ]]; then
-                    mv "$binary_path" "$SCRIPT_DIR/$binary_name"
+                    mv "$binary_path" "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$binary_name"
                     rm -rf "$temp_dir"
                 else
                     error "Binary not found in extracted archive"
@@ -155,11 +154,11 @@ download_gum() {
     esac
 
     # Rename binary to platform-specific name
-    mv "$SCRIPT_DIR/$binary_name" "$SCRIPT_DIR/$output_name"
-    chmod +x "$SCRIPT_DIR/$output_name"
+    mv "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$binary_name" "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$output_name"
+    chmod +x "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$output_name"
 
     # Clean up archive
-    rm "$SCRIPT_DIR/$archive_name"
+    rm "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name"
 
     success "Downloaded and extracted $output_name"
 }
@@ -179,7 +178,7 @@ download_all_platforms() {
     )
 
     for platform in "${platforms[@]}"; do
-        if [[ -f "$SCRIPT_DIR/gum-$platform" ]]; then
+        if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/gum-$platform" ]]; then
             log "Binary for $platform already exists, skipping..."
             continue
         fi
@@ -234,7 +233,7 @@ main() {
     # Download all platform binaries (force download removes existing binaries)
     if [[ "$force_download" == true ]]; then
         log "Force download enabled, removing existing binaries..."
-        rm -f "$SCRIPT_DIR"/gum-*
+        rm -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")""/gum-*
     fi
 
     download_all_platforms "$target_version"

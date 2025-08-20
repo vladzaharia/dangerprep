@@ -14,23 +14,22 @@ readonly CONFIG_HELPER_LOADED="true"
 set -euo pipefail
 
 # Get the directory where this script is located
-CONFIG_LOADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="${CONFIG_LOADER_DIR}/../configs"
+CONFIG_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../configs"
 
 # Source shared utilities if not already sourced
 if [[ -z "${LOGGING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/logging.sh
-    source "${CONFIG_LOADER_DIR}/../../shared/logging.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 fi
 
 if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/errors.sh
-    source "${CONFIG_LOADER_DIR}/../../shared/errors.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 fi
 
 if [[ -z "${VALIDATION_HELPER_SOURCED:-}" ]]; then
     # shellcheck source=./validation.sh
-    source "${CONFIG_LOADER_DIR}/validation.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/validation.sh"
 fi
 
 # Mark this file as sourced

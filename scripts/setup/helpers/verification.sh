@@ -17,17 +17,16 @@ readonly VERIFICATION_HELPER_LOADED="true"
 set -euo pipefail
 
 # Get the directory where this script is located
-VERIFICATION_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities if not already sourced
-if [[ -z "${LOGGING_SOURCED:-}" ]]; then
+if [[ "${DANGERPREP_LOGGING_LOADED:-}" != "true" ]]; then
     # shellcheck source=../../shared/logging.sh
-    source "${VERIFICATION_HELPER_DIR}/../../shared/logging.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 fi
 
-if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
+if [[ "${DANGERPREP_ERROR_HANDLING_LOADED:-}" != "true" ]]; then
     # shellcheck source=../../shared/errors.sh
-    source "${VERIFICATION_HELPER_DIR}/../../shared/errors.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 fi
 
 # Mark this file as sourced
@@ -376,12 +375,10 @@ verify_setup() {
 
 # Export functions for use in other scripts
 export -f start_all_services
-export -f verify_service_health
+export -f verify_service_status
 export -f verify_network_connectivity
+export -f verify_network_interfaces
 export -f verify_dns_resolution
-export -f verify_certificate_authority
+export -f verify_service_ports
 export -f verify_file_permissions
-export -f verify_system_security
-export -f verify_backup_functionality
-export -f verify_monitoring_services
-export -f run_comprehensive_verification
+export -f verify_setup

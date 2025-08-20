@@ -14,11 +14,11 @@ set -euo pipefail
 
 # Source logging utility if not already loaded
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    readonly SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 fi
 if [[ "${DANGERPREP_LOGGING_LOADED:-}" != "true" ]]; then
     # shellcheck source=./logging.sh
-        source "${SCRIPT_DIR}/logging.sh"
+        source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/logging.sh"
 fi
 
 # Error handling configuration
@@ -417,11 +417,31 @@ disable_rollback_on_error() {
 init_error_handling
 
 # Export functions for use in other scripts
-export -f register_cleanup_function register_rollback_function
-export -f register_temp_file register_temp_dir
-export -f set_error_context set_current_operation clear_error_context clear_current_operation
-export -f safe_execute require_commands require_files require_directories
-export -f create_temp_file create_temp_dir
-export -f enable_error_handling disable_error_handling
-export -f enable_cleanup_on_exit disable_cleanup_on_exit
-export -f enable_rollback_on_error disable_rollback_on_error
+export -f init_error_handling
+export -f handle_error
+export -f handle_exit
+export -f handle_interrupt
+export -f execute_cleanup_functions
+export -f execute_rollback_functions
+export -f cleanup_temp_files
+export -f cleanup_temp_dirs
+export -f register_cleanup_function
+export -f register_rollback_function
+export -f register_temp_file
+export -f register_temp_dir
+export -f set_error_context
+export -f set_current_operation
+export -f clear_error_context
+export -f clear_current_operation
+export -f safe_execute
+export -f require_commands
+export -f require_files
+export -f require_directories
+export -f create_temp_file
+export -f create_temp_dir
+export -f enable_error_handling
+export -f disable_error_handling
+export -f enable_cleanup_on_exit
+export -f disable_cleanup_on_exit
+export -f enable_rollback_on_error
+export -f disable_rollback_on_error

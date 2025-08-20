@@ -311,7 +311,30 @@ _init_logging() {
 _init_logging
 
 # Export functions for use in other scripts
-export -f log info success warning warn error critical debug
-export -f log_command log_file_operation log_network_operation log_progress
-export -f log_section log_subsection log_separator log_error_and_exit
-export -f log_validation_result set_log_file set_log_level enable_color disable_color
+export -f get_log_level_numeric
+export -f should_log
+export -f supports_color
+export -f get_timestamp
+export -f _log_message
+export -f log
+export -f info
+export -f success
+export -f warning
+export -f warn
+export -f error
+export -f critical
+export -f debug
+export -f log_command
+export -f log_file_operation
+export -f log_network_operation
+export -f log_progress
+export -f log_section
+export -f log_subsection
+export -f set_log_file
+export -f set_log_level
+export -f enable_color
+export -f disable_color
+export -f log_separator
+export -f log_error_and_exit
+export -f log_validation_result
+export -f _init_logging

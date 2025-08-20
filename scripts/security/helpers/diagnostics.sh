@@ -18,17 +18,16 @@ set -euo pipefail
 # Script metadata
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SCRIPT_VERSION="1.0"
 SCRIPT_DESCRIPTION="Security Diagnostics"
 
 # Source shared utilities
-source "${SCRIPT_DIR}/../../shared/logging.sh"
-source "${SCRIPT_DIR}/../../shared/errors.sh"
-source "${SCRIPT_DIR}/../../shared/validation.sh"
-source "${SCRIPT_DIR}/../../shared/banner.sh"
-source "${SCRIPT_DIR}/../../shared/security.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/security.sh"
 
 # Configuration
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-security-diagnostics.log"

@@ -13,22 +13,21 @@ readonly SECURITY_HELPERS_SETUP-SECRETS_LOADED="true"
 set -euo pipefail
 
 # Script metadata
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
 # shellcheck source=../../shared/logging.sh
-source "${SCRIPT_DIR}/../../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 # shellcheck source=../../shared/errors.sh
-source "${SCRIPT_DIR}/../../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 # shellcheck source=../../shared/validation.sh
-source "${SCRIPT_DIR}/../../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
-source "${SCRIPT_DIR}/../../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/banner.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-setup-secrets.log"
-PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+PROJECT_ROOT="$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")"")")"
 readonly PROJECT_ROOT
 SECRETS_DIR="${PROJECT_ROOT}/secrets"
 
@@ -179,17 +178,17 @@ generate_all_secrets() {
     
     if [[ "${DRY_RUN}" == "true" ]]; then
         if [[ ${#generate_args[@]} -gt 0 ]]; then
-            log "[DRY RUN] Would run: ${SCRIPT_DIR}/generate-secrets.sh ${generate_args[*]}"
+            log "[DRY RUN] Would run: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/generate-secrets.sh ${generate_args[*]}"
         else
-            log "[DRY RUN] Would run: ${SCRIPT_DIR}/generate-secrets.sh"
+            log "[DRY RUN] Would run: $(dirname "$(realpath "${BASH_SOURCE[0]}")"/generate-secrets.sh"
         fi
         return 0
     fi
 
     if [[ ${#generate_args[@]} -gt 0 ]]; then
-        "${SCRIPT_DIR}/generate-secrets.sh" "${generate_args[@]}"
+        "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/generate-secrets.sh" "${generate_args[@]}"
     else
-        "${SCRIPT_DIR}/generate-secrets.sh"
+        "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/generate-secrets.sh"
     fi
 }
 
@@ -202,7 +201,7 @@ update_all_env_files() {
         update_args+=("--dry-run")
     fi
     
-    "${SCRIPT_DIR}/helpers/update-secrets.sh" "${update_args[@]}"
+    "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/update-secrets.sh" "${update_args[@]}"
 }
 
 # Set secure permissions

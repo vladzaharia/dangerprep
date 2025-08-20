@@ -13,26 +13,25 @@ readonly SYSTEM_HELPERS_MAINTENANCE_LOADED="true"
 set -euo pipefail
 
 # Script metadata
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 
 # Source shared utilities
 # shellcheck source=../../shared/logging.sh
-source "${SCRIPT_DIR}/../../shared/logging.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 # shellcheck source=../../shared/errors.sh
-source "${SCRIPT_DIR}/../../shared/errors.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 # shellcheck source=../../shared/validation.sh
-source "${SCRIPT_DIR}/../../shared/validation.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/validation.sh"
 # shellcheck source=../../shared/banner.sh
-source "${SCRIPT_DIR}/../../shared/banner.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/banner.sh"
 # shellcheck source=../../shared/state/system.sh
-source "${SCRIPT_DIR}/../../shared/state/system.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/state/system.sh"
 # shellcheck source=../../shared/system.sh
-source "${SCRIPT_DIR}/../../shared/system.sh"
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/system.sh"
 
 # Configuration variables
 readonly DEFAULT_LOG_FILE="/var/log/dangerprep-system-maintenance.log"
-PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+PROJECT_ROOT="$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")"")")"
 readonly PROJECT_ROOT
 readonly DANGERPREP_ROOT="${PROJECT_ROOT}"
 readonly DANGERPREP_DATA_DIR="${PROJECT_ROOT}/data"

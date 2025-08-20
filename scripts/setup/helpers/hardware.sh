@@ -18,22 +18,21 @@ readonly HARDWARE_HELPER_LOADED="true"
 set -euo pipefail
 
 # Get the directory where this script is located
-HARDWARE_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities if not already sourced
 if [[ -z "${LOGGING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/logging.sh
-    source "${HARDWARE_HELPER_DIR}/../../shared/logging.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/logging.sh"
 fi
 
 if [[ -z "${ERROR_HANDLING_SOURCED:-}" ]]; then
     # shellcheck source=../../shared/errors.sh
-    source "${HARDWARE_HELPER_DIR}/../../shared/errors.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../shared/errors.sh"
 fi
 
 if [[ -z "${SERVICES_HELPER_SOURCED:-}" ]]; then
     # shellcheck source=./services.sh
-    source "${HARDWARE_HELPER_DIR}/services.sh"
+    source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/services.sh"
 fi
 
 # Mark this file as sourced
@@ -249,7 +248,7 @@ configure_friendlyelec_fan_control() {
     # load_rk3588_fan_control_config
 
     # Make fan control script executable
-    local fan_script="${HARDWARE_HELPER_DIR}/../../monitoring/rk3588-fan-control.sh"
+    local fan_script="$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../../monitoring/rk3588-fan-control.sh"
     if [[ -f "$fan_script" ]]; then
         chmod +x "$fan_script"
     fi
@@ -284,7 +283,7 @@ configure_friendlyelec_gpio_pwm() {
     # load_gpio_pwm_config
 
     # Make GPIO setup script executable
-    local gpio_script="${HARDWARE_HELPER_DIR}/../setup-gpio.sh"
+    local gpio_script="$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../setup-gpio.sh"
     if [[ -f "$gpio_script" ]]; then
         chmod +x "$gpio_script"
 
