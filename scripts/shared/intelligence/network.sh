@@ -7,6 +7,12 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
+# Prevent multiple sourcing
+if [[ "${INTELLIGENCE_NETWORK_SHARED_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly INTELLIGENCE_NETWORK_SHARED_LOADED="true"
+
 # Modern shell script best practices
 set -euo pipefail
 
@@ -483,12 +489,30 @@ force_network_evaluation() {
     set_error_context "Forced network evaluation"
     
     info "Forcing network re-evaluation..."
-    
+
     # Reset last evaluation time to force evaluation
     set_network_state "last_evaluation" "null" false
-    
+
     # Run evaluation
     evaluate_network_configuration
-    
+
     clear_error_context
 }
+
+# Export functions for use in other scripts
+export -f scan_interface_connectivity
+export -f scan_single_interface_connectivity
+export -f test_internet_connectivity_via_interface
+export -f get_interface_priority
+export -f evaluate_wan_candidates
+export -f determine_network_mode
+export -f evaluate_network_configuration
+export -f apply_network_configuration
+export -f apply_internet_sharing_configuration
+export -f apply_local_only_configuration
+export -f apply_mixed_mode_configuration
+export -f apply_bridge_mode_configuration
+export -f handle_interface_change
+export -f handle_wifi_connection
+export -f handle_wifi_disconnection
+export -f force_network_evaluation

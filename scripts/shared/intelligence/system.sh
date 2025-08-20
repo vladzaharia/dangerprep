@@ -4,11 +4,11 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
-# This file is sourced by other scripts - no direct execution
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "Error: This file should be sourced, not executed directly"
-    exit 1
+# Prevent multiple sourcing
+if [[ "${INTELLIGENCE_SYSTEM_SHARED_LOADED:-}" == "true" ]]; then
+    return 0
 fi
+readonly INTELLIGENCE_SYSTEM_SHARED_LOADED="true"
 
 # System intelligence configuration
 readonly SYSTEM_HEALTH_THRESHOLD_CRITICAL=40
@@ -411,6 +411,21 @@ init_system_intelligence() {
         set_system_mode "$SYSTEM_MODE_NORMAL"
     fi
 }
+
+# Export functions for use in other scripts
+export -f evaluate_system_health
+export -f should_restart_service
+export -f auto_recover_services
+export -f should_optimize_system
+export -f auto_optimize_system
+export -f should_run_maintenance
+export -f auto_run_maintenance
+export -f determine_system_mode
+export -f monitor_system_changes
+export -f predict_system_issues
+export -f run_system_intelligence
+export -f handle_system_emergency
+export -f init_system_intelligence
 
 # Initialize on source
 init_system_intelligence

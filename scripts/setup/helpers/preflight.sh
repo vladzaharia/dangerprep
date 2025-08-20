@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# DangerPrep Pre-flight Validation Script
+# DangerPrep Pre-flight Validation Library
 #
 # Purpose: Validate system compatibility and detect conflicts before installation
-# Usage: preflight-check.sh [--fix] [--verbose] [--olares-mode]
+# This is a library script - functions should be sourced, not executed directly
 # Dependencies: systemctl, apt, lscpu, free, df
 # Author: DangerPrep Project
 # Version: 2.0
+
+# Prevent multiple sourcing
+if [[ "${PREFLIGHT_VALIDATION_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly PREFLIGHT_VALIDATION_LOADED="true"
 
 # Modern shell script best practices
 set -euo pipefail
@@ -480,22 +486,18 @@ check_hardware_compatibility() {
     return $issues
 }
 
-# Main validation function
-main() {
+# Run all preflight validation checks
+# Returns: 0 if all checks pass, 1 if critical issues, 2 if non-critical issues
+run_preflight_checks() {
     init_script
 
-    # Only show banner when running directly, not when called from setup script
-    if [[ "${CALLED_FROM_SETUP:-false}" != "true" ]]; then
-        show_banner "DangerPrep Pre-flight Check"
-    fi
-
     log "Starting pre-flight validation..."
-    if [[ "${OLARES_MODE}" == "true" ]]; then
+    if [[ "${OLARES_MODE:-false}" == "true" ]]; then
         log "Mode: Olares Integration"
     else
         log "Mode: Standard"
     fi
-    
+
     # Run all checks
     check_system_requirements
     check_os_compatibility
@@ -504,76 +506,31 @@ main() {
     check_conflicting_packages
     check_olares_requirements
     check_hardware_compatibility
-    
+
     # Summary
     log_section "Validation Summary"
-    
+
     if [[ ${CRITICAL_ISSUES} -gt 0 ]]; then
         error "Critical issues found: ${CRITICAL_ISSUES}"
         error "System does not meet minimum requirements"
-        if [[ "${CALLED_FROM_SETUP:-false}" == "true" ]]; then
-            return 1
-        else
-            exit 1
-        fi
+        return 1
     elif [[ ${ISSUES_FOUND} -gt 0 ]]; then
         warning "Non-critical issues found: ${ISSUES_FOUND}"
         warning "Installation may proceed but with limitations"
-        if [[ "${CALLED_FROM_SETUP:-false}" == "true" ]]; then
-            return 2
-        else
-            exit 2
-        fi
+        return 2
     else
         success "All pre-flight checks passed!"
         success "System is ready for DangerPrep installation"
-        if [[ "${CALLED_FROM_SETUP:-false}" == "true" ]]; then
-            return 0
-        else
-            exit 0
-        fi
+        return 0
     fi
 }
 
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --fix)
-            FIX_ISSUES=true
-            info "Fix mode enabled - will attempt to resolve detected issues"
-            shift
-            ;;
-        --verbose)
-            # shellcheck disable=SC2034  # Variable reserved for future functionality
-            VERBOSE=true
-            export DEBUG=true
-            info "Verbose mode enabled"
-            shift
-            ;;
-        --olares-mode)
-            OLARES_MODE=true
-            shift
-            ;;
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        *)
-            error "Unknown option: $1"
-            show_help
-            exit 1
-            ;;
-    esac
-done
-
-# Function to run preflight checks when called from setup script
-run_preflight_checks() {
-    # Set flag to indicate we're being called from another script
-    export CALLED_FROM_SETUP=true
-    main
-}
-
-# Run main function only if script is executed directly
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi
+# Export functions for use in other scripts
+export -f run_preflight_checks
+export -f check_system_requirements
+export -f check_os_compatibility
+export -f check_network_interfaces
+export -f check_conflicting_services
+export -f check_conflicting_packages
+export -f check_olares_requirements
+export -f check_hardware_compatibility

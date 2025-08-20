@@ -4,11 +4,11 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
-# This file is sourced by other scripts - no direct execution
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "Error: This file should be sourced, not executed directly"
-    exit 1
+# Prevent multiple sourcing
+if [[ "${SYSTEM_SHARED_LOADED:-}" == "true" ]]; then
+    return 0
 fi
+readonly SYSTEM_SHARED_LOADED="true"
 
 # System information functions
 get_system_info() {
@@ -348,6 +348,32 @@ validate_system_requirements() {
         echo "Insufficient memory - minimum 1GB required"
         requirements_met=false
     fi
-    
+
     $requirements_met
 }
+
+# Export functions for use in other scripts
+export -f get_system_info
+export -f get_cpu_usage
+export -f get_memory_usage
+export -f get_disk_usage
+export -f get_load_average
+export -f is_service_running
+export -f is_service_enabled
+export -f get_service_status
+export -f get_package_count
+export -f get_upgradable_packages
+export -f is_k3s_running
+export -f is_kubectl_available
+export -f get_k3s_node_count
+export -f get_k3s_pod_count
+export -f test_internet_connectivity
+export -f get_primary_ip
+export -f get_tailscale_status
+export -f calculate_system_health_score
+export -f get_system_health_status
+export -f get_system_recommendations
+export -f ensure_directory
+export -f safe_file_operation
+export -f log_system_event
+export -f validate_system_requirements

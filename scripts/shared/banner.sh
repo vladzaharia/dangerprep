@@ -2,6 +2,12 @@
 # DangerPrep Shared Banner Utility
 # Provides colorful banner functions for all DangerPrep scripts
 
+# Prevent multiple sourcing
+if [[ "${BANNER_SHARED_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly BANNER_SHARED_LOADED="true"
+
 # Color codes for banner display
 BANNER_NC='\033[0m'             # No color reset
 
@@ -350,31 +356,13 @@ show_motd_banner() {
     render_bottom_border "true"
 }
 
-# Test function to verify banner display
-test_banner() {
-    echo "Testing DangerPrep Banner System"
-    echo "================================"
-    echo
-    echo "1. Title-less banner (default scheme):"
-    show_banner
-    echo
-    echo "2. Banner with custom title (security scheme):"
-    show_banner_with_title "Test Title" "security"
-    echo
-    echo "3. Network scheme banner:"
-    show_banner "network"
-    echo
-    echo "4. Setup banner:"
-    show_setup_banner "$@"
-    echo
-    echo "5. MOTD banner:"
-    show_motd_banner
-    echo
-    echo "6. Plain text version:"
-    show_banner "default" "false"
-}
-
-# If script is run directly, show test
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    test_banner "$@"
-fi
+# Export functions for use in other scripts
+export -f show_banner
+export -f show_banner_with_title
+export -f show_setup_banner
+export -f show_motd_banner
+export -f render_top_border
+export -f render_bottom_border
+export -f render_title_line
+export -f render_content_line
+export -f render_empty_line

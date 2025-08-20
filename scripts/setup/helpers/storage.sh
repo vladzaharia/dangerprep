@@ -5,9 +5,10 @@
 #
 
 # Prevent multiple sourcing
-if [[ "${STORAGE_HELPER_SOURCED:-}" == "true" ]]; then
+if [[ "${STORAGE_HELPER_LOADED:-}" == "true" ]]; then
     return 0
 fi
+readonly STORAGE_HELPER_LOADED="true"
 
 # Get the directory where this script is located
 STORAGE_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -381,5 +381,17 @@ calculate_security_score() {
     echo "$percentage"
 }
 
+# Export functions for use in other scripts
+export -f ensure_security_directories
+export -f generate_secure_password
+export -f generate_secret
+export -f validate_password_strength
+export -f secure_write_file
+export -f read_secret_file
+export -f is_security_critical_service
+export -f is_dangerous_port
+export -f get_security_tool_status
+export -f calculate_security_score
+
 # Initialize security functions
 ensure_security_directories

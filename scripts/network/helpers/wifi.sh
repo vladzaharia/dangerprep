@@ -2,6 +2,12 @@
 # DangerPrep WiFi Manager
 # Manage WiFi interfaces, scanning, connections, and AP mode
 
+# Prevent multiple sourcing
+if [[ "${NETWORK_WIFI_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly NETWORK_WIFI_LOADED="true"
+
 # Modern shell script best practices
 set -euo pipefail
 
@@ -371,5 +377,15 @@ main() {
     esac
 }
 
-# Run main function
-main "$@"
+# Export functions for use in other scripts
+export -f scan_wifi_networks
+export -f connect_to_wifi
+export -f disconnect_wifi
+export -f start_wifi_ap
+export -f stop_wifi_ap
+export -f get_wifi_status
+
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

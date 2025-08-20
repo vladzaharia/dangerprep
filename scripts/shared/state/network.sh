@@ -7,6 +7,12 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
+# Prevent multiple sourcing
+if [[ "${STATE_NETWORK_SHARED_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly STATE_NETWORK_SHARED_LOADED="true"
+
 # Modern shell script best practices
 set -euo pipefail
 
@@ -512,3 +518,35 @@ set_auto_mode() {
     set_network_state "auto_mode" "$enabled"
     info "Auto mode set to: $enabled"
 }
+
+# Export functions for use in other scripts
+export -f init_network_state
+export -f create_default_network_state
+export -f validate_network_state_file
+export -f acquire_network_lock
+export -f release_network_lock
+export -f get_network_state
+export -f set_network_state
+export -f set_network_state_object
+export -f get_network_mode
+export -f set_network_mode
+export -f get_wan_primary
+export -f get_wan_secondary
+export -f get_wan_available
+export -f set_wan_primary
+export -f set_wan_secondary
+export -f add_wan_available
+export -f remove_wan_available
+export -f get_lan_interfaces
+export -f add_lan_interface
+export -f remove_lan_interface
+export -f get_interface_role
+export -f set_interface_role
+export -f clear_interface_role
+export -f update_interface_connectivity
+export -f get_interface_connectivity
+export -f interface_has_internet
+export -f get_network_state_summary
+export -f mark_network_evaluation
+export -f is_auto_mode_enabled
+export -f set_auto_mode

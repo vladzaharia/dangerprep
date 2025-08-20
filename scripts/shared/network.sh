@@ -8,11 +8,19 @@
 # Version: 1.0
 
 # Prevent multiple sourcing
-if [[ -n "${SHARED_NETWORK_SOURCED:-}" ]]; then
+if [[ "${NETWORK_SHARED_LOADED:-}" == "true" ]]; then
     return 0
 fi
+readonly NETWORK_SHARED_LOADED="true"
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${NETWORK_SHARED_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly NETWORK_SHARED_LOADED="true"
+
 set -euo pipefail
 
 # Network configuration defaults (only declare if not already set)
@@ -421,3 +429,24 @@ remove_bridge() {
 
 # Mark this file as sourced
 export SHARED_NETWORK_SOURCED=true
+
+# Export functions for use in other scripts
+export -f validate_interface
+export -f configure_interface_ip
+export -f enable_ip_forwarding
+export -f disable_ip_forwarding
+export -f configure_nat_rules
+export -f clear_nat_rules
+export -f configure_lan_firewall
+export -f start_network_services
+export -f stop_network_services
+export -f configure_dhcp_client
+export -f check_internet_connectivity
+export -f detect_wifi_interfaces
+export -f count_wifi_interfaces
+export -f get_first_wifi_interface
+export -f get_interface_ip
+export -f interface_has_ip
+export -f wait_for_interface_ip
+export -f create_bridge
+export -f remove_bridge

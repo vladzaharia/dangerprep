@@ -1,6 +1,13 @@
 #!/bin/bash
 # FriendlyElec GPIO and PWM Interface Setup Script
 # Configures hardware interfaces for RK3588/RK3588S boards
+# This is a library script - functions should be sourced, not executed directly
+
+# Prevent multiple sourcing
+if [[ "${GPIO_SETUP_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly GPIO_SETUP_LOADED="true"
 
 set -euo pipefail
 
@@ -440,79 +447,76 @@ init_script() {
     log "GPIO/PWM setup script initialized"
 }
 
-# Main function
-main() {
-    case "${1:-setup}" in
-        setup)
-            init_script
-            log "Setting up FriendlyElec GPIO and PWM interfaces..."
+# Setup GPIO and hardware interfaces
+# Usage: setup_gpio_interfaces [username]
+setup_gpio_interfaces() {
+    local username="${1:-}"
 
-            # Detect hardware platform first
-            detect_hardware_platform
+    init_script
+    log "Setting up FriendlyElec GPIO and PWM interfaces..."
 
-            if ! load_config; then
-                warning "Failed to load configuration, using defaults"
-            fi
+    # Detect hardware platform first
+    detect_hardware_platform
 
-            create_hardware_groups || {
-                error "Failed to create hardware groups"
-                exit 1
-            }
+    if ! load_config; then
+        warning "Failed to load configuration, using defaults"
+    fi
 
-            configure_gpio_access || {
-                error "Failed to configure GPIO access"
-                exit 1
-            }
+    create_hardware_groups || {
+        error "Failed to create hardware groups"
+        return 1
+    }
 
-            configure_pwm_access || {
-                error "Failed to configure PWM access"
-                exit 1
-            }
+    configure_gpio_access || {
+        error "Failed to configure GPIO access"
+        return 1
+    }
 
-            configure_i2c_access || {
-                error "Failed to configure I2C access"
-                exit 1
-            }
+    configure_pwm_access || {
+        error "Failed to configure PWM access"
+        return 1
+    }
 
-            configure_spi_access || {
-                error "Failed to configure SPI access"
-                exit 1
-            }
+    configure_i2c_access || {
+        error "Failed to configure I2C access"
+        return 1
+    }
 
-            configure_uart_access || {
-                error "Failed to configure UART access"
-                exit 1
-            }
+    configure_spi_access || {
+        error "Failed to configure SPI access"
+        return 1
+    }
 
-            add_user_to_groups "${2:-}" || {
-                warning "Failed to add user to groups"
-            }
+    configure_uart_access || {
+        error "Failed to configure UART access"
+        return 1
+    }
 
-            # Reload udev rules
-            if ! udevadm control --reload-rules 2>/dev/null; then
-                warning "Failed to reload udev rules"
-            fi
+    add_user_to_groups "$username" || {
+        warning "Failed to add user to groups"
+    }
 
-            if ! udevadm trigger 2>/dev/null; then
-                warning "Failed to trigger udev"
-            fi
+    # Reload udev rules
+    if ! udevadm control --reload-rules 2>/dev/null; then
+        warning "Failed to reload udev rules"
+    fi
 
-            test_hardware_interfaces
-            success "FriendlyElec hardware interface setup completed"
-            ;;
-        test)
-            test_hardware_interfaces
-            ;;
-        *)
-            echo "Usage: $0 {setup [username]|test}"
-            echo ""
-            echo "Commands:"
-            echo "  setup [username]  - Set up GPIO/PWM interfaces and optionally add user to groups"
-            echo "  test              - Test hardware interface availability"
-            exit 1
-            ;;
-    esac
+    if ! udevadm trigger 2>/dev/null; then
+        warning "Failed to trigger udev"
+    fi
+
+    test_hardware_interfaces
+    success "FriendlyElec hardware interface setup completed"
 }
 
-# Run main function
-main "$@"
+# Export functions for use in other scripts
+export -f setup_gpio_interfaces
+export -f test_hardware_interfaces
+export -f detect_hardware_platform
+export -f create_hardware_groups
+export -f configure_gpio_access
+export -f configure_pwm_access
+export -f configure_i2c_access
+export -f configure_spi_access
+export -f configure_uart_access
+export -f add_user_to_groups

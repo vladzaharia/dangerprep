@@ -6,6 +6,12 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
+# Prevent multiple sourcing
+if [[ "${SYSTEM_DIAGNOSTICS_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SYSTEM_DIAGNOSTICS_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -471,4 +477,18 @@ main() {
     esac
 }
 
-main "$@"
+# Export functions for use in other scripts
+export -f run_all_diagnostics
+export -f diagnose_hardware
+export -f diagnose_services
+export -f diagnose_performance
+export -f diagnose_network
+export -f diagnose_storage
+export -f diagnose_security
+export -f diagnose_packages
+export -f diagnose_olares
+
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

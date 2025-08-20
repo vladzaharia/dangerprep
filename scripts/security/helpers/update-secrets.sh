@@ -3,6 +3,13 @@
 # Updates Docker compose.env files with generated secrets
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${SECURITY_HELPERS_UPDATE-SECRETS_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SECURITY_HELPERS_UPDATE-SECRETS_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -408,4 +415,10 @@ main() {
 }
 
 # Run main function
-main "$@"
+
+# Export functions for use in other scripts
+export -f cleanup_on_errornexport -f init_scriptnexport -f show_helpnexport -f read_secretnexport -f update_env_varnexport -f update_romm_envnexport -f update_step_ca_envnexport -f update_portainer_envnexport -f update_traefik_envnexport -f update_watchtower_envnexport -f update_komga_envnexport -f update_jellyfin_envnexport -f update_arcane_envnexport -f update_docmost_envnexport -f update_onedev_envnexport -f update_environmentsnexport -f verify_secretsn
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

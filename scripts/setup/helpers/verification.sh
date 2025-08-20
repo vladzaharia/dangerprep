@@ -7,6 +7,12 @@
 # Author: DangerPrep Project
 # Version: 2.0
 
+# Prevent multiple sourcing
+if [[ "${VERIFICATION_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly VERIFICATION_HELPER_LOADED="true"
+
 # Modern shell script best practices
 set -euo pipefail
 
@@ -367,3 +373,15 @@ verify_setup() {
         return 0
     fi
 }
+
+# Export functions for use in other scripts
+export -f start_all_services
+export -f verify_service_health
+export -f verify_network_connectivity
+export -f verify_dns_resolution
+export -f verify_certificate_authority
+export -f verify_file_permissions
+export -f verify_system_security
+export -f verify_backup_functionality
+export -f verify_monitoring_services
+export -f run_comprehensive_verification

@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${SETUP_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SETUP_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -331,3 +338,19 @@ setup_all_services() {
     
     success "All services setup completed successfully"
 }
+
+# Export functions for use in other scripts
+export -f setup_with_config
+export -f setup_service
+export -f setup_with_init
+export -f setup_automatic_updates_service
+export -f setup_fail2ban_service
+export -f setup_file_integrity_monitoring_service
+export -f setup_hardware_monitoring_service
+export -f setup_network_routing_service
+export -f setup_qos_traffic_shaping_service
+export -f setup_dhcp_server_service
+export -f setup_encrypted_backups_service
+export -f setup_system_monitoring_service
+export -f setup_advanced_security_tools_service
+export -f setup_all_services

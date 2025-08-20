@@ -3,6 +3,13 @@
 # Comprehensive system health monitoring and alerting
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${MONITORING_HELPERS_SYSTEM_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly MONITORING_HELPERS_SYSTEM_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -372,4 +379,10 @@ main() {
 }
 
 # Run main function
-main "$@"
+
+# Export functions for use in other scripts
+export -f init_scriptnexport -f get_system_infonexport -f get_cpu_infonexport -f get_memory_infonexport -f get_disk_infonexport -f get_network_infonexport -f get_docker_infonexport -f get_storage_healthnexport -f check_service_healthnexport -f check_security_servicesnexport -f generate_reportnexport -f monitor_continuousnexport -f show_helpn
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

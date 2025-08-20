@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${ADGUARD_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly ADGUARD_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -398,3 +405,16 @@ setup_dns_services() {
     success "Host-based DNS services configured successfully"
     return 0
 }
+
+# Export functions for use in other scripts
+export -f get_latest_adguard_version_safe
+export -f install_adguard_home
+export -f setup_adguard_user_and_directories
+export -f download_and_install_adguard_binary
+export -f configure_adguard_service
+export -f create_adguard_systemd_service_safe
+export -f start_and_verify_adguard_service
+export -f check_adguard_ports
+export -f configure_dns_chain
+export -f verify_dns_chain
+export -f setup_dns_services

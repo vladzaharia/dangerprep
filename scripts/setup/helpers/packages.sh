@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${PACKAGES_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly PACKAGES_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -342,3 +349,11 @@ manage_packages_complete() {
     success "Package management completed successfully"
     return 0
 }
+
+# Export functions for use in other scripts
+export -f update_system_packages_safe
+export -f install_packages_safe
+export -f install_essential_packages
+export -f verify_critical_packages
+export -f check_package_conflicts
+export -f manage_packages_complete

@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${NETWORK_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly NETWORK_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -488,3 +495,18 @@ configure_wifi_routing() {
     success "WiFi routing configured"
     return 0
 }
+
+# Export functions for use in other scripts
+export -f detect_network_interfaces
+export -f select_friendlyelec_interfaces
+export -f select_r6c_interfaces
+export -f select_t6_interfaces
+export -f select_generic_interfaces
+export -f log_friendlyelec_interface_details
+export -f configure_network_bonding
+export -f validate_interface
+export -f setup_network_routing
+export -f setup_qos_traffic_shaping
+export -f configure_wifi_hotspot
+export -f setup_dhcp_server
+export -f configure_wifi_routing

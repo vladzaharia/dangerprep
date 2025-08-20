@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${OLARES_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly OLARES_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -398,3 +405,14 @@ install_and_configure_olares() {
     success "Olares installation and integration completed"
     return 0
 }
+
+# Export functions for use in other scripts
+export -f check_olares_requirements
+export -f check_olares_conflicts
+export -f download_olares_installer_safe
+export -f prepare_olares_environment_safe
+export -f install_olares
+export -f verify_olares_installation
+export -f configure_olares_integration
+export -f setup_olares_directory_structure
+export -f install_and_configure_olares

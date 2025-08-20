@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${SERVICES_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SERVICES_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -339,3 +346,13 @@ apply_service_config() {
         return 1
     fi
 }
+
+# Export functions for use in other scripts
+export -f create_service_user
+export -f create_service_group
+export -f install_github_binary
+export -f get_latest_github_version
+export -f create_systemd_service
+export -f enable_and_start_service
+export -f check_service_health
+export -f apply_service_config

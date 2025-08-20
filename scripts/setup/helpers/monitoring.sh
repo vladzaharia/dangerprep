@@ -7,6 +7,12 @@
 # Author: DangerPrep Project
 # Version: 2.0
 
+# Prevent multiple sourcing
+if [[ "${MONITORING_BACKUP_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly MONITORING_BACKUP_LOADED="true"
+
 # Modern shell script best practices
 set -euo pipefail
 
@@ -394,3 +400,10 @@ setup_monitoring_and_backup() {
         return 1
     fi
 }
+
+# Export functions for use in other scripts
+export -f setup_monitoring_and_backup
+export -f setup_system_monitoring
+export -f setup_encrypted_backups
+export -f setup_container_health_monitoring
+export -f test_backup_functionality

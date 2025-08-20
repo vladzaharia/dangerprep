@@ -6,6 +6,13 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
+
+# Prevent multiple sourcing
+if [[ "${SECURITY_HELPERS_COMPLIANCE_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SECURITY_HELPERS_COMPLIANCE_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -320,4 +327,10 @@ main() {
     esac
 }
 
-main "$@"
+
+# Export functions for use in other scripts
+export -f cleanup_on_errornexport -f init_scriptnexport -f show_helpnexport -f check_lynis_confignexport -f update_lynis_databasenexport -f run_security_auditnexport -f show_audit_summarynexport -f generate_detailed_reportn
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

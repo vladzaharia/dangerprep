@@ -4,11 +4,11 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
-# This file is sourced by other scripts - no direct execution
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "Error: This file should be sourced, not executed directly"
-    exit 1
+# Prevent multiple sourcing
+if [[ "${STATE_SYSTEM_SHARED_LOADED:-}" == "true" ]]; then
+    return 0
 fi
+readonly STATE_SYSTEM_SHARED_LOADED="true"
 
 # System state configuration
 SYSTEM_STATE_DIR="/var/lib/dangerprep"
@@ -318,6 +318,30 @@ cleanup_system_state() {
         fi
     fi
 }
+
+# Export functions for use in other scripts
+export -f ensure_system_state_dir
+export -f init_system_state
+export -f acquire_system_lock
+export -f release_system_lock
+export -f get_system_state
+export -f set_system_state
+export -f update_system_state
+export -f get_system_mode
+export -f set_system_mode
+export -f is_system_auto_mode_enabled
+export -f enable_system_auto_mode
+export -f disable_system_auto_mode
+export -f get_service_status
+export -f set_service_status
+export -f get_system_health_score
+export -f set_system_health_score
+export -f update_system_performance
+export -f update_maintenance_status
+export -f update_backup_status
+export -f get_full_system_state
+export -f validate_system_state
+export -f cleanup_system_state
 
 # Initialize on source
 init_system_state

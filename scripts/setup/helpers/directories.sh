@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${DIRECTORIES_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly DIRECTORIES_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -304,3 +311,13 @@ cleanup_empty_directories() {
     success "Empty directory cleanup completed"
     return 0
 }
+
+# Export functions for use in other scripts
+export -f create_secure_directory
+export -f create_secure_directories
+export -f create_logging_directories
+export -f create_content_directories
+export -f create_service_directories
+export -f create_nfs_directories
+export -f validate_directory
+export -f cleanup_empty_directories

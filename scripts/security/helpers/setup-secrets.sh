@@ -3,6 +3,13 @@
 # Sets up the complete secret management system for Docker services
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${SECURITY_HELPERS_SETUP-SECRETS_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SECURITY_HELPERS_SETUP-SECRETS_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -318,4 +325,10 @@ main() {
 }
 
 # Run main function
-main "$@"
+
+# Export functions for use in other scripts
+export -f cleanup_on_errornexport -f init_scriptnexport -f show_helpnexport -f check_prerequisitesnexport -f backup_env_filesnexport -f generate_all_secretsnexport -f update_all_env_filesnexport -f set_secure_permissionsnexport -f validate_secretsnexport -f show_summaryn
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${CONFIGURE_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly CONFIGURE_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -348,3 +355,16 @@ configure_all_services() {
     
     success "All services configured successfully"
 }
+
+# Export functions for use in other scripts
+export -f configure_with_template
+export -f configure_service
+export -f configure_with_validation
+export -f configure_security_services
+export -f configure_network_services
+export -f configure_wifi_hotspot_service
+export -f configure_wifi_routing_rules
+export -f configure_dns_services
+export -f configure_certificate_authority
+export -f configure_system_services
+export -f configure_all_services

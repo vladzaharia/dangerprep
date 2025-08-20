@@ -7,6 +7,12 @@
 # Author: DangerPrep Project
 # Version: 2.0
 
+# Prevent multiple sourcing
+if [[ "${VALIDATION_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly VALIDATION_HELPER_LOADED="true"
+
 # Modern shell script best practices
 set -euo pipefail
 
@@ -315,3 +321,14 @@ secure_copy() {
         return 1
     fi
 }
+
+# Export functions for use in other scripts
+export -f validate_ip
+export -f validate_interface_name
+export -f validate_path
+export -f validate_port
+export -f validate_cidr
+export -f validate_template_variables
+export -f validate_service_ports
+export -f validate_config_files
+export -f secure_copy

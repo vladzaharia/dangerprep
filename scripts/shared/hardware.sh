@@ -8,6 +8,13 @@
 # Version: 1.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${HARDWARE_SHARED_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly HARDWARE_SHARED_LOADED="true"
+
 set -euo pipefail
 
 # Hardware detection variables (exported for use by other scripts)
@@ -191,3 +198,12 @@ supports_rk3588_thermal_zones() {
 
 # Note: Hardware detection is now called explicitly by scripts that need it
 # This prevents automatic execution during sourcing which could cause issues
+
+# Export functions for use in other scripts
+export -f detect_hardware_platform
+export -f validate_rk3588_platform
+export -f validate_friendlyelec_platform
+export -f get_hardware_summary
+export -f supports_pwm_fan_control
+export -f supports_friendlyelec_features
+export -f supports_rk3588_thermal_zones

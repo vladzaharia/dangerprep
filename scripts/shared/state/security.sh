@@ -384,5 +384,20 @@ export_security_state() {
     fi
 }
 
+# Export functions for use in other scripts
+export -f ensure_security_state_dir
+export -f init_security_state
+export -f acquire_security_lock
+export -f release_security_lock
+export -f get_security_state
+export -f set_security_state
+export -f update_security_tool_status
+export -f update_security_status
+export -f update_certificate_status
+export -f update_secrets_status
+export -f update_monitoring_status
+export -f get_security_summary
+export -f export_security_state
+
 # Initialize security state on load
 init_security_state

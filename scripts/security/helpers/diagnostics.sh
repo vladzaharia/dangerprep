@@ -6,6 +6,13 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
+
+# Prevent multiple sourcing
+if [[ "${SECURITY_HELPERS_DIAGNOSTICS_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SECURITY_HELPERS_DIAGNOSTICS_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -429,4 +436,10 @@ main() {
     esac
 }
 
-main "$@"
+
+# Export functions for use in other scripts
+export -f cleanup_on_errornexport -f init_scriptnexport -f show_helpnexport -f show_security_statusnexport -f validate_security_confignexport -f generate_security_reportn
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

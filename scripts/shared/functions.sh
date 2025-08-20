@@ -2,6 +2,12 @@
 # DangerPrep Common Functions
 # Shared functions for all DangerPrep scripts
 
+# Prevent multiple sourcing
+if [[ "${FUNCTIONS_SHARED_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly FUNCTIONS_SHARED_LOADED="true"
+
 # Get the directory where this script is located
 FUNCTIONS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

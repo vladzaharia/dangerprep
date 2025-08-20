@@ -6,6 +6,13 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
+
+# Prevent multiple sourcing
+if [[ "${SYSTEM_HELPERS_OPTIMIZATION_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SYSTEM_HELPERS_OPTIMIZATION_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -414,4 +421,10 @@ main() {
     esac
 }
 
-main "$@"
+
+# Export functions for use in other scripts
+export -f cleanup_on_errornexport -f init_scriptnexport -f show_helpnexport -f optimize_memorynexport -f optimize_disknexport -f optimize_networknexport -f optimize_servicesnexport -f optimize_kernelnexport -f optimize_packagesnexport -f analyze_optimizationnexport -f run_all_optimizationsn
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

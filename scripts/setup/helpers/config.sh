@@ -4,6 +4,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${CONFIG_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly CONFIG_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -846,3 +853,51 @@ load_ethernet_bonding_config() {
         debug "Ethernet bonding template not found: $template"
     fi
 }
+
+# Export functions for use in other scripts
+export -f process_template
+export -f load_ssh_config
+export -f load_fail2ban_config
+export -f load_kernel_hardening_config
+export -f load_aide_config
+export -f load_motd_config
+export -f load_hardware_monitoring_config
+export -f load_hostapd_config
+export -f load_dnsmasq_config
+export -f load_dnsmasq_advanced_config
+export -f load_wan_config
+export -f load_sync_configs
+export -f load_adguard_config
+export -f load_unattended_upgrades_config
+export -f load_network_performance_config
+export -f validate_required_variables
+export -f validate_config_files
+export -f validate_all_requirements
+export -f load_friendlyelec_configs
+export -f load_rk3588_configs
+export -f load_rk3588_fan_control_config
+export -f install_rk3588_fan_control_service
+export -f load_gpio_pwm_config
+export -f load_rk3588_sensors_config
+export -f load_rk3588_performance_config
+export -f load_rk3588_udev_rules
+export -f load_rk3588_gpu_config
+export -f load_rk3588_gstreamer_config
+export -f load_mali_gpu_env_config
+export -f load_rk3588_video_env_config
+export -f load_rk3588_cpu_governor_service
+export -f load_ethernet_bonding_config
+export -f load_dnsmasq_minimal_config
+export -f load_adguardhome_service_config
+export -f load_systemd_resolved_adguard_config
+export -f load_step_ca_service_config
+export -f load_backup_cron_config
+export -f load_all_system_configs
+export -f load_all_network_configs
+export -f load_all_service_configs
+export -f load_friendlyelec_configs
+export -f load_configs_by_category
+export -f load_rk3588_sensors_config
+export -f load_rk3588_fan_control_config
+export -f load_gpio_pwm_config
+export -f load_ethernet_bonding_config

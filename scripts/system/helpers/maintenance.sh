@@ -3,6 +3,13 @@
 # Consolidated validation, permission fixes, and system health checks
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${SYSTEM_HELPERS_MAINTENANCE_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SYSTEM_HELPERS_MAINTENANCE_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -288,4 +295,10 @@ main() {
 }
 
 # Run main function
-main "$@"
+
+# Export functions for use in other scripts
+export -f cleanup_on_errornexport -f init_scriptnexport -f show_helpnexport -f validate_systemnexport -f fix_permissionsnexport -f system_healthnexport -f run_alln
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

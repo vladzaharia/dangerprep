@@ -3,6 +3,13 @@
 # Essential network troubleshooting tools for emergency router scenarios
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${NETWORK_HELPERS_DIAGNOSTICS_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly NETWORK_HELPERS_DIAGNOSTICS_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -367,4 +374,10 @@ main() {
 }
 
 # Run main function
-main "$@"
+
+# Export functions for use in other scripts
+export -f cleanup_on_errornexport -f init_scriptnexport -f show_helpnexport -f test_connectivitynexport -f show_interfacesnexport -f show_routesnexport -f test_dnsnexport -f check_portsnexport -f wifi_diagnosticsnexport -f speed_testnexport -f run_alln
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

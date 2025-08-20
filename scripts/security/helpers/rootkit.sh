@@ -6,6 +6,13 @@
 # Author: DangerPrep Project
 # Version: 1.0
 
+
+# Prevent multiple sourcing
+if [[ "${SECURITY_HELPERS_ROOTKIT_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly SECURITY_HELPERS_ROOTKIT_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -375,4 +382,15 @@ main() {
     esac
 }
 
-main "$@"
+# Export functions for use in other scripts
+export -f update_databases
+export -f run_rkhunter_scan
+export -f run_chkrootkit_scan
+export -f run_rootkit_scan
+export -f generate_scan_report
+export -f show_scan_summary
+
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

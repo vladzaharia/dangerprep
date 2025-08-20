@@ -3,6 +3,13 @@
 # Flexible routing based on WAN/LAN interface designation
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${NETWORK_HELPERS_ROUTES_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly NETWORK_HELPERS_ROUTES_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -524,4 +531,10 @@ main() {
 }
 
 # Run main function
-main "$@"
+
+# Export functions for use in other scripts
+export -f cleanup_on_errornexport -f init_scriptnexport -f check_prerequisitesnexport -f get_wan_interfacenexport -f get_lan_interfacesnexport -f get_interface_typenexport -f configure_wan_interfacenexport -f configure_lan_interfacesnexport -f configure_dhcp_dnsnexport -f configure_routingnexport -f start_routingnexport -f stop_routingnexport -f show_routing_statusn
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

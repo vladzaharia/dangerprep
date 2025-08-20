@@ -3,6 +3,13 @@
 # Enumerate and manage physical network interfaces
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${NETWORK_HELPERS_INTERFACES_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly NETWORK_HELPERS_INTERFACES_LOADED="true"
+
 set -euo pipefail
 
 # Script metadata
@@ -460,4 +467,10 @@ main() {
 }
 
 # Run main function
-main "$@"
+
+# Export functions for use in other scripts
+export -f cleanup_on_errornexport -f init_scriptnexport -f enumerate_interfacesnexport -f list_interfacesnexport -f set_wan_interfacenexport -f clear_wan_interfacenexport -f show_wan_configurationnexport -f show_current_confign
+# Run main function only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

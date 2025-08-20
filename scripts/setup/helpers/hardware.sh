@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${HARDWARE_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly HARDWARE_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -585,3 +592,19 @@ configure_friendlyelec_hardware() {
     success "FriendlyElec hardware configuration completed"
     return 0
 }
+
+# Export functions for use in other scripts
+export -f detect_friendlyelec_platform
+export -f detect_friendlyelec_features
+export -f configure_friendlyelec_rtc
+export -f configure_friendlyelec_sensors
+export -f configure_friendlyelec_fan_control
+export -f configure_friendlyelec_gpio_pwm
+export -f install_friendlyelec_packages
+export -f install_friendlyelec_kernel_headers
+export -f configure_rk3588_performance
+export -f configure_rk3588_cpu_governors
+export -f configure_rk3588_gpu_performance
+export -f configure_rk3588_memory_optimizations
+export -f configure_rk3588_hardware_acceleration
+export -f configure_friendlyelec_hardware

@@ -8,6 +8,13 @@
 # Version: 2.0
 
 # Modern shell script best practices
+
+# Prevent multiple sourcing
+if [[ "${STEPCA_HELPER_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly STEPCA_HELPER_LOADED="true"
+
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -485,3 +492,19 @@ setup_certificate_management() {
     success "Host-based certificate management configured successfully"
     return 0
 }
+
+# Export functions for use in other scripts
+export -f get_latest_step_version_safe
+export -f install_step_ca
+export -f setup_step_user_and_directories
+export -f download_and_install_step_binaries
+export -f download_and_install_step_cli
+export -f download_and_install_step_ca
+export -f verify_step_installations
+export -f configure_step_ca
+export -f initialize_step_ca
+export -f create_step_ca_systemd_service_safe
+export -f set_step_ca_permissions
+export -f start_and_verify_step_ca_service
+export -f check_step_ca_port
+export -f setup_certificate_management
