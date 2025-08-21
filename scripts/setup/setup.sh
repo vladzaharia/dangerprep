@@ -40,6 +40,7 @@ export DANGERPREP_SETUP_RUNNING=true
 
 # Script metadata
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
+readonly SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
 SCRIPT_VERSION="2.0"
 SCRIPT_DESCRIPTION="DangerPrep Complete System Setup"
@@ -89,47 +90,47 @@ trap cleanup_on_error ERR
 
 # Source shared utilities
 # shellcheck source=../shared/logging.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/logging.sh"
+source "${SCRIPT_DIR}/../shared/logging.sh"
 # shellcheck source=../shared/errors.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/errors.sh"
+source "${SCRIPT_DIR}/../shared/errors.sh"
 # shellcheck source=../shared/validation.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/validation.sh"
+source "${SCRIPT_DIR}/../shared/validation.sh"
 # shellcheck source=../shared/banner.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/banner.sh"
+source "${SCRIPT_DIR}/../shared/banner.sh"
 # shellcheck source=../shared/functions.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/../shared/functions.sh"
+source "${SCRIPT_DIR}/../shared/functions.sh"
 
 # Source setup helpers
 # shellcheck source=helpers/validation.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/validation.sh"
+source "${SCRIPT_DIR}/helpers/validation.sh"
 # shellcheck source=helpers/directories.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/directories.sh"
+source "${SCRIPT_DIR}/helpers/directories.sh"
 # shellcheck source=helpers/services.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/services.sh"
+source "${SCRIPT_DIR}/helpers/services.sh"
 # shellcheck source=helpers/hardware.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/hardware.sh"
+source "${SCRIPT_DIR}/helpers/hardware.sh"
 # shellcheck source=helpers/network.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/network.sh"
+source "${SCRIPT_DIR}/helpers/network.sh"
 # shellcheck source=helpers/configure.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/configure.sh"
+source "${SCRIPT_DIR}/helpers/configure.sh"
 # shellcheck source=helpers/setup.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/setup.sh"
+source "${SCRIPT_DIR}/helpers/setup.sh"
 # shellcheck source=helpers/packages.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/packages.sh"
+source "${SCRIPT_DIR}/helpers/packages.sh"
 # shellcheck source=helpers/olares.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/olares.sh"
+source "${SCRIPT_DIR}/helpers/olares.sh"
 # shellcheck source=helpers/adguard.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/adguard.sh"
+source "${SCRIPT_DIR}/helpers/adguard.sh"
 # shellcheck source=helpers/stepca.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/stepca.sh"
+source "${SCRIPT_DIR}/helpers/stepca.sh"
 # shellcheck source=helpers/verification.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/verification.sh"
+source "${SCRIPT_DIR}/helpers/verification.sh"
 # shellcheck source=helpers/preflight.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/preflight.sh"
+source "${SCRIPT_DIR}/helpers/preflight.sh"
 # shellcheck source=helpers/monitoring.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/monitoring.sh"
+source "${SCRIPT_DIR}/helpers/monitoring.sh"
 # shellcheck source=helpers/storage.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/storage.sh"
+source "${SCRIPT_DIR}/helpers/storage.sh"
 
 # Show help information
 show_help() {
@@ -180,7 +181,7 @@ EOF
 
 # Configuration variables with validation
 # SCRIPT_DIR already set at top of script
-PROJECT_ROOT="$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")"")")"
+PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
 
 INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-$(pwd)}"
 LOG_FILE="/var/log/dangerprep-setup.log"
@@ -228,7 +229,7 @@ trap 'debug_signal_handler 3' QUIT
 
 # Load configuration utilities
 # shellcheck source=helpers/config.sh
-source "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/helpers/config.sh"
+source "${SCRIPT_DIR}/helpers/config.sh"
 
 # Network configuration
 WIFI_SSID="DangerPrep"
