@@ -1,0 +1,102 @@
+name: Package DangerPrep
+
+on:
+  pull_request:
+    branches:
+      - '*'
+  workflow_dispatch:
+    # Allow manual triggering
+  workflow_call:
+    # Allow being called by other workflows
+
+permissions:
+  contents: read
+
+jobs:
+  update-just:
+    uses: ./.github/workflows/update-just.yml
+
+  update-gum:
+    uses: ./.github/workflows/update-gum.yml
+
+  package:
+    needs: [update-just, update-gum]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download just binaries artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: just-binaries
+          path: lib/just/
+
+      - name: Download gum binaries artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gum-binaries
+          path: lib/gum/
+
+      - name: Get version information
+        id: versions
+        run: |
+          # Get latest versions from GitHub API
+          just_version=$(curl -s https://api.github.com/repos/casey/just/releases/latest | jq -r '.tag_name')
+          gum_version=$(curl -s https://api.github.com/repos/charmbracelet/gum/releases/latest | jq -r '.tag_name')
+
+          echo "just_version=$just_version" >> $GITHUB_OUTPUT
+          echo "gum_version=$gum_version" >> $GITHUB_OUTPUT
+
+          # Create a package tag based on commit SHA
+          package_tag="$(git rev-parse --short HEAD)"
+          echo "package_tag=$package_tag" >> $GITHUB_OUTPUT
+      
+      - name: Create package
+        run: |
+          # Create a comprehensive package with all binaries and scripts
+          mkdir -p dangerprep
+
+          # Copy the entire repository structure
+          rsync -av --exclude='.git' --exclude='dangerprep' . dangerprep/
+
+          # Create package info
+          cat > dangerprep/PACKAGE_INFO << EOF
+          DangerPrep Package
+          Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          Commit: $(git rev-parse HEAD)
+          Branch: $(git rev-parse --abbrev-ref HEAD)
+
+          Included Binaries:
+          - Just: ${{ steps.versions.outputs.just_version }}
+          - Gum: ${{ steps.versions.outputs.gum_version }}
+
+          Installation:
+          1. Extract this package
+          2. Run: ./bootstrap.sh
+
+          Or run the setup directly:
+          ./scripts/setup/setup-dangerprep.sh
+          EOF
+
+          # Create the package archive
+          tar -czf dangerprep-${{ steps.versions.outputs.package_tag }}.tar.gz dangerprep/
+      
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dangerprep-${{ steps.versions.outputs.package_tag }}
+          path: dangerprep-${{ steps.versions.outputs.package_tag }}.tar.gz
+          retention-days: 30
+      
+      - name: Create summary
+        run: |
+          echo "## DangerPrep Package Created" >> $GITHUB_STEP_SUMMARY
+          echo "Package tag: ${{ steps.versions.outputs.package_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "Just version: ${{ steps.versions.outputs.just_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "Gum version: ${{ steps.versions.outputs.gum_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: $(git rev-parse HEAD)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifact:" >> $GITHUB_STEP_SUMMARY
+          echo "- dangerprep-${{ steps.versions.outputs.package_tag }}.tar.gz" >> $GITHUB_STEP_SUMMARY
