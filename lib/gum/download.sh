@@ -94,7 +94,6 @@ download_gum() {
         darwin-x86_64)  release_platform="Darwin_x86_64" ;;
         darwin-aarch64) release_platform="Darwin_arm64" ;;
         windows-x86_64) release_platform="Windows_x86_64" ;;
-        windows-aarch64) release_platform="Windows_arm64" ;;
         *)              error "Unsupported platform: $platform"; exit 1 ;;
     esac
 
@@ -105,10 +104,13 @@ download_gum() {
     log "Downloading $archive_name..."
 
     # Download archive
+    local script_dir
+    script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+
     if command -v curl > /dev/null 2>&1; then
-        curl -L -o "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" "$download_url"
+        curl -L -o "${script_dir}/${archive_name}" "$download_url"
     elif command -v wget > /dev/null 2>&1; then
-        wget -O "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" "$download_url"
+        wget -O "${script_dir}/${archive_name}" "$download_url"
     else
         error "Neither curl nor wget found. Cannot download binary."
         exit 1
@@ -116,14 +118,17 @@ download_gum() {
     
     # Extract binary
     log "Extracting $archive_name..."
+    local script_dir
+    script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+
     case "$archive_ext" in
         tar.gz)
             # Extract the entire archive and find the binary
-            tar -xzf "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" -C "$(dirname "$(realpath "${BASH_SOURCE[0]}")""
+            tar -xzf "${script_dir}/${archive_name}" -C "${script_dir}"
             # Find the binary in the extracted directory
-            local extracted_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")"/gum_${version#v}_${release_platform}"
+            local extracted_dir="${script_dir}/gum_${version#v}_${release_platform}"
             if [[ -f "$extracted_dir/$binary_name" ]]; then
-                mv "$extracted_dir/$binary_name" "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$binary_name"
+                mv "$extracted_dir/$binary_name" "${script_dir}/${binary_name}"
                 rm -rf "$extracted_dir"
             else
                 error "Binary not found in extracted archive"
@@ -133,13 +138,13 @@ download_gum() {
         zip)
             if command -v unzip > /dev/null 2>&1; then
                 # Extract and find binary
-                local temp_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")"/temp_extract"
+                local temp_dir="${script_dir}/temp_extract"
                 mkdir -p "$temp_dir"
-                unzip "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name" -d "$temp_dir"
+                unzip "${script_dir}/${archive_name}" -d "$temp_dir"
                 local binary_path
                 binary_path=$(find "$temp_dir" -name "$binary_name" -type f | head -1)
                 if [[ -n "$binary_path" ]]; then
-                    mv "$binary_path" "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$binary_name"
+                    mv "$binary_path" "${script_dir}/${binary_name}"
                     rm -rf "$temp_dir"
                 else
                     error "Binary not found in extracted archive"
@@ -154,11 +159,11 @@ download_gum() {
     esac
 
     # Rename binary to platform-specific name
-    mv "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$binary_name" "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$output_name"
-    chmod +x "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$output_name"
+    mv "${script_dir}/${binary_name}" "${script_dir}/${output_name}"
+    chmod +x "${script_dir}/${output_name}"
 
     # Clean up archive
-    rm "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/$archive_name"
+    rm "${script_dir}/${archive_name}"
 
     success "Downloaded and extracted $output_name"
 }
@@ -174,11 +179,13 @@ download_all_platforms() {
         "darwin-x86_64"
         "darwin-aarch64"
         "windows-x86_64"
-        "windows-aarch64"
     )
 
     for platform in "${platforms[@]}"; do
-        if [[ -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")"/gum-$platform" ]]; then
+        local script_dir
+        script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+
+        if [[ -f "${script_dir}/gum-${platform}" ]]; then
             log "Binary for $platform already exists, skipping..."
             continue
         fi
@@ -233,7 +240,9 @@ main() {
     # Download all platform binaries (force download removes existing binaries)
     if [[ "$force_download" == true ]]; then
         log "Force download enabled, removing existing binaries..."
-        rm -f "$(dirname "$(realpath "${BASH_SOURCE[0]}")""/gum-*
+        local script_dir
+        script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+        rm -f "${script_dir}"/gum-*
     fi
 
     download_all_platforms "$target_version"
