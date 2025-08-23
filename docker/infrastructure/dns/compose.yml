@@ -37,8 +37,8 @@ services:
     image: coredns/coredns:latest
     restart: unless-stopped
     ports:
-      - "53:53/tcp"     # Primary DNS port
-      - "53:53/udp"     # Primary DNS port
+      - "5353:53/tcp"   # DNS port (changed to avoid conflict with RaspAP)
+      - "5353:53/udp"   # DNS port (changed to avoid conflict with RaspAP)
     volumes:
       - ${INSTALL_ROOT}/data/local-dns:/etc/coredns
       - ./Corefile:/etc/coredns/Corefile:ro

@@ -1,70 +1,248 @@
 #!/bin/bash
-# DangerPrep Setup Script - Clean Architecture
-# Complete system setup for Ubuntu 24.04 with 2025 security hardening
+# DangerPrep Setup Script - 2025 Best Practices Edition
+# Complete system setup for Ubuntu 24.04 with modern security hardening
 # Uses external configuration templates for maintainability
 
-# Modern shell script security and error handling
+# Modern shell script security and error handling - 2025 best practices
 set -euo pipefail
 IFS=$'\n\t'
+
+# Script metadata
+readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+readonly SCRIPT_VERSION="2.0.0"
+readonly REQUIRED_BASH_VERSION="4.0"
 
 # Enable debug mode if DEBUG environment variable is set
 if [[ "${DEBUG:-}" == "true" ]]; then
     set -x
 fi
 
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# Global state variables
+declare -g CLEANUP_PERFORMED=false
+declare -g LOCK_ACQUIRED=false
+declare -g TEMP_DIR=""
+declare -g -a CLEANUP_TASKS=()
 
-# Logging functions
-log() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
+# Color codes for output (using tput for better compatibility)
+if command -v tput >/dev/null 2>&1 && [[ -t 1 ]]; then
+    readonly RED=$(tput setaf 1)
+    readonly GREEN=$(tput setaf 2)
+    readonly YELLOW=$(tput setaf 3)
+    readonly BLUE=$(tput setaf 4)
+    readonly PURPLE=$(tput setaf 5)
+    readonly CYAN=$(tput setaf 6)
+    readonly BOLD=$(tput bold)
+    readonly NC=$(tput sgr0)
+else
+    readonly RED='\033[0;31m'
+    readonly GREEN='\033[0;32m'
+    readonly YELLOW='\033[1;33m'
+    readonly BLUE='\033[0;34m'
+    readonly PURPLE='\033[0;35m'
+    readonly CYAN='\033[0;36m'
+    readonly BOLD='\033[1m'
+    readonly NC='\033[0m'
+fi
+
+# Enhanced logging functions with structured levels
+log_debug() {
+    [[ "${DEBUG:-}" == "true" ]] && echo -e "${PURPLE}[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG]${NC} $*" | tee -a "$LOG_FILE" >&2
 }
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE" >&2
+log_info() {
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]${NC} $*" | tee -a "$LOG_FILE"
 }
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1" | tee -a "$LOG_FILE"
+log_warn() {
+    echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] [WARN]${NC} $*" | tee -a "$LOG_FILE" >&2
 }
 
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1" | tee -a "$LOG_FILE"
+log_error() {
+    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR]${NC} $*" | tee -a "$LOG_FILE" >&2
 }
 
-info() {
-    echo -e "${CYAN}[INFO]${NC} $1" | tee -a "$LOG_FILE"
+log_success() {
+    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS]${NC} $*" | tee -a "$LOG_FILE"
 }
 
-# Configuration variables with validation
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# Legacy function aliases for backward compatibility
+log() { log_info "$@"; }
+error() { log_error "$@"; }
+success() { log_success "$@"; }
+warning() { log_warn "$@"; }
+info() { log_info "$@"; }
 
-# Source shared banner utility
-source "$SCRIPT_DIR/../shared/banner.sh"
-INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-$(pwd)}"
-LOG_FILE="/var/log/dangerprep-setup.log"
-BACKUP_DIR="/var/backups/dangerprep-$(date +%Y%m%d-%H%M%S)"
-CONFIG_DIR="$SCRIPT_DIR/configs"
+# Enhanced utility functions for 2025 best practices
 
-# Secure temporary directory
-TEMP_DIR=""
-create_temp_dir() {
-    TEMP_DIR=$(mktemp -d -t dangerprep-setup.XXXXXX)
-    chmod 700 "$TEMP_DIR"
-}
-
-# Cleanup function for temporary files
-cleanup_temp() {
-    if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
-        rm -rf "$TEMP_DIR"
+# Bash version check
+check_bash_version() {
+    local current_version
+    current_version=$(bash --version | head -n1 | grep -oE '[0-9]+\.[0-9]+' | head -n1)
+    if ! awk -v curr="$current_version" -v req="$REQUIRED_BASH_VERSION" 'BEGIN {exit !(curr >= req)}'; then
+        log_error "Bash version $REQUIRED_BASH_VERSION or higher required. Current: $current_version"
+        exit 1
     fi
+}
+
+# Retry function with exponential backoff
+retry_with_backoff() {
+    local max_attempts="$1"
+    local delay="$2"
+    local max_delay="${3:-300}"
+    shift 3
+
+    local attempt=1
+    local current_delay="$delay"
+
+    while [[ $attempt -le $max_attempts ]]; do
+        log_debug "Attempt $attempt/$max_attempts: $*"
+
+        if "$@"; then
+            log_debug "Command succeeded on attempt $attempt"
+            return 0
+        fi
+
+        local exit_code=$?
+
+        if [[ $attempt -eq $max_attempts ]]; then
+            log_error "Command failed after $max_attempts attempts: $*"
+            return $exit_code
+        fi
+
+        log_warn "Command failed (exit code $exit_code), retrying in ${current_delay}s..."
+        sleep "$current_delay"
+
+        # Exponential backoff with jitter
+        current_delay=$((current_delay * 2))
+        if [[ $current_delay -gt $max_delay ]]; then
+            current_delay=$max_delay
+        fi
+        # Add jitter (±25%)
+        local jitter=$((current_delay / 4))
+        current_delay=$((current_delay + (RANDOM % (jitter * 2)) - jitter))
+
+        ((attempt++))
+    done
+}
+
+# Enhanced input validation functions
+validate_ip_address() {
+    local ip="$1"
+    local ip_regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+
+    if [[ ! $ip =~ $ip_regex ]]; then
+        return 1
+    fi
+
+    # Check each octet is valid (0-255)
+    local IFS='.'
+    local -a octets
+    read -ra octets <<< "$ip"
+    for octet in "${octets[@]}"; do
+        if [[ $octet -gt 255 ]] || [[ $octet =~ ^0[0-9] && $octet != "0" ]]; then
+            return 1
+        fi
+    done
+    return 0
+}
+
+validate_interface_name() {
+    local interface="$1"
+    local interface_regex='^[a-zA-Z0-9_-]{1,15}$'
+    [[ $interface =~ $interface_regex ]]
+}
+
+validate_path_safe() {
+    local path="$1"
+    # Prevent path traversal attacks and ensure absolute paths for critical operations
+    if [[ "$path" =~ \.\./|\.\.\\ ]] || [[ "$path" =~ ^[[:space:]]*$ ]]; then
+        return 1
+    fi
+    return 0
+}
+
+validate_port_number() {
+    local port="$1"
+    if [[ $port =~ ^[0-9]+$ ]] && [[ $port -ge 1 ]] && [[ $port -le 65535 ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Configuration variables with enhanced validation
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+readonly INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-/opt/dangerprep}"
+readonly LOG_FILE="/var/log/dangerprep-setup.log"
+readonly BACKUP_DIR="/var/backups/dangerprep-$(date +%Y%m%d-%H%M%S)"
+readonly CONFIG_DIR="$SCRIPT_DIR/configs"
+readonly LOCK_FILE="/var/run/dangerprep-setup.lock"
+
+# Source shared banner utility with error handling
+if [[ -f "$SCRIPT_DIR/../shared/banner.sh" ]]; then
+    # shellcheck source=../shared/banner.sh
+    source "$SCRIPT_DIR/../shared/banner.sh"
+else
+    log_warn "Banner utility not found, continuing without banner"
+    show_setup_banner() { echo "DangerPrep Setup"; }
+    show_cleanup_banner() { echo "DangerPrep Cleanup"; }
+fi
+
+# Enhanced temporary directory management
+create_secure_temp_dir() {
+    if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
+        log_debug "Temporary directory already exists: $TEMP_DIR"
+        return 0
+    fi
+
+    TEMP_DIR=$(mktemp -d -t "dangerprep-setup-$$-XXXXXX")
+    chmod 700 "$TEMP_DIR"
+    log_debug "Created secure temporary directory: $TEMP_DIR"
+
+    # Add to cleanup tasks
+    CLEANUP_TASKS+=("remove_temp_dir")
+}
+
+# Enhanced cleanup function with comprehensive resource management
+cleanup_resources() {
+    local exit_code=$?
+
+    if [[ "$CLEANUP_PERFORMED" == "true" ]]; then
+        log_debug "Cleanup already performed, skipping"
+        return $exit_code
+    fi
+
+    CLEANUP_PERFORMED=true
+    log_debug "Starting cleanup process (exit code: $exit_code)"
+
+    # Execute cleanup tasks in reverse order
+    local task
+    for ((i=${#CLEANUP_TASKS[@]}-1; i>=0; i--)); do
+        task="${CLEANUP_TASKS[i]}"
+        log_debug "Executing cleanup task: $task"
+        case "$task" in
+            "remove_temp_dir")
+                if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
+                    rm -rf "$TEMP_DIR" 2>/dev/null || log_warn "Failed to remove temporary directory: $TEMP_DIR"
+                fi
+                ;;
+            "release_lock")
+                release_lock
+                ;;
+            *)
+                log_warn "Unknown cleanup task: $task"
+                ;;
+        esac
+    done
+
+    # Final status message
+    if [[ $exit_code -eq 0 ]]; then
+        log_success "Script completed successfully"
+    else
+        log_error "Script failed with exit code $exit_code"
+    fi
+
+    exit $exit_code
 }
 
 # Input validation functions
@@ -118,13 +296,257 @@ secure_copy() {
     chown root:root "$dest"
 }
 
-# Signal handlers for cleanup
-trap cleanup_temp EXIT
-trap 'cleanup_temp; exit 130' INT
-trap 'cleanup_temp; exit 143' TERM
+# Lock file management for preventing concurrent execution
+acquire_lock() {
+    log_debug "Attempting to acquire lock: ${LOCK_FILE}"
 
-# Load configuration utilities
-source "$SCRIPT_DIR/config-loader.sh"
+    # Use noclobber to atomically create lock file
+    if ! (set -o noclobber; echo "$$" > "${LOCK_FILE}") 2>/dev/null; then
+        local existing_pid
+        if [[ -r "${LOCK_FILE}" ]]; then
+            existing_pid=$(cat "${LOCK_FILE}" 2>/dev/null || echo "unknown")
+            if [[ "$existing_pid" =~ ^[0-9]+$ ]] && kill -0 "$existing_pid" 2>/dev/null; then
+                log_error "Another instance is already running (PID: ${existing_pid})"
+                log_error "If you're sure no other instance is running, remove: ${LOCK_FILE}"
+                return 1
+            else
+                log_warn "Stale lock file found (PID: ${existing_pid}), removing"
+                rm -f "${LOCK_FILE}"
+                # Try again
+                if ! (set -o noclobber; echo "$$" > "${LOCK_FILE}") 2>/dev/null; then
+                    log_error "Failed to acquire lock after removing stale lock file"
+                    return 1
+                fi
+            fi
+        else
+            log_error "Failed to acquire lock file: ${LOCK_FILE}"
+            return 1
+        fi
+    fi
+
+    LOCK_ACQUIRED=true
+    CLEANUP_TASKS+=("release_lock")
+    log_debug "Lock acquired successfully"
+    return 0
+}
+
+release_lock() {
+    if [[ "$LOCK_ACQUIRED" == "true" && -f "${LOCK_FILE}" ]]; then
+        local lock_pid
+        lock_pid=$(cat "${LOCK_FILE}" 2>/dev/null || echo "")
+        if [[ "$lock_pid" == "$$" ]]; then
+            rm -f "${LOCK_FILE}"
+            log_debug "Lock released successfully"
+        else
+            log_warn "Lock file PID mismatch, not removing (expected: $$, found: ${lock_pid})"
+        fi
+        LOCK_ACQUIRED=false
+    fi
+}
+
+# Enhanced signal handlers with proper cleanup
+handle_interrupt() {
+    log_warn "Received interrupt signal (SIGINT)"
+    log_info "Performing cleanup before exit..."
+    cleanup_resources
+    exit 130
+}
+
+handle_termination() {
+    log_warn "Received termination signal (SIGTERM)"
+    log_info "Performing cleanup before exit..."
+    cleanup_resources
+    exit 143
+}
+
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    log_error "Script failed at line ${line_number} with exit code ${exit_code}"
+    log_error "Command: ${BASH_COMMAND}"
+    cleanup_resources
+    exit $exit_code
+}
+
+# Register comprehensive signal handlers
+trap 'handle_error ${LINENO}' ERR
+trap cleanup_resources EXIT
+trap handle_interrupt INT
+trap handle_termination TERM
+
+# Progress indicator functions
+show_progress() {
+    local current="$1"
+    local total="$2"
+    local description="$3"
+    local percentage=$((current * 100 / total))
+    local bar_length=50
+    local filled_length=$((percentage * bar_length / 100))
+
+    printf "\r${BLUE}[%3d%%]${NC} " "$percentage"
+    printf "["
+    printf "%*s" "$filled_length" "" | tr ' ' '='
+    printf "%*s" $((bar_length - filled_length)) "" | tr ' ' '-'
+    printf "] %s" "$description"
+
+    if [[ $current -eq $total ]]; then
+        printf "\n"
+    fi
+}
+
+# Command existence check with detailed error reporting
+require_command() {
+    local cmd="$1"
+    local package="${2:-$cmd}"
+    local install_hint="${3:-"apt install $package"}"
+
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        log_error "Required command '$cmd' not found"
+        log_error "Install with: $install_hint"
+        return 1
+    fi
+    log_debug "Required command '$cmd' found"
+    return 0
+}
+
+# Network connectivity check with timeout
+check_network_connectivity() {
+    local host="${1:-8.8.8.8}"
+    local timeout="${2:-5}"
+
+    log_debug "Checking network connectivity to $host"
+    if timeout "$timeout" ping -c 1 "$host" >/dev/null 2>&1; then
+        log_debug "Network connectivity confirmed"
+        return 0
+    else
+        log_error "No network connectivity to $host"
+        return 1
+    fi
+}
+
+# Command-line argument parsing with enhanced options
+DRY_RUN=false
+VERBOSE=false
+SKIP_UPDATES=false
+FORCE_INSTALL=false
+
+show_help() {
+    cat << EOF
+${BOLD}DangerPrep Setup Script${NC} - Version ${SCRIPT_VERSION}
+
+${BOLD}USAGE:${NC}
+    sudo $0 [OPTIONS]
+
+${BOLD}OPTIONS:${NC}
+    -d, --dry-run           Show what would be done without making changes
+    -v, --verbose           Enable verbose output and debug logging
+    -s, --skip-updates      Skip system package updates
+    -f, --force             Force installation even if already installed
+    -h, --help              Show this help message
+    --version               Show version information
+
+${BOLD}EXAMPLES:${NC}
+    sudo $0                 # Standard installation
+    sudo $0 --dry-run       # Preview changes without installing
+    sudo $0 --verbose       # Detailed logging output
+    sudo $0 --skip-updates  # Skip package updates (faster)
+
+${BOLD}DESCRIPTION:${NC}
+    Complete system setup for DangerPrep emergency router and content hub.
+    Installs and configures all necessary services including Docker, networking,
+    security tools, and hardware-specific optimizations.
+
+${BOLD}REQUIREMENTS:${NC}
+    - Ubuntu 24.04 LTS
+    - Root privileges (run with sudo)
+    - Internet connection
+    - Minimum 10GB disk space
+    - Minimum 2GB RAM
+
+${BOLD}FILES:${NC}
+    Log file: ${LOG_FILE}
+    Backup:   ${BACKUP_DIR}
+    Install:  ${INSTALL_ROOT}
+
+For more information, visit: https://github.com/vladzaharia/dangerprep
+EOF
+}
+
+show_version() {
+    echo "${SCRIPT_NAME} version ${SCRIPT_VERSION}"
+    echo "Bash version: ${BASH_VERSION}"
+    echo "System: $(uname -a)"
+}
+
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -d|--dry-run)
+                DRY_RUN=true
+                log_info "Dry-run mode enabled - no changes will be made"
+                shift
+                ;;
+            -v|--verbose)
+                VERBOSE=true
+                DEBUG=true
+                log_info "Verbose mode enabled"
+                shift
+                ;;
+            -s|--skip-updates)
+                SKIP_UPDATES=true
+                log_info "Skipping system updates"
+                shift
+                ;;
+            -f|--force)
+                FORCE_INSTALL=true
+                log_info "Force installation enabled"
+                shift
+                ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            --version)
+                show_version
+                exit 0
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                log_error "Use --help for usage information"
+                exit 1
+                ;;
+            *)
+                log_error "Unexpected argument: $1"
+                log_error "Use --help for usage information"
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Load configuration utilities with error handling
+load_configuration() {
+    local config_loader="$SCRIPT_DIR/config-loader.sh"
+
+    if [[ -f "$config_loader" ]]; then
+        log_debug "Loading configuration utilities from: $config_loader"
+        # shellcheck source=config-loader.sh
+        if ! source "$config_loader"; then
+            log_error "Failed to load configuration utilities"
+            return 1
+        fi
+        log_debug "Configuration utilities loaded successfully"
+    else
+        log_warn "Configuration loader not found: $config_loader"
+        log_warn "Some configuration features may not be available"
+
+        # Provide minimal fallback functions
+        validate_config_files() { return 0; }
+        load_ssh_config() { log_warn "SSH config loading not available"; }
+        load_fail2ban_config() { log_warn "Fail2ban config loading not available"; }
+        # Add other fallback functions as needed
+    fi
+}
 
 # Network configuration
 WIFI_SSID="DangerPrep"
@@ -140,26 +562,151 @@ FAIL2BAN_BANTIME="3600"
 FAIL2BAN_MAXRETRY="3"
 NAS_HOST="100.65.182.27"  # Tailscale NAS IP
 
-# Check if running as root
-check_root() {
+# Enhanced root privilege check with detailed error reporting
+check_root_privileges() {
     if [[ $EUID -ne 0 ]]; then
-        error "This script must be run as root (use sudo)"
-        echo "Usage: sudo $0"
-        exit 1
+        log_error "This script must be run with root privileges"
+        log_error "Usage: sudo $0 [options]"
+        log_error "Current user: $(whoami) (UID: $EUID)"
+        return 1
     fi
+
+    # Verify we can actually perform root operations
+    if ! touch /tmp/dangerprep-root-test 2>/dev/null; then
+        log_error "Unable to perform root operations despite running as root"
+        return 1
+    fi
+    rm -f /tmp/dangerprep-root-test
+
+    log_debug "Root privileges confirmed"
+    return 0
 }
 
-# Create backup directory and log file
+# Enhanced logging setup with proper permissions and rotation
 setup_logging() {
-    mkdir -p "$BACKUP_DIR"
-    mkdir -p "$(dirname "$LOG_FILE")"
-    touch "$LOG_FILE"
+    local log_dir
+    log_dir="$(dirname "$LOG_FILE")"
+
+    # Create log directory with proper permissions
+    if ! mkdir -p "$log_dir"; then
+        echo "ERROR: Failed to create log directory: $log_dir" >&2
+        exit 1
+    fi
+
+    # Create backup directory
+    if ! mkdir -p "$BACKUP_DIR"; then
+        echo "ERROR: Failed to create backup directory: $BACKUP_DIR" >&2
+        exit 1
+    fi
+
+    # Initialize log file with proper permissions
+    if ! touch "$LOG_FILE"; then
+        echo "ERROR: Failed to create log file: $LOG_FILE" >&2
+        exit 1
+    fi
+
+    # Set secure permissions (readable by root and adm group)
     chmod 640 "$LOG_FILE"
-    
-    log "DangerPrep Setup Started"
-    log "Backup directory: $BACKUP_DIR"
-    log "Install root: $INSTALL_ROOT"
-    log "Project root: $PROJECT_ROOT"
+    chown root:adm "$LOG_FILE" 2>/dev/null || true
+
+    # Log rotation setup (keep last 10 files, max 10MB each)
+    if command -v logrotate >/dev/null 2>&1; then
+        cat > "/etc/logrotate.d/dangerprep-setup" << EOF
+$LOG_FILE {
+    daily
+    rotate 10
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 640 root adm
+    maxsize 10M
+}
+EOF
+    fi
+
+    # Initial log entries
+    log_info "DangerPrep Setup Started (Version: $SCRIPT_VERSION)"
+    log_info "Backup directory: $BACKUP_DIR"
+    log_info "Install root: $INSTALL_ROOT"
+    log_info "Project root: $PROJECT_ROOT"
+    log_info "Log file: $LOG_FILE"
+    log_info "Process ID: $$"
+    log_info "User: $(whoami) (UID: $EUID)"
+    log_info "System: $(uname -a)"
+}
+
+# Enhanced system requirements check
+check_system_requirements() {
+    log_info "Checking system requirements..."
+
+    # Check Bash version
+    check_bash_version
+
+    # Check OS version
+    if ! lsb_release -d 2>/dev/null | grep -q "Ubuntu 24.04"; then
+        log_warn "This script is designed for Ubuntu 24.04"
+        log_warn "Current OS: $(lsb_release -d 2>/dev/null | cut -f2 || echo "Unknown")"
+        log_warn "Proceeding anyway, but some features may not work correctly"
+    fi
+
+    # Check available disk space (minimum 10GB)
+    local available_kb
+    available_kb=$(df / | tail -1 | awk '{print $4}')
+    local required_kb=$((10 * 1024 * 1024))  # 10GB in KB
+
+    if [[ $available_kb -lt $required_kb ]]; then
+        log_error "Insufficient disk space"
+        log_error "Required: 10GB, Available: $(( available_kb / 1024 / 1024 ))GB"
+        return 1
+    fi
+
+    log_info "Available disk space: $(( available_kb / 1024 / 1024 ))GB"
+
+    # Check memory (minimum 2GB)
+    local available_mb
+    available_mb=$(free -m | grep '^Mem:' | awk '{print $2}')
+    local required_mb=$((2 * 1024))  # 2GB in MB
+
+    if [[ $available_mb -lt $required_mb ]]; then
+        log_error "Insufficient memory"
+        log_error "Required: 2GB, Available: ${available_mb}MB"
+        return 1
+    fi
+
+    log_info "Available memory: ${available_mb}MB"
+
+    # Check required commands
+    local required_commands=(
+        "curl:curl"
+        "wget:wget"
+        "git:git"
+        "docker:docker.io"
+        "systemctl:systemd"
+        "iptables:iptables"
+        "ip:iproute2"
+    )
+
+    local missing_commands=()
+    local cmd package
+    for cmd_package in "${required_commands[@]}"; do
+        IFS=':' read -r cmd package <<< "$cmd_package"
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            missing_commands+=("$cmd ($package)")
+        fi
+    done
+
+    if [[ ${#missing_commands[@]} -gt 0 ]]; then
+        log_error "Missing required commands:"
+        printf '%s\n' "${missing_commands[@]}" | while read -r missing; do
+            log_error "  - $missing"
+        done
+        log_error "Install missing packages with: apt update && apt install -y <package-names>"
+        return 1
+    fi
+
+    log_success "System requirements check passed"
+    return 0
 }
 
 # Display banner
@@ -719,7 +1266,7 @@ setup_docker_services() {
 
     # Set up directory structure
     mkdir -p "$INSTALL_ROOT"/{docker,data,content,nfs}
-    mkdir -p "$INSTALL_ROOT/data"/{traefik,portainer,jellyfin,komga,kiwix,logs,backups}
+    mkdir -p "$INSTALL_ROOT/data"/{traefik,arcane,jellyfin,komga,kiwix,logs,backups,raspap}
     mkdir -p "$INSTALL_ROOT/content"/{movies,tv,webtv,music,audiobooks,books,comics,magazines,games/roms,kiwix}
 
     # Copy Docker configurations if they exist
@@ -1355,71 +1902,44 @@ setup_qos_traffic_shaping() {
     success "QoS traffic shaping configured"
 }
 
-# Configure WiFi hotspot
-configure_wifi_hotspot() {
-    log "Configuring WiFi hotspot..."
 
-    # Stop NetworkManager management of WiFi interface
-    nmcli device set "$WIFI_INTERFACE" managed no
+# Setup RaspAP for WiFi management and networking
+setup_raspap() {
+    log "Setting up RaspAP for WiFi management..."
 
-    # Bring up WiFi interface
-    ip link set "$WIFI_INTERFACE" up
-    ip addr add "$LAN_IP/22" dev "$WIFI_INTERFACE"
+    # Create RaspAP environment file if it doesn't exist
+    local raspap_env="$PROJECT_ROOT/docker/infrastructure/raspap/compose.env"
+    if [[ ! -f "$raspap_env" ]]; then
+        log "Creating RaspAP environment file..."
+        cp "$PROJECT_ROOT/docker/infrastructure/raspap/compose.env.example" "$raspap_env"
 
-    # Load hostapd configuration
-    load_hostapd_config
-
-    # Detect and configure WPA3 if supported
-    if iw phy | grep -q "SAE"; then
-        echo "wpa_key_mgmt=WPA-PSK SAE" >> /etc/hostapd/hostapd.conf
-        echo "sae_password=$WIFI_PASSWORD" >> /etc/hostapd/hostapd.conf
-        echo "ieee80211w=2" >> /etc/hostapd/hostapd.conf
-        success "WiFi hotspot configured with WPA3 support"
-    else
-        success "WiFi hotspot configured with WPA2"
+        # Prompt for GitHub credentials if not set
+        if [[ -z "${GITHUB_USERNAME:-}" ]] || [[ -z "${GITHUB_TOKEN:-}" ]]; then
+            warning "GitHub credentials required for RaspAP Insiders features"
+            echo "Please set GITHUB_USERNAME and GITHUB_TOKEN environment variables"
+            echo "or edit $raspap_env manually"
+        else
+            # Update environment file with provided credentials
+            sed -i "s/GITHUB_USERNAME=your_github_username/GITHUB_USERNAME=$GITHUB_USERNAME/" "$raspap_env"
+            sed -i "s/GITHUB_TOKEN=your_github_token/GITHUB_TOKEN=$GITHUB_TOKEN/" "$raspap_env"
+        fi
     fi
 
-    # Enable hostapd
-    systemctl unmask hostapd
-    systemctl enable hostapd
-}
+    # Build and start RaspAP container
+    log "Building and starting RaspAP container..."
+    cd "$PROJECT_ROOT/docker/infrastructure/raspap" && docker compose up -d --build
 
-# Setup DHCP and DNS server (via Docker)
-setup_dhcp_dns_server() {
-    log "Setting up DHCP and DNS server..."
+    # Wait for RaspAP to be ready
+    log "Waiting for RaspAP to initialize..."
+    sleep 60
 
-    # DNS is handled by Docker containers (CoreDNS/AdGuard)
-    # DHCP for WiFi hotspot is still handled by dnsmasq for simplicity
-    log "DNS will be handled by Docker containers"
-    log "DHCP for WiFi hotspot will use minimal dnsmasq configuration"
+    # Configure DNS forwarding for DangerPrep integration
+    if [[ -f "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh" ]]; then
+        log "Configuring DNS forwarding for DangerPrep integration..."
+        "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh"
+    fi
 
-    # Create minimal dnsmasq config for DHCP only
-    cat > /etc/dnsmasq.conf << 'EOF'
-# Minimal dnsmasq config for WiFi hotspot DHCP only
-# DNS is handled by Docker containers
-
-# Interface to bind to
-interface=wlan0
-
-# DHCP range for WiFi clients
-dhcp-range=192.168.120.100,192.168.120.200,255.255.252.0,24h
-
-# Don't read /etc/hosts
-no-hosts
-
-# Don't read /etc/resolv.conf
-no-resolv
-
-# Forward DNS to Docker DNS service
-server=127.0.0.1#5053
-
-# Log queries for debugging
-log-queries
-log-dhcp
-EOF
-
-    systemctl enable dnsmasq
-    success "DHCP server configured (DNS handled by Docker)"
+    success "RaspAP configured for WiFi management"
 }
 
 # Configure WiFi routing
@@ -1590,8 +2110,6 @@ start_all_services() {
     local services=(
         "ssh"
         "fail2ban"
-        "hostapd"
-        "dnsmasq"  # Only for WiFi DHCP, DNS handled by Docker
         "docker"
         "tailscaled"
     )
@@ -1615,8 +2133,16 @@ verify_setup() {
     log "Verifying setup..."
 
     # Check critical services
-    local critical_services=("ssh" "fail2ban" "hostapd" "dnsmasq" "docker")
+    local critical_services=("ssh" "fail2ban" "docker")
     local failed_services=()
+
+    # Check if RaspAP container is running
+    if docker ps --format "{{.Names}}" | grep -q "^raspap$"; then
+        success "RaspAP container is running"
+    else
+        warning "RaspAP container is not running"
+        failed_services+=("raspap")
+    fi
 
     for service in "${critical_services[@]}"; do
         if ! systemctl is-active "$service" >/dev/null 2>&1; then
@@ -1652,21 +2178,21 @@ show_final_info() {
     echo -e "${GREEN}"
     cat << EOF
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                        DangerPrep Setup Complete!                           ║
+║                        DangerPrep Setup Complete!                            ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  WiFi Hotspot: $WIFI_SSID                                                   ║
+║  WiFi Hotspot: $WIFI_SSID                                                    ║
 ║  Password: $WIFI_PASSWORD                                                    ║
 ║  Network: $LAN_NETWORK                                                       ║
 ║  Gateway: $LAN_IP                                                            ║
 ║                                                                              ║
-║  SSH: Port $SSH_PORT (key-only authentication)                              ║
+║  SSH: Port $SSH_PORT (key-only authentication)                               ║
 ║  Management: dangerprep --help                                               ║
 ║                                                                              ║
 ║  Services: http://portal.danger                                              ║
 ║  Traefik: http://traefik.danger                                              ║
 ║                                                                              ║
-║  Tailscale: tailscale up --advertise-routes=$LAN_NETWORK                    ║
+║  Tailscale: tailscale up --advertise-routes=$LAN_NETWORK                     ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 EOF
@@ -1677,67 +2203,148 @@ EOF
     info "Install root: $INSTALL_ROOT"
 }
 
-# Main function
+# Enhanced main function with comprehensive error handling and flow control
 main() {
-    show_banner
-    check_root
+    # Record start time for performance metrics
+    readonly START_TIME=$SECONDS
+
+    # Parse command line arguments first
+    parse_arguments "$@"
+
+    # Initialize logging before any other operations
     setup_logging
-    show_system_info
-    pre_flight_checks
-    backup_original_configs
-    update_system_packages
-    install_essential_packages
-    setup_automatic_updates
 
-    log "System preparation completed. Continuing with security hardening..."
-    configure_ssh_hardening
-    load_motd_config
-    setup_fail2ban
-    configure_kernel_hardening
-    setup_file_integrity_monitoring
-    setup_hardware_monitoring
-    setup_advanced_security_tools
-
-    log "Security hardening completed. Continuing with Docker setup..."
-    configure_rootless_docker
-    setup_docker_services
-    setup_container_health_monitoring
-
-    log "Docker setup completed. Continuing with network configuration..."
-    detect_network_interfaces
-    configure_wan_interface
-    setup_network_routing
-    setup_qos_traffic_shaping
-    configure_wifi_hotspot
-    setup_dhcp_dns_server
-    configure_wifi_routing
-
-    log "Network configuration completed. Applying hardware optimizations..."
-    # Apply FriendlyElec-specific performance optimizations
-    if [[ "$IS_FRIENDLYELEC" == true ]]; then
-        configure_rk3588_performance
+    # Acquire lock to prevent concurrent execution
+    if ! acquire_lock; then
+        log_error "Failed to acquire lock, exiting"
+        exit 1
     fi
 
-    log "Hardware optimizations completed. Continuing with services..."
-    generate_sync_configs
-    setup_tailscale
-    setup_advanced_dns
-    setup_certificate_management
+    # Create secure temporary directory
+    create_secure_temp_dir
 
-    log "Services configured. Installing management tools..."
-    install_management_scripts
-    create_routing_scenarios
-    setup_system_monitoring
-    configure_nfs_client
-    install_maintenance_scripts
-    setup_encrypted_backups
+    # Show banner and initial information
+    show_banner
 
-    log "Starting services and finalizing..."
-    start_all_services
-    verify_setup
+    # Comprehensive pre-flight checks
+    log_info "Starting pre-flight checks..."
+
+    if ! check_root_privileges; then
+        log_error "Root privileges check failed"
+        exit 1
+    fi
+
+    if ! check_system_requirements; then
+        log_error "System requirements check failed"
+        exit 1
+    fi
+
+    if ! check_network_connectivity; then
+        log_error "Network connectivity check failed"
+        log_error "Internet connection is required for installation"
+        exit 1
+    fi
+
+    # Load configuration utilities
+    if ! load_configuration; then
+        log_error "Configuration loading failed"
+        exit 1
+    fi
+
+    # Additional pre-flight checks
+    if ! pre_flight_checks; then
+        log_error "Pre-flight checks failed"
+        exit 1
+    fi
+
+    log_success "All pre-flight checks passed"
+
+    # Show system information
+    show_system_info
+
+    # Main installation phases with progress tracking
+    local -a installation_phases=(
+        "backup_original_configs:Backing up original configurations"
+        "update_system_packages:Updating system packages"
+        "install_essential_packages:Installing essential packages"
+        "setup_automatic_updates:Setting up automatic updates"
+        "configure_ssh_hardening:Configuring SSH hardening"
+        "load_motd_config:Loading MOTD configuration"
+        "setup_fail2ban:Setting up Fail2ban"
+        "configure_kernel_hardening:Configuring kernel hardening"
+        "setup_file_integrity_monitoring:Setting up file integrity monitoring"
+        "setup_hardware_monitoring:Setting up hardware monitoring"
+        "setup_advanced_security_tools:Setting up advanced security tools"
+        "configure_rootless_docker:Configuring rootless Docker"
+        "setup_docker_services:Setting up Docker services"
+        "setup_container_health_monitoring:Setting up container health monitoring"
+        "detect_network_interfaces:Detecting network interfaces"
+        "configure_wan_interface:Configuring WAN interface"
+        "setup_network_routing:Setting up network routing"
+        "setup_qos_traffic_shaping:Setting up QoS traffic shaping"
+        "setup_raspap:Setting up RaspAP"
+        "configure_wifi_routing:Configuring WiFi routing"
+        "configure_rk3588_performance:Applying hardware optimizations"
+        "generate_sync_configs:Generating sync configurations"
+        "setup_tailscale:Setting up Tailscale"
+        "setup_advanced_dns:Setting up advanced DNS"
+        "setup_certificate_management:Setting up certificate management"
+        "install_management_scripts:Installing management scripts"
+        "create_routing_scenarios:Creating routing scenarios"
+        "setup_system_monitoring:Setting up system monitoring"
+        "configure_nfs_client:Configuring NFS client"
+        "install_maintenance_scripts:Installing maintenance scripts"
+        "setup_encrypted_backups:Setting up encrypted backups"
+        "start_all_services:Starting all services"
+        "verify_setup:Verifying setup"
+    )
+
+    local phase_count=${#installation_phases[@]}
+    local current_phase=0
+
+    log_info "Starting installation with ${phase_count} phases"
+
+    # Execute each installation phase
+    for phase_info in "${installation_phases[@]}"; do
+        IFS=':' read -r phase_function phase_description <<< "$phase_info"
+        ((current_phase++))
+
+        show_progress "$current_phase" "$phase_count" "$phase_description"
+        log_info "Phase ${current_phase}/${phase_count}: $phase_description"
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_info "[DRY RUN] Would execute: $phase_function"
+            sleep 0.5  # Simulate work for demo
+        else
+            # Skip hardware optimization if not FriendlyElec
+            if [[ "$phase_function" == "configure_rk3588_performance" && "$IS_FRIENDLYELEC" != "true" ]]; then
+                log_info "Skipping RK3588 optimizations (not FriendlyElec hardware)"
+                continue
+            fi
+
+            if ! "$phase_function"; then
+                log_error "Phase failed: $phase_description"
+                log_error "Installation cannot continue"
+                exit 1
+            fi
+        fi
+
+        log_success "Phase completed: $phase_description"
+    done
+
+    # Show completion message
     show_final_info
 
-    success "DangerPrep setup completed successfully!"
+    # Calculate and log final statistics
+    local total_time=$((SECONDS - START_TIME))
+    local minutes=$((total_time / 60))
+    local seconds=$((total_time % 60))
+
+    log_success "DangerPrep setup completed successfully in ${minutes}m ${seconds}s"
+    log_info "Total log entries: $(wc -l < "${LOG_FILE}" 2>/dev/null || echo "unknown")"
+    log_info "Backup directory size: $(du -sh "${BACKUP_DIR}" 2>/dev/null | cut -f1 || echo "unknown")"
+
+    return 0
 }
 
 # Set up error handling
