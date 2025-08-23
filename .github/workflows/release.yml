@@ -1,0 +1,123 @@
+name: Create DangerPrep Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Only trigger on version tags like v1.0.0, v2.1.3, etc.
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.validate.outputs.tag_name }}
+
+    steps:
+      - name: Validate tag format
+        id: validate
+        run: |
+          tag_name="${GITHUB_REF#refs/tags/}"
+          echo "tag_name=$tag_name" >> $GITHUB_OUTPUT
+
+          # Validate tag format (vX.X.X)
+          if [[ ! "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag format: $tag_name"
+            echo "Tags must be in format vX.X.X (e.g., v1.0.0, v2.1.3)"
+            exit 1
+          fi
+
+          echo "Valid tag format: $tag_name"
+
+  package:
+    needs: validate
+    uses: ./.github/workflows/package.yml
+
+  release:
+    needs: [validate, package]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dangerprep-*
+          merge-multiple: true
+      
+      - name: Get version information
+        id: versions
+        run: |
+          # Get latest versions from GitHub API
+          just_version=$(curl -s https://api.github.com/repos/casey/just/releases/latest | jq -r '.tag_name')
+          gum_version=$(curl -s https://api.github.com/repos/charmbracelet/gum/releases/latest | jq -r '.tag_name')
+
+          echo "just_version=$just_version" >> $GITHUB_OUTPUT
+          echo "gum_version=$gum_version" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate.outputs.tag_name }}
+          name: DangerPrep ${{ needs.validate.outputs.tag_name }}
+          body: |
+            ## DangerPrep Release ${{ needs.validate.outputs.tag_name }}
+
+            **Released:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+            **Commit:** ${{ github.sha }}
+
+            ### Included Components:
+            - **Just binaries:** ${{ steps.versions.outputs.just_version }}
+            - **Gum binaries:** ${{ steps.versions.outputs.gum_version }}
+            - **Complete DangerPrep codebase**
+
+            ### Quick Installation (Recommended):
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/${{ needs.validate.outputs.tag_name }}/bootstrap.sh | bash
+            ```
+
+            ### Manual Installation:
+            ```bash
+            # Download and extract
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ needs.validate.outputs.tag_name }}/dangerprep-package-*.tar.gz | tar -xz
+            cd dangerprep-package
+
+            # Install to /dangerprep and run setup
+            sudo ./bootstrap.sh
+            ```
+
+            ### Requirements:
+            - Ubuntu 24.04 LTS
+            - Root access (sudo)
+            - Supported hardware: NanoPi M6/R6C, NanoPC-T6, CM3588, or generic x86_64
+            - Internet connection for initial setup
+
+            ### Files:
+            - `dangerprep-package-*.tar.gz` - Complete package with all scripts and binaries
+
+            ### What's New:
+            See the [commit history](https://github.com/${{ github.repository }}/commits/${{ needs.validate.outputs.tag_name }}) for detailed changes.
+          files: dangerprep-*.tar.gz
+          draft: false
+          prerelease: false
+      
+      - name: Create summary
+        run: |
+          echo "## DangerPrep Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${{ needs.validate.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "Just version: ${{ steps.versions.outputs.just_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "Gum version: ${{ steps.versions.outputs.gum_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Release Asset:" >> $GITHUB_STEP_SUMMARY
+          ls -la dangerprep-*.tar.gz | awk '{print "- " $9 " (" $5 " bytes)"}' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation Commands:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "# Quick install (recommended):" >> $GITHUB_STEP_SUMMARY
+          echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/${{ needs.validate.outputs.tag_name }}/bootstrap.sh | bash" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Manual installation:" >> $GITHUB_STEP_SUMMARY
+          echo "curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ needs.validate.outputs.tag_name }}/dangerprep-package-*.tar.gz | tar -xz" >> $GITHUB_STEP_SUMMARY
+          echo "cd dangerprep-package && sudo ./bootstrap.sh" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

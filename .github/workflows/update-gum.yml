@@ -1,0 +1,44 @@
+name: Update Gum Binaries
+
+on:
+  workflow_call:
+    # Allow being called by other workflows
+
+permissions:
+  contents: read
+
+jobs:
+  update-gum:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest gum version
+        id: latest
+        run: |
+          latest=$(curl -s https://api.github.com/repos/charmbracelet/gum/releases/latest | jq -r '.tag_name')
+          echo "version=$latest" >> $GITHUB_OUTPUT
+
+      - name: Download gum binaries
+        run: |
+          cd lib/gum
+          ./download.sh --force --version ${{ steps.latest.outputs.version }}
+
+      - name: Upload gum binaries artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gum-binaries
+          path: lib/gum/gum-*
+          retention-days: 1
+
+      - name: Create summary
+        run: |
+          echo "## Gum Binaries Downloaded" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${{ steps.latest.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Available Platforms:" >> $GITHUB_STEP_SUMMARY
+          echo "- linux-x86_64, linux-aarch64, linux-armv7, linux-arm" >> $GITHUB_STEP_SUMMARY
+          echo "- darwin-x86_64, darwin-aarch64" >> $GITHUB_STEP_SUMMARY
+          echo "- windows-x86_64, windows-aarch64" >> $GITHUB_STEP_SUMMARY
