@@ -75,10 +75,10 @@ sleep 5
 
 # Start core infrastructure services
 log "Starting infrastructure services..."
-[[ -f docker/infrastructure/portainer/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/portainer/compose.yml up -d
 [[ -f docker/infrastructure/arcane/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/arcane/compose.yml up -d
 [[ -f docker/infrastructure/watchtower/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/watchtower/compose.yml up -d
 [[ -f docker/infrastructure/dns/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/dns/compose.yml up -d
+[[ -f docker/infrastructure/raspap/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/raspap/compose.yml up -d
 sleep 3
 
 # Start media services

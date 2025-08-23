@@ -1,0 +1,41 @@
+services:
+  # RaspAP - Comprehensive WiFi management and networking solution
+  raspap:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - GITHUB_USERNAME=${GITHUB_USERNAME}
+        - GITHUB_TOKEN=${GITHUB_TOKEN}
+    privileged: true
+    network_mode: host
+    cgroup: host # uncomment when using an ARM device
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    restart: unless-stopped
+    env_file:
+      - compose.env
+    labels:
+      # Traefik Configuration
+      - "traefik.enable=true"
+      - "traefik.http.routers.raspap.rule=Host(`router.danger`)"
+      - "traefik.http.routers.raspap.entrypoints=websecure"
+      - "traefik.http.routers.raspap.tls.certresolver=step-ca"
+      - "traefik.http.services.raspap.loadbalancer.server.port=8080"
+
+      # DNS Registration
+      - "dns.register=router.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Note: RaspAP uses host networking, so no custom networks needed
+# It will access other services via host network (127.0.0.1:5353 for CoreDNS, etc.)

@@ -72,10 +72,10 @@ log "Stopping media services..."
 [[ -f docker/media/jellyfin/compose.yml ]] && $DOCKER_CMD compose -f docker/media/jellyfin/compose.yml down
 
 log "Stopping infrastructure services..."
+[[ -f docker/infrastructure/raspap/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/raspap/compose.yml down
 [[ -f docker/infrastructure/dns/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/dns/compose.yml down
 [[ -f docker/infrastructure/watchtower/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/watchtower/compose.yml down
 [[ -f docker/infrastructure/arcane/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/arcane/compose.yml down
-[[ -f docker/infrastructure/portainer/compose.yml ]] && $DOCKER_CMD compose -f docker/infrastructure/portainer/compose.yml down
 
 # Stop Traefik last
 log "Stopping Traefik..."

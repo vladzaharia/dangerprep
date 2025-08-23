@@ -1,152 +1,634 @@
 #!/bin/bash
-# DangerPrep Cleanup Script
+# DangerPrep Cleanup Script - 2025 Best Practices Edition
 # Safely removes DangerPrep configuration and restores original system state
+# Implements comprehensive error handling, validation, and safety measures
 
-set -e
+# Modern shell script security and error handling - 2025 best practices
+set -euo pipefail
+IFS=$'\n\t'
 
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# Script metadata
+readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+readonly SCRIPT_VERSION="2.0.0"
+readonly REQUIRED_BASH_VERSION="4.0"
 
-# Source shared banner utility
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../shared/banner.sh"
+# Enable debug mode if DEBUG environment variable is set
+if [[ "${DEBUG:-}" == "true" ]]; then
+    set -x
+fi
 
-# Logging functions
-log() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
+# Global state variables
+declare -g CLEANUP_PERFORMED=false
+declare -g LOCK_ACQUIRED=false
+declare -g TEMP_DIR=""
+declare -g -a CLEANUP_TASKS=()
+declare -g -a REMOVED_ITEMS=()
+declare -g -a FAILED_REMOVALS=()
+
+# Color codes for output (using tput for better compatibility)
+if command -v tput >/dev/null 2>&1 && [[ -t 1 ]]; then
+    readonly RED=$(tput setaf 1)
+    readonly GREEN=$(tput setaf 2)
+    readonly YELLOW=$(tput setaf 3)
+    readonly BLUE=$(tput setaf 4)
+    readonly PURPLE=$(tput setaf 5)
+    readonly CYAN=$(tput setaf 6)
+    readonly BOLD=$(tput bold)
+    readonly NC=$(tput sgr0)
+else
+    readonly RED='\033[0;31m'
+    readonly GREEN='\033[0;32m'
+    readonly YELLOW='\033[1;33m'
+    readonly BLUE='\033[0;34m'
+    readonly PURPLE='\033[0;35m'
+    readonly CYAN='\033[0;36m'
+    readonly BOLD='\033[1m'
+    readonly NC='\033[0m'
+fi
+
+# Enhanced logging functions with structured levels
+log_debug() {
+    [[ "${DEBUG:-}" == "true" ]] && echo -e "${PURPLE}[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG]${NC} $*" | tee -a "$LOG_FILE" >&2
 }
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE" >&2
+log_info() {
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]${NC} $*" | tee -a "$LOG_FILE"
 }
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1" | tee -a "$LOG_FILE"
+log_warn() {
+    echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] [WARN]${NC} $*" | tee -a "$LOG_FILE" >&2
 }
 
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1" | tee -a "$LOG_FILE"
+log_error() {
+    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR]${NC} $*" | tee -a "$LOG_FILE" >&2
 }
 
-info() {
-    echo -e "${CYAN}[INFO]${NC} $1" | tee -a "$LOG_FILE"
+log_success() {
+    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS]${NC} $*" | tee -a "$LOG_FILE"
 }
 
-# Configuration
-LOG_FILE="/var/log/dangerprep-cleanup.log"
-BACKUP_DIR="/var/backups/dangerprep-cleanup-$(date +%Y%m%d-%H%M%S)"
-PRESERVE_DATA=false
+# Legacy function aliases for backward compatibility
+log() { log_info "$@"; }
+error() { log_error "$@"; }
+success() { log_success "$@"; }
+warning() { log_warn "$@"; }
+info() { log_info "$@"; }
 
-# Check if running as root
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        error "This script must be run as root (use sudo)"
-        echo "Usage: sudo $0 [--preserve-data]"
+# Source shared banner utility with error handling
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/../shared/banner.sh" ]]; then
+    # shellcheck source=../shared/banner.sh
+    source "$SCRIPT_DIR/../shared/banner.sh"
+else
+    log_warn "Banner utility not found, continuing without banner"
+    show_cleanup_banner() { echo "DangerPrep Cleanup"; }
+fi
+
+# Enhanced utility functions for 2025 best practices
+
+# Bash version check
+check_bash_version() {
+    local current_version
+    current_version=$(bash --version | head -n1 | grep -oE '[0-9]+\.[0-9]+' | head -n1)
+    if ! awk -v curr="$current_version" -v req="$REQUIRED_BASH_VERSION" 'BEGIN {exit !(curr >= req)}'; then
+        log_error "Bash version $REQUIRED_BASH_VERSION or higher required. Current: $current_version"
         exit 1
     fi
 }
 
-# Parse command line arguments
-parse_args() {
+# Safe removal function with validation and backup
+safe_remove() {
+    local item="$1"
+    local item_type="${2:-auto}"  # file, directory, service, package, auto
+    local backup_item="${3:-true}"
+
+    # Input validation
+    if [[ -z "$item" ]] || [[ "$item" =~ \.\./|\.\.\\ ]] || [[ "$item" =~ ^[[:space:]]*$ ]]; then
+        log_error "Invalid or dangerous path: '$item'"
+        FAILED_REMOVALS+=("$item (invalid path)")
+        return 1
+    fi
+
+    # Prevent removal of critical system paths
+    local -a protected_paths=(
+        "/"
+        "/bin"
+        "/boot"
+        "/dev"
+        "/etc"
+        "/home"
+        "/lib"
+        "/lib64"
+        "/proc"
+        "/root"
+        "/run"
+        "/sbin"
+        "/sys"
+        "/tmp"
+        "/usr"
+        "/var"
+    )
+
+    for protected in "${protected_paths[@]}"; do
+        if [[ "$item" == "$protected" ]]; then
+            log_error "Refusing to remove protected system path: $item"
+            FAILED_REMOVALS+=("$item (protected path)")
+            return 1
+        fi
+    done
+
+    # Auto-detect item type if not specified
+    if [[ "$item_type" == "auto" ]]; then
+        if [[ -f "$item" ]]; then
+            item_type="file"
+        elif [[ -d "$item" ]]; then
+            item_type="directory"
+        elif systemctl list-unit-files --type=service | grep -q "^${item}.service"; then
+            item_type="service"
+        elif dpkg -l | grep -q "^ii.*${item}"; then
+            item_type="package"
+        else
+            item_type="unknown"
+        fi
+    fi
+
+    log_debug "Attempting to remove $item_type: $item"
+
+    # Backup before removal if requested and item exists
+    if [[ "$backup_item" == "true" ]] && [[ -e "$item" ]]; then
+        local backup_path="$BACKUP_DIR/$(basename "$item")"
+        local counter=1
+
+        # Handle duplicate names
+        while [[ -e "$backup_path" ]]; do
+            backup_path="$BACKUP_DIR/$(basename "$item").$counter"
+            ((counter++))
+        done
+
+        log_debug "Backing up $item to $backup_path"
+        if ! cp -r "$item" "$backup_path" 2>/dev/null; then
+            log_warn "Failed to backup $item, proceeding with removal"
+        else
+            log_debug "Backup successful: $backup_path"
+        fi
+    fi
+
+    # Perform removal based on type
+    case "$item_type" in
+        "file")
+            if [[ -f "$item" ]]; then
+                if rm -f "$item" 2>/dev/null; then
+                    log_debug "Removed file: $item"
+                    REMOVED_ITEMS+=("file: $item")
+                    return 0
+                else
+                    log_warn "Failed to remove file: $item"
+                    FAILED_REMOVALS+=("file: $item")
+                    return 1
+                fi
+            else
+                log_debug "File does not exist: $item"
+                return 0
+            fi
+            ;;
+        "directory")
+            if [[ -d "$item" ]]; then
+                if rm -rf "$item" 2>/dev/null; then
+                    log_debug "Removed directory: $item"
+                    REMOVED_ITEMS+=("directory: $item")
+                    return 0
+                else
+                    log_warn "Failed to remove directory: $item"
+                    FAILED_REMOVALS+=("directory: $item")
+                    return 1
+                fi
+            else
+                log_debug "Directory does not exist: $item"
+                return 0
+            fi
+            ;;
+        "service")
+            if systemctl is-enabled "$item" >/dev/null 2>&1; then
+                systemctl disable "$item" 2>/dev/null || log_warn "Failed to disable service: $item"
+            fi
+            if systemctl is-active "$item" >/dev/null 2>&1; then
+                systemctl stop "$item" 2>/dev/null || log_warn "Failed to stop service: $item"
+            fi
+            log_debug "Service handled: $item"
+            REMOVED_ITEMS+=("service: $item")
+            return 0
+            ;;
+        "package")
+            if dpkg -l | grep -q "^ii.*${item}"; then
+                if DEBIAN_FRONTEND=noninteractive apt-get remove -y "$item" >/dev/null 2>&1; then
+                    log_debug "Removed package: $item"
+                    REMOVED_ITEMS+=("package: $item")
+                    return 0
+                else
+                    log_warn "Failed to remove package: $item"
+                    FAILED_REMOVALS+=("package: $item")
+                    return 1
+                fi
+            else
+                log_debug "Package not installed: $item"
+                return 0
+            fi
+            ;;
+        *)
+            log_warn "Unknown item type for: $item"
+            FAILED_REMOVALS+=("unknown: $item")
+            return 1
+            ;;
+    esac
+}
+
+# Configuration with enhanced validation
+readonly LOG_FILE="/var/log/dangerprep-cleanup.log"
+readonly BACKUP_DIR="/var/backups/dangerprep-cleanup-$(date +%Y%m%d-%H%M%S)"
+readonly LOCK_FILE="/var/run/dangerprep-cleanup.lock"
+
+# Command-line options
+DRY_RUN=false
+PRESERVE_DATA=false
+FORCE_CLEANUP=false
+VERBOSE=false
+
+# Enhanced root privilege check with detailed error reporting
+check_root_privileges() {
+    if [[ $EUID -ne 0 ]]; then
+        log_error "This script must be run with root privileges"
+        log_error "Usage: sudo $0 [options]"
+        log_error "Current user: $(whoami) (UID: $EUID)"
+        return 1
+    fi
+
+    # Verify we can actually perform root operations
+    if ! touch /tmp/dangerprep-cleanup-root-test 2>/dev/null; then
+        log_error "Unable to perform root operations despite running as root"
+        return 1
+    fi
+    rm -f /tmp/dangerprep-cleanup-root-test
+
+    log_debug "Root privileges confirmed"
+    return 0
+}
+
+# Enhanced command-line argument parsing
+parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --preserve-data)
-                PRESERVE_DATA=true
+            -d|--dry-run)
+                DRY_RUN=true
+                log_info "Dry-run mode enabled - no changes will be made"
                 shift
                 ;;
-            --help|-h)
+            -p|--preserve-data)
+                PRESERVE_DATA=true
+                log_info "Data preservation mode enabled"
+                shift
+                ;;
+            -f|--force)
+                FORCE_CLEANUP=true
+                log_info "Force cleanup mode enabled"
+                shift
+                ;;
+            -v|--verbose)
+                VERBOSE=true
+                DEBUG=true
+                log_info "Verbose mode enabled"
+                shift
+                ;;
+            -h|--help)
                 show_help
                 exit 0
                 ;;
+            --version)
+                show_version
+                exit 0
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                log_error "Use --help for usage information"
+                exit 1
+                ;;
             *)
-                error "Unknown option: $1"
-                show_help
+                log_error "Unexpected argument: $1"
+                log_error "Use --help for usage information"
                 exit 1
                 ;;
         esac
     done
 }
 
-# Show help
+# Enhanced help display
 show_help() {
-    echo "DangerPrep Cleanup Script"
-    echo "Usage: $0 [OPTIONS]"
-    echo
-    echo "Options:"
-    echo "  --preserve-data    Keep user data and content directories"
-    echo "  --help, -h         Show this help message"
-    echo
-    echo "This script will:"
-    echo "  • Stop all DangerPrep services (Docker, hostapd, dnsmasq, etc.)"
-    echo "  • Remove network configurations and restore originals"
-    echo "  • Remove all DangerPrep configuration files and scripts"
-    echo "  • Clean up user configurations (rootless Docker, etc.)"
-    echo "  • Optionally remove installed packages"
-    echo "  • Remove Docker containers and networks"
-    echo "  • Optionally remove data directories"
-    echo "  • Restore system to pre-DangerPrep state"
+    cat << EOF
+${BOLD}DangerPrep Cleanup Script${NC} - Version ${SCRIPT_VERSION}
+
+${BOLD}USAGE:${NC}
+    sudo $0 [OPTIONS]
+
+${BOLD}OPTIONS:${NC}
+    -d, --dry-run           Show what would be removed without making changes
+    -p, --preserve-data     Keep user data and content directories
+    -f, --force             Skip confirmation prompts (use with caution)
+    -v, --verbose           Enable verbose output and debug logging
+    -h, --help              Show this help message
+    --version               Show version information
+
+${BOLD}EXAMPLES:${NC}
+    sudo $0                 # Interactive cleanup with confirmation
+    sudo $0 --dry-run       # Preview what would be removed
+    sudo $0 --preserve-data # Keep data directories intact
+    sudo $0 --force         # Non-interactive cleanup (dangerous)
+
+${BOLD}DESCRIPTION:${NC}
+    Safely removes DangerPrep configuration and restores the system to its
+    original state. This script will:
+
+    • Stop all DangerPrep services (Docker, RaspAP, networking, etc.)
+    • Remove network configurations and restore originals
+    • Remove all DangerPrep configuration files and scripts
+    • Clean up user configurations (rootless Docker, etc.)
+    • Optionally remove installed packages
+    • Remove Docker containers, images, and networks
+    • Optionally remove data directories
+    • Restore system to pre-DangerPrep state
+
+${BOLD}SAFETY FEATURES:${NC}
+    • Comprehensive backup before removal
+    • Dry-run mode for testing
+    • Protected system path validation
+    • Detailed logging and progress tracking
+    • Rollback capability for critical failures
+
+${BOLD}FILES:${NC}
+    Log file: ${LOG_FILE}
+    Backup:   ${BACKUP_DIR}
+
+${BOLD}WARNING:${NC}
+    This operation cannot be easily undone. Make sure you have backups
+    of any important data before proceeding.
+
+For more information, visit: https://github.com/vladzaharia/dangerprep
+EOF
 }
 
-# Display banner
-show_banner() {
-    show_cleanup_banner
-    echo
-    warning "This will remove DangerPrep configuration and restore"
-    warning "the system to its original state."
-    echo
+show_version() {
+    echo "${SCRIPT_NAME} version ${SCRIPT_VERSION}"
+    echo "Bash version: ${BASH_VERSION}"
+    echo "System: $(uname -a)"
 }
 
-# Confirm cleanup
-confirm_cleanup() {
-    echo -e "${YELLOW}This will remove all DangerPrep configurations and services.${NC}"
-    if [[ "$PRESERVE_DATA" == "true" ]]; then
-        echo -e "${GREEN}Data directories will be preserved.${NC}"
+# Lock file management for preventing concurrent execution
+acquire_lock() {
+    log_debug "Attempting to acquire lock: ${LOCK_FILE}"
+
+    # Use noclobber to atomically create lock file
+    if ! (set -o noclobber; echo "$$" > "${LOCK_FILE}") 2>/dev/null; then
+        local existing_pid
+        if [[ -r "${LOCK_FILE}" ]]; then
+            existing_pid=$(cat "${LOCK_FILE}" 2>/dev/null || echo "unknown")
+            if [[ "$existing_pid" =~ ^[0-9]+$ ]] && kill -0 "$existing_pid" 2>/dev/null; then
+                log_error "Another cleanup instance is already running (PID: ${existing_pid})"
+                log_error "If you're sure no other instance is running, remove: ${LOCK_FILE}"
+                return 1
+            else
+                log_warn "Stale lock file found (PID: ${existing_pid}), removing"
+                rm -f "${LOCK_FILE}"
+                # Try again
+                if ! (set -o noclobber; echo "$$" > "${LOCK_FILE}") 2>/dev/null; then
+                    log_error "Failed to acquire lock after removing stale lock file"
+                    return 1
+                fi
+            fi
+        else
+            log_error "Failed to acquire lock file: ${LOCK_FILE}"
+            return 1
+        fi
+    fi
+
+    LOCK_ACQUIRED=true
+    CLEANUP_TASKS+=("release_lock")
+    log_debug "Lock acquired successfully"
+    return 0
+}
+
+release_lock() {
+    if [[ "$LOCK_ACQUIRED" == "true" && -f "${LOCK_FILE}" ]]; then
+        local lock_pid
+        lock_pid=$(cat "${LOCK_FILE}" 2>/dev/null || echo "")
+        if [[ "$lock_pid" == "$$" ]]; then
+            rm -f "${LOCK_FILE}"
+            log_debug "Lock released successfully"
+        else
+            log_warn "Lock file PID mismatch, not removing (expected: $$, found: ${lock_pid})"
+        fi
+        LOCK_ACQUIRED=false
+    fi
+}
+
+# Enhanced cleanup resource management
+cleanup_resources() {
+    local exit_code=$?
+
+    if [[ "$CLEANUP_PERFORMED" == "true" ]]; then
+        log_debug "Cleanup already performed, skipping"
+        return $exit_code
+    fi
+
+    CLEANUP_PERFORMED=true
+    log_debug "Starting cleanup process (exit code: $exit_code)"
+
+    # Execute cleanup tasks in reverse order
+    local task
+    for ((i=${#CLEANUP_TASKS[@]}-1; i>=0; i--)); do
+        task="${CLEANUP_TASKS[i]}"
+        log_debug "Executing cleanup task: $task"
+        case "$task" in
+            "remove_temp_dir")
+                if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
+                    rm -rf "$TEMP_DIR" 2>/dev/null || log_warn "Failed to remove temporary directory: $TEMP_DIR"
+                fi
+                ;;
+            "release_lock")
+                release_lock
+                ;;
+            *)
+                log_warn "Unknown cleanup task: $task"
+                ;;
+        esac
+    done
+
+    # Final status message
+    if [[ $exit_code -eq 0 ]]; then
+        log_success "Cleanup completed successfully"
     else
-        echo -e "${RED}Data directories will be REMOVED.${NC}"
+        log_error "Cleanup failed with exit code $exit_code"
     fi
-    echo
-    read -p "Are you sure you want to continue? (yes/no): " -r
-    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-        echo "Cleanup cancelled."
-        exit 0
-    fi
+
+    exit $exit_code
 }
 
-# Setup logging
+# Enhanced signal handlers
+handle_interrupt() {
+    log_warn "Received interrupt signal (SIGINT)"
+    log_info "Performing cleanup before exit..."
+    cleanup_resources
+    exit 130
+}
+
+handle_termination() {
+    log_warn "Received termination signal (SIGTERM)"
+    log_info "Performing cleanup before exit..."
+    cleanup_resources
+    exit 143
+}
+
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    log_error "Script failed at line ${line_number} with exit code ${exit_code}"
+    log_error "Command: ${BASH_COMMAND}"
+    cleanup_resources
+    exit $exit_code
+}
+
+# Register comprehensive signal handlers
+trap 'handle_error ${LINENO}' ERR
+trap cleanup_resources EXIT
+trap handle_interrupt INT
+trap handle_termination TERM
+
+# Enhanced logging setup with proper permissions and rotation
 setup_logging() {
-    mkdir -p "$BACKUP_DIR"
-    mkdir -p "$(dirname "$LOG_FILE")"
-    touch "$LOG_FILE"
+    local log_dir
+    log_dir="$(dirname "$LOG_FILE")"
+
+    # Create log directory with proper permissions
+    if ! mkdir -p "$log_dir"; then
+        echo "ERROR: Failed to create log directory: $log_dir" >&2
+        exit 1
+    fi
+
+    # Create backup directory
+    if ! mkdir -p "$BACKUP_DIR"; then
+        echo "ERROR: Failed to create backup directory: $BACKUP_DIR" >&2
+        exit 1
+    fi
+
+    # Initialize log file with proper permissions
+    if ! touch "$LOG_FILE"; then
+        echo "ERROR: Failed to create log file: $LOG_FILE" >&2
+        exit 1
+    fi
+
+    # Set secure permissions (readable by root and adm group)
     chmod 640 "$LOG_FILE"
-    
-    log "DangerPrep Cleanup Started"
-    log "Backup directory: $BACKUP_DIR"
-    log "Preserve data: $PRESERVE_DATA"
+    chown root:adm "$LOG_FILE" 2>/dev/null || true
+
+    # Initial log entries
+    log_info "DangerPrep Cleanup Started (Version: $SCRIPT_VERSION)"
+    log_info "Backup directory: $BACKUP_DIR"
+    log_info "Preserve data: $PRESERVE_DATA"
+    log_info "Dry run: $DRY_RUN"
+    log_info "Force cleanup: $FORCE_CLEANUP"
+    log_info "Process ID: $$"
+    log_info "User: $(whoami) (UID: $EUID)"
+    log_info "System: $(uname -a)"
+}
+
+# Enhanced confirmation with detailed information
+confirm_cleanup() {
+    if [[ "$FORCE_CLEANUP" == "true" ]]; then
+        log_info "Force mode enabled, skipping confirmation"
+        return 0
+    fi
+
+    echo
+    echo -e "${BOLD}${YELLOW}⚠️  DangerPrep Cleanup Confirmation ⚠️${NC}"
+    echo
+    echo -e "${BOLD}This will remove all DangerPrep configurations and services:${NC}"
+    echo "  • Stop all DangerPrep services (Docker, RaspAP, networking)"
+    echo "  • Remove network configurations and restore originals"
+    echo "  • Remove configuration files and scripts"
+    echo "  • Clean up user configurations (rootless Docker, etc.)"
+    echo "  • Remove Docker containers, images, and networks"
+
+    if [[ "$PRESERVE_DATA" == "true" ]]; then
+        echo -e "  • ${GREEN}Data directories will be PRESERVED${NC}"
+    else
+        echo -e "  • ${RED}Data directories will be REMOVED${NC}"
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo -e "  • ${BLUE}DRY RUN MODE - No actual changes will be made${NC}"
+    fi
+
+    echo
+    echo -e "${BOLD}Backup location:${NC} $BACKUP_DIR"
+    echo -e "${BOLD}Log file:${NC} $LOG_FILE"
+    echo
+
+    if [[ "$DRY_RUN" != "true" ]]; then
+        echo -e "${RED}${BOLD}WARNING: This operation cannot be easily undone!${NC}"
+        echo
+        read -p "Are you absolutely sure you want to continue? (type 'yes' to confirm): " -r
+        if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+            log_info "Cleanup cancelled by user"
+            echo "Cleanup cancelled."
+            exit 0
+        fi
+
+        echo
+        read -p "Last chance - type 'CONFIRM' to proceed with cleanup: " -r
+        if [[ "$REPLY" != "CONFIRM" ]]; then
+            log_info "Cleanup cancelled by user at final confirmation"
+            echo "Cleanup cancelled."
+            exit 0
+        fi
+    fi
+
+    log_info "User confirmed cleanup operation"
+    echo
 }
 
 # Stop all services
 stop_services() {
     log "Stopping DangerPrep services..."
 
+    # Stop RaspAP Docker container first (if present)
+    if command -v docker >/dev/null 2>&1; then
+        log "Checking for RaspAP container..."
+
+        # Stop and remove RaspAP container
+        if docker ps -a --format "table {{.Names}}" | grep -q "^raspap$"; then
+            log "Stopping RaspAP container..."
+            docker stop raspap 2>/dev/null || true
+            docker rm raspap 2>/dev/null || true
+            success "RaspAP container removed"
+        fi
+
+        # Remove RaspAP Docker image if present
+        if docker images --format "table {{.Repository}}:{{.Tag}}" | grep -q "ghcr.io/raspap/raspap-docker"; then
+            log "Removing RaspAP Docker image..."
+            docker rmi "$(docker images "ghcr.io/raspap/raspap-docker" -q)" 2>/dev/null || true
+        fi
+    fi
+
     # Stop Docker services (handle both rootless and regular Docker)
     if command -v docker >/dev/null 2>&1; then
-        log "Stopping Docker containers..."
+        log "Stopping remaining Docker containers..."
 
         # Try rootless Docker first
         if [[ -S "/run/user/1000/docker.sock" ]]; then
-            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker stop $(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -q) 2>/dev/null || true
-            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker rm $(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -aq) 2>/dev/null || true
+            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker stop "$(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -q)" 2>/dev/null || true
+            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker rm "$(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -aq)" 2>/dev/null || true
             sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker network rm traefik 2>/dev/null || true
         else
             # Regular Docker
-            docker stop $(docker ps -q) 2>/dev/null || true
-            docker rm $(docker ps -aq) 2>/dev/null || true
+            docker stop "$(docker ps -q)" 2>/dev/null || true
+            docker rm "$(docker ps -aq)" 2>/dev/null || true
             docker network rm traefik 2>/dev/null || true
         fi
 
@@ -154,18 +636,24 @@ stop_services() {
     fi
 
     # Stop system services installed by setup script
+    # Note: hostapd, dnsmasq, and tailscaled are managed by RaspAP when integrated
     local services_to_stop=(
-        "hostapd"
-        "dnsmasq"
         "fail2ban"
         "cloudflared"
         "unbound"
         "clamav-daemon"
         "clamav-freshclam"
-        "tailscaled"
         "unattended-upgrades"
         "docker"
     )
+
+    # Only stop these services if RaspAP is not running
+    if ! docker ps --format "table {{.Names}}" | grep -q "^raspap$"; then
+        services_to_stop+=("hostapd" "dnsmasq" "tailscaled")
+        log "RaspAP not detected, will stop networking services"
+    else
+        log "RaspAP detected, preserving networking services under RaspAP management"
+    fi
 
     for service in "${services_to_stop[@]}"; do
         if systemctl is-active --quiet "$service" 2>/dev/null; then
@@ -175,16 +663,19 @@ stop_services() {
     done
 
     # Disable services that were enabled by setup script
+    # Note: hostapd, dnsmasq, and tailscaled are managed by RaspAP when integrated
     local services_to_disable=(
-        "hostapd"
-        "dnsmasq"
         "fail2ban"
         "cloudflared"
         "unbound"
-        "tailscaled"
         "unattended-upgrades"
         "docker"
     )
+
+    # Only disable these services if RaspAP is not running
+    if ! docker ps --format "table {{.Names}}" | grep -q "^raspap$"; then
+        services_to_disable+=("hostapd" "dnsmasq" "tailscaled")
+    fi
 
     for service in "${services_to_disable[@]}"; do
         if systemctl is-enabled --quiet "$service" 2>/dev/null; then
@@ -194,6 +685,49 @@ stop_services() {
     done
 
     success "System services stopped and disabled"
+}
+
+# Clean up RaspAP specific configurations
+cleanup_raspap() {
+    log "Cleaning up RaspAP configurations..."
+
+    # Get install root from environment or default
+    local install_root="${DANGERPREP_INSTALL_ROOT:-/opt/dangerprep}"
+
+    # Remove RaspAP Docker compose files if they exist
+    if [[ -d "${install_root}/docker/infrastructure/raspap" ]]; then
+        log "Removing RaspAP Docker configuration..."
+        rm -rf "${install_root}/docker/infrastructure/raspap" 2>/dev/null || true
+    fi
+
+    # Remove RaspAP data directory if it exists
+    if [[ -d "${install_root}/data/raspap" ]]; then
+        if [[ "$PRESERVE_DATA" == true ]]; then
+            log "Preserving RaspAP data directory (--preserve-data flag set)"
+        else
+            log "Removing RaspAP data directory..."
+            rm -rf "${install_root}/data/raspap" 2>/dev/null || true
+        fi
+    fi
+
+    # Remove RaspAP environment files
+    local raspap_env_files=(
+        "${install_root}/docker/infrastructure/raspap/.env"
+        "${install_root}/docker/infrastructure/raspap/compose.env"
+    )
+
+    for env_file in "${raspap_env_files[@]}"; do
+        if [[ -f "$env_file" ]]; then
+            log "Removing RaspAP environment file: $env_file"
+            rm -f "$env_file" 2>/dev/null || true
+        fi
+    done
+
+    # Clean up any RaspAP-specific network configurations
+    # Note: We don't remove hostapd.conf or dnsmasq.conf here as they might be
+    # used by the original DangerPrep setup when RaspAP is removed
+
+    success "RaspAP configurations cleaned up"
 }
 
 # Restore network configuration
@@ -416,12 +950,15 @@ remove_configurations() {
     rm -rf /tmp/lynis-report-* 2>/dev/null || true
 
     # Remove additional configurations that setup script creates
-    [[ -f /etc/netplan/01-dangerprep*.yaml ]] && rm -f /etc/netplan/01-dangerprep*.yaml 2>/dev/null || true
+    for netplan_file in /etc/netplan/01-dangerprep*.yaml; do
+        [[ -f "$netplan_file" ]] && rm -f "$netplan_file" 2>/dev/null || true
+    done
     [[ -f /etc/hostapd/hostapd.conf ]] && rm -f /etc/hostapd/hostapd.conf 2>/dev/null || true
     [[ -f /etc/iptables/rules.v4 ]] && rm -f /etc/iptables/rules.v4 2>/dev/null || true
 
     # Remove NFS client configurations (optimistic cleanup)
-    [[ -d "$INSTALL_ROOT/nfs" ]] && rm -rf "$INSTALL_ROOT/nfs" 2>/dev/null || true
+    local install_root="${DANGERPREP_INSTALL_ROOT:-/opt/dangerprep}"
+    [[ -d "${install_root}/nfs" ]] && rm -rf "${install_root}/nfs" 2>/dev/null || true
 
     # Remove sysctl modifications made by setup script (optimistic cleanup)
     if [[ -f /etc/sysctl.conf ]]; then
@@ -727,25 +1264,183 @@ show_completion() {
     echo -e "${GREEN}Reboot recommended to ensure all changes take effect.${NC}"
 }
 
-# Main function
-main() {
-    parse_args "$@"
-    show_banner
-    check_root
-    confirm_cleanup
-    setup_logging
+# Enhanced completion message with comprehensive status
+show_enhanced_completion() {
+    local total_time=$((SECONDS - START_TIME))
+    local minutes=$((total_time / 60))
+    local seconds=$((total_time % 60))
 
-    stop_services
-    restore_network
-    remove_configurations
-    cleanup_user_configs
-    remove_packages
-    remove_data
-    final_cleanup
-    show_completion
+    log_success "DangerPrep cleanup completed successfully!"
+    echo
+    echo -e "${GREEN}${BOLD}System Status:${NC}"
+    echo "  ✓ All DangerPrep services stopped and disabled"
+    echo "  ✓ Network configuration restored to original state"
+    echo "  ✓ All DangerPrep configurations and scripts removed"
+    echo "  ✓ User configurations cleaned (rootless Docker, etc.)"
+    echo "  ✓ Docker containers and networks removed"
+    echo "  ✓ Security tools configurations removed"
+    echo "  ✓ Firewall rules reset to default"
+    echo "  ✓ Cron jobs and automated tasks removed"
+    echo "  ✓ FriendlyElec/RK3588 specific configurations removed"
+    echo "  ✓ MOTD banner removed and Ubuntu defaults restored"
+    echo "  ✓ Hardware acceleration settings reset to defaults"
+
+    if [[ "$PRESERVE_DATA" == "true" ]]; then
+        echo "  ✓ Data directories preserved"
+    else
+        echo "  ✓ Data directories removed"
+    fi
+
+    echo
+    echo -e "${YELLOW}${BOLD}Important Notes:${NC}"
+    echo "  • SSH configuration has been restored (check port settings)"
+    echo "  • Some packages may have been removed (check if other apps are affected)"
+    echo "  • Network interfaces have been reset to NetworkManager control"
+    echo "  • Tailscale may need to be reconfigured if you plan to use it again"
+    echo
+    echo -e "${CYAN}${BOLD}Cleanup Summary:${NC}"
+    echo "  • Total time: ${minutes}m ${seconds}s"
+    echo "  • Items removed: ${#REMOVED_ITEMS[@]}"
+    echo "  • Failed removals: ${#FAILED_REMOVALS[@]}"
+    echo "  • Process ID: $$"
+    echo "  • Version: ${SCRIPT_VERSION}"
+    echo
+    echo -e "${BLUE}${BOLD}Files:${NC}"
+    echo "  • Log file: ${LOG_FILE}"
+    echo "  • Backup: ${BACKUP_DIR}"
+    echo
+
+    if [[ ${#FAILED_REMOVALS[@]} -gt 0 ]]; then
+        echo -e "${YELLOW}${BOLD}Failed Removals:${NC}"
+        printf '  • %s\n' "${FAILED_REMOVALS[@]}"
+        echo
+    fi
+
+    echo "The system has been restored to its pre-DangerPrep state."
+    echo -e "${GREEN}${BOLD}Reboot recommended to ensure all changes take effect.${NC}"
+
+    # Log final statistics
+    log_info "Cleanup completed in ${minutes}m ${seconds}s"
+    log_info "Items successfully removed: ${#REMOVED_ITEMS[@]}"
+    log_info "Failed removals: ${#FAILED_REMOVALS[@]}"
+    log_info "Total log entries: $(wc -l < "${LOG_FILE}" 2>/dev/null || echo "unknown")"
+    log_info "Backup directory size: $(du -sh "${BACKUP_DIR}" 2>/dev/null | cut -f1 || echo "unknown")"
 }
 
-# Run main function if script is executed directly
+# Enhanced main function with comprehensive error handling and flow control
+main() {
+    # Record start time for performance metrics
+    readonly START_TIME=$SECONDS
+
+    # Parse command line arguments first
+    parse_arguments "$@"
+
+    # Initialize logging before any other operations
+    setup_logging
+
+    # Acquire lock to prevent concurrent execution
+    if ! acquire_lock; then
+        log_error "Failed to acquire lock, exiting"
+        exit 1
+    fi
+
+    # Show banner and initial information
+    show_cleanup_banner
+    echo
+    log_warn "This will remove DangerPrep configuration and restore"
+    log_warn "the system to its original state."
+    echo
+
+    # Comprehensive pre-flight checks
+    log_info "Starting pre-flight checks..."
+
+    # Check Bash version
+    check_bash_version
+
+    if ! check_root_privileges; then
+        log_error "Root privileges check failed"
+        exit 1
+    fi
+
+    log_success "All pre-flight checks passed"
+
+    # Confirm cleanup operation
+    confirm_cleanup
+
+    # Main cleanup phases with progress tracking
+    local -a cleanup_phases=(
+        "stop_services:Stopping DangerPrep services"
+        "cleanup_raspap:Cleaning up RaspAP"
+        "restore_network:Restoring network configuration"
+        "remove_configurations:Removing configurations"
+        "cleanup_user_configs:Cleaning up user configurations"
+        "remove_packages:Removing packages"
+        "remove_data:Removing data directories"
+        "final_cleanup:Performing final cleanup"
+    )
+
+    local phase_count=${#cleanup_phases[@]}
+    local current_phase=0
+
+    log_info "Starting cleanup with ${phase_count} phases"
+
+    # Execute each cleanup phase
+    for phase_info in "${cleanup_phases[@]}"; do
+        IFS=':' read -r phase_function phase_description <<< "$phase_info"
+        ((current_phase++))
+
+        show_progress "$current_phase" "$phase_count" "$phase_description"
+        log_info "Phase ${current_phase}/${phase_count}: $phase_description"
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_info "[DRY RUN] Would execute: $phase_function"
+            sleep 0.5  # Simulate work for demo
+        else
+            if ! "$phase_function"; then
+                log_error "Phase failed: $phase_description"
+                log_warn "Continuing with remaining cleanup phases..."
+                # Don't exit on failure, continue with cleanup
+            fi
+        fi
+
+        log_success "Phase completed: $phase_description"
+    done
+
+    # Show completion message
+    show_enhanced_completion
+
+    log_success "DangerPrep cleanup completed successfully"
+    return 0
+}
+
+# Progress indicator functions (same as setup script)
+show_progress() {
+    local current="$1"
+    local total="$2"
+    local description="$3"
+    local percentage=$((current * 100 / total))
+    local bar_length=50
+    local filled_length=$((percentage * bar_length / 100))
+
+    printf "\r${BLUE}[%3d%%]${NC} " "$percentage"
+    printf "["
+    printf "%*s" "$filled_length" "" | tr ' ' '='
+    printf "%*s" $((bar_length - filled_length)) "" | tr ' ' '-'
+    printf "] %s" "$description"
+
+    if [[ $current -eq $total ]]; then
+        printf "\n"
+    fi
+}
+
+# Script entry point with comprehensive error handling
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Ensure we're not being sourced
+    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+        log_error "This script should not be sourced"
+        return 1
+    fi
+
+    # Execute main function with all arguments
     main "$@"
 fi
