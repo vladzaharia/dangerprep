@@ -1459,6 +1459,45 @@ SSH_PORT="2222"
 FAIL2BAN_BANTIME="3600"
 FAIL2BAN_MAXRETRY="3"
 
+# Set default configuration values for non-interactive mode
+set_default_configuration_values() {
+    log_info "Setting default configuration values..."
+
+    # Set default username if not already set
+    if [[ -z "${NEW_USERNAME:-}" ]]; then
+        NEW_USERNAME="dangerprep"
+        log_debug "Set default username: $NEW_USERNAME"
+    fi
+
+    # Set default full name if not already set
+    if [[ -z "${NEW_USER_FULLNAME:-}" ]]; then
+        NEW_USER_FULLNAME="DangerPrep User"
+        log_debug "Set default full name: $NEW_USER_FULLNAME"
+    fi
+
+    # Set default SSH key transfer settings
+    if [[ -z "${TRANSFER_SSH_KEYS:-}" ]]; then
+        TRANSFER_SSH_KEYS="yes"
+        log_debug "Set default SSH key transfer: $TRANSFER_SSH_KEYS"
+    fi
+
+    # Set default GitHub key import settings
+    if [[ -z "${IMPORT_GITHUB_KEYS:-}" ]]; then
+        IMPORT_GITHUB_KEYS="no"
+        log_debug "Set default GitHub key import: $IMPORT_GITHUB_KEYS"
+    fi
+
+    # Export all variables for use in templates and other functions
+    export WIFI_SSID WIFI_PASSWORD LAN_NETWORK LAN_IP DHCP_START DHCP_END
+    export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
+    export SELECTED_PACKAGE_CATEGORIES SELECTED_DOCKER_SERVICES
+    export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
+    export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
+    export IMPORT_GITHUB_KEYS GITHUB_USERNAME
+
+    log_debug "Default configuration values set and exported"
+}
+
 # Interactive configuration collection
 collect_configuration() {
     log_info "Collecting configuration preferences..."
@@ -1466,6 +1505,7 @@ collect_configuration() {
     # Check if we're in a non-interactive environment or mode
     if [[ "${NON_INTERACTIVE:-false}" == "true" ]] || [[ "${DRY_RUN:-false}" == "true" ]] || [[ ! -t 0 ]] || [[ ! -t 1 ]] || [[ "${TERM:-}" == "dumb" ]]; then
         log_info "Non-interactive mode enabled, using default configuration values"
+        set_default_configuration_values
         return 0
     fi
 
@@ -1473,6 +1513,7 @@ collect_configuration() {
     if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]] || [[ "${TERM:-}" == "screen"* ]]; then
         log_warn "Remote/SSH session detected, using default configuration values"
         log_info "Use --non-interactive flag to suppress this warning"
+        set_default_configuration_values
         return 0
     fi
 
@@ -1603,6 +1644,12 @@ collect_configuration() {
 
 # Collect package configuration upfront
 collect_package_configuration() {
+    # Check if package categories are already configured
+    if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
+        log_debug "Package categories already configured: $SELECTED_PACKAGE_CATEGORIES"
+        return 0
+    fi
+
     echo
     log_info "📦 Package Selection Configuration"
     echo
@@ -1631,6 +1678,12 @@ collect_package_configuration() {
 
 # Collect Docker services configuration upfront
 collect_docker_services_configuration() {
+    # Check if Docker services are already configured
+    if [[ -n "${SELECTED_DOCKER_SERVICES:-}" ]]; then
+        log_debug "Docker services already configured: $SELECTED_DOCKER_SERVICES"
+        return 0
+    fi
+
     echo
     log_info "🐳 Docker Services Configuration"
     echo
@@ -1662,6 +1715,12 @@ collect_docker_services_configuration() {
 
 # Collect FriendlyElec-specific configuration upfront
 collect_friendlyelec_configuration() {
+    # Check if FriendlyElec configuration is already set
+    if [[ -n "${FRIENDLYELEC_INSTALL_PACKAGES:-}" ]] && [[ -n "${FRIENDLYELEC_ENABLE_FEATURES:-}" ]]; then
+        log_debug "FriendlyElec configuration already set"
+        return 0
+    fi
+
     echo
     log_info "🔧 FriendlyElec Hardware Configuration"
     echo
@@ -2736,6 +2795,9 @@ configure_ssh_hardening() {
         return 1
     fi
 
+    # Debug: Show current variable values
+    log_debug "SSH configuration variables: SSH_PORT=${SSH_PORT:-unset}, NEW_USERNAME=${NEW_USERNAME:-unset}"
+
     # Load SSH configuration with error handling
     if ! load_ssh_config; then
         log_error "Failed to load SSH configuration"
@@ -2754,8 +2816,18 @@ configure_ssh_hardening() {
     fi
 
     # Test SSH configuration before applying
-    if ! sshd -t 2>/dev/null; then
+    local ssh_test_output
+    if ! ssh_test_output=$(sshd -t 2>&1); then
         log_error "SSH configuration is invalid, not applying changes"
+        log_error "SSH validation output: $ssh_test_output"
+
+        # Show the generated config for debugging
+        log_debug "Generated SSH config content:"
+        if [[ -f /etc/ssh/sshd_config ]]; then
+            head -20 /etc/ssh/sshd_config | while IFS= read -r line; do
+                log_debug "  $line"
+            done
+        fi
         return 1
     fi
 
