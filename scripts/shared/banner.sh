@@ -265,7 +265,7 @@ show_banner_with_title() {
 
 # Convenience function for setup scripts
 show_setup_banner() {
-    show_banner_with_title "DangerPrep Setup 2025" "default" "$@"
+    show_banner_with_title "DangerPrep Setup" "default" "$@"
 }
 
 # Convenience function for cleanup scripts

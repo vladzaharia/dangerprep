@@ -1,68 +1,44 @@
 #!/bin/bash
 # DangerPrep Gum Utility Functions
-# Enhanced user interaction functions with gum integration and graceful fallbacks
-# Maintains 100% backward compatibility when gum is unavailable
+# Enhanced user interaction functions with gum integration
+# Gum is guaranteed to be available (system-installed or from lib directory)
 
 # Determine script directory for gum binary location
 GUM_UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GUM_PROJECT_ROOT="$(cd "${GUM_UTILS_DIR}/../.." && pwd)"
 GUM_LIB_DIR="${GUM_PROJECT_ROOT}/lib/gum"
 
-# Global gum availability flag (cached after first check)
-GUM_AVAILABLE=""
-
-# Check if gum is available (system-installed or from lib directory)
-gum_available() {
-    # Return cached result if already checked
-    if [[ -n "${GUM_AVAILABLE}" ]]; then
-        [[ "${GUM_AVAILABLE}" == "true" ]]
-        return $?
-    fi
-
-    # Check system-installed gum first
-    if command -v gum >/dev/null 2>&1; then
-        GUM_AVAILABLE="true"
-        return 0
-    fi
-
-    # Check lib directory for platform-specific binary
-    local platform
-    case "$(uname -s)" in
-        Linux*)  platform="linux" ;;
-        Darwin*) platform="darwin" ;;
-        *)       platform="unknown" ;;
-    esac
-
-    case "$(uname -m)" in
-        x86_64|amd64)   platform="${platform}-x86_64" ;;
-        aarch64|arm64)  platform="${platform}-aarch64" ;;
-        armv7l)         platform="${platform}-armv7" ;;
-        arm*)           platform="${platform}-arm" ;;
-        *)              platform="unknown" ;;
-    esac
-
-    local gum_binary="${GUM_LIB_DIR}/gum-${platform}"
-    if [[ -x "${gum_binary}" ]]; then
-        # Create symlink for easy access
-        if [[ ! -L "${GUM_LIB_DIR}/gum" ]] || [[ ! -e "${GUM_LIB_DIR}/gum" ]]; then
-            ln -sf "gum-${platform}" "${GUM_LIB_DIR}/gum" 2>/dev/null || true
-        fi
-        GUM_AVAILABLE="true"
-        return 0
-    fi
-
-    GUM_AVAILABLE="false"
-    return 1
-}
-
 # Get gum command (system or lib directory)
 get_gum_cmd() {
     if command -v gum >/dev/null 2>&1; then
         echo "gum"
-    elif [[ -x "${GUM_LIB_DIR}/gum" ]]; then
-        echo "${GUM_LIB_DIR}/gum"
     else
-        return 1
+        # Check lib directory for platform-specific binary
+        local platform
+        case "$(uname -s)" in
+            Linux*)  platform="linux" ;;
+            Darwin*) platform="darwin" ;;
+            *)       platform="unknown" ;;
+        esac
+
+        case "$(uname -m)" in
+            x86_64|amd64)   platform="${platform}-x86_64" ;;
+            aarch64|arm64)  platform="${platform}-aarch64" ;;
+            armv7l)         platform="${platform}-armv7" ;;
+            arm*)           platform="${platform}-arm" ;;
+            *)              platform="unknown" ;;
+        esac
+
+        local gum_binary="${GUM_LIB_DIR}/gum-${platform}"
+        if [[ -x "${gum_binary}" ]]; then
+            # Create symlink for easy access
+            if [[ ! -L "${GUM_LIB_DIR}/gum" ]] || [[ ! -e "${GUM_LIB_DIR}/gum" ]]; then
+                ln -sf "gum-${platform}" "${GUM_LIB_DIR}/gum" 2>/dev/null || true
+            fi
+            echo "${GUM_LIB_DIR}/gum"
+        else
+            echo "gum"  # Fallback to system command
+        fi
     fi
 }
 
@@ -72,32 +48,18 @@ enhanced_input() {
     local prompt="$1"
     local default="${2:-}"
     local placeholder="${3:-}"
-    local result
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+    local gum_args=()
 
-    if gum_available; then
-        local gum_cmd
-        gum_cmd=$(get_gum_cmd)
-        local gum_args=()
-        
-        [[ -n "${default}" ]] && gum_args+=(--value "${default}")
-        [[ -n "${placeholder}" ]] && gum_args+=(--placeholder "${placeholder}")
-        
-        result=$("${gum_cmd}" input --prompt "${prompt} " "${gum_args[@]}" 2>/dev/null)
-        local exit_code=$?
-        
-        if [[ ${exit_code} -eq 0 ]]; then
-            echo "${result}"
-            return 0
-        fi
-    fi
+    [[ -n "${default}" ]] && gum_args+=(--value "${default}")
+    [[ -n "${placeholder}" ]] && gum_args+=(--placeholder "${placeholder}")
 
-    # Fallback to traditional read
-    if [[ -n "${default}" ]]; then
-        read -r -p "${prompt} [${default}]: " result
-        echo "${result:-${default}}"
+    # Handle empty array properly
+    if [[ ${#gum_args[@]} -gt 0 ]]; then
+        "${gum_cmd}" input --prompt "${prompt} " "${gum_args[@]}"
     else
-        read -r -p "${prompt}: " result
-        echo "${result}"
+        "${gum_cmd}" input --prompt "${prompt} "
     fi
 }
 
@@ -106,40 +68,21 @@ enhanced_input() {
 enhanced_confirm() {
     local question="$1"
     local default_yes="${2:-false}"
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+    local gum_args=()
 
-    if gum_available; then
-        local gum_cmd
-        gum_cmd=$(get_gum_cmd)
-        local gum_args=()
-        
-        if [[ "${default_yes}" == "true" ]]; then
-            gum_args+=(--default=true)
-        else
-            gum_args+=(--default=false)
-        fi
-        
-        if "${gum_cmd}" confirm "${question}" "${gum_args[@]}" 2>/dev/null; then
-            return 0
-        else
-            return 1
-        fi
+    if [[ "${default_yes}" == "true" ]]; then
+        gum_args+=(--default=true)
+    else
+        gum_args+=(--default=false)
     fi
 
-    # Fallback to traditional read
-    local reply
-    local prompt_suffix
-    if [[ "${default_yes}" == "true" ]]; then
-        prompt_suffix=" [Y/n]: "
+    # Handle array expansion properly
+    if [[ ${#gum_args[@]} -gt 0 ]]; then
+        "${gum_cmd}" confirm "${question}" "${gum_args[@]}"
     else
-        prompt_suffix=" [y/N]: "
-    fi
-    
-    read -r -p "${question}${prompt_suffix}" reply
-    
-    if [[ "${default_yes}" == "true" ]]; then
-        [[ -z "${reply}" || "${reply}" =~ ^[Yy] ]]
-    else
-        [[ "${reply}" =~ ^[Yy] ]]
+        "${gum_cmd}" confirm "${question}"
     fi
 }
 
@@ -150,38 +93,10 @@ enhanced_choose() {
     local prompt="$1"
     shift
     local options=("$@")
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
 
-    if gum_available && [[ ${#options[@]} -gt 0 ]]; then
-        local gum_cmd
-        gum_cmd=$(get_gum_cmd)
-        
-        local result
-        result=$("${gum_cmd}" choose --header "${prompt}" "${options[@]}" 2>/dev/null)
-        local exit_code=$?
-        
-        if [[ ${exit_code} -eq 0 && -n "${result}" ]]; then
-            echo "${result}"
-            return 0
-        fi
-    fi
-
-    # Fallback to traditional menu
-    echo "${prompt}"
-    local i=1
-    for option in "${options[@]}"; do
-        echo "  ${i}) ${option}"
-        ((i++))
-    done
-    
-    local choice
-    while true; do
-        read -r -p "Select option (1-${#options[@]}): " choice
-        if [[ "${choice}" =~ ^[0-9]+$ ]] && [[ ${choice} -ge 1 ]] && [[ ${choice} -le ${#options[@]} ]]; then
-            echo "${options[$((choice-1))]}"
-            return 0
-        fi
-        echo "Invalid choice. Please select 1-${#options[@]}."
-    done
+    "${gum_cmd}" choose --header "${prompt}" "${options[@]}"
 }
 
 # Enhanced multi-choice function with gum integration
@@ -191,54 +106,10 @@ enhanced_multi_choose() {
     local prompt="$1"
     shift
     local options=("$@")
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
 
-    if gum_available && [[ ${#options[@]} -gt 0 ]]; then
-        local gum_cmd
-        gum_cmd=$(get_gum_cmd)
-        
-        local result
-        result=$("${gum_cmd}" choose --no-limit --header "${prompt}" "${options[@]}" 2>/dev/null)
-        local exit_code=$?
-        
-        if [[ ${exit_code} -eq 0 ]]; then
-            echo "${result}"
-            return 0
-        fi
-    fi
-
-    # Fallback to traditional multi-select
-    echo "${prompt}"
-    echo "Enter numbers separated by spaces (e.g., 1 3 5):"
-    
-    local i=1
-    for option in "${options[@]}"; do
-        echo "  ${i}) ${option}"
-        ((i++))
-    done
-    
-    local choices
-    local selected=()
-    
-    while true; do
-        read -r -p "Select options (1-${#options[@]}): " -a choices
-        selected=()
-        local valid=true
-        
-        for choice in "${choices[@]}"; do
-            if [[ "${choice}" =~ ^[0-9]+$ ]] && [[ ${choice} -ge 1 ]] && [[ ${choice} -le ${#options[@]} ]]; then
-                selected+=("${options[$((choice-1))]}")
-            else
-                echo "Invalid choice: ${choice}. Please select from 1-${#options[@]}."
-                valid=false
-                break
-            fi
-        done
-        
-        if [[ "${valid}" == "true" ]]; then
-            printf '%s\n' "${selected[@]}"
-            return 0
-        fi
-    done
+    "${gum_cmd}" choose --no-limit --header "${prompt}" "${options[@]}"
 }
 
 # Enhanced progress spinner function with gum integration
@@ -247,62 +118,161 @@ enhanced_spin() {
     local message="$1"
     shift
     local command=("$@")
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
 
-    if gum_available; then
-        local gum_cmd
-        gum_cmd=$(get_gum_cmd)
-        
-        "${gum_cmd}" spin --spinner dot --title "${message}" -- "${command[@]}" 2>/dev/null
-        return $?
-    fi
-
-    # Fallback to simple execution with message
-    echo "${message}..."
-    "${command[@]}"
+    "${gum_cmd}" spin --spinner dot --title "${message}" -- "${command[@]}"
 }
 
+# Enhanced logging functions with gum integration and file logging
+# These functions replace the custom logging in setup scripts
+
 # Enhanced logging function with gum integration
-# Usage: enhanced_log "level" "message"
+# Usage: enhanced_log "level" "message" [key=value pairs...]
 enhanced_log() {
     local level="$1"
     local message="$2"
+    shift 2
+    local structured_args=("$@")
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
 
-    if gum_available; then
-        local gum_cmd
-        gum_cmd=$(get_gum_cmd)
-        
-        case "${level}" in
-            "error"|"ERROR")
-                "${gum_cmd}" log --level error "${message}" 2>/dev/null || echo "ERROR: ${message}" >&2
-                ;;
-            "warn"|"WARN"|"warning"|"WARNING")
-                "${gum_cmd}" log --level warn "${message}" 2>/dev/null || echo "WARNING: ${message}" >&2
-                ;;
-            "info"|"INFO")
-                "${gum_cmd}" log --level info "${message}" 2>/dev/null || echo "INFO: ${message}"
-                ;;
-            "debug"|"DEBUG")
-                "${gum_cmd}" log --level debug "${message}" 2>/dev/null || echo "DEBUG: ${message}"
-                ;;
-            *)
-                "${gum_cmd}" log "${message}" 2>/dev/null || echo "${message}"
-                ;;
-        esac
-        return 0
-    fi
-
-    # Fallback to traditional logging
     case "${level}" in
         "error"|"ERROR")
-            echo "ERROR: ${message}" >&2
+            if [[ ${#structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level error --time rfc3339 "${message}" "${structured_args[@]}"
+            else
+                "${gum_cmd}" log --level error --time rfc3339 "${message}"
+            fi
             ;;
         "warn"|"WARN"|"warning"|"WARNING")
-            echo "WARNING: ${message}" >&2
+            if [[ ${#structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level warn --time rfc3339 "${message}" "${structured_args[@]}"
+            else
+                "${gum_cmd}" log --level warn --time rfc3339 "${message}"
+            fi
+            ;;
+        "info"|"INFO")
+            if [[ ${#structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level info --time rfc3339 "${message}" "${structured_args[@]}"
+            else
+                "${gum_cmd}" log --level info --time rfc3339 "${message}"
+            fi
+            ;;
+        "debug"|"DEBUG")
+            [[ "${DEBUG:-}" != "true" ]] && return 0
+            if [[ ${#structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level debug --time rfc3339 "${message}" "${structured_args[@]}"
+            else
+                "${gum_cmd}" log --level debug --time rfc3339 "${message}"
+            fi
+            ;;
+        "success"|"SUCCESS")
+            if [[ ${#structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level info --time rfc3339 "SUCCESS: ${message}" "${structured_args[@]}"
+            else
+                "${gum_cmd}" log --level info --time rfc3339 "SUCCESS: ${message}"
+            fi
             ;;
         *)
-            echo "${message}"
+            "${gum_cmd}" log --time rfc3339 "${message}"
             ;;
     esac
+
+    # Always log to file if LOG_FILE is set
+    if [[ -n "${LOG_FILE:-}" ]]; then
+        local file_timestamp
+        file_timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+        local file_level
+        file_level="$(echo "${level}" | tr '[:lower:]' '[:upper:]')"
+        echo "[${file_timestamp}] [${file_level}] ${message}" >> "${LOG_FILE}" 2>/dev/null || true
+    fi
+}
+
+# Modern logging functions - use these consistently across all scripts
+
+log_debug() {
+    enhanced_log "debug" "$@"
+}
+
+log_info() {
+    enhanced_log "info" "$@"
+}
+
+log_warn() {
+    enhanced_log "warn" "$@"
+}
+
+log_error() {
+    enhanced_log "error" "$@"
+}
+
+log_success() {
+    enhanced_log "success" "$@"
+}
+
+# Enhanced file selection with gum integration
+# Usage: enhanced_file_select [starting_directory]
+enhanced_file_select() {
+    local start_dir="${1:-$(pwd)}"
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+
+    "${gum_cmd}" file "${start_dir}"
+}
+
+# Enhanced write/multiline input with gum integration
+# Usage: enhanced_write "prompt" [placeholder]
+enhanced_write() {
+    local prompt="$1"
+    local placeholder="${2:-}"
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+    local gum_args=()
+
+    [[ -n "${placeholder}" ]] && gum_args+=(--placeholder "${placeholder}")
+
+    echo "${prompt}"
+    if [[ ${#gum_args[@]} -gt 0 ]]; then
+        "${gum_cmd}" write "${gum_args[@]}"
+    else
+        "${gum_cmd}" write
+    fi
+}
+
+# Enhanced style function with gum integration
+# Usage: enhanced_style "text" [style_options...]
+enhanced_style() {
+    local text="$1"
+    shift
+    local style_args=("$@")
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+
+    "${gum_cmd}" style "${style_args[@]}" "${text}"
+}
+
+# Enhanced join function with gum integration
+# Usage: enhanced_join [--vertical] text1 text2 text3...
+enhanced_join() {
+    local vertical=false
+    if [[ "$1" == "--vertical" ]]; then
+        vertical=true
+        shift
+    fi
+
+    local texts=("$@")
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+    local gum_args=()
+
+    [[ "${vertical}" == "true" ]] && gum_args+=(--vertical)
+
+    if [[ ${#gum_args[@]} -gt 0 ]]; then
+        "${gum_cmd}" join "${gum_args[@]}" "${texts[@]}"
+    else
+        "${gum_cmd}" join "${texts[@]}"
+    fi
 }
 
 # Enhanced table display function with gum integration
@@ -311,52 +281,227 @@ enhanced_table() {
     local headers="$1"
     shift
     local rows=("$@")
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
 
-    if gum_available && [[ -n "${headers}" ]] && [[ ${#rows[@]} -gt 0 ]]; then
-        local gum_cmd
-        gum_cmd=$(get_gum_cmd)
-        
-        # Create temporary file for table data
-        local temp_file
-        temp_file=$(mktemp)
-        
-        echo "${headers}" > "${temp_file}"
-        printf '%s\n' "${rows[@]}" >> "${temp_file}"
-        
-        "${gum_cmd}" table < "${temp_file}" 2>/dev/null
-        local exit_code=$?
-        rm -f "${temp_file}"
-        
-        if [[ ${exit_code} -eq 0 ]]; then
-            return 0
-        fi
-    fi
+    # Create temporary file for table data
+    local temp_file
+    temp_file=$(mktemp)
 
-    # Fallback to simple column display
-    echo "${headers}"
-    echo "${headers}" | sed 's/[^,]/-/g'
-    printf '%s\n' "${rows[@]}"
+    # Write headers and rows to temp file
+    echo "${headers}" > "${temp_file}"
+    printf '%s\n' "${rows[@]}" >> "${temp_file}"
+
+    # Use gum table with static print (non-interactive)
+    "${gum_cmd}" table --separator="," --print < "${temp_file}"
+    local exit_code=$?
+    rm -f "${temp_file}"
+
+    return "${exit_code}"
 }
 
 # Enhanced pager function with gum integration
 # Usage: enhanced_pager < input_file  OR  echo "content" | enhanced_pager
 enhanced_pager() {
-    if gum_available; then
-        local gum_cmd
-        gum_cmd=$(get_gum_cmd)
-        
-        "${gum_cmd}" pager 2>/dev/null
-        return $?
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+
+    "${gum_cmd}" pager
+}
+
+# Enhanced progress bar function with gum integration
+# Usage: enhanced_progress_bar current total "description"
+enhanced_progress_bar() {
+    local current="$1"
+    local total="$2"
+    local description="${3:-Processing}"
+    local percentage=$((current * 100 / total))
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+
+    # Use gum style to create a progress bar
+    local bar_width=40
+    local filled_width=$((percentage * bar_width / 100))
+    local empty_width=$((bar_width - filled_width))
+
+    local filled_bar=""
+    local empty_bar=""
+
+    # Create filled portion
+    if [[ ${filled_width} -gt 0 ]]; then
+        filled_bar=$(printf "%*s" "${filled_width}" "" | tr ' ' '█')
     fi
 
-    # Fallback to less or more
-    if command -v less >/dev/null 2>&1; then
-        less
-    elif command -v more >/dev/null 2>&1; then
-        more
-    else
-        cat
+    # Create empty portion
+    if [[ ${empty_width} -gt 0 ]]; then
+        empty_bar=$(printf "%*s" "${empty_width}" "" | tr ' ' '░')
     fi
+
+    local progress_text="[${filled_bar}${empty_bar}] ${percentage}% (${current}/${total})"
+
+    "${gum_cmd}" style --foreground 212 --bold "${description}"
+    "${gum_cmd}" style --foreground 86 "${progress_text}"
+}
+
+# Enhanced card function with gum integration
+# Usage: enhanced_card "title" "content" [border_color] [title_color]
+enhanced_card() {
+    local title="$1"
+    local content="$2"
+    local border_color="${3:-212}"  # Default: bright magenta
+    local title_color="${4:-86}"    # Default: bright cyan
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+
+    # Create styled title
+    local styled_title
+    styled_title=$("${gum_cmd}" style --foreground "${title_color}" --bold "${title}")
+
+    # Create card content with title
+    local card_content="${styled_title}"$'\n'"${content}"
+
+    # Style the entire card with border
+    "${gum_cmd}" style \
+        --border normal \
+        --border-foreground "${border_color}" \
+        --padding "1 2" \
+        --margin "1 0" \
+        "${card_content}"
+}
+
+# Enhanced status indicator function with gum integration
+# Usage: enhanced_status_indicator "success|failure|warning|info" "message"
+enhanced_status_indicator() {
+    local status="$1"
+    local message="$2"
+    local symbol=""
+    local color=""
+
+    case "${status}" in
+        "success"|"ok"|"pass"|"✓")
+            symbol="✓"
+            color="46"  # Green
+            ;;
+        "failure"|"error"|"fail"|"✗")
+            symbol="✗"
+            color="196" # Red
+            ;;
+        "warning"|"warn"|"⚠")
+            symbol="⚠"
+            color="226" # Yellow
+            ;;
+        "info"|"ℹ")
+            symbol="ℹ"
+            color="39"  # Blue
+            ;;
+        "pending"|"…")
+            symbol="…"
+            color="244" # Gray
+            ;;
+        *)
+            symbol="${status}"
+            color="15"  # White
+            ;;
+    esac
+
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+
+    # Style the symbol with color
+    local styled_symbol
+    styled_symbol=$("${gum_cmd}" style --foreground "${color}" --bold "${symbol}")
+
+    # Combine symbol and message
+    echo "${styled_symbol} ${message}"
+}
+
+# Enhanced warning box function with gum integration
+# Usage: enhanced_warning_box "title" "message" [warning_level]
+# warning_level: "danger" (red), "warning" (yellow), "info" (blue), default: "warning"
+enhanced_warning_box() {
+    local title="$1"
+    local message="$2"
+    local warning_level="${3:-warning}"
+    local border_color=""
+    local title_color=""
+    local symbol=""
+
+    case "${warning_level}" in
+        "danger"|"error")
+            border_color="196"  # Red
+            title_color="196"   # Red
+            symbol="🚨"
+            ;;
+        "warning"|"warn")
+            border_color="226"  # Yellow
+            title_color="226"   # Yellow
+            symbol="⚠️"
+            ;;
+        "info")
+            border_color="39"   # Blue
+            title_color="39"    # Blue
+            symbol="ℹ️"
+            ;;
+        *)
+            border_color="226"  # Default to yellow
+            title_color="226"
+            symbol="⚠️"
+            ;;
+    esac
+
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+
+    # Create styled title with symbol
+    local styled_title
+    styled_title=$("${gum_cmd}" style --foreground "${title_color}" --bold "${symbol} ${title}")
+
+    # Process message to convert \n to actual newlines
+    local processed_message
+    processed_message=$(echo -e "${message}")
+
+    # Create warning content with title and processed message
+    local warning_content="${styled_title}"$'\n\n'"${processed_message}"
+
+    # Style the entire warning box with prominent border
+    "${gum_cmd}" style \
+        --border thick \
+        --border-foreground "${border_color}" \
+        --padding "2 3" \
+        --margin "1 0" \
+        --width 80 \
+        "${warning_content}"
+}
+
+# Enhanced section function with gum integration
+# Usage: enhanced_section "title" "content" [emoji] [title_color]
+enhanced_section() {
+    local title="$1"
+    local content="$2"
+    local emoji="${3:-📋}"
+    local title_color="${4:-39}"  # Default: blue
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+
+    # Create styled section header
+    local section_header
+    section_header=$("${gum_cmd}" style \
+        --foreground "${title_color}" \
+        --bold \
+        --margin "1 0 0 0" \
+        "${emoji} ${title}")
+
+    # Create section separator
+    local separator
+    separator=$("${gum_cmd}" style \
+        --foreground 244 \
+        "$(printf "%*s" 60 "" | tr ' ' '─')")
+
+    # Display section
+    echo "${section_header}"
+    echo "${separator}"
+    echo "${content}"
+    echo
 }
 
 # Test function to verify gum integration
@@ -364,23 +509,19 @@ test_gum_utils() {
     echo "Testing DangerPrep Gum Utilities"
     echo "================================"
     echo
-    
-    if gum_available; then
-        echo "✓ Gum is available"
-        local gum_cmd
-        gum_cmd=$(get_gum_cmd)
-        echo "  Using: ${gum_cmd}"
-    else
-        echo "✗ Gum is not available, using fallbacks"
-    fi
+
+    echo "✓ Gum is available"
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+    echo "  Using: ${gum_cmd}"
     echo
-    
+
     echo "Testing enhanced_input:"
     local test_input
     test_input=$(enhanced_input "Enter test value" "default")
     echo "Result: ${test_input}"
     echo
-    
+
     echo "Testing enhanced_confirm:"
     if enhanced_confirm "Test confirmation"; then
         echo "Result: Yes"
@@ -388,7 +529,7 @@ test_gum_utils() {
         echo "Result: No"
     fi
     echo
-    
+
     echo "Testing enhanced_choose:"
     local test_choice
     test_choice=$(enhanced_choose "Choose an option" "Option 1" "Option 2" "Option 3")
@@ -462,7 +603,8 @@ get_log_file_path() {
 # Usage: get_backup_dir_path "script_name"
 get_backup_dir_path() {
     local script_name="$1"
-    local timestamp="$(date +%Y%m%d-%H%M%S)"
+    local timestamp
+    timestamp="$(date +%Y%m%d-%H%M%S)"
     local primary_backup="/var/backups/dangerprep-${script_name}-${timestamp}"
     local fallback_backup="${HOME}/.local/dangerprep/backups/dangerprep-${script_name}-${timestamp}"
 

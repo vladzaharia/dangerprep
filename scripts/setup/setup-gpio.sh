@@ -4,11 +4,15 @@
 
 set -euo pipefail
 
-# Basic logging functions
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-success() { echo "[SUCCESS] $*"; }
-warning() { echo "[WARNING] $*"; }
-error() { echo "[ERROR] $*"; }
+# Source gum utilities for enhanced logging and user interaction
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
+    # shellcheck source=../shared/gum-utils.sh
+    source "$SCRIPT_DIR/../shared/gum-utils.sh"
+else
+    echo "ERROR: gum-utils.sh not found. Cannot continue without logging functions." >&2
+    exit 1
+fi
 
 # Configuration file
 CONFIG_FILE="/etc/dangerprep/gpio-pwm-setup.conf"
@@ -18,9 +22,9 @@ GPIO_GROUPS="gpio gpio-admin"
 PWM_GROUPS="gpio pwm"
 I2C_GROUPS="i2c"
 SPI_GROUPS="spi"
-ALLOW_NON_ROOT_GPIO=true
-ALLOW_NON_ROOT_PWM=true
-ALLOW_NON_ROOT_I2C=true
+export ALLOW_NON_ROOT_GPIO=true
+export ALLOW_NON_ROOT_PWM=true
+export ALLOW_NON_ROOT_I2C=true
 ALLOW_NON_ROOT_SPI=false
 
 # Load configuration
@@ -33,52 +37,68 @@ load_config() {
 
 # Create system groups for hardware access
 create_hardware_groups() {
-    log "Creating hardware access groups..."
-    
+    enhanced_section "Hardware Access Groups" "Creating system groups for GPIO, PWM, I2C, and SPI access" "👥"
+
+    local all_groups=($GPIO_GROUPS $PWM_GROUPS $I2C_GROUPS $SPI_GROUPS)
+    local total_groups=${#all_groups[@]}
+    local current_group=0
+
     # GPIO groups
     for group in $GPIO_GROUPS; do
+        ((current_group++))
+        enhanced_progress_bar "$current_group" "$total_groups" "Creating Hardware Groups"
+
         if ! getent group "$group" >/dev/null 2>&1; then
-            groupadd "$group"
-            success "Created group: $group"
+            enhanced_spin "Creating GPIO group: $group" groupadd "$group"
+            enhanced_status_indicator "success" "Created GPIO group: $group"
         else
-            log "Group already exists: $group"
+            enhanced_status_indicator "info" "GPIO group already exists: $group"
         fi
     done
-    
+
     # PWM groups
     for group in $PWM_GROUPS; do
+        ((current_group++))
+        enhanced_progress_bar "$current_group" "$total_groups" "Creating Hardware Groups"
+
         if ! getent group "$group" >/dev/null 2>&1; then
-            groupadd "$group"
-            success "Created group: $group"
+            enhanced_spin "Creating PWM group: $group" groupadd "$group"
+            enhanced_status_indicator "success" "Created PWM group: $group"
         else
-            log "Group already exists: $group"
+            enhanced_status_indicator "info" "PWM group already exists: $group"
         fi
     done
-    
+
     # I2C groups
     for group in $I2C_GROUPS; do
+        ((current_group++))
+        enhanced_progress_bar "$current_group" "$total_groups" "Creating Hardware Groups"
+
         if ! getent group "$group" >/dev/null 2>&1; then
-            groupadd "$group"
-            success "Created group: $group"
+            enhanced_spin "Creating I2C group: $group" groupadd "$group"
+            enhanced_status_indicator "success" "Created I2C group: $group"
         else
-            log "Group already exists: $group"
+            enhanced_status_indicator "info" "I2C group already exists: $group"
         fi
     done
-    
+
     # SPI groups
     for group in $SPI_GROUPS; do
+        ((current_group++))
+        enhanced_progress_bar "$current_group" "$total_groups" "Creating Hardware Groups"
+
         if ! getent group "$group" >/dev/null 2>&1; then
-            groupadd "$group"
-            success "Created group: $group"
+            enhanced_spin "Creating SPI group: $group" groupadd "$group"
+            enhanced_status_indicator "success" "Created SPI group: $group"
         else
-            log "Group already exists: $group"
+            enhanced_status_indicator "info" "SPI group already exists: $group"
         fi
     done
 }
 
 # Configure GPIO access
 configure_gpio_access() {
-    log "Configuring GPIO access..."
+    log_info "Configuring GPIO access..."
     
     # Create udev rules for GPIO access
     cat > /etc/udev/rules.d/99-friendlyelec-gpio.rules << 'EOF'
@@ -100,12 +120,12 @@ EOF
         chmod -R g+rw /sys/class/gpio 2>/dev/null || true
     fi
     
-    success "GPIO access configured"
+    log_success "GPIO access configured"
 }
 
 # Configure PWM access
 configure_pwm_access() {
-    log "Configuring PWM access..."
+    log_info "Configuring PWM access..."
     
     # Create udev rules for PWM access
     cat > /etc/udev/rules.d/99-friendlyelec-pwm.rules << 'EOF'
@@ -132,16 +152,16 @@ EOF
         chmod -R g+rw /sys/class/pwm 2>/dev/null || true
     fi
     
-    success "PWM access configured"
+    log_success "PWM access configured"
 }
 
 # Configure I2C access
 configure_i2c_access() {
-    log "Configuring I2C access..."
-    
+    log_info "Configuring I2C access..."
+
     # Install I2C tools if not present
     if ! command -v i2cdetect >/dev/null 2>&1; then
-        log "Installing I2C tools..."
+        log_info "Installing I2C tools..."
         apt update
         apt install -y i2c-tools
     fi
@@ -160,12 +180,12 @@ EOF
         fi
     done
     
-    success "I2C access configured"
+    log_success "I2C access configured"
 }
 
 # Configure SPI access
 configure_spi_access() {
-    log "Configuring SPI access..."
+    log_info "Configuring SPI access..."
     
     # Create udev rules for SPI access
     if [[ "$ALLOW_NON_ROOT_SPI" == true ]]; then
@@ -193,12 +213,12 @@ EOF
         fi
     done
     
-    success "SPI access configured"
+    log_success "SPI access configured"
 }
 
 # Configure UART access
 configure_uart_access() {
-    log "Configuring UART access..."
+    log_info "Configuring UART access..."
     
     # Create udev rules for UART access
     cat > /etc/udev/rules.d/99-friendlyelec-uart.rules << 'EOF'
@@ -208,7 +228,7 @@ KERNEL=="ttyAMA[0-9]*", GROUP="dialout", MODE="0664"
 KERNEL=="ttyUSB[0-9]*", GROUP="dialout", MODE="0664"
 EOF
     
-    success "UART access configured"
+    log_success "UART access configured"
 }
 
 # Add user to hardware groups
@@ -216,11 +236,11 @@ add_user_to_groups() {
     local username="${1:-$SUDO_USER}"
     
     if [[ -z "$username" ]]; then
-        warning "No username provided, skipping user group assignment"
+        log_warn "No username provided, skipping user group assignment"
         return 0
     fi
-    
-    log "Adding user $username to hardware groups..."
+
+    log_info "Adding user $username to hardware groups..."
     
     # Add to GPIO groups
     for group in $GPIO_GROUPS; do
@@ -247,42 +267,45 @@ add_user_to_groups() {
     # Add to dialout for UART access
     usermod -a -G dialout "$username" 2>/dev/null || true
     
-    success "User $username added to hardware groups"
+    log_success "User $username added to hardware groups"
 }
 
 # Test hardware interfaces
 test_hardware_interfaces() {
-    log "Testing hardware interfaces..."
-    
+    log_info "Testing hardware interfaces..."
+
     # Test GPIO
     if [[ -d /sys/class/gpio ]]; then
-        success "GPIO interface available"
+        log_success "GPIO interface available"
     else
-        warning "GPIO interface not available"
+        log_warn "GPIO interface not available"
     fi
-    
+
     # Test PWM
     if [[ -d /sys/class/pwm ]]; then
-        local pwm_chips=$(ls /sys/class/pwm/pwmchip* 2>/dev/null | wc -l)
-        success "PWM interface available ($pwm_chips chips)"
+        local pwm_chips
+        pwm_chips=$(find /sys/class/pwm -name "pwmchip*" 2>/dev/null | wc -l)
+        log_success "PWM interface available (${pwm_chips} chips)"
     else
-        warning "PWM interface not available"
+        log_warn "PWM interface not available"
     fi
-    
+
     # Test I2C
-    local i2c_buses=$(ls /dev/i2c-* 2>/dev/null | wc -l)
-    if [[ $i2c_buses -gt 0 ]]; then
-        success "I2C interface available ($i2c_buses buses)"
+    local i2c_buses
+    i2c_buses=$(find /dev -name "i2c-*" 2>/dev/null | wc -l)
+    if [[ ${i2c_buses} -gt 0 ]]; then
+        log_success "I2C interface available (${i2c_buses} buses)"
     else
-        warning "I2C interface not available"
+        log_warn "I2C interface not available"
     fi
-    
+
     # Test SPI
-    local spi_devices=$(ls /dev/spidev* 2>/dev/null | wc -l)
-    if [[ $spi_devices -gt 0 ]]; then
-        success "SPI interface available ($spi_devices devices)"
+    local spi_devices
+    spi_devices=$(find /dev -name "spidev*" 2>/dev/null | wc -l)
+    if [[ ${spi_devices} -gt 0 ]]; then
+        log_success "SPI interface available (${spi_devices} devices)"
     else
-        warning "SPI interface not available"
+        log_warn "SPI interface not available"
     fi
 }
 
@@ -290,7 +313,7 @@ test_hardware_interfaces() {
 main() {
     case "${1:-setup}" in
         setup)
-            log "Setting up FriendlyElec GPIO and PWM interfaces..."
+            log_info "Setting up FriendlyElec GPIO and PWM interfaces..."
             load_config
             create_hardware_groups
             configure_gpio_access
@@ -305,7 +328,7 @@ main() {
             udevadm trigger
             
             test_hardware_interfaces
-            success "FriendlyElec hardware interface setup completed"
+            log_success "FriendlyElec hardware interface setup completed"
             ;;
         test)
             test_hardware_interfaces

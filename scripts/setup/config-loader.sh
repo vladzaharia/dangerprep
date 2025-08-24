@@ -6,6 +6,15 @@
 CONFIG_LOADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="$CONFIG_LOADER_DIR/configs"
 
+# Source gum utilities for enhanced logging and user interaction
+if [[ -f "$CONFIG_LOADER_DIR/../shared/gum-utils.sh" ]]; then
+    # shellcheck source=../shared/gum-utils.sh
+    source "$CONFIG_LOADER_DIR/../shared/gum-utils.sh"
+else
+    echo "ERROR: gum-utils.sh not found. Cannot continue without logging functions." >&2
+    exit 1
+fi
+
 # Generic template processor
 # Usage: process_template <template_file> <output_file> [var1=value1] [var2=value2] ...
 process_template() {
@@ -14,7 +23,7 @@ process_template() {
     shift 2
 
     if [[ ! -f "$template_file" ]]; then
-        error "Template file not found: $template_file"
+        log_error "Template file not found: $template_file"
         return 1
     fi
 
@@ -24,11 +33,12 @@ process_template() {
     # Backup original file if it exists
     if [[ -f "$output_file" ]]; then
         cp "$output_file" "$BACKUP_DIR/$(basename "$output_file").backup" 2>/dev/null || true
-        log "Backed up existing file: $output_file"
+        log_info "Backed up existing file: $output_file"
     fi
 
     # Read template content
-    local content=$(cat "$template_file")
+    local content
+    content=$(cat "$template_file")
 
     # Process substitutions from arguments
     for substitution in "$@"; do
@@ -55,36 +65,36 @@ process_template() {
     # Write the processed content to output file
     echo "$content" > "$output_file"
 
-    log "Generated configuration: $output_file"
+    log_info "Generated configuration: $output_file"
 }
 
 # Convenience functions for common configurations
 load_ssh_config() {
-    log "Loading SSH configuration..."
+    log_info "Loading SSH configuration..."
     process_template "$CONFIG_DIR/security/sshd_config.tmpl" "/etc/ssh/sshd_config"
     process_template "$CONFIG_DIR/security/ssh_banner.tmpl" "/etc/ssh/ssh_banner"
     chmod 644 /etc/ssh/ssh_banner
 }
 
 load_fail2ban_config() {
-    log "Loading fail2ban configuration..."
+    log_info "Loading fail2ban configuration..."
     process_template "$CONFIG_DIR/security/jail.local.tmpl" "/etc/fail2ban/jail.local"
     process_template "$CONFIG_DIR/security/nginx-botsearch.conf.tmpl" "/etc/fail2ban/filter.d/nginx-botsearch.conf"
 }
 
 load_kernel_hardening_config() {
-    log "Loading kernel hardening configuration..."
+    log_info "Loading kernel hardening configuration..."
     # Append hardening configuration to existing sysctl.conf
     cat "$CONFIG_DIR/security/sysctl_hardening.conf.tmpl" >> /etc/sysctl.conf
 }
 
 load_aide_config() {
-    log "Loading AIDE configuration..."
+    log_info "Loading AIDE configuration..."
     cat "$CONFIG_DIR/security/aide_dangerprep.conf.tmpl" >> /etc/aide/aide.conf
 }
 
 load_motd_config() {
-    log "Loading MOTD configuration..."
+    log_info "Loading MOTD configuration..."
     # Install DangerPrep banner for MOTD
     cp "$CONFIG_DIR/system/01-dangerprep-banner" "/etc/update-motd.d/01-dangerprep-banner"
     chmod +x "/etc/update-motd.d/01-dangerprep-banner"
@@ -97,19 +107,19 @@ load_motd_config() {
 }
 
 load_hardware_monitoring_config() {
-    log "Loading hardware monitoring configuration..."
+    log_info "Loading hardware monitoring configuration..."
     cat "$CONFIG_DIR/monitoring/sensors3_dangerprep.conf.tmpl" >> /etc/sensors3.conf
 }
 
 load_hostapd_config() {
-    log "Loading hostapd configuration..."
+    log_info "Loading hostapd configuration..."
     process_template "$CONFIG_DIR/network/hostapd.conf.tmpl" "/etc/hostapd/hostapd.conf"
     # Configure hostapd to use our config file
     sed -i 's|#DAEMON_CONF=""|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
 }
 
 load_dnsmasq_config() {
-    log "Loading dnsmasq configuration..."
+    log_info "Loading dnsmasq configuration..."
     process_template "$CONFIG_DIR/network/dnsmasq.conf.tmpl" "/etc/dnsmasq.conf"
     # Create log file
     touch /var/log/dnsmasq.log
@@ -117,17 +127,17 @@ load_dnsmasq_config() {
 }
 
 load_dnsmasq_advanced_config() {
-    log "Loading advanced dnsmasq configuration..."
+    log_info "Loading advanced dnsmasq configuration..."
     process_template "$CONFIG_DIR/dns/dnsmasq_advanced.conf.tmpl" "/etc/dnsmasq.conf"
 }
 
 load_wan_config() {
-    log "Loading WAN interface configuration..."
+    log_info "Loading WAN interface configuration..."
     process_template "$CONFIG_DIR/network/netplan_wan.yaml.tmpl" "/etc/netplan/01-dangerprep-wan.yaml"
 }
 
 load_sync_configs() {
-    log "Loading sync service configurations..."
+    log_info "Loading sync service configurations..."
     local sync_config_dir="$INSTALL_ROOT/config"
     mkdir -p "$sync_config_dir"
 
@@ -137,24 +147,24 @@ load_sync_configs() {
 }
 
 load_unattended_upgrades_config() {
-    log "Loading unattended upgrades configuration..."
+    log_info "Loading unattended upgrades configuration..."
     process_template "$CONFIG_DIR/system/50unattended-upgrades.tmpl" "/etc/apt/apt.conf.d/50unattended-upgrades"
     process_template "$CONFIG_DIR/system/20auto-upgrades.tmpl" "/etc/apt/apt.conf.d/20auto-upgrades"
 }
 
 load_network_performance_config() {
-    log "Loading network performance configuration..."
+    log_info "Loading network performance configuration..."
     cat "$CONFIG_DIR/network/network_performance.conf.tmpl" >> /etc/sysctl.conf
 }
 
 load_docker_config() {
-    log "Loading Docker daemon configuration..."
+    log_info "Loading Docker daemon configuration..."
     mkdir -p /etc/docker
     process_template "$CONFIG_DIR/docker/daemon.json.tmpl" "/etc/docker/daemon.json"
 }
 
 load_watchtower_config() {
-    log "Loading Watchtower configuration..."
+    log_info "Loading Watchtower configuration..."
     local watchtower_dir="$INSTALL_ROOT/docker/infrastructure/watchtower"
     mkdir -p "$watchtower_dir"
     process_template "$CONFIG_DIR/docker/watchtower.compose.yml.tmpl" "$watchtower_dir/compose.yml"
@@ -162,7 +172,7 @@ load_watchtower_config() {
 
 # Function to validate all configuration files exist
 validate_config_files() {
-    log "Validating configuration files..."
+    log_info "Validating configuration files..."
 
     local missing_files=()
     local config_files=(
@@ -208,12 +218,12 @@ validate_config_files() {
     done
 
     if [[ ${#missing_files[@]} -gt 0 ]]; then
-        error "Missing configuration files:"
+        log_error "Missing configuration files:"
         printf '%s\n' "${missing_files[@]}"
         return 1
     fi
 
-    success "All configuration files validated"
+    log_success "All configuration files validated"
     return 0
 }
 
@@ -223,19 +233,19 @@ load_friendlyelec_configs() {
         return 0
     fi
 
-    log "Loading FriendlyElec-specific configurations..."
+    log_info "Loading FriendlyElec-specific configurations..."
 
     # Load RK3588/RK3588S configurations
     if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
         load_rk3588_configs
     fi
 
-    success "FriendlyElec configurations loaded"
+    log_success "FriendlyElec configurations loaded"
 }
 
 # Load RK3588/RK3588S specific configurations
 load_rk3588_configs() {
-    log "Loading RK3588/RK3588S configurations..."
+    log_info "Loading RK3588/RK3588S configurations..."
 
     # Load sensors configuration
     load_rk3588_sensors_config
@@ -266,9 +276,9 @@ load_rk3588_fan_control_config() {
 
     if [[ -f "$template" ]]; then
         process_template "$template" "$output"
-        log "Loaded RK3588 fan control configuration"
+        log_info "Loaded RK3588 fan control configuration"
     else
-        warning "RK3588 fan control template not found: $template"
+        log_warn "RK3588 fan control template not found: $template"
     fi
 }
 
@@ -282,9 +292,9 @@ install_rk3588_fan_control_service() {
         systemctl daemon-reload
         systemctl enable rk3588-fan-control.service 2>/dev/null || true
         systemctl start rk3588-fan-control.service 2>/dev/null || true
-        log "Installed and started RK3588 fan control service"
+        log_info "Installed and started RK3588 fan control service"
     else
-        warning "RK3588 fan control service template not found: $template"
+        log_warn "RK3588 fan control service template not found: $template"
     fi
 }
 
@@ -295,9 +305,9 @@ load_gpio_pwm_config() {
 
     if [[ -f "$template" ]]; then
         process_template "$template" "$output"
-        log "Loaded GPIO/PWM configuration"
+        log_info "Loaded GPIO/PWM configuration"
     else
-        warning "GPIO/PWM configuration template not found: $template"
+        log_warn "GPIO/PWM configuration template not found: $template"
     fi
 }
 
@@ -308,9 +318,9 @@ load_rk3588_sensors_config() {
 
     if [[ -f "$template" ]]; then
         process_template "$template" "$output"
-        log "Loaded RK3588 sensors configuration"
+        log_info "Loaded RK3588 sensors configuration"
     else
-        warning "RK3588 sensors template not found: $template"
+        log_warn "RK3588 sensors template not found: $template"
     fi
 }
 
@@ -321,9 +331,9 @@ load_rk3588_performance_config() {
 
     if [[ -f "$template" ]]; then
         process_template "$template" "$output"
-        log "Loaded RK3588 performance configuration"
+        log_info "Loaded RK3588 performance configuration"
     else
-        warning "RK3588 performance template not found: $template"
+        log_warn "RK3588 performance template not found: $template"
     fi
 }
 
@@ -335,9 +345,9 @@ load_rk3588_udev_rules() {
     if [[ -f "$template" ]]; then
         process_template "$template" "$output"
         udevadm control --reload-rules 2>/dev/null || true
-        log "Loaded RK3588 udev rules"
+        log_info "Loaded RK3588 udev rules"
     else
-        warning "RK3588 udev rules template not found: $template"
+        log_warn "RK3588 udev rules template not found: $template"
     fi
 }
 
@@ -348,9 +358,9 @@ load_rk3588_gpu_config() {
 
     if [[ -f "$template" ]]; then
         process_template "$template" "$output"
-        log "Loaded RK3588 GPU configuration"
+        log_info "Loaded RK3588 GPU configuration"
     else
-        warning "RK3588 GPU template not found: $template"
+        log_warn "RK3588 GPU template not found: $template"
     fi
 }
 
@@ -361,8 +371,8 @@ load_rk3588_gstreamer_config() {
 
     if [[ -f "$template" ]]; then
         process_template "$template" "$output"
-        log "Loaded RK3588 GStreamer configuration"
+        log_info "Loaded RK3588 GStreamer configuration"
     else
-        warning "RK3588 GStreamer template not found: $template"
+        log_warn "RK3588 GStreamer template not found: $template"
     fi
 }
