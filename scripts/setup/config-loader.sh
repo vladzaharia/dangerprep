@@ -72,6 +72,20 @@ process_template() {
 # Convenience functions for common configurations
 load_ssh_config() {
     log_info "Loading SSH configuration..."
+
+    # Validate required variables before processing templates
+    if [[ -z "${NEW_USERNAME:-}" ]]; then
+        log_error "NEW_USERNAME is not set - cannot configure SSH"
+        return 1
+    fi
+
+    if [[ -z "${SSH_PORT:-}" ]]; then
+        log_error "SSH_PORT is not set - cannot configure SSH"
+        return 1
+    fi
+
+    log_debug "Using SSH_PORT=$SSH_PORT, NEW_USERNAME=$NEW_USERNAME"
+
     process_template "$CONFIG_DIR/security/sshd_config.tmpl" "/etc/ssh/sshd_config"
     process_template "$CONFIG_DIR/security/ssh_banner.tmpl" "/etc/ssh/ssh_banner"
     chmod 644 /etc/ssh/ssh_banner
