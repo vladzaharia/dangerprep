@@ -1122,17 +1122,27 @@ update_system_packages() {
 install_essential_packages() {
     log_info "📦 Installing essential packages..."
 
-    # Define package categories (removing certbot and cloudflared)
+    # Define package categories
+    # Core packages: Essential for DangerPrep functionality
     local core_packages=(
-        "curl" "wget" "git" "vim" "nano" "htop" "tree" "unzip" "zip"
-        "software-properties-common" "apt-transport-https" "ca-certificates"
-        "gnupg" "lsb-release" "jq" "bc" "rsync" "screen" "tmux"
+        "curl" "wget" "git" "bc" "unzip"                                    # Required by scripts
+        "software-properties-common" "apt-transport-https" "ca-certificates" # Package management
+        "gnupg" "lsb-release"                                               # Security and system info
     )
 
+    # User convenience packages: Optional tools for system administration
+    local convenience_packages=(
+        "vim" "nano" "htop" "tree" "zip" "jq" "rsync" "screen" "tmux"      # User tools
+    )
+
+    # Network packages: Reduced since RaspAP handles most networking
+    # Only keeping tools that complement RaspAP or are needed for advanced networking
     local network_packages=(
-        "hostapd" "iptables-persistent" "bridge-utils"
-        "wireless-tools" "wpasupplicant" "iw" "rfkill" "netplan.io"
-        "iproute2" "tc" "wondershaper" "iperf3"
+        "netplan.io"        # Network configuration (Ubuntu standard)
+        "iproute2"          # Advanced routing tools (ip command)
+        "tc"                # Traffic control for QoS
+        "wondershaper"      # Bandwidth limiting tool
+        "iperf3"            # Network performance testing
     )
 
     local security_packages=(
@@ -1167,7 +1177,8 @@ install_essential_packages() {
 
     # Optional package categories with multi-select
     local package_categories=(
-        "Network packages (hostapd, iptables, etc.) - ${#network_packages[@]} packages"
+        "Convenience packages (vim, nano, htop, etc.) - ${#convenience_packages[@]} packages"
+        "Network packages (netplan, tc, iperf3, etc.) - ${#network_packages[@]} packages"
         "Security packages (fail2ban, aide, clamav, etc.) - ${#security_packages[@]} packages"
         "Monitoring packages (sensors, collectd, etc.) - ${#monitoring_packages[@]} packages"
         "Backup packages (borgbackup, restic) - ${#backup_packages[@]} packages"
@@ -1182,6 +1193,10 @@ install_essential_packages() {
     if [[ -n "${selected_categories}" ]]; then
         while IFS= read -r category; do
             case "${category}" in
+                *"Convenience packages"*)
+                    selected_packages+=("${convenience_packages[@]}")
+                    enhanced_status_indicator "success" "Added ${#convenience_packages[@]} convenience packages"
+                    ;;
                 *"Network packages"*)
                     selected_packages+=("${network_packages[@]}")
                     enhanced_status_indicator "success" "Added ${#network_packages[@]} network packages"
@@ -1202,6 +1217,9 @@ install_essential_packages() {
                     selected_packages+=("${update_packages[@]}")
                     enhanced_status_indicator "success" "Added ${#update_packages[@]} update packages"
                     ;;
+                *)
+                    log_warn "Unknown package category: ${category}"
+                    ;;
             esac
         done <<< "${selected_categories}"
     else
@@ -1212,6 +1230,7 @@ install_essential_packages() {
     log_info "📋 Package Installation Summary"
     enhanced_table "Category,Count,Packages" \
         "Core,${#core_packages[@]},Always installed" \
+        "Convenience,${#convenience_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${convenience_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)" \
         "Network,${#network_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${network_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)" \
         "Security,${#security_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${security_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)" \
         "Monitoring,${#monitoring_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${monitoring_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)" \
