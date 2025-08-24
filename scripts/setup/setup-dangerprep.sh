@@ -1073,8 +1073,6 @@ backup_original_configs() {
     local configs_to_backup=(
         "/etc/ssh/sshd_config"
         "/etc/sysctl.conf"
-        "/etc/dnsmasq.conf"
-        "/etc/hostapd/hostapd.conf"
         "/etc/fail2ban/jail.conf"
         "/etc/aide/aide.conf"
         "/etc/sensors3.conf"
@@ -2836,57 +2834,8 @@ EOF
     log_info "Configured RK3588 video acceleration"
 }
 
-# Configure WAN interface
-configure_wan_interface() {
-    log_info "Configuring WAN interface..."
-    load_wan_config
-    netplan apply
-    log_success "WAN interface configured"
-}
-
-# Setup network routing
-setup_network_routing() {
-    log_info "Setting up network routing..."
-
-    # Enable IP forwarding
-    echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
-    sysctl -p
-
-    # Configure NAT and forwarding rules (check if rules already exist)
-    if ! iptables -t nat -C POSTROUTING -o "${WAN_INTERFACE}" -j MASQUERADE 2>/dev/null; then
-        iptables -t nat -A POSTROUTING -o "${WAN_INTERFACE}" -j MASQUERADE
-        log_debug "Added NAT masquerade rule for ${WAN_INTERFACE}"
-    fi
-
-    if ! iptables -C FORWARD -i "${WAN_INTERFACE}" -o "${WIFI_INTERFACE}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
-        iptables -A FORWARD -i "${WAN_INTERFACE}" -o "${WIFI_INTERFACE}" -m state --state RELATED,ESTABLISHED -j ACCEPT
-        log_debug "Added forward rule: ${WAN_INTERFACE} -> ${WIFI_INTERFACE}"
-    fi
-
-    if ! iptables -C FORWARD -i "${WIFI_INTERFACE}" -o "${WAN_INTERFACE}" -j ACCEPT 2>/dev/null; then
-        iptables -A FORWARD -i "${WIFI_INTERFACE}" -o "${WAN_INTERFACE}" -j ACCEPT
-        log_debug "Added forward rule: ${WIFI_INTERFACE} -> ${WAN_INTERFACE}"
-    fi
-
-    # Save iptables rules
-    iptables-save > /etc/iptables/rules.v4
-
-    log_success "Network routing configured"
-}
-
-# Setup QoS traffic shaping
-setup_qos_traffic_shaping() {
-    log_info "Setting up QoS traffic shaping..."
-
-    # Load network performance optimizations
-    load_network_performance_config
-    sysctl -p
-
-    # Apply basic QoS via just
-    cd "$PROJECT_ROOT" && just qos-setup
-
-    log_success "QoS traffic shaping configured"
-}
+# Note: WAN interface configuration, network routing, and QoS are handled by RaspAP
+# These functions have been removed to avoid conflicts with RaspAP's networking management
 
 
 # Setup RaspAP for WiFi management and networking
@@ -2934,23 +2883,8 @@ setup_raspap() {
     log_success "RaspAP configured for WiFi management"
 }
 
-# Configure WiFi routing
-configure_wifi_routing() {
-    log_info "Configuring WiFi client routing..."
-
-    # Allow WiFi clients to access services
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 80 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 443 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p tcp --dport 53 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p udp --dport 53 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p udp --dport 67 -j ACCEPT
-    iptables -A INPUT -i "$WIFI_INTERFACE" -p icmp --icmp-type echo-request -j ACCEPT
-
-    # Save rules
-    iptables-save > /etc/iptables/rules.v4
-
-    log_success "WiFi client routing configured"
-}
+# Note: WiFi routing and firewall rules are handled by RaspAP
+# This function has been removed to avoid conflicts with RaspAP's networking management
 
 # Generate sync service configurations
 generate_sync_configs() {
@@ -2980,12 +2914,11 @@ setup_tailscale() {
     systemctl enable tailscaled
     systemctl start tailscaled
 
-    # Configure firewall for Tailscale
-    iptables -A INPUT -p udp --dport 41641 -j ACCEPT
-    iptables -A INPUT -i tailscale0 -j ACCEPT
-    iptables -A FORWARD -i tailscale0 -j ACCEPT
-    iptables -A FORWARD -o tailscale0 -j ACCEPT
-    iptables-save > /etc/iptables/rules.v4
+    # Note: Tailscale firewall rules should be configured in RaspAP
+    # RaspAP manages iptables, so Tailscale rules need to be added through RaspAP interface
+    log_info "Configure Tailscale firewall rules in RaspAP:"
+    log_info "  - Allow UDP port 41641 (Tailscale)"
+    log_info "  - Allow traffic on tailscale0 interface"
 
     log_success "Tailscale installed and configured"
     log_info "Run 'tailscale up --advertise-routes=$LAN_NETWORK --advertise-exit-node' to connect"
@@ -3307,11 +3240,7 @@ main() {
         "setup_docker_services:Setting up Docker services"
         "setup_container_health_monitoring:Setting up container health monitoring"
         "detect_network_interfaces:Detecting network interfaces"
-        "configure_wan_interface:Configuring WAN interface"
-        "setup_network_routing:Setting up network routing"
-        "setup_qos_traffic_shaping:Setting up QoS traffic shaping"
         "setup_raspap:Setting up RaspAP"
-        "configure_wifi_routing:Configuring WiFi routing"
         "configure_rk3588_performance:Applying hardware optimizations"
         "generate_sync_configs:Generating sync configurations"
         "setup_tailscale:Setting up Tailscale"
@@ -3420,16 +3349,13 @@ cleanup_on_error() {
             log_warn "Cleanup script failed, attempting manual cleanup..."
 
             # Fallback to basic cleanup if cleanup script fails
-            systemctl stop hostapd 2>/dev/null || true
-            systemctl stop dnsmasq 2>/dev/null || true
             systemctl stop docker 2>/dev/null || true
 
             # Restore original configurations if they exist
             if [[ -d "$BACKUP_DIR" ]]; then
                 [[ -f "$BACKUP_DIR/sshd_config" ]] && cp "$BACKUP_DIR/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
                 [[ -f "$BACKUP_DIR/sysctl.conf" ]] && cp "$BACKUP_DIR/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
-                [[ -f "$BACKUP_DIR/dnsmasq.conf" ]] && cp "$BACKUP_DIR/dnsmasq.conf" /etc/dnsmasq.conf 2>/dev/null || true
-                [[ -f "$BACKUP_DIR/iptables.rules" ]] && iptables-restore < "$BACKUP_DIR/iptables.rules" 2>/dev/null || true
+                # Note: hostapd and dnsmasq configs are managed by RaspAP
             fi
         }
 
@@ -3439,16 +3365,13 @@ cleanup_on_error() {
         log_warn "Performing basic cleanup only..."
 
         # Basic cleanup if cleanup script is not available
-        systemctl stop hostapd 2>/dev/null || true
-        systemctl stop dnsmasq 2>/dev/null || true
         systemctl stop docker 2>/dev/null || true
 
         # Restore original configurations if they exist
         if [[ -d "$BACKUP_DIR" ]]; then
             [[ -f "$BACKUP_DIR/sshd_config" ]] && cp "$BACKUP_DIR/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
             [[ -f "$BACKUP_DIR/sysctl.conf" ]] && cp "$BACKUP_DIR/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
-            [[ -f "$BACKUP_DIR/dnsmasq.conf" ]] && cp "$BACKUP_DIR/dnsmasq.conf" /etc/dnsmasq.conf 2>/dev/null || true
-            [[ -f "$BACKUP_DIR/iptables.rules" ]] && iptables-restore < "$BACKUP_DIR/iptables.rules" 2>/dev/null || true
+            # Note: hostapd and dnsmasq configs are managed by RaspAP
         fi
     fi
 
