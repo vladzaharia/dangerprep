@@ -70,6 +70,20 @@ enhanced_input() {
     fi
 }
 
+# Enhanced password input function with gum integration
+# Usage: enhanced_password "prompt" ["placeholder"]
+enhanced_password() {
+    local prompt="$1"
+    local placeholder="${2:-}"
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+    local gum_args=(--password)
+
+    [[ -n "${placeholder}" ]] && gum_args+=(--placeholder "${placeholder}")
+
+    "${gum_cmd}" input --prompt "${prompt} " "${gum_args[@]}"
+}
+
 # Enhanced confirmation function with gum integration
 # Usage: enhanced_confirm "question" [default_yes]
 enhanced_confirm() {
@@ -527,6 +541,12 @@ test_gum_utils() {
     local test_input
     test_input=$(enhanced_input "Enter test value" "default")
     echo "Result: ${test_input}"
+    echo
+
+    echo "Testing enhanced_password:"
+    local test_password
+    test_password=$(enhanced_password "Enter test password")
+    echo "Result: [password hidden]"
     echo
 
     echo "Testing enhanced_confirm:"
