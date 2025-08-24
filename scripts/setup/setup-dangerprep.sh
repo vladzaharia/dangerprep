@@ -362,7 +362,7 @@ show_progress() {
     local bar_length=50
     local filled_length=$((percentage * bar_length / 100))
 
-    printf "\r${BLUE}[%3d%%]${NC} " "$percentage"
+    printf "\r[%3d%%] " "$percentage"
     printf "["
     printf "%*s" "$filled_length" "" | tr ' ' '='
     printf "%*s" $((bar_length - filled_length)) "" | tr ' ' '-'
@@ -3119,7 +3119,6 @@ verify_setup() {
 
 # Show final information
 show_final_info() {
-    echo -e "${GREEN}"
     cat << EOF
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                        DangerPrep Setup Complete!                            ║
@@ -3140,7 +3139,6 @@ show_final_info() {
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 EOF
-    echo -e "${NC}"
 
     log_info "Logs: ${LOG_FILE}"
     log_info "Backups: ${BACKUP_DIR}"
@@ -3277,6 +3275,15 @@ main() {
                 continue
             fi
 
+            # Debug: Check if function exists before calling it
+            if ! declare -f "$phase_function" >/dev/null 2>&1; then
+                log_error "Function '$phase_function' is not defined"
+                log_error "Phase failed: $phase_description"
+                log_error "Installation cannot continue"
+                exit 1
+            fi
+
+            log_debug "Executing phase function: $phase_function"
             if ! "$phase_function"; then
                 log_error "Phase failed: $phase_description"
                 log_error "Installation cannot continue"
