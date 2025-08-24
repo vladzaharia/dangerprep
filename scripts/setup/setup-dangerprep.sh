@@ -3309,16 +3309,15 @@ main() {
     )
 
     local phase_count=${#installation_phases[@]}
-    local current_phase=0
 
     log_info "Starting installation with ${phase_count} phases"
     log_debug "Installation phases array has ${#installation_phases[@]} elements"
 
     # Execute each installation phase
-    local phase_index=0
+    local current_phase=0
     for phase_info in "${installation_phases[@]}"; do
-        ((phase_index++))
-        log_debug "Processing phase ${phase_index}: ${phase_info}"
+        ((current_phase++))
+        log_debug "Processing phase ${current_phase}: ${phase_info}"
 
         # Parse phase info with error checking
         if [[ ! "$phase_info" =~ ^[^:]+:.+ ]]; then
@@ -3327,7 +3326,6 @@ main() {
         fi
 
         IFS=':' read -r phase_function phase_description <<< "$phase_info"
-        ((current_phase++))
 
         log_debug "Parsed phase function: '$phase_function', description: '$phase_description'"
 
