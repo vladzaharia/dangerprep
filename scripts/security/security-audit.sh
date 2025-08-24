@@ -49,19 +49,19 @@ check_sensitive_data() {
         # Check for default/example passwords
         if grep -q "password\|admin\|secret.*=.*admin\|secret.*=.*password\|secret.*=.*123" "$env_file" 2>/dev/null; then
             warning "    Contains default/weak passwords"
-            ((issues++))
+            ((++issues))
         fi
-        
+
         # Check for placeholder values that should be changed
         if grep -q "your-.*-here\|example\.com\|test@example\|change-this" "$env_file" 2>/dev/null; then
             warning "    Contains placeholder values that should be changed"
-            ((issues++))
+            ((++issues))
         fi
-        
+
         # Check for hardcoded API keys/tokens (but allow example ones)
         if grep -E "API_KEY=.{20,}|TOKEN=.{20,}" "$env_file" 2>/dev/null | grep -v "your-.*-here\|test-.*\|example" >/dev/null; then
             error "    May contain real API keys/tokens"
-            ((issues++))
+            ((++issues))
         fi
     done
     
@@ -88,13 +88,13 @@ check_file_permissions() {
         # Check if file is world-readable
         if [[ "$perms" =~ [0-9][0-9][4-7] ]]; then
             warning "  $relative_path is world-readable (permissions: $perms)"
-            ((issues++))
+            ((++issues))
         fi
-        
+
         # Check if file is group-writable
         if [[ "$perms" =~ [0-9][2367][0-9] ]]; then
             warning "  $relative_path is group-writable (permissions: $perms)"
-            ((issues++))
+            ((++issues))
         fi
     done
     
@@ -121,15 +121,15 @@ check_compose_secrets() {
         # Check for hardcoded passwords/secrets
         if grep -E "password:|secret:|token:" "$compose_file" 2>/dev/null | grep -v "\${" >/dev/null; then
             warning "  $relative_path may contain hardcoded secrets"
-            ((issues++))
+            ((++issues))
         fi
-        
+
         # Check for exposed ports that shouldn't be
         if grep -E "ports:.*[0-9]+:[0-9]+" "$compose_file" 2>/dev/null; then
             local service_name=$(basename "$(dirname "$compose_file")")
             if [[ "$service_name" != "traefik" && "$service_name" != "dns" ]]; then
                 warning "  $relative_path exposes ports directly (consider using Traefik instead)"
-                ((issues++))
+                ((++issues))
             fi
         fi
     done
@@ -154,16 +154,16 @@ check_secure_defaults() {
     if [[ -f "$traefik_config" ]]; then
         if ! grep -q "insecureSkipVerify.*false\|insecureSkipVerify.*true" "$traefik_config" 2>/dev/null; then
             warning "  Traefik SSL verification settings not explicitly configured"
-            ((issues++))
+            ((++issues))
         fi
     fi
-    
+
     # Check for debug mode in production
     local env_files=($(find "$PROJECT_ROOT/docker" -name "compose.env" -type f))
     for env_file in "${env_files[@]}"; do
         if grep -q "DEBUG=true\|LOG_LEVEL=debug" "$env_file" 2>/dev/null; then
             warning "  Debug mode enabled in $(basename "$(dirname "$env_file")")"
-            ((issues++))
+            ((++issues))
         fi
     done
     
@@ -186,20 +186,20 @@ check_version_control() {
     if [[ -f "$PROJECT_ROOT/.gitignore" ]]; then
         if ! grep -q "\.env\|compose\.env" "$PROJECT_ROOT/.gitignore" 2>/dev/null; then
             error "  Environment files not in .gitignore"
-            ((issues++))
+            ((++issues))
         fi
     else
         warning "  No .gitignore file found"
-        ((issues++))
+        ((++issues))
     fi
-    
+
     # Check if any .env files are tracked by git
     if [[ -d "$PROJECT_ROOT/.git" ]]; then
         local tracked_env_files=$(git -C "$PROJECT_ROOT" ls-files | grep "\.env$\|compose\.env$" || true)
         if [[ -n "$tracked_env_files" ]]; then
             error "  Environment files are tracked by git:"
             echo "$tracked_env_files" | sed 's/^/    /'
-            ((issues++))
+            ((++issues))
         fi
     fi
     
