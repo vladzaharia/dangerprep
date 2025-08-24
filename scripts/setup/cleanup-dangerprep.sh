@@ -18,12 +18,12 @@ if [[ "${DEBUG:-}" == "true" ]]; then
 fi
 
 # Global state variables
-declare -g CLEANUP_PERFORMED=false
-declare -g LOCK_ACQUIRED=false
-declare -g TEMP_DIR=""
-declare -g -a CLEANUP_TASKS=()
-declare -g -a REMOVED_ITEMS=()
-declare -g -a FAILED_REMOVALS=()
+CLEANUP_PERFORMED=false
+LOCK_ACQUIRED=false
+TEMP_DIR=""
+CLEANUP_TASKS=()
+REMOVED_ITEMS=()
+FAILED_REMOVALS=()
 
 # Color codes for output (using tput for better compatibility)
 if command -v tput >/dev/null 2>&1 && [[ -t 1 ]]; then
@@ -83,6 +83,57 @@ else
     log_warn "Banner utility not found, continuing without banner"
     show_cleanup_banner() { echo "DangerPrep Cleanup"; }
 fi
+
+# Source gum utilities for enhanced user interaction
+if [[ -f "$SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
+    # shellcheck source=../shared/gum-utils.sh
+    source "$SCRIPT_DIR/../shared/gum-utils.sh"
+else
+    log_warn "Gum utilities not found, using basic interaction"
+    # Provide fallback functions
+    enhanced_input() { local prompt="$1"; local default="${2:-}"; read -r -p "${prompt}: " result; echo "${result:-${default}}"; }
+    enhanced_confirm() { local question="$1"; read -r -p "${question} [y/N]: " reply; [[ "${reply}" =~ ^[Yy] ]]; }
+    enhanced_choose() { local prompt="$1"; shift; echo "${prompt}"; select opt in "$@"; do echo "${opt}"; break; done; }
+    enhanced_multi_choose() { enhanced_choose "$@"; }
+    enhanced_spin() { local message="$1"; shift; echo "${message}..."; "$@"; }
+    enhanced_log() { local level="$1"; local message="$2"; echo "${level}: ${message}"; }
+    enhanced_table() { local headers="$1"; shift; echo "${headers}"; printf '%s\n' "$@"; }
+    # Provide fallback directory functions
+    get_log_file_path() { echo "/tmp/dangerprep-cleanup-$$.log"; }
+    get_backup_dir_path() { local dir="/tmp/dangerprep-cleanup-$(date +%Y%m%d-%H%M%S)-$$"; mkdir -p "$dir"; echo "$dir"; }
+fi
+
+# Initialize dynamic paths with fallback support
+initialize_paths() {
+    if command -v get_log_file_path >/dev/null 2>&1; then
+        LOG_FILE="$(get_log_file_path "cleanup")"
+        BACKUP_DIR="$(get_backup_dir_path "cleanup")"
+    else
+        # Fallback if gum-utils functions aren't available
+        LOG_FILE="/var/log/dangerprep-cleanup.log"
+        BACKUP_DIR="/var/backups/dangerprep-cleanup-$(date +%Y%m%d-%H%M%S)"
+
+        # Try to create directories, fall back to temp if needed
+        if ! mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || ! touch "$LOG_FILE" 2>/dev/null; then
+            LOG_FILE="/tmp/dangerprep-cleanup-$$.log"
+        fi
+
+        if ! mkdir -p "$BACKUP_DIR" 2>/dev/null; then
+            BACKUP_DIR="/tmp/dangerprep-cleanup-$(date +%Y%m%d-%H%M%S)-$$"
+            mkdir -p "$BACKUP_DIR" 2>/dev/null || true
+        fi
+    fi
+
+    # Make paths readonly after initialization
+    readonly LOG_FILE
+    readonly BACKUP_DIR
+
+    # Try to create lock file with fallback
+    if ! touch "$LOCK_FILE" 2>/dev/null; then
+        LOCK_FILE="/tmp/dangerprep-cleanup-$$.lock"
+        readonly LOCK_FILE
+    fi
+}
 
 # Enhanced utility functions for 2025 best practices
 
@@ -242,10 +293,10 @@ safe_remove() {
     esac
 }
 
-# Configuration with enhanced validation
-readonly LOG_FILE="/var/log/dangerprep-cleanup.log"
-readonly BACKUP_DIR="/var/backups/dangerprep-cleanup-$(date +%Y%m%d-%H%M%S)"
-readonly LOCK_FILE="/var/run/dangerprep-cleanup.lock"
+# Configuration with enhanced validation (dynamic paths set after gum-utils is loaded)
+LOG_FILE=""
+BACKUP_DIR=""
+LOCK_FILE="/var/run/dangerprep-cleanup.lock"
 
 # Command-line options
 DRY_RUN=false
@@ -363,8 +414,8 @@ ${BOLD}SAFETY FEATURES:${NC}
     • Rollback capability for critical failures
 
 ${BOLD}FILES:${NC}
-    Log file: ${LOG_FILE}
-    Backup:   ${BACKUP_DIR}
+    Log file: /var/log/dangerprep-cleanup.log (or ~/.local/dangerprep/logs/ if no permissions)
+    Backup:   /var/backups/dangerprep-cleanup-* (or ~/.local/dangerprep/backups/ if no permissions)
 
 ${BOLD}WARNING:${NC}
     This operation cannot be easily undone. Make sure you have backups
@@ -502,20 +553,8 @@ trap handle_termination TERM
 
 # Enhanced logging setup with proper permissions and rotation
 setup_logging() {
-    local log_dir
-    log_dir="$(dirname "$LOG_FILE")"
-
-    # Create log directory with proper permissions
-    if ! mkdir -p "$log_dir"; then
-        echo "ERROR: Failed to create log directory: $log_dir" >&2
-        exit 1
-    fi
-
-    # Create backup directory
-    if ! mkdir -p "$BACKUP_DIR"; then
-        echo "ERROR: Failed to create backup directory: $BACKUP_DIR" >&2
-        exit 1
-    fi
+    # Paths are already initialized by initialize_paths function
+    # Just ensure the log file exists and set permissions
 
     # Initialize log file with proper permissions
     if ! touch "$LOG_FILE"; then
@@ -538,54 +577,136 @@ setup_logging() {
     log_info "System: $(uname -a)"
 }
 
-# Enhanced confirmation with detailed information
+# Enhanced confirmation with detailed information and gum integration
 confirm_cleanup() {
     if [[ "$FORCE_CLEANUP" == "true" ]]; then
         log_info "Force mode enabled, skipping confirmation"
         return 0
     fi
 
-    echo
-    echo -e "${BOLD}${YELLOW}⚠️  DangerPrep Cleanup Confirmation ⚠️${NC}"
-    echo
-    echo -e "${BOLD}This will remove all DangerPrep configurations and services:${NC}"
-    echo "  • Stop all DangerPrep services (Docker, RaspAP, networking)"
-    echo "  • Remove network configurations and restore originals"
-    echo "  • Remove configuration files and scripts"
-    echo "  • Clean up user configurations (rootless Docker, etc.)"
-    echo "  • Remove Docker containers, images, and networks"
-
-    if [[ "$PRESERVE_DATA" == "true" ]]; then
-        echo -e "  • ${GREEN}Data directories will be PRESERVED${NC}"
-    else
-        echo -e "  • ${RED}Data directories will be REMOVED${NC}"
-    fi
-
-    if [[ "$DRY_RUN" == "true" ]]; then
-        echo -e "  • ${BLUE}DRY RUN MODE - No actual changes will be made${NC}"
-    fi
-
-    echo
-    echo -e "${BOLD}Backup location:${NC} $BACKUP_DIR"
-    echo -e "${BOLD}Log file:${NC} $LOG_FILE"
-    echo
-
-    if [[ "$DRY_RUN" != "true" ]]; then
-        echo -e "${RED}${BOLD}WARNING: This operation cannot be easily undone!${NC}"
+    if gum_available; then
+        enhanced_log "info" "🧹 DangerPrep Cleanup Configuration"
         echo
-        read -p "Are you absolutely sure you want to continue? (type 'yes' to confirm): " -r
-        if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-            log_info "Cleanup cancelled by user"
-            echo "Cleanup cancelled."
-            exit 0
+
+        # Interactive cleanup options
+        local cleanup_scope
+        cleanup_scope=$(enhanced_choose "Select cleanup scope:" \
+            "Quick cleanup (services and configs only)" \
+            "Standard cleanup (includes packages)" \
+            "Complete cleanup (everything including data)" \
+            "Custom cleanup (select components)")
+
+        case "${cleanup_scope}" in
+            "Quick cleanup"*)
+                PRESERVE_DATA="true"
+                log_info "Quick cleanup selected - data will be preserved"
+                ;;
+            "Standard cleanup"*)
+                PRESERVE_DATA="true"
+                log_info "Standard cleanup selected - data will be preserved"
+                ;;
+            "Complete cleanup"*)
+                PRESERVE_DATA="false"
+                log_info "Complete cleanup selected - data will be removed"
+                ;;
+            "Custom cleanup"*)
+                # Custom cleanup options
+                if enhanced_confirm "Remove data directories?" "false"; then
+                    PRESERVE_DATA="false"
+                else
+                    PRESERVE_DATA="true"
+                fi
+                ;;
+        esac
+
+        # Show cleanup summary
+        enhanced_log "info" "📋 Cleanup Summary"
+
+        local cleanup_actions=(
+            "Services,Stop and disable DangerPrep services"
+            "Network,Restore original network configuration"
+            "Configs,Remove DangerPrep configuration files"
+            "Scripts,Remove DangerPrep scripts and cron jobs"
+            "Docker,Remove containers and networks"
+            "Packages,Remove installed packages (optional)"
+        )
+
+        if [[ "$PRESERVE_DATA" == "true" ]]; then
+            cleanup_actions+=("Data,PRESERVED - Data directories will be kept")
+        else
+            cleanup_actions+=("Data,REMOVED - Data directories will be deleted")
+        fi
+
+        enhanced_table "Component,Action" "${cleanup_actions[@]}"
+
+        echo
+        enhanced_log "info" "📁 Backup Information"
+        echo "  Backup location: ${BACKUP_DIR}"
+        echo "  Log file: ${LOG_FILE}"
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            enhanced_log "info" "🔍 DRY RUN MODE - No actual changes will be made"
+        else
+            enhanced_log "warn" "⚠️  This operation cannot be easily undone!"
         fi
 
         echo
-        read -p "Last chance - type 'CONFIRM' to proceed with cleanup: " -r
-        if [[ "$REPLY" != "CONFIRM" ]]; then
-            log_info "Cleanup cancelled by user at final confirmation"
-            echo "Cleanup cancelled."
+        if ! enhanced_confirm "Proceed with cleanup?" "false"; then
+            log_info "Cleanup cancelled by user"
             exit 0
+        fi
+
+        if [[ "$DRY_RUN" != "true" && "$PRESERVE_DATA" != "true" ]]; then
+            enhanced_log "warn" "🚨 Final confirmation required for data removal"
+            if ! enhanced_confirm "Are you absolutely sure you want to remove all data?" "false"; then
+                log_info "Cleanup cancelled - data removal declined"
+                exit 0
+            fi
+        fi
+    else
+        # Fallback to original confirmation dialog
+        echo
+        echo -e "${BOLD}${YELLOW}⚠️  DangerPrep Cleanup Confirmation ⚠️${NC}"
+        echo
+        echo -e "${BOLD}This will remove all DangerPrep configurations and services:${NC}"
+        echo "  • Stop all DangerPrep services (Docker, RaspAP, networking)"
+        echo "  • Remove network configurations and restore originals"
+        echo "  • Remove configuration files and scripts"
+        echo "  • Clean up user configurations (rootless Docker, etc.)"
+        echo "  • Remove Docker containers, images, and networks"
+
+        if [[ "$PRESERVE_DATA" == "true" ]]; then
+            echo -e "  • ${GREEN}Data directories will be PRESERVED${NC}"
+        else
+            echo -e "  • ${RED}Data directories will be REMOVED${NC}"
+        fi
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo -e "  • ${BLUE}DRY RUN MODE - No actual changes will be made${NC}"
+        fi
+
+        echo
+        echo -e "${BOLD}Backup location:${NC} $BACKUP_DIR"
+        echo -e "${BOLD}Log file:${NC} $LOG_FILE"
+        echo
+
+        if [[ "$DRY_RUN" != "true" ]]; then
+            echo -e "${RED}${BOLD}WARNING: This operation cannot be easily undone!${NC}"
+            echo
+            read -p "Are you absolutely sure you want to continue? (type 'yes' to confirm): " -r
+            if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+                log_info "Cleanup cancelled by user"
+                echo "Cleanup cancelled."
+                exit 0
+            fi
+
+            echo
+            read -p "Last chance - type 'CONFIRM' to proceed with cleanup: " -r
+            if [[ "$REPLY" != "CONFIRM" ]]; then
+                log_info "Cleanup cancelled by user at final confirmation"
+                echo "Cleanup cancelled."
+                exit 0
+            fi
         fi
     fi
 
@@ -593,7 +714,7 @@ confirm_cleanup() {
     echo
 }
 
-# Stop all services
+# Stop all services with enhanced progress indication
 stop_services() {
     log "Stopping DangerPrep services..."
 
@@ -603,16 +724,15 @@ stop_services() {
 
         # Stop and remove RaspAP container
         if docker ps -a --format "table {{.Names}}" | grep -q "^raspap$"; then
-            log "Stopping RaspAP container..."
-            docker stop raspap 2>/dev/null || true
-            docker rm raspap 2>/dev/null || true
+            enhanced_spin "Stopping RaspAP container" docker stop raspap
+            enhanced_spin "Removing RaspAP container" docker rm raspap
             success "RaspAP container removed"
         fi
 
         # Remove RaspAP Docker image if present
         if docker images --format "table {{.Repository}}:{{.Tag}}" | grep -q "ghcr.io/raspap/raspap-docker"; then
-            log "Removing RaspAP Docker image..."
-            docker rmi "$(docker images "ghcr.io/raspap/raspap-docker" -q)" 2>/dev/null || true
+            enhanced_spin "Removing RaspAP Docker image" \
+                docker rmi "$(docker images "ghcr.io/raspap/raspap-docker" -q)"
         fi
     fi
 
@@ -622,14 +742,20 @@ stop_services() {
 
         # Try rootless Docker first
         if [[ -S "/run/user/1000/docker.sock" ]]; then
-            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker stop "$(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -q)" 2>/dev/null || true
-            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker rm "$(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -aq)" 2>/dev/null || true
-            sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker network rm traefik 2>/dev/null || true
+            enhanced_spin "Stopping rootless Docker containers" \
+                sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker stop "$(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -q)" 2>/dev/null || true
+            enhanced_spin "Removing rootless Docker containers" \
+                sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker rm "$(sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker ps -aq)" 2>/dev/null || true
+            enhanced_spin "Removing rootless Docker networks" \
+                sudo -u ubuntu DOCKER_HOST="unix:///run/user/1000/docker.sock" docker network rm traefik 2>/dev/null || true
         else
             # Regular Docker
-            docker stop "$(docker ps -q)" 2>/dev/null || true
-            docker rm "$(docker ps -aq)" 2>/dev/null || true
-            docker network rm traefik 2>/dev/null || true
+            enhanced_spin "Stopping Docker containers" \
+                docker stop "$(docker ps -q)" 2>/dev/null || true
+            enhanced_spin "Removing Docker containers" \
+                docker rm "$(docker ps -aq)" 2>/dev/null || true
+            enhanced_spin "Removing Docker networks" \
+                docker network rm traefik 2>/dev/null || true
         fi
 
         success "Docker services stopped"
@@ -655,10 +781,10 @@ stop_services() {
         log "RaspAP detected, preserving networking services under RaspAP management"
     fi
 
+    enhanced_log "info" "🛑 Stopping system services"
     for service in "${services_to_stop[@]}"; do
         if systemctl is-active --quiet "$service" 2>/dev/null; then
-            log "Stopping $service..."
-            systemctl stop "$service" 2>/dev/null || true
+            enhanced_spin "Stopping ${service}" systemctl stop "${service}"
         fi
     done
 
@@ -677,10 +803,10 @@ stop_services() {
         services_to_disable+=("hostapd" "dnsmasq" "tailscaled")
     fi
 
+    enhanced_log "info" "🚫 Disabling system services"
     for service in "${services_to_disable[@]}"; do
         if systemctl is-enabled --quiet "$service" 2>/dev/null; then
-            log "Disabling $service..."
-            systemctl disable "$service" 2>/dev/null || true
+            enhanced_spin "Disabling ${service}" systemctl disable "${service}"
         fi
     done
 
@@ -988,108 +1114,199 @@ remove_configurations() {
     success "Configurations removed"
 }
 
-# Remove packages installed by setup script
+# Remove packages installed by setup script with interactive selection
 remove_packages() {
     log "Removing packages installed by DangerPrep setup..."
 
-    # Packages that were specifically installed by setup script
-    local packages_to_remove=(
-        # Security tools that may not have been on system before
-        "aide"
-        "rkhunter"
-        "chkrootkit"
-        "clamav"
-        "clamav-daemon"
-        "lynis"
-        "ossec-hids"
-        "acct"
-        "psacct"
-
-        # Network tools that may not have been installed
-        "hostapd"
-        "dnsmasq"
-        "iptables-persistent"
-        "bridge-utils"
-        "wireless-tools"
-        "wpasupplicant"
-        "iw"
-        "rfkill"
-        "netplan.io"
-        "iproute2"
-        "tc"
-        "wondershaper"
-        "iperf3"
-
-        # DNS tools
-        "unbound"
-        "unbound-anchor"
-
-        # Backup tools
-        "borgbackup"
-        "restic"
-
-        # Tailscale
-        "tailscale"
-
-        # Automatic updates
-        "unattended-upgrades"
-
-        # Security hardening
-        "apparmor"
-        "apparmor-utils"
-        "libpam-pwquality"
-        "libpam-tmpdir"
-
-        # Hardware monitoring (new)
-        "lm-sensors"
-        "hddtemp"
-        "fancontrol"
-        "sensors-applet"
-        "smartmontools"
-
-        # Certificate management (new)
-        "certbot"
-        "python3-certbot-nginx"
-
-        # Additional monitoring (new)
-        "collectd"
-        "collectd-utils"
-
-        # Log management (new)
-        "logwatch"
-        "rsyslog-gnutls"
-
-        # Advanced security (new)
-        "suricata"
-
-        # NFS client (installed by setup script)
-        "nfs-common"
+    # Define package categories
+    local security_packages=(
+        "aide" "rkhunter" "chkrootkit" "clamav" "clamav-daemon"
+        "lynis" "ossec-hids" "acct" "psacct" "suricata"
+        "apparmor" "apparmor-utils" "libpam-pwquality" "libpam-tmpdir"
     )
 
-    # Ask user which packages to remove
-    echo -e "${YELLOW}The following packages were installed by DangerPrep setup:${NC}"
-    printf '%s\n' "${packages_to_remove[@]}" | column -c 80
-    echo
-    read -p "Remove these packages? This may affect other applications! (yes/no): " -r
+    local network_packages=(
+        "hostapd" "dnsmasq" "iptables-persistent" "bridge-utils"
+        "wireless-tools" "wpasupplicant" "iw" "rfkill" "netplan.io"
+        "iproute2" "tc" "wondershaper" "iperf3" "unbound" "unbound-anchor"
+    )
 
-    if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-        log "Removing DangerPrep packages..."
+    local monitoring_packages=(
+        "lm-sensors" "hddtemp" "fancontrol" "sensors-applet"
+        "smartmontools" "collectd" "collectd-utils" "logwatch" "rsyslog-gnutls"
+    )
 
-        for package in "${packages_to_remove[@]}"; do
-            if dpkg -l 2>/dev/null | grep -q "^ii.*$package " 2>/dev/null; then
-                log "Removing $package..."
-                DEBIAN_FRONTEND=noninteractive apt remove -y "$package" 2>/dev/null || warning "Failed to remove $package"
+    local backup_packages=(
+        "borgbackup" "restic"
+    )
+
+    local other_packages=(
+        "tailscale" "unattended-upgrades" "certbot" "python3-certbot-nginx" "nfs-common"
+    )
+
+    # Interactive package removal if gum is available
+    local packages_to_remove=()
+
+    if gum_available; then
+        enhanced_log "info" "📦 Package Removal Selection"
+        echo
+
+        # Show installed packages by category
+        local installed_security=()
+        local installed_network=()
+        local installed_monitoring=()
+        local installed_backup=()
+        local installed_other=()
+
+        # Check which packages are actually installed
+        for package in "${security_packages[@]}"; do
+            if dpkg -l 2>/dev/null | grep -q "^ii.*${package} " 2>/dev/null; then
+                installed_security+=("${package}")
             fi
         done
 
-        # Clean up package dependencies (optimistic cleanup)
-        apt autoremove -y 2>/dev/null || true
-        apt autoclean 2>/dev/null || true
+        for package in "${network_packages[@]}"; do
+            if dpkg -l 2>/dev/null | grep -q "^ii.*${package} " 2>/dev/null; then
+                installed_network+=("${package}")
+            fi
+        done
 
-        success "Packages removed"
+        for package in "${monitoring_packages[@]}"; do
+            if dpkg -l 2>/dev/null | grep -q "^ii.*${package} " 2>/dev/null; then
+                installed_monitoring+=("${package}")
+            fi
+        done
+
+        for package in "${backup_packages[@]}"; do
+            if dpkg -l 2>/dev/null | grep -q "^ii.*${package} " 2>/dev/null; then
+                installed_backup+=("${package}")
+            fi
+        done
+
+        for package in "${other_packages[@]}"; do
+            if dpkg -l 2>/dev/null | grep -q "^ii.*${package} " 2>/dev/null; then
+                installed_other+=("${package}")
+            fi
+        done
+
+        # Show summary of installed packages
+        enhanced_table "Category,Installed,Packages" \
+            "Security,${#installed_security[@]},${installed_security[*]:0:3}..." \
+            "Network,${#installed_network[@]},${installed_network[*]:0:3}..." \
+            "Monitoring,${#installed_monitoring[@]},${installed_monitoring[*]:0:3}..." \
+            "Backup,${#installed_backup[@]},${installed_backup[*]}" \
+            "Other,${#installed_other[@]},${installed_other[*]:0:3}..."
+
+        echo
+        enhanced_log "warn" "⚠️  Package removal may affect other applications!"
+
+        # Category-based removal selection
+        if [[ ${#installed_security[@]} -gt 0 ]] && enhanced_confirm "Remove security packages? (${#installed_security[@]} packages)" "false"; then
+            packages_to_remove+=("${installed_security[@]}")
+        fi
+
+        if [[ ${#installed_network[@]} -gt 0 ]] && enhanced_confirm "Remove network packages? (${#installed_network[@]} packages)" "false"; then
+            packages_to_remove+=("${installed_network[@]}")
+        fi
+
+        if [[ ${#installed_monitoring[@]} -gt 0 ]] && enhanced_confirm "Remove monitoring packages? (${#installed_monitoring[@]} packages)" "false"; then
+            packages_to_remove+=("${installed_monitoring[@]}")
+        fi
+
+        if [[ ${#installed_backup[@]} -gt 0 ]] && enhanced_confirm "Remove backup packages? (${#installed_backup[@]} packages)" "false"; then
+            packages_to_remove+=("${installed_backup[@]}")
+        fi
+
+        if [[ ${#installed_other[@]} -gt 0 ]] && enhanced_confirm "Remove other packages? (${#installed_other[@]} packages)" "false"; then
+            packages_to_remove+=("${installed_other[@]}")
+        fi
+
+        if [[ ${#packages_to_remove[@]} -eq 0 ]]; then
+            log_info "No packages selected for removal"
+            return 0
+        fi
+
+        # Show final confirmation
+        enhanced_log "info" "📋 Packages Selected for Removal"
+        enhanced_table "Package,Category" $(
+            for pkg in "${packages_to_remove[@]}"; do
+                local category="Other"
+                [[ " ${installed_security[*]} " =~ " ${pkg} " ]] && category="Security"
+                [[ " ${installed_network[*]} " =~ " ${pkg} " ]] && category="Network"
+                [[ " ${installed_monitoring[*]} " =~ " ${pkg} " ]] && category="Monitoring"
+                [[ " ${installed_backup[*]} " =~ " ${pkg} " ]] && category="Backup"
+                echo "${pkg},${category}"
+            done
+        )
+
+        echo
+        if ! enhanced_confirm "Proceed with package removal?" "false"; then
+            log_info "Package removal cancelled"
+            return 0
+        fi
     else
-        info "Packages preserved"
+        # Fallback to original behavior
+        local all_packages=(
+            "${security_packages[@]}"
+            "${network_packages[@]}"
+            "${monitoring_packages[@]}"
+            "${backup_packages[@]}"
+            "${other_packages[@]}"
+        )
+
+        # Filter to only installed packages
+        for package in "${all_packages[@]}"; do
+            if dpkg -l 2>/dev/null | grep -q "^ii.*${package} " 2>/dev/null; then
+                packages_to_remove+=("${package}")
+            fi
+        done
+
+        if [[ ${#packages_to_remove[@]} -eq 0 ]]; then
+            log_info "No DangerPrep packages found to remove"
+            return 0
+        fi
+
+        echo -e "${YELLOW}The following packages were installed by DangerPrep setup:${NC}"
+        printf '%s\n' "${packages_to_remove[@]}" | column -c 80
+        echo
+        read -p "Remove these packages? This may affect other applications! (yes/no): " -r
+
+        if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+            info "Packages preserved"
+            return 0
+        fi
     fi
+
+    # Remove selected packages with progress indication
+    log "Removing ${#packages_to_remove[@]} packages..."
+    local removed_count=0
+    local failed_count=0
+
+    for package in "${packages_to_remove[@]}"; do
+        if gum_available; then
+            enhanced_spin "Removing ${package}" \
+                apt remove -y "${package}" DEBIAN_FRONTEND=noninteractive
+            local remove_result=$?
+        else
+            log "Removing ${package}..."
+            DEBIAN_FRONTEND=noninteractive apt remove -y "${package}" 2>/dev/null
+            local remove_result=$?
+        fi
+
+        if [[ ${remove_result} -eq 0 ]]; then
+            ((removed_count++))
+            log_debug "✓ Removed ${package}"
+        else
+            ((failed_count++))
+            warning "✗ Failed to remove ${package}"
+        fi
+    done
+
+    # Clean up package dependencies
+    enhanced_spin "Cleaning up dependencies" apt autoremove -y
+    enhanced_spin "Cleaning package cache" apt autoclean
+
+    log_success "Package removal completed: ${removed_count} removed, ${failed_count} failed"
 }
 
 # Remove data directories
@@ -1334,6 +1551,9 @@ main() {
 
     # Parse command line arguments first
     parse_arguments "$@"
+
+    # Initialize paths with fallback support
+    initialize_paths
 
     # Initialize logging before any other operations
     setup_logging

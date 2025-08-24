@@ -18,10 +18,10 @@ if [[ "${DEBUG:-}" == "true" ]]; then
 fi
 
 # Global state variables
-declare -g CLEANUP_PERFORMED=false
-declare -g LOCK_ACQUIRED=false
-declare -g TEMP_DIR=""
-declare -g -a CLEANUP_TASKS=()
+CLEANUP_PERFORMED=false
+LOCK_ACQUIRED=false
+TEMP_DIR=""
+CLEANUP_TASKS=()
 
 # Color codes for output (using tput for better compatibility)
 if command -v tput >/dev/null 2>&1 && [[ -t 1 ]]; then
@@ -173,10 +173,12 @@ validate_port_number() {
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 readonly INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-/opt/dangerprep}"
-readonly LOG_FILE="/var/log/dangerprep-setup.log"
-readonly BACKUP_DIR="/var/backups/dangerprep-$(date +%Y%m%d-%H%M%S)"
 readonly CONFIG_DIR="$SCRIPT_DIR/configs"
-readonly LOCK_FILE="/var/run/dangerprep-setup.lock"
+
+# Dynamic paths with fallback support (set after gum-utils is loaded)
+LOG_FILE=""
+BACKUP_DIR=""
+LOCK_FILE="/var/run/dangerprep-setup.lock"
 
 # Source shared banner utility with error handling
 if [[ -f "$SCRIPT_DIR/../shared/banner.sh" ]]; then
@@ -187,6 +189,56 @@ else
     show_setup_banner() { echo "DangerPrep Setup"; }
     show_cleanup_banner() { echo "DangerPrep Cleanup"; }
 fi
+
+# Source gum utilities for enhanced user interaction
+if [[ -f "$SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
+    # shellcheck source=../shared/gum-utils.sh
+    source "$SCRIPT_DIR/../shared/gum-utils.sh"
+else
+    log_warn "Gum utilities not found, using basic interaction"
+    # Provide fallback functions
+    enhanced_input() { local prompt="$1"; local default="${2:-}"; read -r -p "${prompt}: " result; echo "${result:-${default}}"; }
+    enhanced_confirm() { local question="$1"; read -r -p "${question} [y/N]: " reply; [[ "${reply}" =~ ^[Yy] ]]; }
+    enhanced_choose() { local prompt="$1"; shift; echo "${prompt}"; select opt in "$@"; do echo "${opt}"; break; done; }
+    enhanced_multi_choose() { enhanced_choose "$@"; }
+    enhanced_spin() { local message="$1"; shift; echo "${message}..."; "$@"; }
+    enhanced_log() { local level="$1"; local message="$2"; echo "${level}: ${message}"; }
+    # Provide fallback directory functions
+    get_log_file_path() { echo "/tmp/dangerprep-setup-$$.log"; }
+    get_backup_dir_path() { local dir="/tmp/dangerprep-setup-$(date +%Y%m%d-%H%M%S)-$$"; mkdir -p "$dir"; echo "$dir"; }
+fi
+
+# Initialize dynamic paths with fallback support
+initialize_paths() {
+    if command -v get_log_file_path >/dev/null 2>&1; then
+        LOG_FILE="$(get_log_file_path "setup")"
+        BACKUP_DIR="$(get_backup_dir_path "setup")"
+    else
+        # Fallback if gum-utils functions aren't available
+        LOG_FILE="/var/log/dangerprep-setup.log"
+        BACKUP_DIR="/var/backups/dangerprep-setup-$(date +%Y%m%d-%H%M%S)"
+
+        # Try to create directories, fall back to temp if needed
+        if ! mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || ! touch "$LOG_FILE" 2>/dev/null; then
+            LOG_FILE="/tmp/dangerprep-setup-$$.log"
+        fi
+
+        if ! mkdir -p "$BACKUP_DIR" 2>/dev/null; then
+            BACKUP_DIR="/tmp/dangerprep-setup-$(date +%Y%m%d-%H%M%S)-$$"
+            mkdir -p "$BACKUP_DIR" 2>/dev/null || true
+        fi
+    fi
+
+    # Make paths readonly after initialization
+    readonly LOG_FILE
+    readonly BACKUP_DIR
+
+    # Try to create lock file with fallback
+    if ! touch "$LOCK_FILE" 2>/dev/null; then
+        LOCK_FILE="/tmp/dangerprep-setup-$$.lock"
+        readonly LOCK_FILE
+    fi
+}
 
 # Enhanced temporary directory management
 create_secure_temp_dir() {
@@ -464,8 +516,8 @@ ${BOLD}REQUIREMENTS:${NC}
     - Minimum 2GB RAM
 
 ${BOLD}FILES:${NC}
-    Log file: ${LOG_FILE}
-    Backup:   ${BACKUP_DIR}
+    Log file: /var/log/dangerprep-setup.log (or ~/.local/dangerprep/logs/ if no permissions)
+    Backup:   /var/backups/dangerprep-setup-* (or ~/.local/dangerprep/backups/ if no permissions)
     Install:  ${INSTALL_ROOT}
 
 For more information, visit: https://github.com/vladzaharia/dangerprep
@@ -548,7 +600,7 @@ load_configuration() {
     fi
 }
 
-# Network configuration
+# Default network configuration (can be overridden by interactive setup)
 WIFI_SSID="DangerPrep"
 WIFI_PASSWORD="Buff00n!"
 LAN_NETWORK="192.168.120.0/22"
@@ -556,11 +608,147 @@ LAN_IP="192.168.120.1"
 DHCP_START="192.168.120.100"
 DHCP_END="192.168.120.200"
 
-# System configuration
+# Default system configuration (can be overridden by interactive setup)
 SSH_PORT="2222"
 FAIL2BAN_BANTIME="3600"
 FAIL2BAN_MAXRETRY="3"
 NAS_HOST="100.65.182.27"  # Tailscale NAS IP
+
+# Interactive configuration collection
+collect_configuration() {
+    log_info "Collecting configuration preferences..."
+
+    if gum_available; then
+        enhanced_log "info" "🎛️  Interactive configuration mode enabled"
+        echo
+    else
+        log_info "Using default configuration values"
+        return 0
+    fi
+
+    # Network configuration
+    enhanced_log "info" "📡 Network Configuration"
+    echo
+
+    local new_wifi_ssid
+    new_wifi_ssid=$(enhanced_input "WiFi Hotspot Name (SSID)" "${WIFI_SSID}" "Enter WiFi network name")
+    if [[ -n "${new_wifi_ssid}" ]]; then
+        WIFI_SSID="${new_wifi_ssid}"
+        log_debug "WiFi SSID set to: ${WIFI_SSID}"
+    fi
+
+    local new_wifi_password
+    new_wifi_password=$(enhanced_input "WiFi Password" "${WIFI_PASSWORD}" "Enter WiFi password (min 8 chars)")
+    if [[ -n "${new_wifi_password}" && ${#new_wifi_password} -ge 8 ]]; then
+        WIFI_PASSWORD="${new_wifi_password}"
+        log_debug "WiFi password updated"
+    elif [[ -n "${new_wifi_password}" ]]; then
+        log_warn "WiFi password too short (minimum 8 characters), using default"
+    fi
+
+    local new_lan_network
+    new_lan_network=$(enhanced_input "LAN Network CIDR" "${LAN_NETWORK}" "e.g., 192.168.120.0/22")
+    if [[ -n "${new_lan_network}" ]] && [[ "${new_lan_network}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
+        LAN_NETWORK="${new_lan_network}"
+        # Extract base IP for LAN_IP (replace last octet with 1)
+        LAN_IP="${new_lan_network%/*}"
+        LAN_IP="${LAN_IP%.*}.1"
+        log_debug "LAN network set to: ${LAN_NETWORK}, gateway: ${LAN_IP}"
+    elif [[ -n "${new_lan_network}" ]]; then
+        log_warn "Invalid network CIDR format, using default: ${LAN_NETWORK}"
+    fi
+
+    # DHCP range configuration
+    local new_dhcp_start
+    new_dhcp_start=$(enhanced_input "DHCP Range Start" "${DHCP_START}" "First IP in DHCP pool")
+    if [[ -n "${new_dhcp_start}" ]] && validate_ip_address "${new_dhcp_start}"; then
+        DHCP_START="${new_dhcp_start}"
+        log_debug "DHCP start set to: ${DHCP_START}"
+    elif [[ -n "${new_dhcp_start}" ]]; then
+        log_warn "Invalid IP address format, using default: ${DHCP_START}"
+    fi
+
+    local new_dhcp_end
+    new_dhcp_end=$(enhanced_input "DHCP Range End" "${DHCP_END}" "Last IP in DHCP pool")
+    if [[ -n "${new_dhcp_end}" ]] && validate_ip_address "${new_dhcp_end}"; then
+        DHCP_END="${new_dhcp_end}"
+        log_debug "DHCP end set to: ${DHCP_END}"
+    elif [[ -n "${new_dhcp_end}" ]]; then
+        log_warn "Invalid IP address format, using default: ${DHCP_END}"
+    fi
+
+    echo
+    enhanced_log "info" "🔒 Security Configuration"
+    echo
+
+    # SSH configuration
+    local new_ssh_port
+    new_ssh_port=$(enhanced_input "SSH Port" "${SSH_PORT}" "Port for SSH access")
+    if [[ -n "${new_ssh_port}" ]] && validate_port_number "${new_ssh_port}"; then
+        SSH_PORT="${new_ssh_port}"
+        log_debug "SSH port set to: ${SSH_PORT}"
+    elif [[ -n "${new_ssh_port}" ]]; then
+        log_warn "Invalid port number, using default: ${SSH_PORT}"
+    fi
+
+    # Fail2ban configuration
+    local new_ban_time
+    new_ban_time=$(enhanced_input "Fail2ban Ban Time (seconds)" "${FAIL2BAN_BANTIME}" "How long to ban IPs")
+    if [[ -n "${new_ban_time}" ]] && [[ "${new_ban_time}" =~ ^[0-9]+$ ]]; then
+        FAIL2BAN_BANTIME="${new_ban_time}"
+        log_debug "Fail2ban ban time set to: ${FAIL2BAN_BANTIME}"
+    elif [[ -n "${new_ban_time}" ]]; then
+        log_warn "Invalid ban time, using default: ${FAIL2BAN_BANTIME}"
+    fi
+
+    local new_max_retry
+    new_max_retry=$(enhanced_input "Fail2ban Max Retry" "${FAIL2BAN_MAXRETRY}" "Failed attempts before ban")
+    if [[ -n "${new_max_retry}" ]] && [[ "${new_max_retry}" =~ ^[0-9]+$ ]]; then
+        FAIL2BAN_MAXRETRY="${new_max_retry}"
+        log_debug "Fail2ban max retry set to: ${FAIL2BAN_MAXRETRY}"
+    elif [[ -n "${new_max_retry}" ]]; then
+        log_warn "Invalid max retry value, using default: ${FAIL2BAN_MAXRETRY}"
+    fi
+
+    echo
+    enhanced_log "info" "📋 Configuration Summary"
+
+    # Display configuration summary using enhanced table if available
+    if gum_available; then
+        enhanced_table "Setting,Value" \
+            "WiFi SSID,${WIFI_SSID}" \
+            "WiFi Password,${WIFI_PASSWORD:0:3}***" \
+            "LAN Network,${LAN_NETWORK}" \
+            "LAN Gateway,${LAN_IP}" \
+            "DHCP Start,${DHCP_START}" \
+            "DHCP End,${DHCP_END}" \
+            "SSH Port,${SSH_PORT}" \
+            "Fail2ban Ban Time,${FAIL2BAN_BANTIME}s" \
+            "Fail2ban Max Retry,${FAIL2BAN_MAXRETRY}"
+    else
+        log_info "Configuration Summary:"
+        log_info "  WiFi SSID: ${WIFI_SSID}"
+        log_info "  WiFi Password: ${WIFI_PASSWORD:0:3}***"
+        log_info "  LAN Network: ${LAN_NETWORK}"
+        log_info "  LAN Gateway: ${LAN_IP}"
+        log_info "  DHCP Range: ${DHCP_START} - ${DHCP_END}"
+        log_info "  SSH Port: ${SSH_PORT}"
+        log_info "  Fail2ban Ban Time: ${FAIL2BAN_BANTIME}s"
+        log_info "  Fail2ban Max Retry: ${FAIL2BAN_MAXRETRY}"
+    fi
+
+    echo
+    if ! enhanced_confirm "Proceed with this configuration?" "true"; then
+        log_info "Configuration cancelled by user"
+        exit 0
+    fi
+
+    # Export variables for use in templates and other functions
+    export WIFI_SSID WIFI_PASSWORD LAN_NETWORK LAN_IP DHCP_START DHCP_END
+    export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
+
+    log_success "Configuration collection completed"
+}
 
 # Enhanced root privilege check with detailed error reporting
 check_root_privileges() {
@@ -584,20 +772,8 @@ check_root_privileges() {
 
 # Enhanced logging setup with proper permissions and rotation
 setup_logging() {
-    local log_dir
-    log_dir="$(dirname "$LOG_FILE")"
-
-    # Create log directory with proper permissions
-    if ! mkdir -p "$log_dir"; then
-        echo "ERROR: Failed to create log directory: $log_dir" >&2
-        exit 1
-    fi
-
-    # Create backup directory
-    if ! mkdir -p "$BACKUP_DIR"; then
-        echo "ERROR: Failed to create backup directory: $BACKUP_DIR" >&2
-        exit 1
-    fi
+    # Paths are already initialized by initialize_paths function
+    # Just ensure the log file exists and set permissions
 
     # Initialize log file with proper permissions
     if ! touch "$LOG_FILE"; then
@@ -709,17 +885,10 @@ check_system_requirements() {
     return 0
 }
 
-# Display banner
-show_banner() {
+# Display banner and setup information
+show_setup_info() {
+    # Use the shared banner utility
     show_setup_banner
-    echo
-    info "Emergency Router & Content Hub Setup"
-    info "• WiFi Hotspot: DangerPrep (WPA3/WPA2)"
-    info "• Network: 192.168.120.0/22"
-    info "• Security: 2025 Hardening Standards"
-    info "• Services: Docker + Traefik + Sync"
-    echo
-    info "All changes are logged and backed up."
     echo
     info "Logs: $LOG_FILE"
     info "Backups: $BACKUP_DIR"
@@ -902,79 +1071,153 @@ update_system_packages() {
     success "System packages updated"
 }
 
-# Install essential packages
+# Install essential packages with interactive selection
 install_essential_packages() {
     log "Installing essential packages..."
-    
+
     # Define package categories (removing certbot and cloudflared)
     local core_packages=(
         "curl" "wget" "git" "vim" "nano" "htop" "tree" "unzip" "zip"
         "software-properties-common" "apt-transport-https" "ca-certificates"
         "gnupg" "lsb-release" "jq" "bc" "rsync" "screen" "tmux"
     )
-    
+
     local network_packages=(
         "hostapd" "iptables-persistent" "bridge-utils"
         "wireless-tools" "wpasupplicant" "iw" "rfkill" "netplan.io"
         "iproute2" "tc" "wondershaper" "iperf3"
     )
-    
+
     local security_packages=(
         "fail2ban" "aide" "rkhunter" "chkrootkit" "clamav" "clamav-daemon"
         "lynis" "suricata" "apparmor" "apparmor-utils" "libpam-pwquality"
         "libpam-tmpdir" "acct" "psacct"
     )
-    
+
     local monitoring_packages=(
         "lm-sensors" "hddtemp" "fancontrol" "sensors-applet"
         "collectd" "collectd-utils" "logwatch" "rsyslog-gnutls"
         "smartmontools"
     )
-    
+
     local backup_packages=(
         "borgbackup" "restic"
     )
-    
+
     local update_packages=(
         "unattended-upgrades"
     )
-    
-    # Combine all packages
-    local all_packages=(
-        "${core_packages[@]}"
-        "${network_packages[@]}"
-        "${security_packages[@]}"
-        "${monitoring_packages[@]}"
-        "${backup_packages[@]}"
-        "${update_packages[@]}"
-    )
-    
-    # Install packages with error handling
+
+    # Interactive package selection if gum is available
+    local selected_packages=()
+
+    if gum_available; then
+        enhanced_log "info" "📦 Package Selection"
+        echo
+
+        # Always include core packages (non-optional)
+        selected_packages+=("${core_packages[@]}")
+        log_info "Core packages (required): ${#core_packages[@]} packages"
+
+        # Optional package categories
+        if enhanced_confirm "Install network packages? (hostapd, iptables, etc.)" "true"; then
+            selected_packages+=("${network_packages[@]}")
+            log_debug "Added ${#network_packages[@]} network packages"
+        fi
+
+        if enhanced_confirm "Install security packages? (fail2ban, aide, clamav, etc.)" "true"; then
+            selected_packages+=("${security_packages[@]}")
+            log_debug "Added ${#security_packages[@]} security packages"
+        fi
+
+        if enhanced_confirm "Install monitoring packages? (sensors, collectd, etc.)" "true"; then
+            selected_packages+=("${monitoring_packages[@]}")
+            log_debug "Added ${#monitoring_packages[@]} monitoring packages"
+        fi
+
+        if enhanced_confirm "Install backup packages? (borgbackup, restic)" "true"; then
+            selected_packages+=("${backup_packages[@]}")
+            log_debug "Added ${#backup_packages[@]} backup packages"
+        fi
+
+        if enhanced_confirm "Install automatic update packages?" "true"; then
+            selected_packages+=("${update_packages[@]}")
+            log_debug "Added ${#update_packages[@]} update packages"
+        fi
+
+        # Show package summary
+        enhanced_log "info" "📋 Package Installation Summary"
+        enhanced_table "Category,Count,Packages" \
+            "Core,${#core_packages[@]},Always installed" \
+            "Network,${#network_packages[@]},$(if [[ " ${selected_packages[*]} " =~ " ${network_packages[0]} " ]]; then echo "Selected"; else echo "Skipped"; fi)" \
+            "Security,${#security_packages[@]},$(if [[ " ${selected_packages[*]} " =~ " ${security_packages[0]} " ]]; then echo "Selected"; else echo "Skipped"; fi)" \
+            "Monitoring,${#monitoring_packages[@]},$(if [[ " ${selected_packages[*]} " =~ " ${monitoring_packages[0]} " ]]; then echo "Selected"; else echo "Skipped"; fi)" \
+            "Backup,${#backup_packages[@]},$(if [[ " ${selected_packages[*]} " =~ " ${backup_packages[0]} " ]]; then echo "Selected"; else echo "Skipped"; fi)" \
+            "Updates,${#update_packages[@]},$(if [[ " ${selected_packages[*]} " =~ " ${update_packages[0]} " ]]; then echo "Selected"; else echo "Skipped"; fi)"
+
+        echo
+        if ! enhanced_confirm "Proceed with package installation?" "true"; then
+            log_info "Package installation cancelled by user"
+            return 1
+        fi
+    else
+        # Default: install all packages
+        selected_packages=(
+            "${core_packages[@]}"
+            "${network_packages[@]}"
+            "${security_packages[@]}"
+            "${monitoring_packages[@]}"
+            "${backup_packages[@]}"
+            "${update_packages[@]}"
+        )
+    fi
+
+    # Install selected packages with enhanced progress indication
     local failed_packages=()
-    for package in "${all_packages[@]}"; do
-        log "Installing $package..."
-        if DEBIAN_FRONTEND=noninteractive apt install -y "$package" 2>/dev/null; then
-            success "Installed $package"
+    local installed_count=0
+    local total_packages=${#selected_packages[@]}
+
+    enhanced_log "info" "Installing ${total_packages} packages..."
+
+    for package in "${selected_packages[@]}"; do
+        ((installed_count++))
+
+        if gum_available; then
+            enhanced_spin "Installing ${package} (${installed_count}/${total_packages})" \
+                apt install -y "$package" DEBIAN_FRONTEND=noninteractive
+            local install_result=$?
         else
-            warning "Failed to install $package"
+            log "Installing $package (${installed_count}/${total_packages})..."
+            DEBIAN_FRONTEND=noninteractive apt install -y "$package" 2>/dev/null
+            local install_result=$?
+        fi
+
+        if [[ ${install_result} -eq 0 ]]; then
+            log_debug "✓ Installed $package"
+        else
+            warning "✗ Failed to install $package"
             failed_packages+=("$package")
         fi
     done
-    
-    # Report failed packages
+
+    # Report installation results
     if [[ ${#failed_packages[@]} -gt 0 ]]; then
-        warning "Failed to install packages: ${failed_packages[*]}"
+        warning "Failed to install ${#failed_packages[@]} packages: ${failed_packages[*]}"
         log "These packages may not be available in the current repository"
     fi
-    
+
+    log_success "Successfully installed $((total_packages - ${#failed_packages[@]}))/${total_packages} packages"
+
     # Install FriendlyElec-specific packages
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
-        install_friendlyelec_packages
+        if ! gum_available || enhanced_confirm "Install FriendlyElec-specific packages?" "true"; then
+            install_friendlyelec_packages
+        fi
     fi
 
     # Clean up package cache
-    apt autoremove -y
-    apt autoclean
+    enhanced_spin "Cleaning package cache" apt autoremove -y
+    enhanced_spin "Cleaning package cache" apt autoclean
 
     success "Essential packages installation completed"
 }
@@ -1071,6 +1314,11 @@ configure_friendlyelec_hardware() {
         configure_rk3588_gpu
     fi
 
+    # Configure NanoPi M6 specific settings
+    if [[ "$FRIENDLYELEC_MODEL" == "NanoPi-M6" ]]; then
+        configure_nanopi_m6_specific
+    fi
+
     # Configure RTC if HYM8563 is detected
     configure_friendlyelec_rtc
 
@@ -1084,6 +1332,215 @@ configure_friendlyelec_hardware() {
     configure_friendlyelec_gpio_pwm
 
     success "FriendlyElec hardware configuration completed"
+}
+
+# Configure NanoPi M6 specific settings based on FriendlyElec wiki
+configure_nanopi_m6_specific() {
+    log "Configuring NanoPi M6 specific settings..."
+
+    # Enable hardware acceleration and media codecs
+    configure_nanopi_m6_media_acceleration
+
+    # Configure M.2 interfaces
+    configure_nanopi_m6_m2_interfaces
+
+    # Configure USB and power management
+    configure_nanopi_m6_usb_power
+
+    # Configure thermal management
+    configure_nanopi_m6_thermal
+
+    # Configure network optimizations
+    configure_nanopi_m6_network
+
+    success "NanoPi M6 specific configuration completed"
+}
+
+# Configure NanoPi M6 media acceleration
+configure_nanopi_m6_media_acceleration() {
+    log "Configuring NanoPi M6 media acceleration..."
+
+    # Install RK3588S specific packages
+    local rk3588s_packages=(
+        "librockchip-mpp1"
+        "librockchip-mpp-dev"
+        "librockchip-vpu0"
+        "gstreamer1.0-rockchip1"
+        "ffmpeg"
+    )
+
+    for package in "${rk3588s_packages[@]}"; do
+        if apt install -y "$package" 2>/dev/null; then
+            log_debug "Installed $package"
+        else
+            log_debug "Package $package not available, skipping"
+        fi
+    done
+
+    # Configure GPU memory allocation
+    if [[ -f /boot/config.txt ]]; then
+        # Add GPU memory split for better performance
+        if ! grep -q "gpu_mem=" /boot/config.txt; then
+            echo "gpu_mem=128" >> /boot/config.txt
+            log "Set GPU memory allocation to 128MB"
+        fi
+    fi
+
+    # Configure hardware video decoding
+    cat > /etc/environment.d/50-rk3588-media.conf << 'EOF'
+# RK3588S Media Acceleration Environment
+LIBVA_DRIVER_NAME=rockchip
+VDPAU_DRIVER=rockchip
+GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0
+EOF
+
+    log "Media acceleration configured for RK3588S"
+}
+
+# Configure NanoPi M6 M.2 interfaces
+configure_nanopi_m6_m2_interfaces() {
+    log "Configuring NanoPi M6 M.2 interfaces..."
+
+    # The NanoPi M6 has:
+    # - M.2 M-Key for NVMe SSD (PCIe 3.0 x4)
+    # - M.2 E-Key for WiFi module (PCIe 2.1 x1 + USB 2.0)
+
+    # Configure NVMe optimizations
+    if [[ -d /sys/class/nvme ]]; then
+        log "Configuring NVMe optimizations for M.2 M-Key slot..."
+
+        # Set NVMe queue depth for better performance
+        echo 'ACTION=="add", SUBSYSTEM=="nvme", ATTR{queue/nr_requests}="256"' > /etc/udev/rules.d/60-nvme-optimization.rules
+
+        # Configure NVMe power management
+        for nvme_device in /sys/class/nvme/nvme*; do
+            if [[ -d "$nvme_device" ]]; then
+                echo auto > "${nvme_device}/power/control" 2>/dev/null || true
+            fi
+        done
+    fi
+
+    # Configure WiFi module detection for M.2 E-Key
+    if [[ -d /sys/class/ieee80211 ]]; then
+        log "WiFi module detected in M.2 E-Key slot"
+
+        # Common WiFi modules for NanoPi M6
+        local wifi_modules=("rtl8852be" "mt7921e" "iwlwifi")
+
+        for module in "${wifi_modules[@]}"; do
+            if lsmod | grep -q "$module"; then
+                log "WiFi module loaded: $module"
+                break
+            fi
+        done
+    fi
+
+    log "M.2 interface configuration completed"
+}
+
+# Configure NanoPi M6 USB and power management
+configure_nanopi_m6_usb_power() {
+    log "Configuring NanoPi M6 USB and power management..."
+
+    # The NanoPi M6 has multiple USB ports with different capabilities
+    # Configure USB power management for better efficiency
+
+    # Enable USB autosuspend for power saving
+    echo 'ACTION=="add", SUBSYSTEM=="usb", TEST=="power/control", ATTR{power/control}="auto"' > /etc/udev/rules.d/50-usb-power.rules
+
+    # Configure USB3 ports for optimal performance
+    if [[ -d /sys/bus/usb/devices ]]; then
+        for usb_device in /sys/bus/usb/devices/usb*; do
+            if [[ -f "${usb_device}/speed" ]]; then
+                local speed
+                speed=$(cat "${usb_device}/speed" 2>/dev/null || echo "unknown")
+                if [[ "$speed" == "5000" ]]; then
+                    log_debug "USB 3.0 port detected: $(basename "$usb_device")"
+                fi
+            fi
+        done
+    fi
+
+    # Configure power button behavior
+    if [[ -f /etc/systemd/logind.conf ]]; then
+        sed -i 's/#HandlePowerKey=poweroff/HandlePowerKey=poweroff/' /etc/systemd/logind.conf
+        log "Configured power button behavior"
+    fi
+
+    log "USB and power management configured"
+}
+
+# Configure NanoPi M6 thermal management
+configure_nanopi_m6_thermal() {
+    log "Configuring NanoPi M6 thermal management..."
+
+    # The NanoPi M6 uses RK3588S with integrated thermal management
+    # Configure thermal zones and cooling policies
+
+    if [[ -d /sys/class/thermal ]]; then
+        # Configure thermal governor
+        for thermal_zone in /sys/class/thermal/thermal_zone*; do
+            if [[ -f "${thermal_zone}/policy" ]]; then
+                echo "step_wise" > "${thermal_zone}/policy" 2>/dev/null || true
+            fi
+        done
+
+        # Set thermal trip points if available
+        for thermal_zone in /sys/class/thermal/thermal_zone*; do
+            if [[ -f "${thermal_zone}/trip_point_0_temp" ]]; then
+                local temp
+                temp=$(cat "${thermal_zone}/trip_point_0_temp" 2>/dev/null || echo "0")
+                if [[ "$temp" -gt 0 ]]; then
+                    log_debug "Thermal zone $(basename "$thermal_zone"): trip point at ${temp}°C"
+                fi
+            fi
+        done
+    fi
+
+    # Configure CPU frequency scaling for thermal management
+    if [[ -d /sys/devices/system/cpu/cpufreq ]]; then
+        # Set conservative governor for better thermal management
+        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+            if [[ -f "$cpu" ]]; then
+                echo "conservative" > "$cpu" 2>/dev/null || true
+            fi
+        done
+        log "Set CPU frequency scaling to conservative mode"
+    fi
+
+    log "Thermal management configured"
+}
+
+# Configure NanoPi M6 network optimizations
+configure_nanopi_m6_network() {
+    log "Configuring NanoPi M6 network optimizations..."
+
+    # The NanoPi M6 has Gigabit Ethernet with RTL8211F PHY
+    # Configure network interface optimizations
+
+    # Configure Ethernet interface optimizations
+    cat > /etc/udev/rules.d/70-nanopi-m6-network.rules << 'EOF'
+# NanoPi M6 Network Optimizations
+# Configure Ethernet interface settings
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="eth*", RUN+="/sbin/ethtool -K %k tso on gso on gro on"
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="eth*", RUN+="/sbin/ethtool -G %k rx 512 tx 512"
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="eth*", RUN+="/sbin/ethtool -C %k rx-usecs 50 tx-usecs 50"
+EOF
+
+    # Configure network buffer sizes for Gigabit performance
+    cat >> /etc/sysctl.d/99-nanopi-m6-network.conf << 'EOF'
+# NanoPi M6 Network Buffer Optimizations
+net.core.rmem_default = 262144
+net.core.rmem_max = 16777216
+net.core.wmem_default = 262144
+net.core.wmem_max = 16777216
+net.core.netdev_max_backlog = 5000
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+net.ipv4.tcp_congestion_control = bbr
+EOF
+
+    log "Network optimizations configured for Gigabit Ethernet"
 }
 
 # Configure RK3588/RK3588S GPU settings
@@ -1309,9 +1766,9 @@ setup_container_health_monitoring() {
     success "Container health monitoring configured"
 }
 
-# Enhanced network interface detection with FriendlyElec support
+# Enhanced network interface detection and enumeration (RaspAP handles management)
 detect_network_interfaces() {
-    log "Detecting network interfaces..."
+    log "Detecting and enumerating network interfaces..."
 
     # Initialize interface arrays
     local ethernet_interfaces=()
@@ -1331,11 +1788,20 @@ detect_network_interfaces() {
         fi
     done < <(iw dev 2>/dev/null | grep Interface | awk '{print $2}')
 
+    log_debug "Detected ethernet interfaces: ${ethernet_interfaces[*]:-none}"
+    log_debug "Detected WiFi interfaces: ${wifi_interfaces[*]:-none}"
+
+    # Automatic interface selection (RaspAP will handle the actual management)
     # FriendlyElec-specific interface selection
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
         select_friendlyelec_interfaces "${ethernet_interfaces[@]}" -- "${wifi_interfaces[@]}"
     else
         select_generic_interfaces "${ethernet_interfaces[@]}" -- "${wifi_interfaces[@]}"
+    fi
+
+    # Set WiFi interface if not already set
+    if [[ -z "${WIFI_INTERFACE:-}" ]]; then
+        WIFI_INTERFACE="${wifi_interfaces[0]:-wlan0}"
     fi
 
     # Validate and set fallbacks
@@ -1349,18 +1815,382 @@ detect_network_interfaces() {
         WIFI_INTERFACE="wlan0"  # fallback
     fi
 
-    log "WAN Interface: $WAN_INTERFACE"
-    log "WiFi Interface: $WIFI_INTERFACE"
+    log "Primary WAN Interface: $WAN_INTERFACE"
+    log "Primary WiFi Interface: $WIFI_INTERFACE"
+    log "Note: RaspAP will manage all network interface configuration"
 
     # Log additional interface information for FriendlyElec
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
         log_friendlyelec_interface_details
     fi
 
-    # Export for use in templates
-    export WAN_INTERFACE WIFI_INTERFACE
+    # Show comprehensive interface enumeration
+    if gum_available; then
+        enhanced_log "info" "� Network Interface Enumeration"
 
-    success "Network interfaces detected"
+        # Create table data for all interfaces
+        local interface_data=()
+        interface_data+=("Interface,Type,Status,Speed,Driver")
+
+        # Add ethernet interfaces
+        for iface in "${ethernet_interfaces[@]}"; do
+            local status speed driver
+            status=$(cat "/sys/class/net/${iface}/operstate" 2>/dev/null || echo "unknown")
+            speed=$(cat "/sys/class/net/${iface}/speed" 2>/dev/null || echo "unknown")
+            driver=$(readlink "/sys/class/net/${iface}/device/driver" 2>/dev/null | xargs basename || echo "unknown")
+            [[ "${speed}" != "unknown" ]] && speed="${speed}Mbps"
+            interface_data+=("${iface},Ethernet,${status},${speed},${driver}")
+        done
+
+        # Add WiFi interfaces
+        for iface in "${wifi_interfaces[@]}"; do
+            local status driver
+            status=$(cat "/sys/class/net/${iface}/operstate" 2>/dev/null || echo "unknown")
+            driver=$(readlink "/sys/class/net/${iface}/device/driver" 2>/dev/null | xargs basename || echo "unknown")
+            interface_data+=("${iface},WiFi,${status},N/A,${driver}")
+        done
+
+        enhanced_table "${interface_data[0]}" "${interface_data[@]:1}"
+
+        echo
+        enhanced_log "info" "🔧 RaspAP will configure and manage all network interfaces"
+        enhanced_log "info" "   Primary interfaces identified for RaspAP configuration:"
+        enhanced_log "info" "   • WAN: ${WAN_INTERFACE}"
+        enhanced_log "info" "   • WiFi Hotspot: ${WIFI_INTERFACE}"
+    else
+        log "Network Interface Summary:"
+        log "  Ethernet interfaces: ${ethernet_interfaces[*]:-none}"
+        log "  WiFi interfaces: ${wifi_interfaces[*]:-none}"
+        log "  Primary WAN: $WAN_INTERFACE"
+        log "  Primary WiFi: $WIFI_INTERFACE"
+    fi
+
+    # Export for use in templates and RaspAP configuration
+    export WAN_INTERFACE WIFI_INTERFACE
+    export ETHERNET_INTERFACES="${ethernet_interfaces[*]}"
+    export WIFI_INTERFACES="${wifi_interfaces[*]}"
+
+    success "Network interfaces enumerated (RaspAP will handle configuration)"
+}
+
+# Detect and configure NVMe storage
+detect_and_configure_nvme_storage() {
+    log "Detecting NVMe storage devices..."
+
+    # Find NVMe devices
+    local nvme_devices=()
+    while IFS= read -r device; do
+        if [[ -n "$device" ]]; then
+            nvme_devices+=("$device")
+        fi
+    done < <(lsblk -d -n -o NAME | grep '^nvme')
+
+    if [[ ${#nvme_devices[@]} -eq 0 ]]; then
+        log_info "No NVMe devices detected, skipping NVMe configuration"
+        return 0
+    fi
+
+    log "Found NVMe devices: ${nvme_devices[*]}"
+
+    # Use the first NVMe device (typically nvme0n1)
+    local nvme_device="/dev/${nvme_devices[0]}"
+    log "Using NVMe device: ${nvme_device}"
+
+    # Get device information
+    local device_size
+    device_size=$(lsblk -b -d -n -o SIZE "${nvme_device}" 2>/dev/null || echo "0")
+    local device_size_gb=$((device_size / 1024 / 1024 / 1024))
+
+    log "NVMe device size: ${device_size_gb}GB"
+
+    if [[ ${device_size_gb} -lt 100 ]]; then
+        log_warn "NVMe device is smaller than expected (${device_size_gb}GB), skipping partitioning"
+        return 0
+    fi
+
+    # Check for existing partitions
+    local existing_partitions
+    existing_partitions=$(lsblk -n -o NAME "${nvme_device}" | grep -v "^${nvme_devices[0]}$" | wc -l)
+
+    if [[ ${existing_partitions} -gt 0 ]]; then
+        log_warn "Existing partitions detected on ${nvme_device}"
+        lsblk "${nvme_device}"
+
+        if gum_available; then
+            enhanced_log "warn" "⚠️  Existing partitions found on NVMe device"
+            enhanced_log "info" "📋 Current partition layout:"
+
+            # Show current partitions in a table
+            local partition_data=()
+            partition_data+=("Partition,Size,Type,Mountpoint")
+
+            while IFS= read -r line; do
+                if [[ -n "$line" ]]; then
+                    local name size fstype mountpoint
+                    read -r name size fstype mountpoint <<< "$line"
+                    partition_data+=("${name},${size},${fstype:-N/A},${mountpoint:-N/A}")
+                fi
+            done < <(lsblk -n -o NAME,SIZE,FSTYPE,MOUNTPOINT "${nvme_device}" | tail -n +2)
+
+            enhanced_table "${partition_data[0]}" "${partition_data[@]:1}"
+
+            echo
+            enhanced_log "warn" "🚨 Repartitioning will DESTROY all existing data!"
+
+            if ! enhanced_confirm "Proceed with repartitioning? This will erase all data on ${nvme_device}" "false"; then
+                log_info "NVMe partitioning cancelled by user"
+                return 0
+            fi
+        else
+            echo "Current partition layout:"
+            lsblk "${nvme_device}"
+            echo
+            echo "WARNING: Repartitioning will DESTROY all existing data!"
+            read -p "Proceed with repartitioning ${nvme_device}? (type 'yes' to confirm): " -r
+            if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+                log_info "NVMe partitioning cancelled by user"
+                return 0
+            fi
+        fi
+
+        # Unmount any mounted partitions
+        log "Unmounting existing partitions..."
+        for partition in $(lsblk -n -o NAME "${nvme_device}" | grep -v "^${nvme_devices[0]}$"); do
+            local partition_path="/dev/${partition}"
+            if mountpoint -q "/dev/${partition}" 2>/dev/null; then
+                umount "${partition_path}" 2>/dev/null || true
+            fi
+        done
+    fi
+
+    # Create new partition layout
+    create_nvme_partitions "${nvme_device}"
+
+    success "NVMe storage configuration completed"
+}
+
+# Create NVMe partitions (256GB /data, rest /content)
+create_nvme_partitions() {
+    local nvme_device="$1"
+
+    log "Creating new partition layout on ${nvme_device}..."
+
+    # Wipe existing partition table
+    wipefs -a "${nvme_device}" 2>/dev/null || true
+
+    # Create GPT partition table and partitions using parted
+    log "Creating GPT partition table..."
+    parted -s "${nvme_device}" mklabel gpt
+
+    # Create 256GB partition for /data (starting at 1MB for alignment)
+    log "Creating 256GB /data partition..."
+    parted -s "${nvme_device}" mkpart primary ext4 1MiB 256GiB
+
+    # Create partition for /content using remaining space
+    log "Creating /content partition with remaining space..."
+    parted -s "${nvme_device}" mkpart primary ext4 256GiB 100%
+
+    # Wait for kernel to recognize new partitions
+    sleep 2
+    partprobe "${nvme_device}"
+    sleep 2
+
+    # Format partitions
+    local data_partition="${nvme_device}p1"
+    local content_partition="${nvme_device}p2"
+
+    log "Formatting /data partition (${data_partition})..."
+    mkfs.ext4 -F -L "dangerprep-data" "${data_partition}"
+
+    log "Formatting /content partition (${content_partition})..."
+    mkfs.ext4 -F -L "dangerprep-content" "${content_partition}"
+
+    # Create mount points
+    mkdir -p /data /content
+
+    # Mount partitions
+    log "Mounting partitions..."
+    mount "${data_partition}" /data
+    mount "${content_partition}" /content
+
+    # Add to fstab for persistent mounting
+    log "Adding partitions to /etc/fstab..."
+
+    # Remove any existing entries for these mount points
+    sed -i '\|/data|d' /etc/fstab
+    sed -i '\|/content|d' /etc/fstab
+
+    # Add new entries using LABEL for reliability
+    echo "LABEL=dangerprep-data /data ext4 defaults,noatime 0 2" >> /etc/fstab
+    echo "LABEL=dangerprep-content /content ext4 defaults,noatime 0 2" >> /etc/fstab
+
+    # Set appropriate permissions
+    chown root:root /data /content
+    chmod 755 /data /content
+
+    # Create subdirectories for organization
+    mkdir -p /data/{config,logs,backups,cache}
+    mkdir -p /content/{media,documents,downloads,sync}
+
+    # Set permissions for subdirectories
+    chmod 755 /data/{config,logs,backups,cache}
+    chmod 755 /content/{media,documents,downloads,sync}
+
+    log "NVMe partition layout:"
+    log "  ${data_partition} -> /data (256GB)"
+    log "  ${content_partition} -> /content (remaining space)"
+
+    # Show final layout
+    if gum_available; then
+        enhanced_log "info" "📋 Final NVMe Partition Layout"
+        enhanced_table "Partition,Mount,Size,Filesystem,Label" \
+            "${data_partition},/data,256GB,ext4,dangerprep-data" \
+            "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}"),ext4,dangerprep-content"
+    fi
+
+    success "NVMe partitions created and mounted successfully"
+}
+
+# Enumerate Docker services that will be installed
+enumerate_docker_services() {
+    log "Enumerating Docker services for installation..."
+
+    # Define Docker service categories
+    local infrastructure_services=(
+        "traefik:Reverse proxy and load balancer"
+        "watchtower:Automatic container updates"
+        "step-ca:Internal certificate authority"
+        "raspap:Network management interface"
+        "arcane:System monitoring dashboard"
+        "cdn:Local content delivery network"
+        "dns:DNS server (CoreDNS)"
+    )
+
+    local media_services=(
+        "jellyfin:Media server for videos and music"
+        "komga:Comic and ebook server"
+        "romm:ROM management for retro gaming"
+    )
+
+    local sync_services=(
+        "kiwix-sync:Offline Wikipedia and educational content sync"
+        "nfs-sync:Network file system synchronization"
+        "offline-sync:Offline content synchronization"
+    )
+
+    local application_services=(
+        "docmost:Documentation and knowledge base"
+        "onedev:Git server and CI/CD platform"
+    )
+
+    # Show service enumeration
+    if gum_available; then
+        enhanced_log "info" "🐳 Docker Services Installation Plan"
+        echo
+
+        # Infrastructure services
+        enhanced_log "info" "🏗️  Infrastructure Services"
+        local infra_table_data=()
+        infra_table_data+=("Service,Description")
+        for service in "${infrastructure_services[@]}"; do
+            local name="${service%%:*}"
+            local desc="${service#*:}"
+            infra_table_data+=("${name},${desc}")
+        done
+        enhanced_table "${infra_table_data[0]}" "${infra_table_data[@]:1}"
+        echo
+
+        # Media services
+        enhanced_log "info" "🎬 Media Services"
+        local media_table_data=()
+        media_table_data+=("Service,Description")
+        for service in "${media_services[@]}"; do
+            local name="${service%%:*}"
+            local desc="${service#*:}"
+            media_table_data+=("${name},${desc}")
+        done
+        enhanced_table "${media_table_data[0]}" "${media_table_data[@]:1}"
+        echo
+
+        # Sync services
+        enhanced_log "info" "🔄 Synchronization Services"
+        local sync_table_data=()
+        sync_table_data+=("Service,Description")
+        for service in "${sync_services[@]}"; do
+            local name="${service%%:*}"
+            local desc="${service#*:}"
+            sync_table_data+=("${name},${desc}")
+        done
+        enhanced_table "${sync_table_data[0]}" "${sync_table_data[@]:1}"
+        echo
+
+        # Application services
+        enhanced_log "info" "📱 Application Services"
+        local app_table_data=()
+        app_table_data+=("Service,Description")
+        for service in "${application_services[@]}"; do
+            local name="${service%%:*}"
+            local desc="${service#*:}"
+            app_table_data+=("${name},${desc}")
+        done
+        enhanced_table "${app_table_data[0]}" "${app_table_data[@]:1}"
+        echo
+
+        enhanced_log "info" "📊 Service Summary"
+        enhanced_table "Category,Count,Services" \
+            "Infrastructure,${#infrastructure_services[@]},Core system services" \
+            "Media,${#media_services[@]},Entertainment and content" \
+            "Sync,${#sync_services[@]},Data synchronization" \
+            "Applications,${#application_services[@]},Productivity tools"
+
+        echo
+        enhanced_log "info" "🔧 All services will be configured with:"
+        enhanced_log "info" "   • Traefik reverse proxy integration"
+        enhanced_log "info" "   • Automatic SSL certificates via step-ca"
+        enhanced_log "info" "   • Health monitoring and auto-restart"
+        enhanced_log "info" "   • Watchtower automatic updates"
+        enhanced_log "info" "   • Persistent data storage"
+
+    else
+        log "Docker Services Installation Plan:"
+        log ""
+        log "Infrastructure Services (${#infrastructure_services[@]}):"
+        for service in "${infrastructure_services[@]}"; do
+            local name="${service%%:*}"
+            local desc="${service#*:}"
+            log "  • ${name}: ${desc}"
+        done
+        log ""
+        log "Media Services (${#media_services[@]}):"
+        for service in "${media_services[@]}"; do
+            local name="${service%%:*}"
+            local desc="${service#*:}"
+            log "  • ${name}: ${desc}"
+        done
+        log ""
+        log "Sync Services (${#sync_services[@]}):"
+        for service in "${sync_services[@]}"; do
+            local name="${service%%:*}"
+            local desc="${service#*:}"
+            log "  • ${name}: ${desc}"
+        done
+        log ""
+        log "Application Services (${#application_services[@]}):"
+        for service in "${application_services[@]}"; do
+            local name="${service%%:*}"
+            local desc="${service#*:}"
+            log "  • ${name}: ${desc}"
+        done
+    fi
+
+    # Export service lists for use in other functions
+    export INFRASTRUCTURE_SERVICES="${infrastructure_services[*]}"
+    export MEDIA_SERVICES="${media_services[*]}"
+    export SYNC_SERVICES="${sync_services[*]}"
+    export APPLICATION_SERVICES="${application_services[*]}"
+
+    local total_services=$((${#infrastructure_services[@]} + ${#media_services[@]} + ${#sync_services[@]} + ${#application_services[@]}))
+    success "Enumerated ${total_services} Docker services for installation"
 }
 
 # Select interfaces for FriendlyElec hardware
@@ -2211,6 +3041,12 @@ main() {
     # Parse command line arguments first
     parse_arguments "$@"
 
+    # Initialize paths with fallback support
+    initialize_paths
+
+    # Show banner before logging starts
+    show_setup_banner
+
     # Initialize logging before any other operations
     setup_logging
 
@@ -2222,9 +3058,6 @@ main() {
 
     # Create secure temporary directory
     create_secure_temp_dir
-
-    # Show banner and initial information
-    show_banner
 
     # Comprehensive pre-flight checks
     log_info "Starting pre-flight checks..."
@@ -2259,6 +3092,9 @@ main() {
 
     log_success "All pre-flight checks passed"
 
+    # Collect interactive configuration if gum is available
+    collect_configuration
+
     # Show system information
     show_system_info
 
@@ -2268,6 +3104,7 @@ main() {
         "update_system_packages:Updating system packages"
         "install_essential_packages:Installing essential packages"
         "setup_automatic_updates:Setting up automatic updates"
+        "detect_and_configure_nvme_storage:Detecting and configuring NVMe storage"
         "configure_ssh_hardening:Configuring SSH hardening"
         "load_motd_config:Loading MOTD configuration"
         "setup_fail2ban:Setting up Fail2ban"
@@ -2276,6 +3113,7 @@ main() {
         "setup_hardware_monitoring:Setting up hardware monitoring"
         "setup_advanced_security_tools:Setting up advanced security tools"
         "configure_rootless_docker:Configuring rootless Docker"
+        "enumerate_docker_services:Enumerating Docker services"
         "setup_docker_services:Setting up Docker services"
         "setup_container_health_monitoring:Setting up container health monitoring"
         "detect_network_interfaces:Detecting network interfaces"
