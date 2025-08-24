@@ -3,7 +3,6 @@
 Port {{SSH_PORT}}
 
 # Protocol and encryption
-Protocol 2
 HostKey /etc/ssh/ssh_host_rsa_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
@@ -14,7 +13,6 @@ PubkeyAuthentication yes
 AuthorizedKeysFile .ssh/authorized_keys
 PasswordAuthentication no
 PermitEmptyPasswords no
-ChallengeResponseAuthentication no
 KbdInteractiveAuthentication no
 UsePAM yes
 
@@ -23,7 +21,6 @@ X11Forwarding no
 PrintMotd no
 PrintLastLog yes
 TCPKeepAlive yes
-UsePrivilegeSeparation yes
 StrictModes yes
 IgnoreRhosts yes
 HostbasedAuthentication no
@@ -49,7 +46,7 @@ LogLevel VERBOSE
 Banner /etc/ssh/ssh_banner
 
 # Allow specific users only
-AllowUsers ubuntu
+AllowUsers {{NEW_USERNAME}}
 
 # Disable unused features
 AllowAgentForwarding no

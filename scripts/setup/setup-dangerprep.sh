@@ -77,9 +77,23 @@ install_packages_with_selection() {
         category_options+=("$category packages - $package_count packages")
     done
 
-    # Interactive category selection
+    # Package selection logic
     local selected_packages=()
-    if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
+    local packages_preselected=false
+
+    # Check if this is being called with pre-selected packages (from configuration phase)
+    # This happens when SELECTED_PACKAGE_CATEGORIES is already set and we're in the installation phase
+    if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]] && [[ "$category_name" == "Essential Packages" ]]; then
+        packages_preselected=true
+        log_info "Using packages selected during configuration phase"
+        # Install all provided categories (they're already filtered based on user selection)
+        for category in "${category_names[@]}"; do
+            local packages="${package_categories[$category]}"
+            IFS=',' read -ra package_array <<< "$packages"
+            selected_packages+=("${package_array[@]}")
+        done
+    elif [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
+        # Interactive category selection for new package installations
         log_info "Select $category_name package categories to install:"
         local selected_categories
         selected_categories=$(enhanced_multi_choose "Package Categories" "${category_options[@]}")
@@ -103,6 +117,7 @@ install_packages_with_selection() {
         fi
     else
         # Non-interactive mode: install all packages
+        packages_preselected=true
         for category in "${category_names[@]}"; do
             local packages="${package_categories[$category]}"
             IFS=',' read -ra package_array <<< "$packages"
@@ -115,12 +130,16 @@ install_packages_with_selection() {
         return 0
     fi
 
-    # Show package summary and confirm
+    # Show package summary and confirm (only if packages were interactively selected)
     log_info "📋 Package Installation Summary: ${#selected_packages[@]} packages selected"
     echo
-    if [[ "${NON_INTERACTIVE:-false}" != "true" ]] && ! enhanced_confirm "Proceed with package installation?" "true"; then
+
+    # Only ask for confirmation if packages were selected interactively (not pre-selected from config)
+    if [[ "$packages_preselected" == "false" ]] && ! enhanced_confirm "Proceed with package installation?" "true"; then
         log_info "Package installation cancelled by user"
         return 1
+    elif [[ "$packages_preselected" == "true" ]]; then
+        log_info "Proceeding with installation of pre-selected packages..."
     fi
 
     # Install selected packages with progress tracking
@@ -2740,10 +2759,18 @@ configure_ssh_hardening() {
         return 1
     fi
 
-    # Restart SSH service with error handling
-    if ! systemctl restart ssh; then
-        log_error "Failed to restart SSH service"
-        return 1
+    # Check if we're running over SSH - if so, don't restart SSH service now
+    if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]] || [[ "${TERM:-}" == "screen"* ]]; then
+        log_warn "SSH session detected - SSH service will be restarted on reboot to avoid disconnection"
+        log_info "SSH configuration updated but not yet active"
+        enhanced_status_indicator "warning" "SSH restart deferred until reboot"
+    else
+        # Safe to restart SSH service immediately
+        if ! systemctl restart ssh; then
+            log_error "Failed to restart SSH service"
+            return 1
+        fi
+        log_success "SSH service restarted successfully"
     fi
 
     log_success "SSH configured on port ${SSH_PORT} with key-only authentication"
@@ -4951,9 +4978,10 @@ main() {
     # Show completion information
     log_success "DangerPrep setup completed successfully!"
     log_info "Next steps:"
-    log_info "1. Reboot the system to complete pi user cleanup"
-    log_info "2. Log in with your new user account"
-    log_info "3. The pi user will be automatically removed on reboot"
+    log_info "1. Reboot the system to complete setup and apply all configurations"
+    log_info "2. SSH hardening will be activated on reboot (port ${SSH_PORT})"
+    log_info "3. Log in with your new user account"
+    log_info "4. The pi user will be automatically removed on reboot"
 
     return 0
 }

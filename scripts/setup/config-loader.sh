@@ -61,6 +61,7 @@ process_template() {
     [[ -n "${DHCP_END:-}" ]] && content="${content//\{\{DHCP_END\}\}/$DHCP_END}"
     [[ -n "${FAIL2BAN_BANTIME:-}" ]] && content="${content//\{\{FAIL2BAN_BANTIME\}\}/$FAIL2BAN_BANTIME}"
     [[ -n "${FAIL2BAN_MAXRETRY:-}" ]] && content="${content//\{\{FAIL2BAN_MAXRETRY\}\}/$FAIL2BAN_MAXRETRY}"
+    [[ -n "${NEW_USERNAME:-}" ]] && content="${content//\{\{NEW_USERNAME\}\}/$NEW_USERNAME}"
 
     # Write the processed content to output file
     echo "$content" > "$output_file"
