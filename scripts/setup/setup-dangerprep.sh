@@ -341,8 +341,22 @@ handle_termination() {
 handle_error() {
     local exit_code=$?
     local line_number=$1
+    log_error "=== SCRIPT ERROR DETAILS ==="
     log_error "Script failed at line ${line_number} with exit code ${exit_code}"
     log_error "Command: ${BASH_COMMAND}"
+    log_error "Function stack: ${FUNCNAME[*]}"
+    log_error "Current working directory: $(pwd)"
+    log_error "Current user: $(whoami) (UID: $EUID)"
+
+    # Show recent log entries for context
+    if [[ -f "${LOG_FILE}" ]]; then
+        log_error "Last 5 log entries:"
+        tail -5 "${LOG_FILE}" 2>/dev/null | while IFS= read -r line; do
+            log_error "  $line"
+        done
+    fi
+
+    log_error "=== END ERROR DETAILS ==="
     cleanup_resources
     exit $exit_code
 }
@@ -1080,11 +1094,27 @@ backup_original_configs() {
 # Update system packages
 update_system_packages() {
     log_info "Updating system packages..."
-    
+
+    # Check if we have root privileges for package operations
+    if [[ $EUID -ne 0 ]]; then
+        log_error "Root privileges required for package operations"
+        return 1
+    fi
+
     export DEBIAN_FRONTEND=noninteractive
-    apt update
-    apt upgrade -y
-    
+
+    # Update package lists with retry logic
+    if ! retry_with_backoff 3 5 30 apt update; then
+        log_error "Failed to update package lists after multiple attempts"
+        return 1
+    fi
+
+    # Upgrade packages with retry logic
+    if ! retry_with_backoff 3 10 60 apt upgrade -y; then
+        log_error "Failed to upgrade packages after multiple attempts"
+        return 1
+    fi
+
     log_success "System packages updated"
 }
 
@@ -1646,17 +1676,43 @@ setup_automatic_updates() {
 # Configure SSH hardening
 configure_ssh_hardening() {
     log_info "Configuring SSH hardening..."
-    load_ssh_config
-    chmod 644 /etc/ssh/sshd_config /etc/ssh/ssh_banner
 
-    # Test SSH configuration
-    if sshd -t; then
-        systemctl restart ssh
-        log_success "SSH configured on port $SSH_PORT with key-only authentication"
-    else
-        log_error "SSH configuration is invalid"
-        exit 1
+    # Check if we have root privileges for SSH configuration
+    if [[ $EUID -ne 0 ]]; then
+        log_error "Root privileges required for SSH configuration"
+        return 1
     fi
+
+    # Load SSH configuration with error handling
+    if ! load_ssh_config; then
+        log_error "Failed to load SSH configuration"
+        return 1
+    fi
+
+    # Set proper permissions on SSH files
+    if ! chmod 644 /etc/ssh/sshd_config 2>/dev/null; then
+        log_error "Failed to set permissions on sshd_config"
+        return 1
+    fi
+
+    # Set permissions on SSH banner if it exists
+    if [[ -f /etc/ssh/ssh_banner ]] && ! chmod 644 /etc/ssh/ssh_banner 2>/dev/null; then
+        log_warn "Failed to set permissions on ssh_banner, continuing anyway"
+    fi
+
+    # Test SSH configuration before applying
+    if ! sshd -t 2>/dev/null; then
+        log_error "SSH configuration is invalid, not applying changes"
+        return 1
+    fi
+
+    # Restart SSH service with error handling
+    if ! systemctl restart ssh; then
+        log_error "Failed to restart SSH service"
+        return 1
+    fi
+
+    log_success "SSH configured on port ${SSH_PORT} with key-only authentication"
 }
 
 # Load MOTD configuration
@@ -3256,13 +3312,43 @@ main() {
     local current_phase=0
 
     log_info "Starting installation with ${phase_count} phases"
+    log_debug "Installation phases array has ${#installation_phases[@]} elements"
 
     # Execute each installation phase
+    local phase_index=0
     for phase_info in "${installation_phases[@]}"; do
+        ((phase_index++))
+        log_debug "Processing phase ${phase_index}: ${phase_info}"
+
+        # Parse phase info with error checking
+        if [[ ! "$phase_info" =~ ^[^:]+:.+ ]]; then
+            log_error "Invalid phase format: $phase_info"
+            exit 1
+        fi
+
         IFS=':' read -r phase_function phase_description <<< "$phase_info"
         ((current_phase++))
 
-        show_progress "$current_phase" "$phase_count" "$phase_description"
+        log_debug "Parsed phase function: '$phase_function', description: '$phase_description'"
+
+        # Check if function exists before any other operations
+        if ! declare -f "$phase_function" >/dev/null 2>&1; then
+            log_error "Function '$phase_function' is not defined"
+            log_error "Available functions: $(declare -F | grep -cE '^declare -f [a-zA-Z_][a-zA-Z0-9_]*$') total"
+            log_error "Phase failed: $phase_description"
+            log_error "Installation cannot continue"
+            exit 1
+        fi
+
+        log_debug "Function '$phase_function' exists, proceeding with phase"
+
+        # Show progress with error handling
+        log_debug "Calling show_progress with: $current_phase $phase_count '$phase_description'"
+        if ! show_progress "$current_phase" "$phase_count" "$phase_description"; then
+            log_error "show_progress failed for phase: $phase_description"
+            exit 1
+        fi
+
         log_info "Phase ${current_phase}/${phase_count}: $phase_description"
 
         if [[ "$DRY_RUN" == "true" ]]; then
@@ -3275,16 +3361,9 @@ main() {
                 continue
             fi
 
-            # Debug: Check if function exists before calling it
-            if ! declare -f "$phase_function" >/dev/null 2>&1; then
-                log_error "Function '$phase_function' is not defined"
-                log_error "Phase failed: $phase_description"
-                log_error "Installation cannot continue"
-                exit 1
-            fi
-
             log_debug "Executing phase function: $phase_function"
             if ! "$phase_function"; then
+                log_error "Phase function '$phase_function' failed with exit code $?"
                 log_error "Phase failed: $phase_description"
                 log_error "Installation cannot continue"
                 exit 1
@@ -3292,6 +3371,7 @@ main() {
         fi
 
         log_success "Phase completed: $phase_description"
+        log_debug "Phase ${current_phase} completed successfully"
     done
 
     # Show completion message
