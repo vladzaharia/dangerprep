@@ -578,12 +578,6 @@ collect_configuration() {
         return 0
     fi
 
-    log_info "🎛️  Interactive configuration mode enabled"
-    log_info "Press Ctrl+C to skip interactive configuration and use defaults"
-    echo
-
-    # Set up trap to handle Ctrl+C gracefully
-    trap 'log_warn "Interactive configuration cancelled, using default values"; return 0' INT
 
     # Network configuration
     log_info "📡 Network Configuration"
@@ -2886,6 +2880,389 @@ setup_raspap() {
 # Note: WiFi routing and firewall rules are handled by RaspAP
 # This function has been removed to avoid conflicts with RaspAP's networking management
 
+# Configure user accounts (replace default pi user with custom user)
+configure_user_accounts() {
+    log_info "Configuring user accounts..."
+
+    # Check if we're running as pi user
+    local current_user=$(whoami)
+    if [[ "$current_user" != "pi" ]]; then
+        log_warn "Not running as pi user. Skipping user account configuration."
+        log_info "Current user: $current_user"
+        return 0
+    fi
+
+    enhanced_section "User Account Configuration" "Replace default pi user with custom account" "👤"
+
+    # Collect new user information
+    local new_username
+    local new_password
+    local new_fullname
+    local transfer_ssh_keys="yes"
+
+    # Get username with validation
+    while true; do
+        new_username=$(enhanced_input "New Username" "" "Enter username for new account (lowercase, no spaces)")
+        if [[ -z "$new_username" ]]; then
+            log_warn "Username cannot be empty"
+            continue
+        fi
+        if [[ ! "$new_username" =~ ^[a-z][a-z0-9_-]*$ ]]; then
+            log_warn "Username must start with lowercase letter and contain only lowercase letters, numbers, hyphens, and underscores"
+            continue
+        fi
+        if id "$new_username" >/dev/null 2>&1; then
+            log_warn "User $new_username already exists"
+            continue
+        fi
+        break
+    done
+
+    # Get full name
+    new_fullname=$(enhanced_input "Full Name" "" "Enter full name for new user (optional)")
+
+    # Get password with confirmation
+    while true; do
+        new_password=$(enhanced_password "New Password" "Enter password for new user")
+        if [[ -z "$new_password" ]]; then
+            log_warn "Password cannot be empty"
+            continue
+        fi
+        local confirm_password
+        confirm_password=$(enhanced_password "Confirm Password" "Confirm password for new user")
+        if [[ "$new_password" != "$confirm_password" ]]; then
+            log_warn "Passwords do not match"
+            continue
+        fi
+        break
+    done
+
+    # Ask about SSH key transfer
+    if [[ -d "/home/pi/.ssh" ]] && [[ -n "$(ls -A /home/pi/.ssh 2>/dev/null)" ]]; then
+        transfer_ssh_keys=$(enhanced_confirm "Transfer SSH Keys" "Transfer SSH keys from pi user to new user?" "yes")
+    fi
+
+    # Show configuration summary
+    enhanced_section "User Configuration Summary" "Review new user account settings" "📋"
+    log_info "Username: $new_username"
+    log_info "Full Name: ${new_fullname:-'(not specified)'}"
+    log_info "Transfer SSH Keys: $transfer_ssh_keys"
+    log_info "Groups: Will inherit all groups from pi user"
+    log_info "Sudo Access: Yes"
+
+    if ! enhanced_confirm "Create User" "Create new user account with these settings?" "yes"; then
+        log_info "User account configuration cancelled"
+        return 0
+    fi
+
+    # Create the new user
+    create_new_user "$new_username" "$new_password" "$new_fullname" "$transfer_ssh_keys"
+
+    log_success "User account configuration completed"
+    log_info "Next steps after setup completion:"
+    log_info "1. Log out of current session"
+    log_info "2. Log in as: $new_username"
+    log_info "3. Run: sudo /dangerprep/scripts/setup/finalize-user-migration.sh"
+}
+
+# Create new user account with proper configuration
+create_new_user() {
+    local username="$1"
+    local password="$2"
+    local fullname="$3"
+    local transfer_ssh="$4"
+
+    log_info "Creating user account: $username"
+
+    # Create user with home directory
+    if [[ -n "$fullname" ]]; then
+        useradd -m -c "$fullname" -s /bin/bash "$username"
+    else
+        useradd -m -s /bin/bash "$username"
+    fi
+
+    # Set password
+    echo "$username:$password" | chpasswd
+
+    # Get pi user's groups and add new user to same groups
+    local pi_groups
+    pi_groups=$(groups pi | cut -d: -f2 | tr ' ' '\n' | grep -v "^pi$" | tr '\n' ',' | sed 's/,$//')
+    if [[ -n "$pi_groups" ]]; then
+        usermod -a -G "$pi_groups" "$username"
+        log_debug "Added $username to groups: $pi_groups"
+    fi
+
+    # Add to sudo group if not already included
+    usermod -a -G sudo "$username"
+
+    # Transfer SSH keys if requested
+    if [[ "$transfer_ssh" == "yes" ]] && [[ -d "/home/pi/.ssh" ]]; then
+        log_info "Transferring SSH keys..."
+        cp -r /home/pi/.ssh "/home/$username/"
+        chown -R "$username:$username" "/home/$username/.ssh"
+        chmod 700 "/home/$username/.ssh"
+        find "/home/$username/.ssh" -type f -exec chmod 600 {} \;
+        log_debug "SSH keys transferred to $username"
+    fi
+
+    # Update configuration files that reference pi user
+    update_user_references "$username"
+
+    # Create reboot finalization script for pi user removal
+    create_reboot_finalization_script "$username"
+
+    log_success "User $username created successfully"
+}
+
+
+
+# Update configuration files that reference pi user
+update_user_references() {
+    local new_username="$1"
+
+    log_info "Updating configuration files..."
+
+    # Update autologin configuration
+    local autologin_dir="/etc/systemd/system/getty@tty1.service.d"
+    local autologin_conf="$autologin_dir/autologin.conf"
+
+    if [[ -f "$autologin_conf" ]]; then
+        log_debug "Updating autologin configuration"
+        sed -i "s/pi/$new_username/g" "$autologin_conf"
+    fi
+
+    # Update lightdm configuration if it exists
+    if [[ -f "/etc/lightdm/lightdm.conf" ]]; then
+        log_debug "Updating lightdm configuration"
+        sed -i "s/autologin-user=pi/autologin-user=$new_username/g" /etc/lightdm/lightdm.conf
+    fi
+
+    # Transfer cron jobs
+    if [[ -f "/var/spool/cron/crontabs/pi" ]]; then
+        log_debug "Transferring cron jobs"
+        cp "/var/spool/cron/crontabs/pi" "/var/spool/cron/crontabs/$new_username"
+        chown "$new_username:crontab" "/var/spool/cron/crontabs/$new_username"
+        chmod 600 "/var/spool/cron/crontabs/$new_username"
+    fi
+
+    # Update any systemd services that run as pi user
+    local service_files
+    service_files=$(grep -r "User=pi" /etc/systemd/system/ 2>/dev/null | cut -d: -f1 | sort -u)
+    if [[ -n "$service_files" ]]; then
+        log_debug "Updating systemd services"
+        while IFS= read -r service_file; do
+            sed -i "s/User=pi/User=$new_username/g" "$service_file"
+            log_debug "Updated service: $service_file"
+        done <<< "$service_files"
+        systemctl daemon-reload
+    fi
+
+    # Update Docker Compose files that might reference pi user
+    if [[ -d "/dangerprep/docker" ]]; then
+        find /dangerprep/docker -name "*.yml" -o -name "*.yaml" | while read -r compose_file; do
+            if grep -q "pi:" "$compose_file" 2>/dev/null; then
+                log_debug "Updating Docker Compose file: $compose_file"
+                sed -i "s/pi:/$new_username:/g" "$compose_file"
+            fi
+        done
+    fi
+
+    log_success "Configuration files updated"
+}
+
+# Disable screen lock password requirement
+configure_screen_lock() {
+    log_info "Configuring screen lock settings..."
+
+    # Create polkit rule to disable password requirement for screen unlock
+    local polkit_rule="/etc/polkit-1/localauthority/50-local.d/disable-screen-lock-password.pkla"
+
+    mkdir -p "$(dirname "$polkit_rule")"
+
+    cat > "$polkit_rule" << 'EOF'
+[Disable password for screen unlock]
+Identity=unix-user:*
+Action=org.freedesktop.login1.lock-session;org.freedesktop.login1.unlock-session
+ResultActive=yes
+ResultInactive=yes
+ResultAny=yes
+EOF
+
+    # Also configure lightdm if present
+    if [[ -f "/etc/lightdm/lightdm.conf" ]]; then
+        log_debug "Configuring lightdm screen lock settings"
+
+        # Backup original config
+        cp /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup 2>/dev/null || true
+
+        # Configure lightdm to not require password for unlock
+        if ! grep -q "^lock-screen-timeout=" /etc/lightdm/lightdm.conf; then
+            echo "lock-screen-timeout=0" >> /etc/lightdm/lightdm.conf
+        fi
+
+        if ! grep -q "^user-session-timeout=" /etc/lightdm/lightdm.conf; then
+            echo "user-session-timeout=0" >> /etc/lightdm/lightdm.conf
+        fi
+    fi
+
+    # Configure gsettings for GNOME/Ubuntu desktop if present
+    local new_user_home="/home/$NEW_USERNAME"
+    if [[ -n "${NEW_USERNAME:-}" ]] && [[ -d "$new_user_home" ]]; then
+        log_debug "Configuring desktop screen lock settings for $NEW_USERNAME"
+
+        # Create script to configure desktop settings for new user
+        cat > "/tmp/configure-desktop-settings.sh" << EOF
+#!/bin/bash
+export DISPLAY=:0
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/\$(id -u)/bus"
+
+# Disable screen lock
+gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null || true
+gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null || true
+gsettings set org.gnome.desktop.session idle-delay 0 2>/dev/null || true
+
+# Disable automatic suspend
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
+EOF
+
+        chmod +x "/tmp/configure-desktop-settings.sh"
+
+        # Schedule to run when user logs in
+        mkdir -p "$new_user_home/.config/autostart"
+        cat > "$new_user_home/.config/autostart/configure-dangerprep-desktop.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=Configure DangerPrep Desktop
+Exec=/tmp/configure-desktop-settings.sh
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+EOF
+
+        chown -R "$NEW_USERNAME:$NEW_USERNAME" "$new_user_home/.config" 2>/dev/null || true
+    fi
+
+    log_success "Screen lock configuration completed"
+}
+
+# Create reboot finalization script for pi user cleanup
+create_reboot_finalization_script() {
+    local new_username="$1"
+
+    log_info "Creating reboot finalization service..."
+
+    # Create the cleanup script
+    local cleanup_script="/usr/local/bin/dangerprep-finalize.sh"
+    cat > "$cleanup_script" << EOF
+#!/bin/bash
+# DangerPrep Reboot Finalization Script
+# This script runs once on reboot to complete pi user cleanup
+
+set -euo pipefail
+
+# Configuration
+NEW_USERNAME="$new_username"
+LOG_FILE="/var/log/dangerprep-finalization.log"
+
+# Logging setup
+exec 1> >(tee -a "\$LOG_FILE")
+exec 2> >(tee -a "\$LOG_FILE" >&2)
+
+log_info() {
+    echo "\$(date): [INFO] \$*"
+}
+
+log_warn() {
+    echo "\$(date): [WARN] \$*"
+}
+
+log_error() {
+    echo "\$(date): [ERROR] \$*"
+}
+
+log_success() {
+    echo "\$(date): [SUCCESS] \$*"
+}
+
+main() {
+    log_info "Starting DangerPrep reboot finalization..."
+
+    # Kill any processes still running as pi user
+    local pi_processes
+    pi_processes=\$(ps -u pi -o pid --no-headers 2>/dev/null | wc -l)
+    if [[ "\$pi_processes" -gt 0 ]]; then
+        log_info "Terminating \$pi_processes processes running as pi user..."
+        pkill -u pi 2>/dev/null || true
+        sleep 2
+        pkill -9 -u pi 2>/dev/null || true
+    fi
+
+    # Transfer ownership of any remaining pi user files
+    log_info "Transferring ownership of remaining pi user files..."
+    find / -user pi -not -path "/home/pi*" -not -path "/proc/*" -not -path "/sys/*" 2>/dev/null | \
+        xargs chown "\$NEW_USERNAME:\$NEW_USERNAME" 2>/dev/null || true
+
+    # Remove pi user and home directory
+    log_info "Removing pi user account..."
+    userdel -r pi 2>/dev/null || {
+        log_warn "Failed to remove pi user with home directory, trying without -r flag"
+        userdel pi 2>/dev/null || log_error "Failed to remove pi user"
+    }
+
+    # Remove pi home directory if it still exists
+    if [[ -d "/home/pi" ]]; then
+        log_info "Removing pi home directory..."
+        rm -rf /home/pi
+    fi
+
+    # Remove pi crontab if it exists
+    rm -f /var/spool/cron/crontabs/pi 2>/dev/null || true
+
+    # Disable and remove this service
+    systemctl disable dangerprep-finalize.service 2>/dev/null || true
+    rm -f /etc/systemd/system/dangerprep-finalize.service 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
+
+    # Remove this script
+    rm -f "\$0" 2>/dev/null || true
+
+    log_success "DangerPrep finalization completed successfully!"
+    log_info "Pi user has been removed and system is ready for use"
+}
+
+# Run main function
+main "\$@"
+EOF
+
+    chmod +x "$cleanup_script"
+
+    # Create systemd service for reboot finalization
+    local service_file="/etc/systemd/system/dangerprep-finalize.service"
+    cat > "$service_file" << EOF
+[Unit]
+Description=DangerPrep Finalization Service
+After=multi-user.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStart=$cleanup_script
+RemainAfterExit=yes
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Enable the service
+    systemctl daemon-reload
+    systemctl enable dangerprep-finalize.service
+
+    log_success "Reboot finalization service created and enabled"
+    log_info "Pi user will be removed automatically on next reboot"
+}
+
 # Generate sync service configurations
 generate_sync_configs() {
     log_info "Generating sync service configurations..."
@@ -3252,6 +3629,8 @@ main() {
         "configure_nfs_client:Configuring NFS client"
         "install_maintenance_scripts:Installing maintenance scripts"
         "setup_encrypted_backups:Setting up encrypted backups"
+        "configure_user_accounts:Configuring user accounts"
+        "configure_screen_lock:Configuring screen lock settings"
         "start_all_services:Starting all services"
         "verify_setup:Verifying setup"
     )
@@ -3331,6 +3710,13 @@ main() {
     log_success "DangerPrep setup completed successfully in ${minutes}m ${seconds}s"
     log_info "Total log entries: $(wc -l < "${LOG_FILE}" 2>/dev/null || echo "unknown")"
     log_info "Backup directory size: $(du -sh "${BACKUP_DIR}" 2>/dev/null | cut -f1 || echo "unknown")"
+
+    # Show completion information
+    log_success "DangerPrep setup completed successfully!"
+    log_info "Next steps:"
+    log_info "1. Reboot the system to complete pi user cleanup"
+    log_info "2. Log in with your new user account"
+    log_info "3. The pi user will be automatically removed on reboot"
 
     return 0
 }
