@@ -39,7 +39,10 @@ load_config() {
 create_hardware_groups() {
     enhanced_section "Hardware Access Groups" "Creating system groups for GPIO, PWM, I2C, and SPI access" "👥"
 
-    local all_groups=($GPIO_GROUPS $PWM_GROUPS $I2C_GROUPS $SPI_GROUPS)
+    # Create array from space-separated group lists
+    local all_groups=()
+    # shellcheck disable=SC2206
+    all_groups+=($GPIO_GROUPS $PWM_GROUPS $I2C_GROUPS $SPI_GROUPS)
     local total_groups=${#all_groups[@]}
     local current_group=0
 

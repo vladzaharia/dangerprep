@@ -16,6 +16,8 @@ BANNER_NC='\033[0m'             # No color reset
 # Banner elements
 BANNER_TOP_BORDER=".·:'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''':·."
 BANNER_BOTTOM_BORDER="·:........................................................................:·"
+# BANNER_SIDE_BORDER is used in render functions but not directly referenced
+# shellcheck disable=SC2034
 BANNER_SIDE_BORDER=': :'
 BANNER_EMPTY_LINE=': :                                                                        : :'
 
@@ -345,7 +347,7 @@ test_banner() {
     show_banner "network"
     echo
     echo "4. Setup banner:"
-    show_setup_banner
+    show_setup_banner "$@"
     echo
     echo "5. MOTD banner:"
     show_motd_banner
@@ -356,5 +358,5 @@ test_banner() {
 
 # If script is run directly, show test
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    test_banner
+    test_banner "$@"
 fi
