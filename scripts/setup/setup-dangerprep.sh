@@ -824,22 +824,27 @@ check_system_requirements() {
     fi
     check_results+=("Memory,${memory_check_result},${available_mb}MB available")
 
-    # Check 5: Required commands
+    # Check 5: Essential system commands (pre-installed)
     enhanced_progress_bar 5 ${total_checks} "System Requirements Validation"
 
-    local required_commands=(
-        "curl:curl"
-        "wget:wget"
-        "git:git"
-        "docker:docker.io"
-        "systemctl:systemd"
-        "iptables:iptables"
-        "ip:iproute2"
+    # Only check for commands that:
+    # 1. Are essential system utilities that should be present on Ubuntu 24.04
+    # 2. Are needed by the setup script to function
+    # 3. Are NOT installed by the setup script itself
+    local essential_commands=(
+        "systemctl:systemd"     # Service management (core system)
+        "apt:apt"              # Package manager (essential for setup)
+        "ip:iproute2"          # Network configuration (core networking)
+        "iptables:iptables"    # Firewall management (core security)
+        "lsb_release:lsb-release"  # OS identification (used by script)
+        "ping:iputils-ping"    # Network connectivity testing
+        "df:coreutils"         # Disk usage checking
+        "free:procps"          # Memory usage checking
     )
-
+    
     local missing_commands=()
     local cmd package
-    for cmd_package in "${required_commands[@]}"; do
+    for cmd_package in "${essential_commands[@]}"; do
         IFS=':' read -r cmd package <<< "$cmd_package"
         if ! command -v "$cmd" >/dev/null 2>&1; then
             missing_commands+=("$cmd ($package)")
@@ -849,16 +854,17 @@ check_system_requirements() {
     local commands_check_result=""
     if [[ ${#missing_commands[@]} -gt 0 ]]; then
         commands_check_result="failure"
-        log_error "Missing required commands:"
+        log_error "Missing essential system commands:"
         printf '%s\n' "${missing_commands[@]}" | while read -r missing; do
             log_error "  - $missing"
         done
+        log_error "These are core system utilities that should be pre-installed on Ubuntu 24.04"
         log_error "Install missing packages with: apt update && apt install -y <package-names>"
     else
         commands_check_result="success"
         ((checks_passed++))
     fi
-    check_results+=("Required Commands,${commands_check_result},${#required_commands[@]} commands checked")
+    check_results+=("Essential Commands,${commands_check_result},${#essential_commands[@]} system commands checked")
 
     # Display results
     echo
