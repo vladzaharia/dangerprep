@@ -130,7 +130,7 @@ enhanced_multi_choose() {
     local gum_cmd
     gum_cmd=$(get_gum_cmd)
 
-    "${gum_cmd}" choose --no-limit --header "${prompt}" "${options[@]}"
+    "${gum_cmd}" choose --no-limit --selected="*" --header "${prompt}" "${options[@]}"
 }
 
 # Enhanced progress spinner function with gum integration

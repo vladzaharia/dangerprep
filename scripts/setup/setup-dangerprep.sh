@@ -182,8 +182,9 @@ standard_installer_step() {
         enhanced_progress_bar "$current_step" "$total_steps" "Installation Progress"
     fi
 
-    # Execute with spinner for long operations
-    if enhanced_spin "Executing $step_description" "$step_function"; then
+    # Execute the function directly (not through enhanced_spin since it expects commands, not functions)
+    log_info "Executing $step_description..."
+    if "$step_function"; then
         enhanced_status_indicator "success" "$step_description completed"
         log_success "$step_name completed successfully"
         return 0
