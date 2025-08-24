@@ -50,17 +50,17 @@ process_template() {
     done
 
     # Process common environment variables if they exist
-    [[ -n "$SSH_PORT" ]] && content="${content//\{\{SSH_PORT\}\}/$SSH_PORT}"
-    [[ -n "$WIFI_SSID" ]] && content="${content//\{\{WIFI_SSID\}\}/$WIFI_SSID}"
-    [[ -n "$WIFI_PASSWORD" ]] && content="${content//\{\{WIFI_PASSWORD\}\}/$WIFI_PASSWORD}"
-    [[ -n "$WIFI_INTERFACE" ]] && content="${content//\{\{WIFI_INTERFACE\}\}/$WIFI_INTERFACE}"
-    [[ -n "$WAN_INTERFACE" ]] && content="${content//\{\{WAN_INTERFACE\}\}/$WAN_INTERFACE}"
-    [[ -n "$LAN_IP" ]] && content="${content//\{\{LAN_IP\}\}/$LAN_IP}"
-    [[ -n "$LAN_NETWORK" ]] && content="${content//\{\{LAN_NETWORK\}\}/$LAN_NETWORK}"
-    [[ -n "$DHCP_START" ]] && content="${content//\{\{DHCP_START\}\}/$DHCP_START}"
-    [[ -n "$DHCP_END" ]] && content="${content//\{\{DHCP_END\}\}/$DHCP_END}"
-    [[ -n "$FAIL2BAN_BANTIME" ]] && content="${content//\{\{FAIL2BAN_BANTIME\}\}/$FAIL2BAN_BANTIME}"
-    [[ -n "$FAIL2BAN_MAXRETRY" ]] && content="${content//\{\{FAIL2BAN_MAXRETRY\}\}/$FAIL2BAN_MAXRETRY}"
+    [[ -n "${SSH_PORT:-}" ]] && content="${content//\{\{SSH_PORT\}\}/$SSH_PORT}"
+    [[ -n "${WIFI_SSID:-}" ]] && content="${content//\{\{WIFI_SSID\}\}/$WIFI_SSID}"
+    [[ -n "${WIFI_PASSWORD:-}" ]] && content="${content//\{\{WIFI_PASSWORD\}\}/$WIFI_PASSWORD}"
+    [[ -n "${WIFI_INTERFACE:-}" ]] && content="${content//\{\{WIFI_INTERFACE\}\}/$WIFI_INTERFACE}"
+    [[ -n "${WAN_INTERFACE:-}" ]] && content="${content//\{\{WAN_INTERFACE\}\}/$WAN_INTERFACE}"
+    [[ -n "${LAN_IP:-}" ]] && content="${content//\{\{LAN_IP\}\}/$LAN_IP}"
+    [[ -n "${LAN_NETWORK:-}" ]] && content="${content//\{\{LAN_NETWORK\}\}/$LAN_NETWORK}"
+    [[ -n "${DHCP_START:-}" ]] && content="${content//\{\{DHCP_START\}\}/$DHCP_START}"
+    [[ -n "${DHCP_END:-}" ]] && content="${content//\{\{DHCP_END\}\}/$DHCP_END}"
+    [[ -n "${FAIL2BAN_BANTIME:-}" ]] && content="${content//\{\{FAIL2BAN_BANTIME\}\}/$FAIL2BAN_BANTIME}"
+    [[ -n "${FAIL2BAN_MAXRETRY:-}" ]] && content="${content//\{\{FAIL2BAN_MAXRETRY\}\}/$FAIL2BAN_MAXRETRY}"
 
     # Write the processed content to output file
     echo "$content" > "$output_file"
