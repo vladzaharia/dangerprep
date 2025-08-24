@@ -42,6 +42,13 @@ get_gum_cmd() {
     fi
 }
 
+# Check if gum is available (system or lib directory)
+gum_available() {
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+    command -v "${gum_cmd}" >/dev/null 2>&1
+}
+
 # Enhanced input function with gum integration
 # Usage: enhanced_input "prompt" ["default_value"] ["placeholder"]
 enhanced_input() {
