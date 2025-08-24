@@ -1659,6 +1659,31 @@ configure_ssh_hardening() {
     fi
 }
 
+# Load MOTD configuration
+load_motd_config() {
+    log_info "Loading MOTD configuration..."
+
+    # Copy the MOTD banner script to the system
+    local motd_source="${CONFIG_DIR}/system/01-dangerprep-banner"
+    local motd_target="/etc/update-motd.d/01-dangerprep-banner"
+
+    if [[ -f "$motd_source" ]]; then
+        cp "$motd_source" "$motd_target"
+        chmod +x "$motd_target"
+        log_info "Installed DangerPrep MOTD banner"
+    else
+        log_warn "MOTD banner source not found: $motd_source"
+    fi
+
+    # Update MOTD
+    if command -v update-motd >/dev/null 2>&1; then
+        update-motd
+        log_info "Updated MOTD"
+    fi
+
+    log_success "MOTD configuration loaded"
+}
+
 # Setup fail2ban
 setup_fail2ban() {
     log_info "Setting up fail2ban..."
