@@ -1181,13 +1181,21 @@ acquire_lock() {
     if ! (set -o noclobber; echo "$$" > "${LOCK_FILE}") 2>/dev/null; then
         local existing_pid
         if [[ -r "${LOCK_FILE}" ]]; then
-            existing_pid=$(cat "${LOCK_FILE}" 2>/dev/null || echo "unknown")
+            existing_pid=$(cat "${LOCK_FILE}" 2>/dev/null | tr -d '\n' | tr -d ' ')
+            if [[ -z "$existing_pid" ]]; then
+                existing_pid="unknown"
+            fi
+
             if [[ "$existing_pid" =~ ^[0-9]+$ ]] && kill -0 "$existing_pid" 2>/dev/null; then
                 log_error "Another instance is already running (PID: ${existing_pid})"
                 log_error "If you're sure no other instance is running, remove: ${LOCK_FILE}"
                 return 1
             else
-                log_warn "Stale lock file found (PID: ${existing_pid}), removing"
+                if [[ "$existing_pid" == "unknown" ]]; then
+                    log_warn "Stale lock file found (empty/invalid PID), removing"
+                else
+                    log_warn "Stale lock file found (PID: ${existing_pid}), removing"
+                fi
                 rm -f "${LOCK_FILE}"
                 # Try again
                 if ! (set -o noclobber; echo "$$" > "${LOCK_FILE}") 2>/dev/null; then
@@ -1459,6 +1467,10 @@ SSH_PORT="2222"
 FAIL2BAN_BANTIME="3600"
 FAIL2BAN_MAXRETRY="3"
 
+# Configuration persistence
+CONFIG_STATE_FILE="/etc/dangerprep/setup-config.conf"
+INSTALL_STATE_FILE="/etc/dangerprep/install-state.conf"
+
 # Set default configuration values for non-interactive mode
 set_default_configuration_values() {
     log_info "Setting default configuration values..."
@@ -1498,6 +1510,149 @@ set_default_configuration_values() {
     log_debug "Default configuration values set and exported"
 }
 
+# Save configuration to persistent storage
+save_configuration() {
+    log_info "Saving configuration for future runs..."
+
+    # Ensure config directory exists
+    mkdir -p "$(dirname "$CONFIG_STATE_FILE")"
+
+    # Create configuration file with all settings
+    cat > "$CONFIG_STATE_FILE" << EOF
+# DangerPrep Setup Configuration
+# Generated on $(date)
+# This file stores user configuration choices for resumable installations
+
+# Network Configuration
+WIFI_SSID="$WIFI_SSID"
+WIFI_PASSWORD="$WIFI_PASSWORD"
+LAN_NETWORK="$LAN_NETWORK"
+LAN_IP="$LAN_IP"
+DHCP_START="$DHCP_START"
+DHCP_END="$DHCP_END"
+
+# Security Configuration
+SSH_PORT="$SSH_PORT"
+FAIL2BAN_BANTIME="$FAIL2BAN_BANTIME"
+FAIL2BAN_MAXRETRY="$FAIL2BAN_MAXRETRY"
+
+# User Account Configuration
+NEW_USERNAME="$NEW_USERNAME"
+NEW_USER_FULLNAME="$NEW_USER_FULLNAME"
+TRANSFER_SSH_KEYS="$TRANSFER_SSH_KEYS"
+IMPORT_GITHUB_KEYS="$IMPORT_GITHUB_KEYS"
+GITHUB_USERNAME="$GITHUB_USERNAME"
+
+# Package Selection
+SELECTED_PACKAGE_CATEGORIES="$SELECTED_PACKAGE_CATEGORIES"
+SELECTED_DOCKER_SERVICES="$SELECTED_DOCKER_SERVICES"
+
+# FriendlyElec Configuration
+FRIENDLYELEC_INSTALL_PACKAGES="$FRIENDLYELEC_INSTALL_PACKAGES"
+FRIENDLYELEC_ENABLE_FEATURES="$FRIENDLYELEC_ENABLE_FEATURES"
+
+# System Detection
+IS_FRIENDLYELEC="$IS_FRIENDLYELEC"
+EOF
+
+    chmod 600 "$CONFIG_STATE_FILE"
+    log_success "Configuration saved to $CONFIG_STATE_FILE"
+}
+
+# Load configuration from persistent storage
+load_saved_configuration() {
+    if [[ -f "$CONFIG_STATE_FILE" ]]; then
+        log_info "Found saved configuration from previous run"
+        # shellcheck source=/dev/null
+        source "$CONFIG_STATE_FILE"
+        log_debug "Loaded configuration from $CONFIG_STATE_FILE"
+        return 0
+    else
+        log_debug "No saved configuration found"
+        return 1
+    fi
+}
+
+# Clear saved configuration
+clear_saved_configuration() {
+    if [[ -f "$CONFIG_STATE_FILE" ]]; then
+        rm -f "$CONFIG_STATE_FILE"
+        log_info "Cleared saved configuration"
+    fi
+}
+
+# Installation state management
+save_install_state() {
+    local phase="$1"
+    local status="$2"  # completed, failed, in_progress
+
+    # Ensure state directory exists
+    mkdir -p "$(dirname "$INSTALL_STATE_FILE")"
+
+    # Update or create state file
+    if [[ -f "$INSTALL_STATE_FILE" ]]; then
+        # Update existing entry or add new one
+        if grep -q "^$phase=" "$INSTALL_STATE_FILE"; then
+            sed -i "s/^$phase=.*/$phase=$status/" "$INSTALL_STATE_FILE"
+        else
+            echo "$phase=$status" >> "$INSTALL_STATE_FILE"
+        fi
+    else
+        # Create new state file
+        cat > "$INSTALL_STATE_FILE" << EOF
+# DangerPrep Installation State
+# Generated on $(date)
+# Tracks completion status of installation phases
+
+$phase=$status
+EOF
+    fi
+
+    chmod 600 "$INSTALL_STATE_FILE"
+    log_debug "Saved install state: $phase=$status"
+}
+
+get_install_state() {
+    local phase="$1"
+
+    if [[ -f "$INSTALL_STATE_FILE" ]]; then
+        grep "^$phase=" "$INSTALL_STATE_FILE" 2>/dev/null | cut -d'=' -f2
+    else
+        echo "not_started"
+    fi
+}
+
+is_phase_completed() {
+    local phase="$1"
+    local state
+    state=$(get_install_state "$phase")
+    [[ "$state" == "completed" ]]
+}
+
+clear_install_state() {
+    if [[ -f "$INSTALL_STATE_FILE" ]]; then
+        rm -f "$INSTALL_STATE_FILE"
+        log_info "Cleared installation state"
+    fi
+}
+
+get_last_completed_phase() {
+    if [[ ! -f "$INSTALL_STATE_FILE" ]]; then
+        echo ""
+        return
+    fi
+
+    # Find the last completed phase
+    local last_completed=""
+    while IFS='=' read -r phase status; do
+        if [[ "$status" == "completed" ]]; then
+            last_completed="$phase"
+        fi
+    done < "$INSTALL_STATE_FILE"
+
+    echo "$last_completed"
+}
+
 # Interactive configuration collection
 collect_configuration() {
     log_info "Collecting configuration preferences..."
@@ -1515,6 +1670,40 @@ collect_configuration() {
         log_info "Use --non-interactive flag to suppress this warning"
         set_default_configuration_values
         return 0
+    fi
+
+    # Check for saved configuration from previous run
+    if load_saved_configuration; then
+        echo
+        log_info "📋 Found Previous Configuration"
+        echo
+
+        # Show current configuration summary
+        show_complete_configuration_summary
+
+        echo
+        local config_choice
+        config_choice=$(enhanced_choose "Configuration Options" \
+            "Use saved configuration" \
+            "Modify configuration" \
+            "Start fresh (clear saved config)")
+
+        case "$config_choice" in
+            "Use saved configuration")
+                log_info "Using saved configuration from previous run"
+                return 0
+                ;;
+            "Modify configuration")
+                log_info "Modifying existing configuration..."
+                # Continue with interactive collection but with current values as defaults
+                ;;
+            "Start fresh (clear saved config)")
+                log_info "Starting with fresh configuration..."
+                clear_saved_configuration
+                # Reset to defaults and continue with interactive collection
+                set_default_configuration_values
+                ;;
+        esac
     fi
 
 
@@ -1635,6 +1824,9 @@ collect_configuration() {
     export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
     export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
+
+    # Save configuration for resumable installations
+    save_configuration
 
     # Clean up trap
     trap - INT
@@ -2434,45 +2626,70 @@ install_friendlyelec_packages() {
 
 # Install FriendlyElec kernel headers
 install_friendlyelec_kernel_headers() {
-    log_info "Installing FriendlyElec kernel headers..."
+    log_info "Checking FriendlyElec kernel headers..."
+
+    local current_kernel
+    current_kernel=$(uname -r)
+
+    # Check if kernel headers are already installed for current kernel
+    if dpkg -l | grep -q "linux-headers-${current_kernel}"; then
+        log_info "Kernel headers for ${current_kernel} already installed"
+        return 0
+    fi
+
+    # Check if generic kernel headers are sufficient
+    if dpkg -l | grep -q "linux-headers-generic" && [[ -d "/usr/src/linux-headers-${current_kernel}" ]]; then
+        log_info "Generic kernel headers already provide support for ${current_kernel}"
+        return 0
+    fi
+
+    log_info "Installing FriendlyElec kernel headers for ${current_kernel}..."
 
     # Check for pre-installed kernel headers in /opt/archives/
     if [[ -d /opt/archives ]]; then
         local kernel_headers
-        kernel_headers=$(find /opt/archives -name "linux-headers-*.deb" | head -1)
+        kernel_headers=$(find /opt/archives -name "linux-headers-${current_kernel}*.deb" | head -1)
         if [[ -n "$kernel_headers" ]]; then
             log_info "Found FriendlyElec kernel headers: $kernel_headers"
             if dpkg -i "$kernel_headers" 2>/dev/null; then
                 log_success "Installed FriendlyElec kernel headers"
+                return 0
             else
-                log_warn "Failed to install FriendlyElec kernel headers"
+                log_warn "Failed to install FriendlyElec kernel headers from archive"
             fi
         else
-            log_info "No FriendlyElec kernel headers found in /opt/archives/"
+            log_debug "No matching FriendlyElec kernel headers found in /opt/archives/"
         fi
     fi
 
     # Try to download latest kernel headers if not found locally
-    if ! dpkg -l | grep -q "linux-headers-$(uname -r)"; then
-        log_info "Attempting to download latest kernel headers..."
-        local kernel_version
-        kernel_version=$(uname -r)
-        local headers_url="http://112.124.9.243/archives/rk3588/linux-headers-${kernel_version}-latest.deb"
+    log_info "Attempting to download kernel headers for ${current_kernel}..."
+    local headers_url="http://112.124.9.243/archives/rk3588/linux-headers-${current_kernel}-latest.deb"
 
-        if wget -q --spider "$headers_url" 2>/dev/null; then
-            log_info "Downloading kernel headers from FriendlyElec repository..."
-            if wget -O "/tmp/linux-headers-latest.deb" "$headers_url" 2>/dev/null; then
-                if dpkg -i "/tmp/linux-headers-latest.deb" 2>/dev/null; then
-                    log_success "Downloaded and installed latest kernel headers"
-                    rm -f "/tmp/linux-headers-latest.deb"
-                else
-                    log_warn "Failed to install downloaded kernel headers"
-                fi
+    if wget -q --spider "$headers_url" 2>/dev/null; then
+        log_info "Downloading kernel headers from FriendlyElec repository..."
+        if wget -O "/tmp/linux-headers-latest.deb" "$headers_url" 2>/dev/null; then
+            if dpkg -i "/tmp/linux-headers-latest.deb" 2>/dev/null; then
+                log_success "Downloaded and installed latest kernel headers"
+                rm -f "/tmp/linux-headers-latest.deb"
+                return 0
             else
-                log_warn "Failed to download kernel headers"
+                log_warn "Failed to install downloaded kernel headers"
             fi
         else
-            log_info "No online kernel headers available for this version"
+            log_warn "Failed to download kernel headers"
+        fi
+    else
+        log_info "No online kernel headers available for ${current_kernel}"
+    fi
+
+    # Fall back to generic headers if available
+    if ! dpkg -l | grep -q "linux-headers-generic"; then
+        log_info "Installing generic kernel headers as fallback..."
+        if apt-get install -y linux-headers-generic 2>/dev/null; then
+            log_success "Installed generic kernel headers"
+        else
+            log_warn "Failed to install generic kernel headers"
         fi
     fi
 }
@@ -2797,6 +3014,17 @@ configure_ssh_hardening() {
 
     # Debug: Show current variable values
     log_debug "SSH configuration variables: SSH_PORT=${SSH_PORT:-unset}, NEW_USERNAME=${NEW_USERNAME:-unset}"
+
+    # Create SSH privilege separation directory if missing
+    if [[ ! -d /run/sshd ]]; then
+        log_info "Creating SSH privilege separation directory..."
+        if ! mkdir -p /run/sshd; then
+            log_error "Failed to create SSH privilege separation directory"
+            return 1
+        fi
+        chmod 755 /run/sshd
+        log_debug "Created /run/sshd directory"
+    fi
 
     # Load SSH configuration with error handling
     if ! load_ssh_config; then
@@ -4982,13 +5210,59 @@ main() {
 
     local phase_count=${#installation_phases[@]}
 
+    # Check for resumable installation
+    local last_completed_phase
+    last_completed_phase=$(get_last_completed_phase)
+    local resume_from_phase=0
+
+    if [[ -n "$last_completed_phase" ]]; then
+        echo
+        log_info "🔄 Resumable Installation Detected"
+        echo
+        log_info "Last completed phase: $last_completed_phase"
+
+        local resume_choice
+        resume_choice=$(enhanced_choose "Installation Options" \
+            "Resume from last completed phase" \
+            "Restart from beginning")
+
+        case "$resume_choice" in
+            "Resume from last completed phase")
+                # Find the index of the last completed phase
+                for i in "${!installation_phases[@]}"; do
+                    local phase_function="${installation_phases[$i]%%:*}"
+                    if [[ "$phase_function" == "$last_completed_phase" ]]; then
+                        resume_from_phase=$((i + 1))
+                        break
+                    fi
+                done
+                log_info "Resuming from phase $((resume_from_phase + 1))"
+                ;;
+            "Restart from beginning")
+                log_info "Restarting installation from beginning"
+                clear_install_state
+                resume_from_phase=0
+                ;;
+        esac
+    fi
+
     log_info "Starting installation with ${phase_count} phases"
     log_debug "Installation phases array has ${#installation_phases[@]} elements"
+    if [[ $resume_from_phase -gt 0 ]]; then
+        log_info "Resuming from phase $((resume_from_phase + 1))"
+    fi
 
     # Execute each installation phase
     local current_phase=0
     for phase_info in "${installation_phases[@]}"; do
         ((++current_phase))
+
+        # Skip phases if resuming
+        if [[ $current_phase -le $resume_from_phase ]]; then
+            log_debug "Skipping completed phase ${current_phase}: ${phase_info#*:}"
+            continue
+        fi
+
         log_debug "Processing phase ${current_phase}: ${phase_info}"
 
         # Parse phase info with error checking
@@ -5022,14 +5296,22 @@ main() {
                 continue
             fi
 
+            # Mark phase as in progress
+            save_install_state "$phase_function" "in_progress"
+
             # Execute phase using standardized installer step pattern
             log_debug "Executing phase function: $phase_function"
             if ! standard_installer_step "$phase_function" "$phase_description" "$phase_function" "$current_phase" "$phase_count"; then
+                save_install_state "$phase_function" "failed"
                 log_error "Phase function '$phase_function' failed"
                 log_error "Phase failed: $phase_description"
                 log_error "Installation cannot continue"
+                log_error "You can resume from this point by running the script again"
                 exit 1
             fi
+
+            # Mark phase as completed
+            save_install_state "$phase_function" "completed"
         fi
 
         log_debug "Phase ${current_phase} completed successfully"
@@ -5046,6 +5328,10 @@ main() {
     log_success "DangerPrep setup completed successfully in ${minutes}m ${seconds}s"
     log_info "Total log entries: $(wc -l < "${LOG_FILE}" 2>/dev/null || echo "unknown")"
     log_info "Backup directory size: $(du -sh "${BACKUP_DIR}" 2>/dev/null | cut -f1 || echo "unknown")"
+
+    # Clear installation state since we completed successfully
+    clear_install_state
+    log_debug "Cleared installation state after successful completion"
 
     # Show completion information
     log_success "DangerPrep setup completed successfully!"
