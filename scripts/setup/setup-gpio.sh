@@ -48,7 +48,7 @@ create_hardware_groups() {
 
     # GPIO groups
     for group in $GPIO_GROUPS; do
-        ((current_group++))
+        ((++current_group))
         enhanced_progress_bar "$current_group" "$total_groups" "Creating Hardware Groups"
 
         if ! getent group "$group" >/dev/null 2>&1; then
@@ -61,7 +61,7 @@ create_hardware_groups() {
 
     # PWM groups
     for group in $PWM_GROUPS; do
-        ((current_group++))
+        ((++current_group))
         enhanced_progress_bar "$current_group" "$total_groups" "Creating Hardware Groups"
 
         if ! getent group "$group" >/dev/null 2>&1; then
@@ -74,7 +74,7 @@ create_hardware_groups() {
 
     # I2C groups
     for group in $I2C_GROUPS; do
-        ((current_group++))
+        ((++current_group))
         enhanced_progress_bar "$current_group" "$total_groups" "Creating Hardware Groups"
 
         if ! getent group "$group" >/dev/null 2>&1; then
@@ -87,7 +87,7 @@ create_hardware_groups() {
 
     # SPI groups
     for group in $SPI_GROUPS; do
-        ((current_group++))
+        ((++current_group))
         enhanced_progress_bar "$current_group" "$total_groups" "Creating Hardware Groups"
 
         if ! getent group "$group" >/dev/null 2>&1; then

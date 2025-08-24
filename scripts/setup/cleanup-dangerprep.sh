@@ -176,7 +176,7 @@ safe_remove() {
         # Handle duplicate names
         while [[ -e "$backup_path" ]]; do
             backup_path="$BACKUP_DIR/$(basename "$item").$counter"
-            ((counter++))
+            ((++counter))
         done
 
         log_debug "Backing up $item to $backup_path"
@@ -1185,10 +1185,10 @@ remove_packages() {
         local remove_result=$?
 
         if [[ ${remove_result} -eq 0 ]]; then
-            ((removed_count++))
+            ((++removed_count))
             log_debug "✓ Removed ${package}"
         else
-            ((failed_count++))
+            ((++failed_count))
             log_warn"✗ Failed to remove ${package}"
         fi
     done
@@ -1513,7 +1513,7 @@ main() {
     # Execute each cleanup phase
     for phase_info in "${cleanup_phases[@]}"; do
         IFS=':' read -r phase_function phase_description <<< "$phase_info"
-        ((current_phase++))
+        ((++current_phase))
 
         enhanced_progress_bar "$current_phase" "$phase_count" "Cleanup Progress"
         enhanced_status_indicator "pending" "Phase ${current_phase}/${phase_count}: $phase_description"

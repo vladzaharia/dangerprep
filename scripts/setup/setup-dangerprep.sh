@@ -778,7 +778,7 @@ check_system_requirements() {
     local bash_check_result=""
     if check_bash_version 2>/dev/null; then
         bash_check_result="success"
-        ((checks_passed++))
+        ((++checks_passed))
     else
         bash_check_result="failure"
     fi
@@ -792,7 +792,7 @@ check_system_requirements() {
     os_version="$(lsb_release -d 2>/dev/null | cut -f2 || echo "Unknown")"
     if lsb_release -d 2>/dev/null | grep -q "Ubuntu 24.04"; then
         os_check_result="success"
-        ((checks_passed++))
+        ((++checks_passed))
     else
         os_check_result="warning"
         log_warn "This script is designed for Ubuntu 24.04"
@@ -816,7 +816,7 @@ check_system_requirements() {
         log_error "Required: 10GB, Available: ${available_gb}GB"
     else
         disk_check_result="success"
-        ((checks_passed++))
+        ((++checks_passed))
     fi
     check_results+=("Disk Space,${disk_check_result},${available_gb}GB available")
 
@@ -834,7 +834,7 @@ check_system_requirements() {
         log_error "Required: 2GB, Available: ${available_mb}MB"
     else
         memory_check_result="success"
-        ((checks_passed++))
+        ((++checks_passed))
     fi
     check_results+=("Memory,${memory_check_result},${available_mb}MB available")
 
@@ -876,7 +876,7 @@ check_system_requirements() {
         log_error "Install missing packages with: apt update && apt install -y <package-names>"
     else
         commands_check_result="success"
-        ((checks_passed++))
+        ((++checks_passed))
     fi
     check_results+=("Essential Commands,${commands_check_result},${#essential_commands[@]} system commands checked")
 
@@ -1232,7 +1232,7 @@ install_essential_packages() {
     enhanced_section "Package Installation" "Installing ${total_packages} selected packages..." "📦"
 
     for package in "${selected_packages[@]}"; do
-        ((installed_count++))
+        ((++installed_count))
 
         # Show progress bar
         enhanced_progress_bar "${installed_count}" "${total_packages}" "Package Installation Progress"
@@ -3316,7 +3316,7 @@ main() {
     # Execute each installation phase
     local current_phase=0
     for phase_info in "${installation_phases[@]}"; do
-        ((current_phase++))
+        ((++current_phase))
         log_debug "Processing phase ${current_phase}: ${phase_info}"
 
         # Parse phase info with error checking
