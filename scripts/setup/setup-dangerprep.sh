@@ -4834,14 +4834,14 @@ main() {
 
     log_success "All pre-flight checks passed"
 
+    # Show system information and detect platform (needed for configuration)
+    show_system_info
+
     # Collect interactive configuration if gum is available
     if ! collect_configuration; then
         log_error "Configuration collection failed or was cancelled by user"
         exit 1
     fi
-
-    # Show system information
-    show_system_info
 
     # Main installation phases with progress tracking
     local -a installation_phases=(
