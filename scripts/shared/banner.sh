@@ -2,6 +2,13 @@
 # DangerPrep Shared Banner Utility
 # Provides colorful banner functions for all DangerPrep scripts
 
+# Source gum utilities if available
+BANNER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$BANNER_SCRIPT_DIR/gum-utils.sh" ]]; then
+    # shellcheck source=gum-utils.sh
+    source "$BANNER_SCRIPT_DIR/gum-utils.sh"
+fi
+
 # Color codes for banner display
 BANNER_NC='\033[0m'             # No color reset
 
