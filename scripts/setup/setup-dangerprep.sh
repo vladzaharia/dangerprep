@@ -35,14 +35,812 @@ CLEANUP_TASKS=()
 
 # Enhanced utility functions for 2025 best practices
 
+# =============================================================================
+# STANDARDIZED HELPER FUNCTIONS
+# =============================================================================
+# These functions provide consistent patterns for common operations throughout
+# the setup script, ensuring uniform error handling, logging, and security
+
+# Standardized package installation with interactive selection
+# Usage: install_packages_with_selection "category_name" "description" "category1:package1,package2" "category2:package3,package4"
+install_packages_with_selection() {
+    local category_name="$1"
+    local description="$2"
+    shift 2
+
+    # Parse package categories from remaining arguments
+    local -A package_categories
+    local -a category_names
+    while [[ $# -gt 0 ]]; do
+        local category_spec="$1"
+        if [[ "$category_spec" =~ ^([^:]+):(.+)$ ]]; then
+            local category="${BASH_REMATCH[1]}"
+            local packages="${BASH_REMATCH[2]}"
+            package_categories["$category"]="$packages"
+            category_names+=("$category")
+        else
+            log_error "Invalid category specification: $category_spec"
+            return 1
+        fi
+        shift
+    done
+
+    # Show section header
+    enhanced_section "$category_name Package Selection" "$description" "📦"
+
+    # Create category options for selection
+    local category_options=()
+    for category in "${category_names[@]}"; do
+        local packages="${package_categories[$category]}"
+        local package_count
+        package_count=$(echo "$packages" | tr ',' '\n' | wc -l)
+        category_options+=("$category packages - $package_count packages")
+    done
+
+    # Interactive category selection
+    local selected_packages=()
+    if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
+        log_info "Select $category_name package categories to install:"
+        local selected_categories
+        selected_categories=$(enhanced_multi_choose "Package Categories" "${category_options[@]}")
+
+        # Process selected categories
+        if [[ -n "${selected_categories}" ]]; then
+            while IFS= read -r category_option; do
+                for category in "${category_names[@]}"; do
+                    if [[ "$category_option" =~ ^"$category packages" ]]; then
+                        local packages="${package_categories[$category]}"
+                        IFS=',' read -ra package_array <<< "$packages"
+                        selected_packages+=("${package_array[@]}")
+                        enhanced_status_indicator "success" "Added ${#package_array[@]} $category packages"
+                        break
+                    fi
+                done
+            done <<< "${selected_categories}"
+        else
+            log_info "No packages selected"
+            return 0
+        fi
+    else
+        # Non-interactive mode: install all packages
+        for category in "${category_names[@]}"; do
+            local packages="${package_categories[$category]}"
+            IFS=',' read -ra package_array <<< "$packages"
+            selected_packages+=("${package_array[@]}")
+        done
+    fi
+
+    if [[ ${#selected_packages[@]} -eq 0 ]]; then
+        log_info "No packages to install"
+        return 0
+    fi
+
+    # Show package summary and confirm
+    log_info "📋 Package Installation Summary: ${#selected_packages[@]} packages selected"
+    echo
+    if [[ "${NON_INTERACTIVE:-false}" != "true" ]] && ! enhanced_confirm "Proceed with package installation?" "true"; then
+        log_info "Package installation cancelled by user"
+        return 1
+    fi
+
+    # Install selected packages with progress tracking
+    local failed_packages=()
+    local installed_count=0
+    local total_packages=${#selected_packages[@]}
+
+    enhanced_section "$category_name Package Installation" "Installing ${total_packages} selected packages..." "📦"
+
+    for package in "${selected_packages[@]}"; do
+        ((++installed_count))
+
+        # Show progress bar
+        enhanced_progress_bar "${installed_count}" "${total_packages}" "Package Installation Progress"
+
+        # Check if package is already installed
+        if dpkg -l "${package}" 2>/dev/null | grep -q "^ii"; then
+            enhanced_status_indicator "success" "${package} (already installed)"
+            continue
+        fi
+
+        # Install package with standardized pattern
+        enhanced_spin "Installing ${package} (${installed_count}/${total_packages})" \
+            env DEBIAN_FRONTEND=noninteractive apt install -y "${package}"
+        local install_result=$?
+
+        if [[ ${install_result} -eq 0 ]]; then
+            enhanced_status_indicator "success" "Installed ${package}"
+        else
+            enhanced_status_indicator "failure" "Failed to install ${package}"
+            failed_packages+=("${package}")
+        fi
+    done
+
+    # Report installation results
+    if [[ ${#failed_packages[@]} -gt 0 ]]; then
+        log_warn "Failed to install ${#failed_packages[@]} packages: ${failed_packages[*]}"
+        log_info "These packages may not be available in the current repository"
+    fi
+
+    log_success "Successfully installed $((total_packages - ${#failed_packages[@]}))/${total_packages} packages"
+    return 0
+}
+
+# Standardized installer step pattern
+# Usage: standard_installer_step "step_name" "step_description" step_function [current_step] [total_steps]
+standard_installer_step() {
+    local step_name="$1"
+    local step_description="$2"
+    local step_function="$3"
+    local current_step="${4:-}"
+    local total_steps="${5:-}"
+
+    # Standard logging pattern
+    enhanced_section "$step_name" "$step_description" "🔧"
+
+    # Progress indication if part of multi-step process
+    if [[ -n "$current_step" && -n "$total_steps" ]]; then
+        enhanced_progress_bar "$current_step" "$total_steps" "Installation Progress"
+    fi
+
+    # Execute with spinner for long operations
+    if enhanced_spin "Executing $step_description" "$step_function"; then
+        enhanced_status_indicator "success" "$step_description completed"
+        log_success "$step_name completed successfully"
+        return 0
+    else
+        local exit_code=$?
+        enhanced_status_indicator "failure" "$step_description failed"
+        log_error "$step_name failed with exit code $exit_code"
+        return $exit_code
+    fi
+}
+
+# Standardized file operations functions
+# These ensure consistent security practices and error handling
+
+# Standardized secure file copy with backup
+# Usage: standard_secure_copy "source" "destination" [mode] [owner] [group]
+standard_secure_copy() {
+    local src="$1"
+    local dest="$2"
+    local mode="${3:-644}"
+    local owner="${4:-root}"
+    local group="${5:-root}"
+
+    # Validate paths
+    if ! validate_path_safe "$src" || ! validate_path_safe "$dest"; then
+        log_error "Invalid path in standard_secure_copy: $src -> $dest"
+        return 1
+    fi
+
+    # Check source exists
+    if [[ ! -f "$src" ]]; then
+        log_error "Source file does not exist: $src"
+        return 1
+    fi
+
+    # Backup existing file if it exists
+    if [[ -f "$dest" ]]; then
+        local backup_file="${BACKUP_DIR}/$(basename "$dest").backup-$(date +%Y%m%d-%H%M%S)"
+        if cp "$dest" "$backup_file" 2>/dev/null; then
+            log_debug "Backed up existing file: $dest -> $backup_file"
+        else
+            log_warn "Failed to backup existing file: $dest"
+        fi
+    fi
+
+    # Create destination directory if needed
+    local dest_dir
+    dest_dir=$(dirname "$dest")
+    if [[ ! -d "$dest_dir" ]]; then
+        if ! mkdir -p "$dest_dir"; then
+            log_error "Failed to create destination directory: $dest_dir"
+            return 1
+        fi
+    fi
+
+    # Copy with secure permissions
+    if cp "$src" "$dest"; then
+        chmod "$mode" "$dest"
+        chown "$owner:$group" "$dest"
+        log_debug "Securely copied: $src -> $dest (mode: $mode, owner: $owner:$group)"
+        return 0
+    else
+        log_error "Failed to copy file: $src -> $dest"
+        return 1
+    fi
+}
+
+# Standardized directory creation with permissions
+# Usage: standard_create_directory "path" [mode] [owner] [group] [create_parents]
+standard_create_directory() {
+    local dir_path="$1"
+    local mode="${2:-755}"
+    local owner="${3:-root}"
+    local group="${4:-root}"
+    local create_parents="${5:-true}"
+
+    # Validate path
+    if ! validate_path_safe "$dir_path"; then
+        log_error "Invalid path in standard_create_directory: $dir_path"
+        return 1
+    fi
+
+    # Create directory
+    local mkdir_opts=()
+    if [[ "$create_parents" == "true" ]]; then
+        mkdir_opts+=("-p")
+    fi
+
+    if mkdir "${mkdir_opts[@]}" "$dir_path" 2>/dev/null || [[ -d "$dir_path" ]]; then
+        chmod "$mode" "$dir_path"
+        chown "$owner:$group" "$dir_path"
+        log_debug "Created directory: $dir_path (mode: $mode, owner: $owner:$group)"
+        return 0
+    else
+        log_error "Failed to create directory: $dir_path"
+        return 1
+    fi
+}
+
+# Standardized permission setting with validation
+# Usage: standard_set_permissions "path" "mode" [owner] [group] [recursive]
+standard_set_permissions() {
+    local target_path="$1"
+    local mode="$2"
+    local owner="${3:-}"
+    local group="${4:-}"
+    local recursive="${5:-false}"
+
+    # Validate path
+    if ! validate_path_safe "$target_path"; then
+        log_error "Invalid path in standard_set_permissions: $target_path"
+        return 1
+    fi
+
+    # Check target exists
+    if [[ ! -e "$target_path" ]]; then
+        log_error "Target does not exist: $target_path"
+        return 1
+    fi
+
+    # Set permissions
+    local chmod_opts=()
+    if [[ "$recursive" == "true" ]]; then
+        chmod_opts+=("-R")
+    fi
+
+    if chmod "${chmod_opts[@]}" "$mode" "$target_path"; then
+        log_debug "Set permissions: $target_path (mode: $mode)"
+    else
+        log_error "Failed to set permissions: $target_path"
+        return 1
+    fi
+
+    # Set ownership if specified
+    if [[ -n "$owner" ]]; then
+        local chown_target="$owner"
+        if [[ -n "$group" ]]; then
+            chown_target="$owner:$group"
+        fi
+
+        local chown_opts=()
+        if [[ "$recursive" == "true" ]]; then
+            chown_opts+=("-R")
+        fi
+
+        if chown "${chown_opts[@]}" "$chown_target" "$target_path"; then
+            log_debug "Set ownership: $target_path (owner: $chown_target)"
+        else
+            log_error "Failed to set ownership: $target_path"
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+# Standardized service management functions
+# These ensure consistent systemctl operations and error handling
+
+# Standardized systemd service management
+# Usage: standard_service_operation "service_name" "operation" [timeout]
+standard_service_operation() {
+    local service_name="$1"
+    local operation="$2"
+    local timeout="${3:-30}"
+
+    case "$operation" in
+        "enable")
+            if systemctl enable "$service_name" 2>/dev/null; then
+                log_debug "Enabled service: $service_name"
+                return 0
+            else
+                log_error "Failed to enable service: $service_name"
+                return 1
+            fi
+            ;;
+        "disable")
+            if systemctl disable "$service_name" 2>/dev/null; then
+                log_debug "Disabled service: $service_name"
+                return 0
+            else
+                log_error "Failed to disable service: $service_name"
+                return 1
+            fi
+            ;;
+        "start")
+            if timeout "$timeout" systemctl start "$service_name" 2>/dev/null; then
+                log_debug "Started service: $service_name"
+                return 0
+            else
+                log_error "Failed to start service: $service_name"
+                return 1
+            fi
+            ;;
+        "stop")
+            if timeout "$timeout" systemctl stop "$service_name" 2>/dev/null; then
+                log_debug "Stopped service: $service_name"
+                return 0
+            else
+                log_error "Failed to stop service: $service_name"
+                return 1
+            fi
+            ;;
+        "restart")
+            if timeout "$timeout" systemctl restart "$service_name" 2>/dev/null; then
+                log_debug "Restarted service: $service_name"
+                return 0
+            else
+                log_error "Failed to restart service: $service_name"
+                return 1
+            fi
+            ;;
+        "reload")
+            if systemctl daemon-reload 2>/dev/null; then
+                log_debug "Reloaded systemd daemon"
+                return 0
+            else
+                log_error "Failed to reload systemd daemon"
+                return 1
+            fi
+            ;;
+        "status")
+            systemctl is-active "$service_name" >/dev/null 2>&1
+            return $?
+            ;;
+        *)
+            log_error "Unknown service operation: $operation"
+            return 1
+            ;;
+    esac
+}
+
+# Standardized systemd service file creation
+# Usage: standard_create_service_file "service_name" "service_content" [enable] [start]
+standard_create_service_file() {
+    local service_name="$1"
+    local service_content="$2"
+    local enable_service="${3:-true}"
+    local start_service="${4:-false}"
+
+    local service_file="/etc/systemd/system/${service_name}.service"
+
+    # Backup existing service file if it exists
+    if [[ -f "$service_file" ]]; then
+        local backup_file="${BACKUP_DIR}/${service_name}.service.backup-$(date +%Y%m%d-%H%M%S)"
+        if cp "$service_file" "$backup_file" 2>/dev/null; then
+            log_debug "Backed up existing service file: $service_file -> $backup_file"
+        else
+            log_warn "Failed to backup existing service file: $service_file"
+        fi
+    fi
+
+    # Create service file
+    if echo "$service_content" > "$service_file"; then
+        chmod 644 "$service_file"
+        chown root:root "$service_file"
+        log_debug "Created service file: $service_file"
+    else
+        log_error "Failed to create service file: $service_file"
+        return 1
+    fi
+
+    # Reload systemd daemon
+    if ! standard_service_operation "" "reload"; then
+        log_error "Failed to reload systemd daemon after creating service"
+        return 1
+    fi
+
+    # Enable service if requested
+    if [[ "$enable_service" == "true" ]]; then
+        if ! standard_service_operation "$service_name" "enable"; then
+            log_error "Failed to enable service: $service_name"
+            return 1
+        fi
+    fi
+
+    # Start service if requested
+    if [[ "$start_service" == "true" ]]; then
+        if ! standard_service_operation "$service_name" "start"; then
+            log_error "Failed to start service: $service_name"
+            return 1
+        fi
+    fi
+
+    log_success "Service $service_name created successfully"
+    return 0
+}
+
+# Standardized cron job management functions
+# These ensure consistent cron job creation and management
+
+# Standardized cron job creation
+# Usage: standard_create_cron_job "job_name" "schedule" "command" [user] [description]
+standard_create_cron_job() {
+    local job_name="$1"
+    local schedule="$2"
+    local command="$3"
+    local user="${4:-root}"
+    local description="${5:-DangerPrep automated task}"
+
+    local cron_file="/etc/cron.d/${job_name}"
+
+    # Validate cron schedule (basic validation)
+    if [[ ! "$schedule" =~ ^[0-9\*\-\,\/]+[[:space:]]+[0-9\*\-\,\/]+[[:space:]]+[0-9\*\-\,\/]+[[:space:]]+[0-9\*\-\,\/]+[[:space:]]+[0-9\*\-\,\/]+$ ]]; then
+        log_error "Invalid cron schedule format: $schedule"
+        return 1
+    fi
+
+    # Backup existing cron job if it exists
+    if [[ -f "$cron_file" ]]; then
+        local backup_file="${BACKUP_DIR}/${job_name}.cron.backup-$(date +%Y%m%d-%H%M%S)"
+        if cp "$cron_file" "$backup_file" 2>/dev/null; then
+            log_debug "Backed up existing cron job: $cron_file -> $backup_file"
+        else
+            log_warn "Failed to backup existing cron job: $cron_file"
+        fi
+    fi
+
+    # Create cron job file with proper format
+    cat > "$cron_file" << EOF
+# $description
+# Created by DangerPrep setup script
+$schedule $user $command
+EOF
+
+    # Set proper permissions for cron file
+    if chmod 644 "$cron_file" && chown root:root "$cron_file"; then
+        log_debug "Created cron job: $job_name ($schedule)"
+        return 0
+    else
+        log_error "Failed to set permissions on cron job: $cron_file"
+        return 1
+    fi
+}
+
+# Standardized cron job removal
+# Usage: standard_remove_cron_job "job_name"
+standard_remove_cron_job() {
+    local job_name="$1"
+    local cron_file="/etc/cron.d/${job_name}"
+
+    if [[ -f "$cron_file" ]]; then
+        if rm -f "$cron_file"; then
+            log_debug "Removed cron job: $job_name"
+            return 0
+        else
+            log_error "Failed to remove cron job: $cron_file"
+            return 1
+        fi
+    else
+        log_debug "Cron job does not exist: $job_name"
+        return 0
+    fi
+}
+
+# Standardized environment file functions
+# These ensure consistent environment file creation and secure permissions
+
+# Standardized environment file creation
+# Usage: standard_create_env_file "file_path" "content" [mode] [owner] [group]
+standard_create_env_file() {
+    local file_path="$1"
+    local content="$2"
+    local mode="${3:-600}"  # Default to secure permissions for env files
+    local owner="${4:-root}"
+    local group="${5:-root}"
+
+    # Validate path
+    if ! validate_path_safe "$file_path"; then
+        log_error "Invalid path in standard_create_env_file: $file_path"
+        return 1
+    fi
+
+    # Backup existing file if it exists
+    if [[ -f "$file_path" ]]; then
+        local backup_file="${BACKUP_DIR}/$(basename "$file_path").backup-$(date +%Y%m%d-%H%M%S)"
+        if cp "$file_path" "$backup_file" 2>/dev/null; then
+            log_debug "Backed up existing env file: $file_path -> $backup_file"
+        else
+            log_warn "Failed to backup existing env file: $file_path"
+        fi
+    fi
+
+    # Create directory if needed
+    local dir_path
+    dir_path=$(dirname "$file_path")
+    if [[ ! -d "$dir_path" ]]; then
+        if ! standard_create_directory "$dir_path" "755" "$owner" "$group"; then
+            log_error "Failed to create directory for env file: $dir_path"
+            return 1
+        fi
+    fi
+
+    # Create environment file
+    if echo "$content" > "$file_path"; then
+        chmod "$mode" "$file_path"
+        chown "$owner:$group" "$file_path"
+        log_debug "Created environment file: $file_path (mode: $mode)"
+        return 0
+    else
+        log_error "Failed to create environment file: $file_path"
+        return 1
+    fi
+}
+
+# Standardized template processing with environment substitution
+# Usage: standard_process_template "template_file" "output_file" [additional_vars...]
+standard_process_template() {
+    local template_file="$1"
+    local output_file="$2"
+    shift 2
+
+    if [[ ! -f "$template_file" ]]; then
+        log_error "Template file not found: $template_file"
+        return 1
+    fi
+
+    # Create output directory if needed
+    local output_dir
+    output_dir=$(dirname "$output_file")
+    if [[ ! -d "$output_dir" ]]; then
+        if ! standard_create_directory "$output_dir"; then
+            log_error "Failed to create output directory: $output_dir"
+            return 1
+        fi
+    fi
+
+    # Backup existing output file if it exists
+    if [[ -f "$output_file" ]]; then
+        local backup_file="${BACKUP_DIR}/$(basename "$output_file").backup-$(date +%Y%m%d-%H%M%S)"
+        if cp "$output_file" "$backup_file" 2>/dev/null; then
+            log_debug "Backed up existing file: $output_file -> $backup_file"
+        else
+            log_warn "Failed to backup existing file: $output_file"
+        fi
+    fi
+
+    # Read template content
+    local content
+    content=$(cat "$template_file")
+
+    # Process substitutions from arguments
+    for substitution in "$@"; do
+        if [[ "$substitution" =~ ^([^=]+)=(.*)$ ]]; then
+            local var_name="${BASH_REMATCH[1]}"
+            local var_value="${BASH_REMATCH[2]}"
+            content="${content//\{\{${var_name}\}\}/$var_value}"
+        fi
+    done
+
+    # Process common environment variables if they exist
+    local common_vars=(
+        "SSH_PORT" "WIFI_SSID" "WIFI_PASSWORD" "WIFI_INTERFACE" "WAN_INTERFACE"
+        "LAN_IP" "LAN_NETWORK" "DHCP_START" "DHCP_END" "FAIL2BAN_BANTIME" "FAIL2BAN_MAXRETRY"
+        "PROJECT_ROOT" "INSTALL_ROOT"
+    )
+
+    for var in "${common_vars[@]}"; do
+        local var_value="${!var:-}"
+        if [[ -n "$var_value" ]]; then
+            content="${content//\{\{${var}\}\}/$var_value}"
+        fi
+    done
+
+    # Write processed content
+    if echo "$content" > "$output_file"; then
+        log_debug "Processed template: $template_file -> $output_file"
+        return 0
+    else
+        log_error "Failed to write processed template: $output_file"
+        return 1
+    fi
+}
+
+# Standardized directory structure functions
+# These ensure consistent directory hierarchy creation with proper permissions
+
+# Standardized directory hierarchy creation
+# Usage: standard_create_directory_hierarchy "base_path" "subdir1:mode:owner:group" "subdir2:mode:owner:group" ...
+standard_create_directory_hierarchy() {
+    local base_path="$1"
+    shift
+
+    # Validate base path
+    if ! validate_path_safe "$base_path"; then
+        log_error "Invalid base path in standard_create_directory_hierarchy: $base_path"
+        return 1
+    fi
+
+    # Create base directory first
+    if ! standard_create_directory "$base_path"; then
+        log_error "Failed to create base directory: $base_path"
+        return 1
+    fi
+
+    # Create subdirectories
+    local failed_dirs=()
+    for dir_spec in "$@"; do
+        if [[ "$dir_spec" =~ ^([^:]+):([^:]+):([^:]+):([^:]+)$ ]]; then
+            local subdir="${BASH_REMATCH[1]}"
+            local mode="${BASH_REMATCH[2]}"
+            local owner="${BASH_REMATCH[3]}"
+            local group="${BASH_REMATCH[4]}"
+            local full_path="$base_path/$subdir"
+
+            if standard_create_directory "$full_path" "$mode" "$owner" "$group"; then
+                log_debug "Created directory: $full_path (mode: $mode, owner: $owner:$group)"
+            else
+                log_error "Failed to create directory: $full_path"
+                failed_dirs+=("$full_path")
+            fi
+        else
+            log_error "Invalid directory specification: $dir_spec"
+            failed_dirs+=("$dir_spec")
+        fi
+    done
+
+    if [[ ${#failed_dirs[@]} -gt 0 ]]; then
+        log_error "Failed to create ${#failed_dirs[@]} directories: ${failed_dirs[*]}"
+        return 1
+    fi
+
+    return 0
+}
+
+# Standardized directory structure validation
+# Usage: standard_validate_directory_structure "base_path" "required_subdirs..."
+standard_validate_directory_structure() {
+    local base_path="$1"
+    shift
+
+    # Check base directory exists
+    if [[ ! -d "$base_path" ]]; then
+        log_error "Base directory does not exist: $base_path"
+        return 1
+    fi
+
+    # Check required subdirectories
+    local missing_dirs=()
+    for subdir in "$@"; do
+        local full_path="$base_path/$subdir"
+        if [[ ! -d "$full_path" ]]; then
+            missing_dirs+=("$full_path")
+        fi
+    done
+
+    if [[ ${#missing_dirs[@]} -gt 0 ]]; then
+        log_error "Missing required directories: ${missing_dirs[*]}"
+        return 1
+    fi
+
+    log_debug "Directory structure validation passed for: $base_path"
+    return 0
+}
+
+# Standardized backup and restore functions
+# These ensure consistent backup and restore operations
+
+# Standardized backup creation
+# Usage: standard_create_backup "source_path" [backup_name]
+standard_create_backup() {
+    local source_path="$1"
+    local backup_name="${2:-$(basename "$source_path")}"
+
+    # Validate source path
+    if ! validate_path_safe "$source_path"; then
+        log_error "Invalid source path in standard_create_backup: $source_path"
+        return 1
+    fi
+
+    # Check source exists
+    if [[ ! -e "$source_path" ]]; then
+        log_error "Source does not exist: $source_path"
+        return 1
+    fi
+
+    # Create backup with timestamp
+    local backup_file="${BACKUP_DIR}/${backup_name}.backup-$(date +%Y%m%d-%H%M%S)"
+
+    if [[ -d "$source_path" ]]; then
+        # Backup directory
+        if cp -r "$source_path" "$backup_file"; then
+            log_debug "Created directory backup: $source_path -> $backup_file"
+            echo "$backup_file"
+            return 0
+        else
+            log_error "Failed to create directory backup: $source_path"
+            return 1
+        fi
+    elif [[ -f "$source_path" ]]; then
+        # Backup file
+        if cp "$source_path" "$backup_file"; then
+            log_debug "Created file backup: $source_path -> $backup_file"
+            echo "$backup_file"
+            return 0
+        else
+            log_error "Failed to create file backup: $source_path"
+            return 1
+        fi
+    else
+        log_error "Source is neither file nor directory: $source_path"
+        return 1
+    fi
+}
+
+# Standardized backup restoration
+# Usage: standard_restore_backup "backup_file" "destination_path"
+standard_restore_backup() {
+    local backup_file="$1"
+    local destination_path="$2"
+
+    # Validate paths
+    if ! validate_path_safe "$backup_file" || ! validate_path_safe "$destination_path"; then
+        log_error "Invalid path in standard_restore_backup: $backup_file -> $destination_path"
+        return 1
+    fi
+
+    # Check backup exists
+    if [[ ! -e "$backup_file" ]]; then
+        log_error "Backup file does not exist: $backup_file"
+        return 1
+    fi
+
+    # Restore backup
+    if [[ -d "$backup_file" ]]; then
+        # Restore directory
+        if cp -r "$backup_file" "$destination_path"; then
+            log_debug "Restored directory backup: $backup_file -> $destination_path"
+            return 0
+        else
+            log_error "Failed to restore directory backup: $backup_file"
+            return 1
+        fi
+    elif [[ -f "$backup_file" ]]; then
+        # Restore file
+        if cp "$backup_file" "$destination_path"; then
+            log_debug "Restored file backup: $backup_file -> $destination_path"
+            return 0
+        else
+            log_error "Failed to restore file backup: $backup_file"
+            return 1
+        fi
+    else
+        log_error "Backup is neither file nor directory: $backup_file"
+        return 1
+    fi
+}
+
 # Bash version check
 check_bash_version() {
     local current_version
     current_version=$(bash --version | head -n1 | grep -oE '[0-9]+\.[0-9]+' | head -n1)
     if ! awk -v curr="$current_version" -v req="$REQUIRED_BASH_VERSION" 'BEGIN {exit !(curr >= req)}'; then
         log_error "Bash version $REQUIRED_BASH_VERSION or higher required. Current: $current_version"
-        exit 1
+        return 1
     fi
+    return 0
 }
 
 # Retry function with exponential backoff
@@ -161,8 +959,8 @@ if [[ -f "${GUM_UTILS_PATH}" ]]; then
     # shellcheck source=../shared/gum-utils.sh
     source "${GUM_UTILS_PATH}"
 else
-    log_error "Required gum utilities not found at ${GUM_UTILS_PATH}"
-    log_error "This indicates a corrupted or incomplete DangerPrep installation"
+    echo "ERROR: Required gum utilities not found at ${GUM_UTILS_PATH}" >&2
+    echo "ERROR: This indicates a corrupted or incomplete DangerPrep installation" >&2
     exit 1
 fi
 
@@ -257,22 +1055,14 @@ cleanup_resources() {
 
 # Note: Duplicate validation functions removed - using enhanced versions above
 
-# Secure file operations
+# Legacy secure file operations - use standard_secure_copy instead
 secure_copy() {
     local src="$1"
     local dest="$2"
     local mode="${3:-644}"
 
-    # Validate paths
-    if ! validate_path_safe "${src}" || ! validate_path_safe "${dest}"; then
-        log_error "Invalid path in secure_copy: ${src} -> ${dest}"
-        return 1
-    fi
-
-    # Copy with secure permissions
-    cp "${src}" "${dest}"
-    chmod "${mode}" "${dest}"
-    chown root:root "${dest}"
+    # Redirect to standardized function
+    standard_secure_copy "$src" "$dest" "$mode" "root" "root"
 }
 
 # Lock file management for preventing concurrent execution
@@ -513,9 +1303,9 @@ parse_arguments() {
                 exit 1
                 ;;
             *)
-                log_error "Unexpected argument: $1"
-                log_error "Use --help for usage information"
-                exit 1
+                echo "ERROR: Unexpected argument: $1" >&2
+                echo "ERROR: Use --help for usage information" >&2
+                return 1
                 ;;
         esac
     done
@@ -664,36 +1454,247 @@ collect_configuration() {
     fi
 
     echo
-    # Create styled configuration summary with sections
+
+    # Package selection configuration
+    collect_package_configuration
+
+    # Docker services configuration
+    collect_docker_services_configuration
+
+    # FriendlyElec-specific configuration
+    if [[ "$IS_FRIENDLYELEC" == true ]]; then
+        collect_friendlyelec_configuration
+    fi
+
+    # User account configuration
+    collect_user_account_configuration
+
+    # Show comprehensive configuration summary
+    show_complete_configuration_summary
+
+    # Final confirmation
+    echo
+    if ! enhanced_confirm "Proceed with this complete configuration?" "true"; then
+        log_info "Configuration cancelled by user"
+        return 1
+    fi
+
+    # Export all variables for use in templates and other functions
+    export WIFI_SSID WIFI_PASSWORD LAN_NETWORK LAN_IP DHCP_START DHCP_END
+    export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
+    export SELECTED_PACKAGE_CATEGORIES SELECTED_DOCKER_SERVICES
+    export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
+    export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
+
+    # Clean up trap
+    trap - INT
+
+    log_success "Configuration collection completed"
+}
+
+# Collect package configuration upfront
+collect_package_configuration() {
+    echo
+    log_info "📦 Package Selection Configuration"
+    echo
+
+    # Define package categories (same as in install_essential_packages)
+    local package_categories=(
+        "Convenience packages (vim, nano, htop, etc.)"
+        "Network packages (netplan, tc, iperf3, etc.)"
+        "Security packages (fail2ban, aide, clamav, etc.)"
+        "Monitoring packages (sensors, collectd, etc.)"
+        "Backup packages (borgbackup, restic)"
+        "Automatic update packages"
+    )
+
+    log_info "Select which package categories to install:"
+    SELECTED_PACKAGE_CATEGORIES=$(enhanced_multi_choose "Package Categories" "${package_categories[@]}")
+
+    if [[ -n "$SELECTED_PACKAGE_CATEGORIES" ]]; then
+        local category_count
+        category_count=$(echo "$SELECTED_PACKAGE_CATEGORIES" | wc -l)
+        enhanced_status_indicator "success" "Selected $category_count package categories"
+    else
+        enhanced_status_indicator "info" "No optional packages selected (core packages will still be installed)"
+    fi
+}
+
+# Collect Docker services configuration upfront
+collect_docker_services_configuration() {
+    echo
+    log_info "🐳 Docker Services Configuration"
+    echo
+
+    # Define available Docker services
+    local docker_services=(
+        "Traefik (Reverse Proxy)"
+        "Arcane (Dashboard)"
+        "Jellyfin (Media Server)"
+        "Komga (Comic/Book Server)"
+        "Kiwix (Offline Wikipedia)"
+        "RaspAP (Network Management)"
+        "Step-CA (Certificate Authority)"
+        "AdGuard Home (DNS Filtering)"
+        "Tailscale (VPN)"
+    )
+
+    log_info "Select which Docker services to install:"
+    SELECTED_DOCKER_SERVICES=$(enhanced_multi_choose "Docker Services" "${docker_services[@]}")
+
+    if [[ -n "$SELECTED_DOCKER_SERVICES" ]]; then
+        local service_count
+        service_count=$(echo "$SELECTED_DOCKER_SERVICES" | wc -l)
+        enhanced_status_indicator "success" "Selected $service_count Docker services"
+    else
+        enhanced_status_indicator "info" "No Docker services selected"
+    fi
+}
+
+# Collect FriendlyElec-specific configuration upfront
+collect_friendlyelec_configuration() {
+    echo
+    log_info "🔧 FriendlyElec Hardware Configuration"
+    echo
+
+    # FriendlyElec package options
+    local friendlyelec_packages=(
+        "Hardware acceleration packages (Mesa, GStreamer)"
+        "Development packages (kernel headers, build tools)"
+        "Media packages (FFmpeg, codecs)"
+        "GPIO/PWM packages (hardware interface tools)"
+    )
+
+    log_info "Select FriendlyElec-specific packages to install:"
+    FRIENDLYELEC_INSTALL_PACKAGES=$(enhanced_multi_choose "FriendlyElec Packages" "${friendlyelec_packages[@]}")
+
+    # FriendlyElec feature options
+    local friendlyelec_features=(
+        "Enable hardware fan control"
+        "Enable GPU performance mode"
+        "Enable hardware monitoring"
+        "Configure thermal management"
+        "Enable M.2 optimizations"
+    )
+
+    log_info "Select FriendlyElec hardware features to enable:"
+    FRIENDLYELEC_ENABLE_FEATURES=$(enhanced_multi_choose "FriendlyElec Features" "${friendlyelec_features[@]}")
+
+    local package_count feature_count
+    package_count=$(echo "$FRIENDLYELEC_INSTALL_PACKAGES" | wc -l)
+    feature_count=$(echo "$FRIENDLYELEC_ENABLE_FEATURES" | wc -l)
+    enhanced_status_indicator "success" "Selected $package_count package categories and $feature_count features"
+}
+
+# Collect user account configuration upfront
+collect_user_account_configuration() {
+    echo
+    log_info "👤 User Account Configuration"
+    echo
+
+    # Get new username
+    NEW_USERNAME=$(enhanced_input "New Username" "" "Enter username for new account (will replace pi user)")
+    while [[ -z "$NEW_USERNAME" ]] || [[ "$NEW_USERNAME" == "pi" ]] || [[ "$NEW_USERNAME" == "root" ]]; do
+        if [[ -z "$NEW_USERNAME" ]]; then
+            log_warn "Username cannot be empty"
+        elif [[ "$NEW_USERNAME" == "pi" ]]; then
+            log_warn "Cannot use 'pi' as username (will be removed)"
+        elif [[ "$NEW_USERNAME" == "root" ]]; then
+            log_warn "Cannot use 'root' as username"
+        fi
+        NEW_USERNAME=$(enhanced_input "New Username" "" "Enter a valid username")
+    done
+
+    # Get full name (optional)
+    NEW_USER_FULLNAME=$(enhanced_input "Full Name (optional)" "" "Enter full name for new user")
+
+    # Ask about SSH key transfer
+    if [[ -d "/home/pi/.ssh" ]]; then
+        TRANSFER_SSH_KEYS=$(enhanced_confirm "Transfer SSH keys from pi user?" "true")
+        if [[ "$TRANSFER_SSH_KEYS" == "true" ]]; then
+            TRANSFER_SSH_KEYS="yes"
+        else
+            TRANSFER_SSH_KEYS="no"
+        fi
+    else
+        TRANSFER_SSH_KEYS="no"
+        log_info "No SSH keys found for pi user"
+    fi
+
+    enhanced_status_indicator "success" "User account configuration completed"
+}
+
+# Show complete configuration summary
+show_complete_configuration_summary() {
+    echo
+    enhanced_section "Complete Configuration Summary" "Review all DangerPrep configuration settings" "📋"
+
+    # Network configuration
     local network_config="WiFi SSID: ${WIFI_SSID}
 WiFi Password: ${WIFI_PASSWORD:0:3}***
 LAN Network: ${LAN_NETWORK}
 LAN Gateway: ${LAN_IP}
 DHCP Range: ${DHCP_START} - ${DHCP_END}"
 
+    # Security configuration
     local security_config="SSH Port: ${SSH_PORT}
 Fail2ban Ban Time: ${FAIL2BAN_BANTIME}s
 Fail2ban Max Retry: ${FAIL2BAN_MAXRETRY}"
 
-    enhanced_section "Configuration Summary" "Review your DangerPrep configuration settings" "📋"
-
-    enhanced_card "🌐 Network Configuration" "${network_config}" "39" "39"
-    enhanced_card "🔒 Security Configuration" "${security_config}" "196" "196"
-
-    echo
-    if ! enhanced_confirm "Proceed with this configuration?" "true"; then
-        log_info "Configuration cancelled by user"
-        exit 0
+    # Package configuration
+    local package_config="Selected Categories: "
+    if [[ -n "$SELECTED_PACKAGE_CATEGORIES" ]]; then
+        local category_count
+        category_count=$(echo "$SELECTED_PACKAGE_CATEGORIES" | wc -l)
+        package_config+="$category_count categories"
+    else
+        package_config+="Core packages only"
     fi
 
-    # Export variables for use in templates and other functions
-    export WIFI_SSID WIFI_PASSWORD LAN_NETWORK LAN_IP DHCP_START DHCP_END
-    export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
+    # Docker services configuration
+    local docker_config="Selected Services: "
+    if [[ -n "$SELECTED_DOCKER_SERVICES" ]]; then
+        local service_count
+        service_count=$(echo "$SELECTED_DOCKER_SERVICES" | wc -l)
+        docker_config+="$service_count services"
+    else
+        docker_config+="None"
+    fi
 
-    # Clean up trap
-    trap - INT
+    # User account configuration
+    local user_config="New Username: ${NEW_USERNAME}
+Full Name: ${NEW_USER_FULLNAME:-"Not specified"}
+Transfer SSH Keys: ${TRANSFER_SSH_KEYS}"
 
-    log_success "Configuration collection completed"
+    # Display all configuration cards
+    enhanced_card "🌐 Network Configuration" "$network_config" "39" "39"
+    enhanced_card "🔒 Security Configuration" "$security_config" "196" "196"
+    enhanced_card "📦 Package Configuration" "$package_config" "33" "33"
+    enhanced_card "🐳 Docker Configuration" "$docker_config" "34" "34"
+    enhanced_card "👤 User Configuration" "$user_config" "35" "35"
+
+    # FriendlyElec configuration if applicable
+    if [[ "$IS_FRIENDLYELEC" == true ]]; then
+        local friendlyelec_config="Hardware Packages: "
+        if [[ -n "$FRIENDLYELEC_INSTALL_PACKAGES" ]]; then
+            local package_count
+            package_count=$(echo "$FRIENDLYELEC_INSTALL_PACKAGES" | wc -l)
+            friendlyelec_config+="$package_count categories"$'\n'
+        else
+            friendlyelec_config+="None"$'\n'
+        fi
+
+        friendlyelec_config+="Hardware Features: "
+        if [[ -n "$FRIENDLYELEC_ENABLE_FEATURES" ]]; then
+            local feature_count
+            feature_count=$(echo "$FRIENDLYELEC_ENABLE_FEATURES" | wc -l)
+            friendlyelec_config+="$feature_count features"
+        else
+            friendlyelec_config+="None"
+        fi
+
+        enhanced_card "🔧 FriendlyElec Configuration" "$friendlyelec_config" "208" "208"
+    fi
 }
 
 # Enhanced root privilege check with detailed error reporting
@@ -724,7 +1725,7 @@ setup_logging() {
     # Initialize log file with proper permissions
     if ! touch "$LOG_FILE"; then
         echo "ERROR: Failed to create log file: $LOG_FILE" >&2
-        exit 1
+        return 1
     fi
 
     # Set secure permissions (readable by root and adm group)
@@ -1041,20 +2042,20 @@ pre_flight_checks() {
     # Check internet connectivity
     if ! ping -c 1 8.8.8.8 >/dev/null 2>&1; then
         log_error "No internet connectivity. Please check your connection."
-        exit 1
+        return 1
     fi
 
     # Check available disk space (minimum 10GB)
     available_space=$(df / | tail -1 | awk '{print $4}')
     if [[ $available_space -lt 10485760 ]]; then  # 10GB in KB
         log_error "Insufficient disk space. At least 10GB required."
-        exit 1
+        return 1
     fi
 
     # Validate configuration files
     if ! validate_config_files; then
         log_error "Configuration file validation failed"
-        exit 1
+        return 1
     fi
 
     log_success "Pre-flight checks completed"
@@ -1110,222 +2111,103 @@ update_system_packages() {
     log_success "System packages updated"
 }
 
-# Install essential packages with interactive selection
+# Install essential packages using standardized pattern and upfront configuration
 install_essential_packages() {
-    log_info "📦 Installing essential packages..."
+    log_info "📦 Installing essential packages based on configuration..."
 
-    # Define package categories
-    # Core packages: Essential for DangerPrep functionality
-    local core_packages=(
-        "curl" "wget" "git" "bc" "unzip"                                    # Required by scripts
-        "software-properties-common" "apt-transport-https" "ca-certificates" # Package management
-        "gnupg" "lsb-release"                                               # Security and system info
-    )
+    # Core packages: Always installed (Essential for DangerPrep functionality)
+    local core_packages="curl,wget,git,bc,unzip,software-properties-common,apt-transport-https,ca-certificates,gnupg,lsb-release"
 
-    # User convenience packages: Optional tools for system administration
-    local convenience_packages=(
-        "vim" "nano" "htop" "tree" "zip" "jq" "rsync" "screen" "tmux"      # User tools
-    )
+    # Build package categories based on upfront configuration
+    local package_categories=("Core:$core_packages")
 
-    # Network packages: Reduced since RaspAP handles most networking
-    # Only keeping tools that complement RaspAP or are needed for advanced networking
-    local network_packages=(
-        "netplan.io"        # Network configuration (Ubuntu standard)
-        "iproute2"          # Advanced routing tools (ip command)
-        "tc"                # Traffic control for QoS
-        "wondershaper"      # Bandwidth limiting tool
-        "iperf3"            # Network performance testing
-    )
-
-    local security_packages=(
-        "fail2ban" "aide" "rkhunter" "chkrootkit" "clamav" "clamav-daemon"
-        "lynis" "suricata" "apparmor" "apparmor-utils" "libpam-pwquality"
-        "libpam-tmpdir" "acct" "psacct"
-    )
-
-    local monitoring_packages=(
-        "lm-sensors" "hddtemp" "fancontrol" "sensors-applet"
-        "collectd" "collectd-utils" "logwatch" "rsyslog-gnutls"
-        "smartmontools"
-    )
-
-    local backup_packages=(
-        "borgbackup" "restic"
-    )
-
-    local update_packages=(
-        "unattended-upgrades"
-    )
-
-    # Interactive package selection
-    local selected_packages=()
-
-    enhanced_section "Package Selection" "Choose which package categories to install" "📦"
-
-    # Always include core packages (non-optional)
-    selected_packages+=("${core_packages[@]}")
-    enhanced_status_indicator "info" "Core packages (required): ${#core_packages[@]} packages - always included"
-    echo
-
-    # Optional package categories with multi-select
-    local package_categories=(
-        "Convenience packages (vim, nano, htop, etc.) - ${#convenience_packages[@]} packages"
-        "Network packages (netplan, tc, iperf3, etc.) - ${#network_packages[@]} packages"
-        "Security packages (fail2ban, aide, clamav, etc.) - ${#security_packages[@]} packages"
-        "Monitoring packages (sensors, collectd, etc.) - ${#monitoring_packages[@]} packages"
-        "Backup packages (borgbackup, restic) - ${#backup_packages[@]} packages"
-        "Automatic update packages - ${#update_packages[@]} packages"
-    )
-
-    log_info "Select optional package categories to install:"
-    local selected_categories
-    selected_categories=$(enhanced_multi_choose "Package Categories" "${package_categories[@]}")
-
-    # Process selected categories
-    if [[ -n "${selected_categories}" ]]; then
+    # Add optional categories based on user selection
+    if [[ -n "$SELECTED_PACKAGE_CATEGORIES" ]]; then
         while IFS= read -r category; do
-            case "${category}" in
+            case "$category" in
                 *"Convenience packages"*)
-                    selected_packages+=("${convenience_packages[@]}")
-                    enhanced_status_indicator "success" "Added ${#convenience_packages[@]} convenience packages"
+                    package_categories+=("Convenience:vim,nano,htop,tree,zip,jq,rsync,screen,tmux")
                     ;;
                 *"Network packages"*)
-                    selected_packages+=("${network_packages[@]}")
-                    enhanced_status_indicator "success" "Added ${#network_packages[@]} network packages"
+                    package_categories+=("Network:netplan.io,iproute2,tc,wondershaper,iperf3")
                     ;;
                 *"Security packages"*)
-                    selected_packages+=("${security_packages[@]}")
-                    enhanced_status_indicator "success" "Added ${#security_packages[@]} security packages"
+                    package_categories+=("Security:fail2ban,aide,rkhunter,chkrootkit,clamav,clamav-daemon,lynis,suricata,apparmor,apparmor-utils,libpam-pwquality,libpam-tmpdir,acct,psacct")
                     ;;
                 *"Monitoring packages"*)
-                    selected_packages+=("${monitoring_packages[@]}")
-                    enhanced_status_indicator "success" "Added ${#monitoring_packages[@]} monitoring packages"
+                    package_categories+=("Monitoring:lm-sensors,hddtemp,fancontrol,sensors-applet,collectd,collectd-utils,logwatch,rsyslog-gnutls,smartmontools")
                     ;;
                 *"Backup packages"*)
-                    selected_packages+=("${backup_packages[@]}")
-                    enhanced_status_indicator "success" "Added ${#backup_packages[@]} backup packages"
+                    package_categories+=("Backup:borgbackup,restic")
                     ;;
                 *"Automatic update packages"*)
-                    selected_packages+=("${update_packages[@]}")
-                    enhanced_status_indicator "success" "Added ${#update_packages[@]} update packages"
-                    ;;
-                *)
-                    log_warn "Unknown package category: ${category}"
+                    package_categories+=("Updates:unattended-upgrades")
                     ;;
             esac
-        done <<< "${selected_categories}"
-    else
-        log_info "No optional packages selected"
+        done <<< "$SELECTED_PACKAGE_CATEGORIES"
     fi
 
-    # Show package summary
-    log_info "📋 Package Installation Summary"
-    enhanced_table "Category,Count,Packages" \
-        "Core,${#core_packages[@]},Always installed" \
-        "Convenience,${#convenience_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${convenience_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)" \
-        "Network,${#network_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${network_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)" \
-        "Security,${#security_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${security_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)" \
-        "Monitoring,${#monitoring_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${monitoring_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)" \
-        "Backup,${#backup_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${backup_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)" \
-        "Updates,${#update_packages[@]},$(if [[ " ${selected_packages[*]} " =~ ${update_packages[0]} ]]; then echo "Selected"; else echo "Skipped"; fi)"
+    # Use standardized package installation function
+    install_packages_with_selection "Essential Packages" "Installing packages based on your configuration" "${package_categories[@]}"
+    local install_result=$?
 
-    echo
-    if ! enhanced_confirm "Proceed with package installation?" "true"; then
-        log_info "Package installation cancelled by user"
-        return 1
-    fi
-
-    # Install selected packages with enhanced progress indication
-    local failed_packages=()
-    local installed_count=0
-    local total_packages=${#selected_packages[@]}
-
-    enhanced_section "Package Installation" "Installing ${total_packages} selected packages..." "📦"
-
-    for package in "${selected_packages[@]}"; do
-        ((++installed_count))
-
-        # Show progress bar
-        enhanced_progress_bar "${installed_count}" "${total_packages}" "Package Installation Progress"
-
-        # Check if package is already installed
-        if dpkg -l "${package}" 2>/dev/null | grep -q "^ii"; then
-            enhanced_status_indicator "success" "${package} (already installed)"
-            continue
-        fi
-
-        enhanced_spin "Installing ${package} (${installed_count}/${total_packages})" \
-            env DEBIAN_FRONTEND=noninteractive apt install -y "${package}"
-        local install_result=$?
-
-        if [[ ${install_result} -eq 0 ]]; then
-            enhanced_status_indicator "success" "Installed ${package}"
-        else
-            enhanced_status_indicator "failure" "Failed to install ${package}"
-            failed_packages+=("${package}")
-        fi
-    done
-
-    # Report installation results
-    if [[ ${#failed_packages[@]} -gt 0 ]]; then
-        log_warn "Failed to install ${#failed_packages[@]} packages: ${failed_packages[*]}"
-        log_info "These packages may not be available in the current repository"
-    fi
-
-    log_success "Successfully installed $((total_packages - ${#failed_packages[@]}))/${total_packages} packages"
-
-    # Install FriendlyElec-specific packages
-    if [[ "$IS_FRIENDLYELEC" == true ]]; then
-        if enhanced_confirm "Install FriendlyElec-specific packages?" "true"; then
-            install_friendlyelec_packages
-        fi
+    # Install FriendlyElec-specific packages if configured
+    if [[ "$IS_FRIENDLYELEC" == true ]] && [[ -n "$FRIENDLYELEC_INSTALL_PACKAGES" ]]; then
+        install_friendlyelec_packages
     fi
 
     # Clean up package cache
     enhanced_spin "Cleaning package cache" apt autoremove -y
     enhanced_spin "Cleaning package cache" apt autoclean
 
-    log_success "Essential packages installation completed"
+    if [[ $install_result -eq 0 ]]; then
+        log_success "Essential packages installation completed"
+    else
+        log_error "Essential packages installation failed"
+        return $install_result
+    fi
 }
 
-# Install FriendlyElec-specific packages and configurations
+# Install FriendlyElec-specific packages using standardized pattern and upfront configuration
 install_friendlyelec_packages() {
-    log_info "Installing FriendlyElec-specific packages..."
+    log_info "Installing FriendlyElec-specific packages based on configuration..."
 
-    # FriendlyElec-specific packages for hardware acceleration
-    local friendlyelec_packages=()
+    # Build package categories based on upfront configuration
+    local package_categories=()
 
-    if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
-        friendlyelec_packages+=(
-            "mesa-utils"           # OpenGL utilities
-            "glmark2-es2"         # OpenGL ES benchmark
-            "v4l-utils"           # Video4Linux utilities
-            "gstreamer1.0-tools"  # GStreamer tools for hardware decoding
-            "gstreamer1.0-plugins-bad"
-            "gstreamer1.0-rockchip1"  # RK3588 hardware acceleration (if available)
-        )
+    if [[ -n "$FRIENDLYELEC_INSTALL_PACKAGES" ]]; then
+        while IFS= read -r category; do
+            case "$category" in
+                *"Hardware acceleration packages"*)
+                    if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
+                        package_categories+=("Hardware:mesa-utils,glmark2-es2,v4l-utils,gstreamer1.0-tools,gstreamer1.0-plugins-bad,gstreamer1.0-rockchip1")
+                    fi
+                    ;;
+                *"Development packages"*)
+                    package_categories+=("Development:build-essential,linux-headers-generic")
+                    ;;
+                *"Media packages"*)
+                    package_categories+=("Media:ffmpeg,libavcodec-extra")
+                    ;;
+                *"GPIO/PWM packages"*)
+                    package_categories+=("GPIO:python3-rpi.gpio,python3-gpiozero,wiringpi")
+                    ;;
+            esac
+        done <<< "$FRIENDLYELEC_INSTALL_PACKAGES"
     fi
 
-    # Install available packages
-    for package in "${friendlyelec_packages[@]}"; do
-        # Check if package is already installed
-        if dpkg -l "${package}" 2>/dev/null | grep -q "^ii"; then
-            log_debug "✓ ${package} already installed"
-            continue
-        fi
-
-        log_info "Installing FriendlyElec package: ${package}..."
-        if env DEBIAN_FRONTEND=noninteractive apt install -y "${package}"; then
-            log_success "Installed ${package}"
-        else
-            log_warn "Package ${package} not available, skipping"
-        fi
-    done
+    # Only proceed if there are packages to install
+    if [[ ${#package_categories[@]} -gt 0 ]]; then
+        # Use standardized package installation function
+        install_packages_with_selection "FriendlyElec Packages" "Installing FriendlyElec-specific packages based on your configuration" "${package_categories[@]}"
+    else
+        log_info "No FriendlyElec packages selected for installation"
+    fi
 
     # Install FriendlyElec kernel headers if available
     install_friendlyelec_kernel_headers
 
-    # Configure hardware-specific settings
+    # Configure hardware-specific settings based on selected features
     configure_friendlyelec_hardware
 
     log_success "FriendlyElec-specific packages installation completed"
@@ -1775,8 +2657,12 @@ setup_file_integrity_monitoring() {
     [[ -f /var/lib/aide/aide.db.new ]] && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
     load_aide_config
 
-    # Add cron job to run via just
-    echo "0 3 * * * root cd $PROJECT_ROOT && just aide-check" > /etc/cron.d/aide-check
+    # Add cron job using standardized cron job creation
+    local aide_command="cd $PROJECT_ROOT && just aide-check"
+    if ! standard_create_cron_job "aide-check" "0 3 * * *" "$aide_command" "root" "DangerPrep file integrity monitoring"; then
+        log_error "Failed to create AIDE check cron job"
+        return 1
+    fi
 
     log_success "File integrity monitoring configured"
 }
@@ -1787,8 +2673,12 @@ setup_hardware_monitoring() {
     sensors-detect --auto
     load_hardware_monitoring_config
 
-    # Add cron job to run via just
-    echo "*/15 * * * * root cd $PROJECT_ROOT && just hardware-monitor" > /etc/cron.d/hardware-monitor
+    # Add cron job using standardized cron job creation
+    local hardware_command="cd $PROJECT_ROOT && just hardware-monitor"
+    if ! standard_create_cron_job "hardware-monitor" "*/15 * * * *" "$hardware_command" "root" "DangerPrep hardware monitoring"; then
+        log_error "Failed to create hardware monitoring cron job"
+        return 1
+    fi
 
     log_success "Hardware monitoring configured"
 }
@@ -1797,106 +2687,213 @@ setup_hardware_monitoring() {
 setup_advanced_security_tools() {
     log_info "Setting up advanced security tools..."
 
-    # Configure ClamAV
+    # Configure ClamAV using standardized cron job creation
     if command -v clamscan >/dev/null 2>&1; then
         freshclam || log_warn "Failed to update ClamAV definitions"
-        echo "0 4 * * * root cd $PROJECT_ROOT && just antivirus-scan" > /etc/cron.d/antivirus-scan
+        local antivirus_command="cd $PROJECT_ROOT && just antivirus-scan"
+        if ! standard_create_cron_job "antivirus-scan" "0 4 * * *" "$antivirus_command" "root" "DangerPrep antivirus scan"; then
+            log_error "Failed to create antivirus scan cron job"
+            return 1
+        fi
     fi
 
-    # Configure Suricata
+    # Configure Suricata using standardized cron job creation
     if command -v suricata >/dev/null 2>&1; then
-        echo "*/30 * * * * root cd $PROJECT_ROOT && just suricata-monitor" > /etc/cron.d/suricata-monitor
+        local suricata_command="cd $PROJECT_ROOT && just suricata-monitor"
+        if ! standard_create_cron_job "suricata-monitor" "*/30 * * * *" "$suricata_command" "root" "DangerPrep Suricata monitoring"; then
+            log_error "Failed to create Suricata monitoring cron job"
+            return 1
+        fi
     fi
 
-    # Add cron jobs to run via just
-    echo "0 2 * * 0 root cd $PROJECT_ROOT && just security-audit" > /etc/cron.d/security-audit
-    echo "0 3 * * 6 root cd $PROJECT_ROOT && just rootkit-scan" > /etc/cron.d/rootkit-scan
+    # Add security audit cron jobs using standardized cron job creation
+    local security_audit_command="cd $PROJECT_ROOT && just security-audit"
+    if ! standard_create_cron_job "security-audit" "0 2 * * 0" "$security_audit_command" "root" "DangerPrep weekly security audit"; then
+        log_error "Failed to create security audit cron job"
+        return 1
+    fi
+
+    local rootkit_scan_command="cd $PROJECT_ROOT && just rootkit-scan"
+    if ! standard_create_cron_job "rootkit-scan" "0 3 * * 6" "$rootkit_scan_command" "root" "DangerPrep weekly rootkit scan"; then
+        log_error "Failed to create rootkit scan cron job"
+        return 1
+    fi
 
     log_success "Advanced security tools configured"
 }
 
-# Configure rootless Docker
+# Configure rootless Docker using standardized patterns
 configure_rootless_docker() {
-    log_info "Configuring rootless Docker..."
+    enhanced_section "Docker Installation" "Installing and configuring Docker with rootless support" "🐳"
 
     # Install Docker using official repository (secure method)
     if ! command -v docker >/dev/null 2>&1; then
         log_info "Installing Docker from official repository..."
 
-        # Add Docker's official GPG key
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        # Add Docker's official GPG key with error handling
+        if enhanced_spin "Adding Docker GPG key" \
+            "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg"; then
+            enhanced_status_indicator "success" "Docker GPG key added"
+        else
+            enhanced_status_indicator "failure" "Failed to add Docker GPG key"
+            return 1
+        fi
 
-        # Add Docker repository
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        # Add Docker repository with standardized file operations
+        local docker_repo="deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+        if standard_create_env_file "/etc/apt/sources.list.d/docker.list" "$docker_repo" "644"; then
+            enhanced_status_indicator "success" "Docker repository added"
+        else
+            enhanced_status_indicator "failure" "Failed to add Docker repository"
+            return 1
+        fi
 
-        # Update package index and install Docker
-        apt update
-        env DEBIAN_FRONTEND=noninteractive apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        # Update package index and install Docker packages
+        if enhanced_spin "Updating package index" "apt update"; then
+            enhanced_status_indicator "success" "Package index updated"
+        else
+            enhanced_status_indicator "failure" "Failed to update package index"
+            return 1
+        fi
 
-        # Add ubuntu user to docker group
-        usermod -aG docker ubuntu
-        log_success "Docker installed successfully"
+        # Install Docker packages using standardized pattern
+        local docker_packages="docker-ce,docker-ce-cli,containerd.io,docker-buildx-plugin,docker-compose-plugin"
+        install_packages_with_selection "Docker" "Installing Docker packages" "Docker:$docker_packages"
+        local install_result=$?
+
+        if [[ $install_result -eq 0 ]]; then
+            # Add user to docker group (will be updated when user account is created)
+            if id ubuntu >/dev/null 2>&1; then
+                usermod -aG docker ubuntu
+                enhanced_status_indicator "success" "Added ubuntu user to docker group"
+            fi
+            log_success "Docker installed successfully"
+        else
+            log_error "Docker installation failed"
+            return $install_result
+        fi
     else
-        log_info "Docker already installed"
+        enhanced_status_indicator "info" "Docker already installed"
     fi
 
-    # Configure rootless Docker for ubuntu user (optional, more secure)
+    # Configure rootless Docker for user (will be updated when user account is created)
     if [[ ! -f /home/ubuntu/.config/systemd/user/docker.service ]]; then
         log_info "Setting up rootless Docker for ubuntu user..."
 
-        # Install rootless Docker dependencies
-        env DEBIAN_FRONTEND=noninteractive apt install -y uidmap dbus-user-session
+        # Install rootless Docker dependencies using standardized pattern
+        local rootless_packages="uidmap,dbus-user-session"
+        install_packages_with_selection "Rootless Docker" "Installing rootless Docker dependencies" "Dependencies:$rootless_packages"
 
         # Set up rootless Docker for ubuntu user
-        sudo -u ubuntu bash -c 'dockerd-rootless-setuptool.sh install'
-        sudo -u ubuntu bash -c 'echo "export PATH=/home/ubuntu/bin:\$PATH" >> /home/ubuntu/.bashrc'
-        sudo -u ubuntu bash -c 'echo "export DOCKER_HOST=unix:///run/user/1000/docker.sock" >> /home/ubuntu/.bashrc'
+        if enhanced_spin "Configuring rootless Docker" \
+            "sudo -u ubuntu bash -c 'dockerd-rootless-setuptool.sh install'"; then
+            enhanced_status_indicator "success" "Rootless Docker setup completed"
 
-        log_success "Rootless Docker configured for ubuntu user"
+            # Add environment variables to user profile
+            sudo -u ubuntu bash -c 'echo "export PATH=/home/ubuntu/bin:\$PATH" >> /home/ubuntu/.bashrc'
+            sudo -u ubuntu bash -c 'echo "export DOCKER_HOST=unix:///run/user/1000/docker.sock" >> /home/ubuntu/.bashrc'
+
+            log_success "Rootless Docker configured for ubuntu user"
+        else
+            enhanced_status_indicator "failure" "Failed to configure rootless Docker"
+            log_warn "Continuing with standard Docker configuration"
+        fi
     else
-        log_info "Rootless Docker already configured"
+        enhanced_status_indicator "info" "Rootless Docker already configured"
     fi
 
-    log_success "Rootless Docker configured"
+    log_success "Docker configuration completed"
 }
 
-# Setup Docker services
+# Setup Docker services using standardized patterns
 setup_docker_services() {
-    log_info "Setting up Docker services..."
+    enhanced_section "Docker Services Setup" "Configuring Docker services and infrastructure" "🐳"
 
     # Load Docker daemon configuration
     load_docker_config
 
-    # Enable and start Docker
-    systemctl enable docker
-    systemctl start docker
-
-    # Create Docker networks
-    if ! docker network ls --format "{{.Name}}" | grep -q "^traefik$"; then
-        if docker network create traefik; then
-            log_debug "Created Docker network: traefik"
-        else
-            log_warn "Failed to create Docker network: traefik"
-        fi
+    # Enable and start Docker using standardized service management
+    if standard_service_operation "docker" "enable"; then
+        enhanced_status_indicator "success" "Docker service enabled"
     else
-        log_debug "Docker network 'traefik' already exists"
+        enhanced_status_indicator "failure" "Failed to enable Docker service"
+        return 1
     fi
 
-    # Set up directory structure
-    mkdir -p "${INSTALL_ROOT}"/{docker,data,content,nfs}
-    mkdir -p "${INSTALL_ROOT}/data"/{traefik,arcane,jellyfin,komga,kiwix,logs,backups,raspap}
-    mkdir -p "${INSTALL_ROOT}/content"/{movies,tv,webtv,music,audiobooks,books,comics,magazines,games/roms,kiwix}
+    if standard_service_operation "docker" "start"; then
+        enhanced_status_indicator "success" "Docker service started"
+    else
+        enhanced_status_indicator "failure" "Failed to start Docker service"
+        return 1
+    fi
 
-    # Copy Docker configurations if they exist
+    # Create Docker networks with error handling
+    if ! docker network ls --format "{{.Name}}" | grep -q "^traefik$"; then
+        if enhanced_spin "Creating Docker network: traefik" "docker network create traefik"; then
+            enhanced_status_indicator "success" "Created Docker network: traefik"
+        else
+            enhanced_status_indicator "failure" "Failed to create Docker network: traefik"
+            return 1
+        fi
+    else
+        enhanced_status_indicator "info" "Docker network 'traefik' already exists"
+    fi
+
+    # Set up directory structure using standardized directory creation
+    local directories=(
+        "${INSTALL_ROOT}/docker:755:root:root"
+        "${INSTALL_ROOT}/data:755:root:root"
+        "${INSTALL_ROOT}/content:755:root:root"
+        "${INSTALL_ROOT}/nfs:755:root:root"
+        "${INSTALL_ROOT}/data/traefik:755:root:root"
+        "${INSTALL_ROOT}/data/arcane:755:root:root"
+        "${INSTALL_ROOT}/data/jellyfin:755:root:root"
+        "${INSTALL_ROOT}/data/komga:755:root:root"
+        "${INSTALL_ROOT}/data/kiwix:755:root:root"
+        "${INSTALL_ROOT}/data/logs:755:root:root"
+        "${INSTALL_ROOT}/data/backups:755:root:root"
+        "${INSTALL_ROOT}/data/raspap:755:root:root"
+        "${INSTALL_ROOT}/content/movies:755:root:root"
+        "${INSTALL_ROOT}/content/tv:755:root:root"
+        "${INSTALL_ROOT}/content/webtv:755:root:root"
+        "${INSTALL_ROOT}/content/music:755:root:root"
+        "${INSTALL_ROOT}/content/audiobooks:755:root:root"
+        "${INSTALL_ROOT}/content/books:755:root:root"
+        "${INSTALL_ROOT}/content/comics:755:root:root"
+        "${INSTALL_ROOT}/content/magazines:755:root:root"
+        "${INSTALL_ROOT}/content/games/roms:755:root:root"
+        "${INSTALL_ROOT}/content/kiwix:755:root:root"
+    )
+
+    log_info "Creating directory structure..."
+    for dir_spec in "${directories[@]}"; do
+        IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
+        if standard_create_directory "$dir_path" "$mode" "$owner" "$group"; then
+            log_debug "Created directory: $dir_path"
+        else
+            log_error "Failed to create directory: $dir_path"
+            return 1
+        fi
+    done
+    enhanced_status_indicator "success" "Directory structure created"
+
+    # Copy Docker configurations if they exist using standardized file operations
     if [[ -d "${PROJECT_ROOT}/docker" ]]; then
         log_info "Copying Docker configurations..."
-        cp -r "${PROJECT_ROOT}"/docker/* "${INSTALL_ROOT}"/docker/ 2>/dev/null || true
+        if enhanced_spin "Copying Docker configurations" \
+            "cp -r '${PROJECT_ROOT}'/docker/* '${INSTALL_ROOT}'/docker/ 2>/dev/null || true"; then
+            enhanced_status_indicator "success" "Docker configurations copied"
+        else
+            enhanced_status_indicator "warning" "Some Docker configurations may not have been copied"
+        fi
+    else
+        enhanced_status_indicator "info" "No Docker configurations found to copy"
     fi
 
     # Setup secrets for Docker services
     setup_docker_secrets
 
-    log_success "Docker services configured"
+    log_success "Docker services configuration completed"
 }
 
 # Setup Docker secrets
@@ -1914,15 +2911,21 @@ setup_docker_secrets() {
     fi
 }
 
-# Setup container health monitoring
+# Setup container health monitoring using standardized patterns
 setup_container_health_monitoring() {
-    log_info "Setting up container health monitoring..."
+    enhanced_section "Container Health Monitoring" "Setting up automated container health checks" "🏥"
 
     # Load Watchtower configuration
     load_watchtower_config
 
-    # Add cron job to run via just
-    echo "*/10 * * * * root cd $PROJECT_ROOT && just container-health" > /etc/cron.d/container-health
+    # Add cron job using standardized cron job creation
+    local cron_command="cd $PROJECT_ROOT && just container-health"
+    if standard_create_cron_job "container-health" "*/10 * * * *" "$cron_command" "root" "DangerPrep container health monitoring"; then
+        enhanced_status_indicator "success" "Container health monitoring cron job created"
+    else
+        enhanced_status_indicator "failure" "Failed to create container health monitoring cron job"
+        return 1
+    fi
 
     log_success "Container health monitoring configured"
 }
@@ -2170,8 +3173,16 @@ create_nvme_partitions() {
     log_info "Formatting /content partition (${content_partition})..."
     mkfs.ext4 -F -L "dangerprep-content" "${content_partition}"
 
-    # Create mount points
-    mkdir -p /data /content
+    # Create mount points using standardized directory creation
+    if ! standard_create_directory "/data" "755" "root" "root"; then
+        log_error "Failed to create /data mount point"
+        return 1
+    fi
+
+    if ! standard_create_directory "/content" "755" "root" "root"; then
+        log_error "Failed to create /content mount point"
+        return 1
+    fi
 
     # Mount partitions
     log_info "Mounting partitions..."
@@ -2189,17 +3200,23 @@ create_nvme_partitions() {
     echo "LABEL=dangerprep-data /data ext4 defaults,noatime 0 2" >> /etc/fstab
     echo "LABEL=dangerprep-content /content ext4 defaults,noatime 0 2" >> /etc/fstab
 
-    # Set appropriate permissions
-    chown root:root /data /content
-    chmod 755 /data /content
+    # Create subdirectories for organization using standardized directory creation
+    local data_subdirs=("/data/config" "/data/logs" "/data/backups" "/data/cache")
+    local content_subdirs=("/content/media" "/content/documents" "/content/downloads" "/content/sync")
 
-    # Create subdirectories for organization
-    mkdir -p /data/{config,logs,backups,cache}
-    mkdir -p /content/{media,documents,downloads,sync}
+    for subdir in "${data_subdirs[@]}"; do
+        if ! standard_create_directory "$subdir" "755" "root" "root"; then
+            log_error "Failed to create directory: $subdir"
+            return 1
+        fi
+    done
 
-    # Set permissions for subdirectories
-    chmod 755 /data/{config,logs,backups,cache}
-    chmod 755 /content/{media,documents,downloads,sync}
+    for subdir in "${content_subdirs[@]}"; do
+        if ! standard_create_directory "$subdir" "755" "root" "root"; then
+            log_error "Failed to create directory: $subdir"
+            return 1
+        fi
+    done
 
     log_info "NVMe partition layout:"
     log_info "  ${data_partition} -> /data (256GB)"
@@ -2552,14 +3569,20 @@ configure_friendlyelec_fan_control() {
         return 0
     fi
 
-    # Create fan control configuration directory
-    mkdir -p /etc/dangerprep
+    # Create fan control configuration directory using standardized directory creation
+    if ! standard_create_directory "/etc/dangerprep" "755" "root" "root"; then
+        log_error "Failed to create fan control configuration directory"
+        return 1
+    fi
 
     # Load fan control configuration
     load_rk3588_fan_control_config
 
-    # Make fan control script executable
-    chmod +x "$PROJECT_ROOT/scripts/monitoring/rk3588-fan-control.sh"
+    # Make fan control script executable using standardized permissions
+    if ! standard_set_permissions "$PROJECT_ROOT/scripts/monitoring/rk3588-fan-control.sh" "755"; then
+        log_error "Failed to make fan control script executable"
+        return 1
+    fi
 
     # Install and enable fan control service
     install_rk3588_fan_control_service
@@ -2995,13 +4018,29 @@ create_new_user() {
     # Add to sudo group if not already included
     usermod -a -G sudo "$username"
 
-    # Transfer SSH keys if requested
+    # Transfer SSH keys if requested using standardized file operations
     if [[ "$transfer_ssh" == "yes" ]] && [[ -d "/home/pi/.ssh" ]]; then
         log_info "Transferring SSH keys..."
-        cp -r /home/pi/.ssh "/home/$username/"
-        chown -R "$username:$username" "/home/$username/.ssh"
-        chmod 700 "/home/$username/.ssh"
-        find "/home/$username/.ssh" -type f -exec chmod 600 {} \;
+
+        # Create .ssh directory for new user
+        if ! standard_create_directory "/home/$username/.ssh" "700" "$username" "$username"; then
+            log_error "Failed to create SSH directory for $username"
+            return 1
+        fi
+
+        # Copy SSH files individually with proper permissions
+        for ssh_file in /home/pi/.ssh/*; do
+            if [[ -f "$ssh_file" ]]; then
+                local filename
+                filename=$(basename "$ssh_file")
+                if standard_secure_copy "$ssh_file" "/home/$username/.ssh/$filename" "600" "$username" "$username"; then
+                    log_debug "Transferred SSH file: $filename"
+                else
+                    log_warn "Failed to transfer SSH file: $filename"
+                fi
+            fi
+        done
+
         log_debug "SSH keys transferred to $username"
     fi
 
@@ -3037,12 +4076,14 @@ update_user_references() {
         sed -i "s/autologin-user=pi/autologin-user=$new_username/g" /etc/lightdm/lightdm.conf
     fi
 
-    # Transfer cron jobs
+    # Transfer cron jobs using standardized file operations
     if [[ -f "/var/spool/cron/crontabs/pi" ]]; then
         log_debug "Transferring cron jobs"
-        cp "/var/spool/cron/crontabs/pi" "/var/spool/cron/crontabs/$new_username"
-        chown "$new_username:crontab" "/var/spool/cron/crontabs/$new_username"
-        chmod 600 "/var/spool/cron/crontabs/$new_username"
+        if standard_secure_copy "/var/spool/cron/crontabs/pi" "/var/spool/cron/crontabs/$new_username" "600" "$new_username" "crontab"; then
+            log_debug "Cron jobs transferred successfully"
+        else
+            log_warn "Failed to transfer cron jobs"
+        fi
     fi
 
     # Update any systemd services that run as pi user
@@ -3054,7 +4095,7 @@ update_user_references() {
             sed -i "s/User=pi/User=$new_username/g" "$service_file"
             log_debug "Updated service: $service_file"
         done <<< "$service_files"
-        systemctl daemon-reload
+        standard_service_operation "" "reload"
     fi
 
     # Update Docker Compose files that might reference pi user
@@ -3076,17 +4117,29 @@ configure_screen_lock() {
 
     # Create polkit rule to disable password requirement for screen unlock
     local polkit_rule="/etc/polkit-1/localauthority/50-local.d/disable-screen-lock-password.pkla"
+    local polkit_dir
+    polkit_dir=$(dirname "$polkit_rule")
 
-    mkdir -p "$(dirname "$polkit_rule")"
+    # Create polkit directory using standardized directory creation
+    if ! standard_create_directory "$polkit_dir" "755" "root" "root"; then
+        log_error "Failed to create polkit directory"
+        return 1
+    fi
 
-    cat > "$polkit_rule" << 'EOF'
-[Disable password for screen unlock]
+    # Create polkit rule using standardized environment file creation
+    local polkit_content='[Disable password for screen unlock]
 Identity=unix-user:*
 Action=org.freedesktop.login1.lock-session;org.freedesktop.login1.unlock-session
 ResultActive=yes
 ResultInactive=yes
-ResultAny=yes
-EOF
+ResultAny=yes'
+
+    if standard_create_env_file "$polkit_rule" "$polkit_content" "644"; then
+        log_debug "Created polkit rule for screen lock"
+    else
+        log_error "Failed to create polkit rule"
+        return 1
+    fi
 
     # Also configure lightdm if present
     if [[ -f "/etc/lightdm/lightdm.conf" ]]; then
@@ -3255,9 +4308,16 @@ TimeoutStartSec=300
 WantedBy=multi-user.target
 EOF
 
-    # Enable the service
-    systemctl daemon-reload
-    systemctl enable dangerprep-finalize.service
+    # Enable the service using standardized service management
+    if ! standard_service_operation "" "reload"; then
+        log_error "Failed to reload systemd daemon"
+        return 1
+    fi
+
+    if ! standard_service_operation "dangerprep-finalize" "enable"; then
+        log_error "Failed to enable finalization service"
+        return 1
+    fi
 
     log_success "Reboot finalization service created and enabled"
     log_info "Pi user will be removed automatically on next reboot"
@@ -3413,28 +4473,44 @@ install_maintenance_scripts() {
 setup_encrypted_backups() {
     log_info "Setting up encrypted backups..."
 
-    # Create backup directory and key
-    mkdir -p /etc/dangerprep/backup
-    openssl rand -base64 32 > /etc/dangerprep/backup/backup.key
-    chmod 600 /etc/dangerprep/backup/backup.key
+    # Create backup directory using standardized directory creation
+    if ! standard_create_directory "/etc/dangerprep/backup" "700" "root" "root"; then
+        log_error "Failed to create backup directory"
+        return 1
+    fi
 
-    # Add backup cron jobs to run via just
-    cat > /etc/cron.d/dangerprep-backups << 'EOF'
-# DangerPrep Encrypted Backups
-# Daily backup at 1 AM
-0 1 * * * root cd /opt/dangerprep && just backup-daily
-# Weekly backup on Sunday at 2 AM
-0 2 * * 0 root cd /opt/dangerprep && just backup-weekly
-# Monthly backup on 1st at 3 AM
-0 3 1 * * root cd /opt/dangerprep && just backup-monthly
-EOF
+    # Generate backup key
+    local backup_key
+    backup_key=$(openssl rand -base64 32)
+    if standard_create_env_file "/etc/dangerprep/backup/backup.key" "$backup_key" "600"; then
+        log_debug "Created backup encryption key"
+    else
+        log_error "Failed to create backup encryption key"
+        return 1
+    fi
+
+    # Add backup cron jobs using standardized cron job creation
+    if ! standard_create_cron_job "dangerprep-backup-daily" "0 1 * * *" "cd /opt/dangerprep && just backup-daily" "root" "DangerPrep daily backup"; then
+        log_error "Failed to create daily backup cron job"
+        return 1
+    fi
+
+    if ! standard_create_cron_job "dangerprep-backup-weekly" "0 2 * * 0" "cd /opt/dangerprep && just backup-weekly" "root" "DangerPrep weekly backup"; then
+        log_error "Failed to create weekly backup cron job"
+        return 1
+    fi
+
+    if ! standard_create_cron_job "dangerprep-backup-monthly" "0 3 1 * *" "cd /opt/dangerprep && just backup-monthly" "root" "DangerPrep monthly backup"; then
+        log_error "Failed to create monthly backup cron job"
+        return 1
+    fi
 
     log_success "Encrypted backup system configured"
 }
 
-# Start all services
+# Start all services using standardized service management
 start_all_services() {
-    log_info "Starting all services..."
+    enhanced_section "Service Startup" "Starting all configured services" "🚀"
 
     local services=(
         "ssh"
@@ -3443,18 +4519,28 @@ start_all_services() {
         "tailscaled"
     )
 
+    local started_count=0
+    local total_services=${#services[@]}
+
     for service in "${services[@]}"; do
+        # Check if service is enabled before trying to start it
         if systemctl is-enabled "$service" >/dev/null 2>&1; then
-            systemctl start "$service" || log_warn "Failed to start $service"
-            if systemctl is-active "$service" >/dev/null 2>&1; then
-                log_success "$service started"
+            if standard_service_operation "$service" "start"; then
+                enhanced_status_indicator "success" "$service started"
+                ((started_count++))
             else
-                log_warn "$service failed to start"
+                enhanced_status_indicator "failure" "Failed to start $service"
             fi
+        else
+            enhanced_status_indicator "info" "$service not enabled, skipping"
         fi
     done
 
-    log_success "All services started"
+    if [[ $started_count -eq $total_services ]]; then
+        log_success "All $total_services services started successfully"
+    else
+        log_warn "Started $started_count out of $total_services services"
+    fi
 }
 
 # Verification and testing
@@ -3536,7 +4622,10 @@ main() {
     readonly START_TIME=$SECONDS
 
     # Parse command line arguments first
-    parse_arguments "$@"
+    if ! parse_arguments "$@"; then
+        echo "ERROR: Failed to parse command line arguments" >&2
+        exit 1
+    fi
 
     # Initialize paths with fallback support
     initialize_paths
@@ -3553,7 +4642,10 @@ main() {
     fi
 
     # Initialize logging after root check
-    setup_logging
+    if ! setup_logging; then
+        echo "ERROR: Failed to initialize logging" >&2
+        exit 1
+    fi
 
     # Acquire lock to prevent concurrent execution
     if ! acquire_lock; then
@@ -3593,7 +4685,10 @@ main() {
     log_success "All pre-flight checks passed"
 
     # Collect interactive configuration if gum is available
-    collect_configuration
+    if ! collect_configuration; then
+        log_error "Configuration collection failed or was cancelled by user"
+        exit 1
+    fi
 
     # Show system information
     show_system_info
@@ -3667,15 +4762,6 @@ main() {
 
         log_debug "Function '$phase_function' exists, proceeding with phase"
 
-        # Show progress with error handling
-        log_debug "Calling show_progress with: $current_phase $phase_count '$phase_description'"
-        if ! show_progress "$current_phase" "$phase_count" "$phase_description"; then
-            log_error "show_progress failed for phase: $phase_description"
-            exit 1
-        fi
-
-        log_info "Phase ${current_phase}/${phase_count}: $phase_description"
-
         if [[ "$DRY_RUN" == "true" ]]; then
             log_info "[DRY RUN] Would execute: $phase_function"
             sleep 0.5  # Simulate work for demo
@@ -3686,16 +4772,16 @@ main() {
                 continue
             fi
 
+            # Execute phase using standardized installer step pattern
             log_debug "Executing phase function: $phase_function"
-            if ! "$phase_function"; then
-                log_error "Phase function '$phase_function' failed with exit code $?"
+            if ! standard_installer_step "$phase_function" "$phase_description" "$phase_function" "$current_phase" "$phase_count"; then
+                log_error "Phase function '$phase_function' failed"
                 log_error "Phase failed: $phase_description"
                 log_error "Installation cannot continue"
                 exit 1
             fi
         fi
 
-        log_success "Phase completed: $phase_description"
         log_debug "Phase ${current_phase} completed successfully"
     done
 
@@ -3735,7 +4821,7 @@ cleanup_on_error() {
             log_warn "Cleanup script failed, attempting manual cleanup..."
 
             # Fallback to basic cleanup if cleanup script fails
-            systemctl stop docker 2>/dev/null || true
+            standard_service_operation "docker" "stop" || true
 
             # Restore original configurations if they exist
             if [[ -d "$BACKUP_DIR" ]]; then

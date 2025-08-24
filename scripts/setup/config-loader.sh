@@ -12,7 +12,7 @@ if [[ -f "$CONFIG_LOADER_DIR/../shared/gum-utils.sh" ]]; then
     source "$CONFIG_LOADER_DIR/../shared/gum-utils.sh"
 else
     echo "ERROR: gum-utils.sh not found. Cannot continue without logging functions." >&2
-    exit 1
+    return 1 2>/dev/null || exit 1
 fi
 
 # Generic template processor
