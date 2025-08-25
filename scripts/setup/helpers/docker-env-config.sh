@@ -189,6 +189,16 @@ parse_and_process_env_directives() {
         if [[ "${line}" =~ ^#[[:space:]]*(PROMPT|PASSWORD|EMAIL|GENERATE|OPTIONAL|REQUIRED):[[:space:]]*(.*)$ ]]; then
             pending_directive="${BASH_REMATCH[1]}"
             pending_description="${BASH_REMATCH[2]}"
+            # Clean up the description - remove any problematic characters and ensure it's a single line
+            pending_description="${pending_description//[$'\n\r\t']/ }"  # Replace newlines/tabs with spaces
+            pending_description="${pending_description//  / }"           # Replace double spaces with single
+            pending_description="${pending_description# }"               # Remove leading space
+            pending_description="${pending_description% }"               # Remove trailing space
+            # Truncate if too long to prevent issues
+            if [[ ${#pending_description} -gt 100 ]]; then
+                pending_description="${pending_description:0:97}..."
+            fi
+            log_debug "Found directive comment: ${pending_directive} - '${pending_description}'"
             continue
         fi
 
@@ -197,7 +207,9 @@ parse_and_process_env_directives() {
             local var_name="${BASH_REMATCH[1]}"
             local var_value="${BASH_REMATCH[2]}"
 
-            log_debug "Found directive ${pending_directive} for variable ${var_name}: ${pending_description}"
+            log_debug "Processing variable ${var_name} with directive ${pending_directive}"
+            log_debug "Description: '${pending_description}'"
+            log_debug "Current value: '${var_value}'"
 
             if process_env_directive "${env_file}" "${var_name}" "${pending_directive}" "${pending_description}"; then
                 ((variables_processed++))
@@ -245,16 +257,25 @@ process_env_directive() {
 
     local new_value=""
 
+    # Sanitize description to prevent shell injection or parsing issues
+    local safe_description="${description}"
+    # Remove any potentially problematic characters
+    safe_description="${safe_description//[\$\`\\\"\']/}"
+    # Ensure it's not empty
+    if [[ -z "${safe_description// }" ]]; then
+        safe_description="Enter value for ${var_name}"
+    fi
+
     case "${directive}" in
         "PROMPT"|"REQUIRED")
-            new_value=$(enhanced_input "${description}" "" "${description}")
+            new_value=$(enhanced_input "${safe_description}" "" "Enter value for ${var_name}")
             ;;
         "PASSWORD")
-            new_value=$(enhanced_password "${description}" "${description}")
+            new_value=$(enhanced_password "${safe_description}" "Enter password for ${var_name}")
             ;;
         "EMAIL")
             while true; do
-                new_value=$(enhanced_input "${description}" "" "Enter valid email address")
+                new_value=$(enhanced_input "${safe_description}" "" "Enter valid email address")
                 if [[ "${new_value}" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
                     break
                 else
@@ -268,7 +289,7 @@ process_env_directive() {
             ;;
         "OPTIONAL")
             if enhanced_confirm "Configure ${var_name}?" "false"; then
-                new_value=$(enhanced_input "${description}" "" "${description}")
+                new_value=$(enhanced_input "${safe_description}" "" "Enter value for ${var_name}")
             else
                 log_debug "Skipping optional variable ${var_name}"
                 return 0
