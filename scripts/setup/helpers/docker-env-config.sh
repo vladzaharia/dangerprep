@@ -3,13 +3,13 @@
 # Dynamically parses environment files for configuration directives
 
 # Source required utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$(dirname "$(dirname "${SCRIPT_DIR}")")")"
+DOCKER_ENV_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$(dirname "$(dirname "${DOCKER_ENV_SCRIPT_DIR}")")")"
 
 # Source gum utilities for consistent user interaction
-if [[ -f "$SCRIPT_DIR/../../shared/gum-utils.sh" ]]; then
+if [[ -f "$DOCKER_ENV_SCRIPT_DIR/../../shared/gum-utils.sh" ]]; then
     # shellcheck source=../../shared/gum-utils.sh
-    source "$SCRIPT_DIR/../../shared/gum-utils.sh"
+    source "$DOCKER_ENV_SCRIPT_DIR/../../shared/gum-utils.sh"
 fi
 
 # Supported directive types in environment files
