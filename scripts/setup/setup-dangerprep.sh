@@ -2274,7 +2274,6 @@ check_system_requirements() {
         "systemctl:systemd"     # Service management (core system)
         "apt:apt"              # Package manager (essential for setup)
         "ip:iproute2"          # Network configuration (core networking)
-        "iptables:iptables"    # Firewall management (core security)
         "lsb_release:lsb-release"  # OS identification (used by script)
         "ping:iputils-ping"    # Network connectivity testing
         "df:coreutils"         # Disk usage checking
@@ -2546,7 +2545,7 @@ install_essential_packages() {
     log_info "📦 Installing essential packages based on configuration..."
 
     # Core packages: Always installed (Essential for DangerPrep functionality)
-    local core_packages="curl,wget,git,bc,unzip,software-properties-common,apt-transport-https,ca-certificates,gnupg,lsb-release"
+    local core_packages="curl,wget,git,bc,unzip,software-properties-common,apt-transport-https,ca-certificates,gnupg,lsb-release,iptables,iptables-persistent"
 
     # Build package categories based on upfront configuration
     local package_categories=("Core:$core_packages")
