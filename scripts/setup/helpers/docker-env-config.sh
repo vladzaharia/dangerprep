@@ -284,6 +284,9 @@ process_env_directive() {
     # Update environment file
     if [[ -n "${new_value}" ]]; then
         update_env_file_variable "${env_file}" "${var_name}" "${new_value}"
+
+        # Export critical variables to shell environment for Docker build args
+        export_critical_variables "${var_name}" "${new_value}"
     fi
 
     return 0
@@ -346,4 +349,71 @@ update_env_file_variable() {
     fi
 
     log_debug "Updated ${var_name} in $(basename "${env_file}")"
+}
+
+# Export critical variables to shell environment for Docker build args
+export_critical_variables() {
+    local var_name="$1"
+    local var_value="$2"
+
+    # List of variables that need to be exported to shell environment
+    # These are typically used in Docker build args or compose interpolation
+    case "${var_name}" in
+        "GITHUB_USERNAME"|"GITHUB_TOKEN")
+            # RaspAP requires these for Docker build
+            export "${var_name}=${var_value}"
+            log_debug "Exported ${var_name} to shell environment for Docker build"
+            ;;
+        "ACME_EMAIL")
+            # Traefik may need this for ACME configuration
+            export "${var_name}=${var_value}"
+            log_debug "Exported ${var_name} to shell environment"
+            ;;
+        "INSTALL_ROOT")
+            # Many services need this path
+            export "${var_name}=${var_value}"
+            log_debug "Exported ${var_name} to shell environment"
+            ;;
+        *)
+            # Most variables don't need shell export, only env file
+            log_debug "Variable ${var_name} set in env file only"
+            ;;
+    esac
+}
+
+# Load and export environment variables from a compose.env file
+# Usage: load_and_export_env_file "/path/to/compose.env"
+load_and_export_env_file() {
+    local env_file="$1"
+
+    if [[ ! -f "${env_file}" ]]; then
+        log_debug "Environment file not found: ${env_file}"
+        return 1
+    fi
+
+    log_debug "Loading environment variables from: $(basename "${env_file}")"
+
+    # Read and export variables from env file
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        if [[ "${line}" =~ ^[[:space:]]*# ]] || [[ -z "${line// }" ]]; then
+            continue
+        fi
+
+        # Process variable assignments
+        if [[ "${line}" =~ ^([A-Z_][A-Z0-9_]*)=(.*)$ ]]; then
+            local var_name="${BASH_REMATCH[1]}"
+            local var_value="${BASH_REMATCH[2]}"
+
+            # Only export critical variables to avoid polluting environment
+            case "${var_name}" in
+                "GITHUB_USERNAME"|"GITHUB_TOKEN"|"ACME_EMAIL"|"INSTALL_ROOT")
+                    export "${var_name}=${var_value}"
+                    log_debug "Exported ${var_name} from env file"
+                    ;;
+            esac
+        fi
+    done < "${env_file}"
+
+    return 0
 }

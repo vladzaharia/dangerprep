@@ -4602,28 +4602,32 @@ EOF
 setup_raspap() {
     log_info "Setting up RaspAP for WiFi management..."
 
-    # Create RaspAP environment file if it doesn't exist
+    # Verify environment file exists (should have been created by Docker environment configuration)
     local raspap_env="$PROJECT_ROOT/docker/infrastructure/raspap/compose.env"
     if [[ ! -f "$raspap_env" ]]; then
-        log_info "Creating RaspAP environment file..."
+        log_warn "RaspAP environment file not found, creating from example..."
         cp "$PROJECT_ROOT/docker/infrastructure/raspap/compose.env.example" "$raspap_env"
+    fi
 
-        # Prompt for GitHub credentials if not set
-        if [[ -z "${GITHUB_USERNAME:-}" ]] || [[ -z "${GITHUB_TOKEN:-}" ]]; then
-            log_warn "GitHub credentials required for RaspAP Insiders features"
-            echo "Please set GITHUB_USERNAME and GITHUB_TOKEN environment variables"
-            echo "or edit $raspap_env manually"
-        else
-            # Update environment file with provided credentials
-            sed -i "s/GITHUB_USERNAME=your_github_username/GITHUB_USERNAME=$GITHUB_USERNAME/" "$raspap_env"
-            sed -i "s/GITHUB_TOKEN=your_github_token/GITHUB_TOKEN=$GITHUB_TOKEN/" "$raspap_env"
-        fi
+    # Load environment variables from compose.env file for Docker build
+    if [[ -f "$raspap_env" ]]; then
+        load_and_export_env_file "$raspap_env"
+    fi
+
+    # Verify GitHub credentials are available for Docker build
+    if [[ -z "${GITHUB_USERNAME:-}" ]] || [[ -z "${GITHUB_TOKEN:-}" ]]; then
+        log_warn "GitHub credentials not found in environment"
+        log_warn "RaspAP Insiders features may not be available"
+        log_info "You can set these later by editing $raspap_env and rebuilding"
+    else
+        log_info "GitHub credentials found - RaspAP Insiders features will be available"
     fi
 
     # Build and start RaspAP container
     log_info "Building and starting RaspAP container..."
     local raspap_compose_dir="${PROJECT_ROOT}/docker/infrastructure/raspap"
     if [[ -d "${raspap_compose_dir}" && -f "${raspap_compose_dir}/compose.yml" ]]; then
+        # Use env_file and exported environment variables for Docker build
         docker compose -f "${raspap_compose_dir}/compose.yml" up -d --build
     else
         log_error "RaspAP compose directory or file not found: ${raspap_compose_dir}"
