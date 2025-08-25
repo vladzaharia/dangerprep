@@ -271,15 +271,26 @@ process_env_directive() {
     local directive="$3"
     local description="$4"
 
-    # Check if variable is already set in env file with a meaningful value
-    local current_value
+    # For resumable setup: check if variable was already configured by user in a previous run
+    # We detect this by checking if the variable exists in the env file AND has a different value
+    # than what's in the example file (indicating user input was already collected)
+    local current_value=""
+    local example_value=""
+
     if grep -q "^${var_name}=" "${env_file}"; then
         current_value=$(grep "^${var_name}=" "${env_file}" | cut -d'=' -f2- || true)
-        # Skip if already has a non-empty value (resumable setup)
-        if [[ -n "${current_value}" ]] && [[ "${current_value}" != "your_"* ]] && [[ "${current_value}" != "AUTO-GENERATED"* ]] && [[ "${current_value}" != "" ]]; then
-            log_debug "Variable ${var_name} already configured, skipping"
-            return 0
-        fi
+    fi
+
+    # Get the value from the example file to compare
+    local env_example="${env_file%.env}.env.example"
+    if [[ -f "${env_example}" ]] && grep -q "^${var_name}=" "${env_example}"; then
+        example_value=$(grep "^${var_name}=" "${env_example}" | cut -d'=' -f2- || true)
+    fi
+
+    # Skip if already configured (current value exists and differs from example)
+    if [[ -n "${current_value}" ]] && [[ "${current_value}" != "${example_value}" ]]; then
+        log_debug "Variable ${var_name} already configured with user value, skipping"
+        return 0
     fi
 
     local new_value=""
