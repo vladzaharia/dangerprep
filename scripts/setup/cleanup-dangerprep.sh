@@ -26,6 +26,7 @@ TEMP_DIR=""
 CLEANUP_TASKS=()
 REMOVED_ITEMS=()
 FAILED_REMOVALS=()
+SKIP_PACKAGES=false
 
 # Note: Color codes replaced with Gum styling functions
 # All styling is now handled through gum-utils.sh enhanced functions
@@ -337,12 +338,12 @@ parse_arguments() {
 # Enhanced help display
 show_help() {
     cat << EOF
-${BOLD}DangerPrep Cleanup Script${NC} - Version ${SCRIPT_VERSION}
+DangerPrep Cleanup Script - Version ${SCRIPT_VERSION}
 
-${BOLD}USAGE:${NC}
+USAGE:
     sudo $0 [OPTIONS]
 
-${BOLD}OPTIONS:${NC}
+OPTIONS:
     -d, --dry-run           Show what would be removed without making changes
     -p, --preserve-data     Keep user data and content directories
     -f, --force             Skip confirmation prompts (use with caution)
@@ -350,13 +351,13 @@ ${BOLD}OPTIONS:${NC}
     -h, --help              Show this help message
     --version               Show version information
 
-${BOLD}EXAMPLES:${NC}
+EXAMPLES:
     sudo $0                 # Interactive cleanup with confirmation
     sudo $0 --dry-run       # Preview what would be removed
     sudo $0 --preserve-data # Keep data directories intact
     sudo $0 --force         # Non-interactive cleanup (dangerous)
 
-${BOLD}DESCRIPTION:${NC}
+DESCRIPTION:
     Safely removes DangerPrep configuration and restores the system to its
     original state. This script will:
 
@@ -369,18 +370,18 @@ ${BOLD}DESCRIPTION:${NC}
     • Optionally remove data directories
     • Restore system to pre-DangerPrep state
 
-${BOLD}SAFETY FEATURES:${NC}
+SAFETY FEATURES:
     • Comprehensive backup before removal
     • Dry-run mode for testing
     • Protected system path validation
     • Detailed logging and progress tracking
     • Rollback capability for critical failures
 
-${BOLD}FILES:${NC}
+FILES:
     Log file: /var/log/dangerprep-cleanup.log (or ~/.local/dangerprep/logs/ if no permissions)
     Backup:   /var/backups/dangerprep-cleanup-* (or ~/.local/dangerprep/backups/ if no permissions)
 
-${BOLD}WARNING:${NC}
+WARNING:
     This operation cannot be easily undone. Make sure you have backups
     of any important data before proceeding.
 
@@ -566,15 +567,18 @@ confirm_cleanup() {
         case "${cleanup_scope}" in
             "Quick cleanup"*)
                 PRESERVE_DATA="true"
-                log_info "Quick cleanup selected - data will be preserved"
+                SKIP_PACKAGES="true"
+                log_info "Quick cleanup selected - data will be preserved, packages will be skipped"
                 ;;
             "Standard cleanup"*)
                 PRESERVE_DATA="true"
-                log_info "Standard cleanup selected - data will be preserved"
+                SKIP_PACKAGES="false"
+                log_info "Standard cleanup selected - data will be preserved, packages will be removed"
                 ;;
             "Complete cleanup"*)
                 PRESERVE_DATA="false"
-                log_info "Complete cleanup selected - data will be removed"
+                SKIP_PACKAGES="false"
+                log_info "Complete cleanup selected - data will be removed, packages will be removed"
                 ;;
             "Custom cleanup"*)
                 # Custom cleanup options
@@ -582,6 +586,11 @@ confirm_cleanup() {
                     PRESERVE_DATA="false"
                 else
                     PRESERVE_DATA="true"
+                fi
+                if enhanced_confirm "Remove installed packages?" "false"; then
+                    SKIP_PACKAGES="false"
+                else
+                    SKIP_PACKAGES="true"
                 fi
                 ;;
         esac
@@ -595,8 +604,13 @@ confirm_cleanup() {
             "Configs,Remove DangerPrep configuration files"
             "Scripts,Remove DangerPrep scripts and cron jobs"
             "Docker,Remove containers and networks"
-            "Packages,Remove installed packages (optional)"
         )
+
+        if [[ "$SKIP_PACKAGES" == "true" ]]; then
+            cleanup_actions+=("Packages,SKIPPED - Packages will be preserved")
+        else
+            cleanup_actions+=("Packages,Remove installed packages")
+        fi
 
         if [[ "$PRESERVE_DATA" == "true" ]]; then
             cleanup_actions+=("Data,PRESERVED - Data directories will be kept")
@@ -1039,6 +1053,12 @@ remove_configurations() {
 
 # Remove packages installed by setup script with interactive selection
 remove_packages() {
+    # Skip package removal if requested (e.g., quick cleanup)
+    if [[ "$SKIP_PACKAGES" == "true" ]]; then
+        log_info "Skipping package removal as requested"
+        return 0
+    fi
+
     log_info "Removing packages installed by DangerPrep setup..."
 
     # Skip interactive package selection in dry-run mode
@@ -1219,7 +1239,7 @@ remove_data() {
 
     # Remove content directories (be careful here)
     if [[ -d "$install_root/content" ]]; then
-        echo -e "${RED}WARNING: This will delete all media files in $install_root/content${NC}"
+        log_warn "WARNING: This will delete all media files in $install_root/content"
         read -p "Remove content directories? (yes/no): " -r
         if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
             rm -rf "$install_root/content" 2>/dev/null || true
@@ -1341,7 +1361,7 @@ final_cleanup() {
 show_completion() {
     log_success "DangerPrep cleanup completed successfully!"
     echo
-    echo -e "${GREEN}System Status:${NC}"
+    echo "System Status:"
     echo "  • All DangerPrep services stopped and disabled"
     echo "  • Network configuration restored to original state"
     echo "  • All DangerPrep configurations and scripts removed"
@@ -1359,17 +1379,17 @@ show_completion() {
         echo "  • Data directories removed"
     fi
     echo
-    echo -e "${YELLOW}Important Notes:${NC}"
+    echo "Important Notes:"
     echo "  • SSH configuration has been restored (check port settings)"
     echo "  • Some packages may have been removed (check if other apps are affected)"
     echo "  • Network interfaces have been reset to NetworkManager control"
     echo "  • Tailscale may need to be reconfigured if you plan to use it again"
     echo
-    echo -e "${CYAN}Log file: $LOG_FILE${NC}"
-    echo -e "${CYAN}Backup created: $BACKUP_DIR${NC}"
+    echo "Log file: $LOG_FILE"
+    echo "Backup created: $BACKUP_DIR"
     echo
     echo "The system has been restored to its pre-DangerPrep state."
-    echo -e "${GREEN}Reboot recommended to ensure all changes take effect.${NC}"
+    echo "Reboot recommended to ensure all changes take effect."
 }
 
 # Enhanced completion message with comprehensive status
@@ -1380,7 +1400,7 @@ show_enhanced_completion() {
 
     log_success "DangerPrep cleanup completed successfully!"
     echo
-    echo -e "${GREEN}${BOLD}System Status:${NC}"
+    echo "System Status:"
     echo "  ✓ All DangerPrep services stopped and disabled"
     echo "  ✓ Network configuration restored to original state"
     echo "  ✓ All DangerPrep configurations and scripts removed"
@@ -1400,32 +1420,32 @@ show_enhanced_completion() {
     fi
 
     echo
-    echo -e "${YELLOW}${BOLD}Important Notes:${NC}"
+    echo "Important Notes:"
     echo "  • SSH configuration has been restored (check port settings)"
     echo "  • Some packages may have been removed (check if other apps are affected)"
     echo "  • Network interfaces have been reset to NetworkManager control"
     echo "  • Tailscale may need to be reconfigured if you plan to use it again"
     echo
-    echo -e "${CYAN}${BOLD}Cleanup Summary:${NC}"
+    echo "Cleanup Summary:"
     echo "  • Total time: ${minutes}m ${seconds}s"
     echo "  • Items removed: ${#REMOVED_ITEMS[@]}"
     echo "  • Failed removals: ${#FAILED_REMOVALS[@]}"
     echo "  • Process ID: $$"
     echo "  • Version: ${SCRIPT_VERSION}"
     echo
-    echo -e "${BLUE}${BOLD}Files:${NC}"
+    echo "Files:"
     echo "  • Log file: ${LOG_FILE}"
     echo "  • Backup: ${BACKUP_DIR}"
     echo
 
     if [[ ${#FAILED_REMOVALS[@]} -gt 0 ]]; then
-        echo -e "${YELLOW}${BOLD}Failed Removals:${NC}"
+        echo "Failed Removals:"
         printf '  • %s\n' "${FAILED_REMOVALS[@]}"
         echo
     fi
 
     echo "The system has been restored to its pre-DangerPrep state."
-    echo -e "${GREEN}${BOLD}Reboot recommended to ensure all changes take effect.${NC}"
+    echo "Reboot recommended to ensure all changes take effect."
 
     # Log final statistics
     log_info "Cleanup completed in ${minutes}m ${seconds}s"
@@ -1548,7 +1568,7 @@ show_progress() {
     local bar_length=50
     local filled_length=$((percentage * bar_length / 100))
 
-    printf "\r${BLUE}[%3d%%]${NC} " "$percentage"
+    printf "\r[%3d%%] " "$percentage"
     printf "["
     printf "%*s" "$filled_length" "" | tr ' ' '='
     printf "%*s" $((bar_length - filled_length)) "" | tr ' ' '-'

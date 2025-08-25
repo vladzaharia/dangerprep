@@ -2540,13 +2540,13 @@ install_essential_packages() {
                     package_categories+=("Convenience:vim,nano,htop,tree,zip,jq,rsync,screen,tmux")
                     ;;
                 *"Network packages"*)
-                    package_categories+=("Network:netplan.io,iproute2,tc,wondershaper,iperf3")
+                    package_categories+=("Network:netplan.io,iproute2,wondershaper,iperf3")
                     ;;
                 *"Security packages"*)
-                    package_categories+=("Security:fail2ban,aide,rkhunter,chkrootkit,clamav,clamav-daemon,lynis,suricata,apparmor,apparmor-utils,libpam-pwquality,libpam-tmpdir,acct,psacct")
+                    package_categories+=("Security:fail2ban,aide,rkhunter,chkrootkit,clamav,clamav-daemon,lynis,suricata,apparmor,apparmor-utils,libpam-pwquality,libpam-tmpdir,acct")
                     ;;
                 *"Monitoring packages"*)
-                    package_categories+=("Monitoring:lm-sensors,hddtemp,fancontrol,sensors-applet,collectd,collectd-utils,logwatch,rsyslog-gnutls,smartmontools")
+                    package_categories+=("Monitoring:lm-sensors,fancontrol,sensors-applet,collectd,collectd-utils,logwatch,rsyslog-gnutls,smartmontools")
                     ;;
                 *"Backup packages"*)
                     package_categories+=("Backup:borgbackup,restic")
@@ -2640,6 +2640,12 @@ install_friendlyelec_kernel_headers() {
     # Check if generic kernel headers are sufficient
     if dpkg -l | grep -q "linux-headers-generic" && [[ -d "/usr/src/linux-headers-${current_kernel}" ]]; then
         log_info "Generic kernel headers already provide support for ${current_kernel}"
+        return 0
+    fi
+
+    # Check if FriendlyElec-specific headers are already installed
+    if dpkg -l | grep -q "^ii.*linux-headers.*${current_kernel}"; then
+        log_info "FriendlyElec kernel headers for ${current_kernel} already installed"
         return 0
     fi
 
@@ -3114,16 +3120,40 @@ setup_fail2ban() {
 configure_kernel_hardening() {
     log_info "Configuring kernel hardening..."
     load_kernel_hardening_config
-    sysctl -p
-    log_success "Kernel hardening applied"
+
+    # Apply sysctl settings with error handling for missing kernel features
+    if ! sysctl -p 2>/dev/null; then
+        log_warn "Some kernel hardening parameters are not available on this system"
+
+        # Apply settings individually to identify which ones fail
+        while IFS= read -r line; do
+            if [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]]; then
+                local param value
+                if [[ "$line" =~ ^[[:space:]]*([^=]+)[[:space:]]*=[[:space:]]*(.+)$ ]]; then
+                    param="${BASH_REMATCH[1]// /}"
+                    value="${BASH_REMATCH[2]// /}"
+
+                    if ! sysctl -w "${param}=${value}" 2>/dev/null; then
+                        log_debug "Skipping unavailable kernel parameter: ${param}"
+                    fi
+                fi
+            fi
+        done < /etc/sysctl.conf
+    fi
+
+    log_success "Kernel hardening applied (with compatibility adjustments)"
 }
 
 # Setup file integrity monitoring
 setup_file_integrity_monitoring() {
     log_info "Setting up file integrity monitoring..."
-    aide --init
-    [[ -f /var/lib/aide/aide.db.new ]] && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+
+    # Load AIDE configuration first
     load_aide_config
+
+    # Initialize AIDE database
+    aide --init --config=/etc/aide/aide.conf
+    [[ -f /var/lib/aide/aide.db.new ]] && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
 
     # Add cron job using standardized cron job creation
     local aide_command="cd $PROJECT_ROOT && just aide-check"
@@ -3135,10 +3165,157 @@ setup_file_integrity_monitoring() {
     log_success "File integrity monitoring configured"
 }
 
+# Detect ARM64 thermal sensors and hwmon devices
+detect_arm64_sensors() {
+    log_info "Detecting ARM64 thermal sensors and hardware monitoring devices..."
+
+    local sensors_found=0
+    local thermal_zones=()
+    local hwmon_devices=()
+
+    # Enumerate thermal zones
+    if [[ -d /sys/class/thermal ]]; then
+        log_info "Scanning thermal zones..."
+        for thermal_zone in /sys/class/thermal/thermal_zone*; do
+            if [[ -d "$thermal_zone" && -r "$thermal_zone/temp" ]]; then
+                local zone_name=$(basename "$thermal_zone")
+                local temp_file="$thermal_zone/temp"
+                local type_file="$thermal_zone/type"
+
+                # Read current temperature to verify sensor works
+                local temp_raw=$(cat "$temp_file" 2>/dev/null)
+                if [[ -n "$temp_raw" && "$temp_raw" != "0" ]]; then
+                    local temp_celsius=$((temp_raw / 1000))
+                    local sensor_type="unknown"
+
+                    if [[ -r "$type_file" ]]; then
+                        sensor_type=$(cat "$type_file" 2>/dev/null)
+                    fi
+
+                    thermal_zones+=("$zone_name:$sensor_type:${temp_celsius}°C")
+                    ((sensors_found++))
+                    log_info "Found thermal sensor: $zone_name ($sensor_type) - ${temp_celsius}°C"
+                fi
+            fi
+        done
+    fi
+
+    # Enumerate hwmon devices
+    if [[ -d /sys/class/hwmon ]]; then
+        log_info "Scanning hwmon devices..."
+        for hwmon_dev in /sys/class/hwmon/hwmon*; do
+            if [[ -d "$hwmon_dev" ]]; then
+                local hwmon_name=$(basename "$hwmon_dev")
+                local name_file="$hwmon_dev/name"
+                local device_name="unknown"
+
+                if [[ -r "$name_file" ]]; then
+                    device_name=$(cat "$name_file" 2>/dev/null)
+                fi
+
+                # Check for temperature inputs
+                local temp_inputs=()
+                for temp_input in "$hwmon_dev"/temp*_input; do
+                    if [[ -r "$temp_input" ]]; then
+                        local temp_raw=$(cat "$temp_input" 2>/dev/null)
+                        if [[ -n "$temp_raw" && "$temp_raw" != "0" ]]; then
+                            local temp_celsius=$((temp_raw / 1000))
+                            temp_inputs+=("${temp_celsius}°C")
+                        fi
+                    fi
+                done
+
+                if [[ ${#temp_inputs[@]} -gt 0 ]]; then
+                    hwmon_devices+=("$hwmon_name:$device_name:${temp_inputs[*]}")
+                    ((sensors_found++))
+                    log_info "Found hwmon device: $hwmon_name ($device_name) - ${temp_inputs[*]}"
+                fi
+            fi
+        done
+    fi
+
+    # Create sensors configuration for discovered devices
+    if [[ $sensors_found -gt 0 ]]; then
+        create_arm64_sensors_config "${thermal_zones[@]}" "${hwmon_devices[@]}"
+        log_success "Detected $sensors_found ARM64 sensor(s)"
+    else
+        log_warn "No ARM64 sensors detected"
+    fi
+
+    return 0
+}
+
+# Create sensors configuration for ARM64 devices
+create_arm64_sensors_config() {
+    log_info "Creating ARM64 sensors configuration..."
+
+    local config_file="/etc/sensors.d/arm64-detected.conf"
+
+    cat > "$config_file" << 'EOF'
+# ARM64 sensors configuration - auto-detected by DangerPrep
+# This file was automatically generated based on detected thermal zones and hwmon devices
+
+EOF
+
+    # Add thermal zone configurations
+    local thermal_zone_count=0
+    for arg in "$@"; do
+        if [[ "$arg" =~ ^thermal_zone[0-9]+: ]]; then
+            local zone_info="${arg#*:}"
+            local sensor_type="${zone_info%%:*}"
+
+            cat >> "$config_file" << EOF
+# Thermal Zone $thermal_zone_count ($sensor_type)
+chip "thermal_zone$thermal_zone_count-*"
+    label temp1 "$sensor_type Temperature"
+    set temp1_max 85
+    set temp1_crit 95
+
+EOF
+            ((thermal_zone_count++))
+        fi
+    done
+
+    # Add hwmon device configurations
+    for arg in "$@"; do
+        if [[ "$arg" =~ ^hwmon[0-9]+: ]]; then
+            local hwmon_info="${arg#*:}"
+            local device_name="${hwmon_info%%:*}"
+
+            cat >> "$config_file" << EOF
+# Hardware Monitor Device ($device_name)
+chip "$device_name-*"
+    # Temperature sensors will be auto-detected by lm-sensors
+
+EOF
+        fi
+    done
+
+    log_info "Created ARM64 sensors configuration: $config_file"
+}
+
 # Setup hardware monitoring
 setup_hardware_monitoring() {
     log_info "Setting up hardware monitoring..."
-    sensors-detect --auto
+
+    # Use appropriate sensor detection method based on architecture
+    local arch=$(uname -m)
+    if [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+        log_info "ARM64 system detected, using native thermal zone detection"
+
+        # Use ARM64-specific sensor detection
+        detect_arm64_sensors
+
+        # Configure ARM64-specific sensors if on FriendlyElec hardware
+        if [[ "$IS_FRIENDLYELEC" == true ]]; then
+            configure_friendlyelec_sensors
+        fi
+    else
+        # Run sensors-detect on x86 systems
+        log_info "x86 system detected, using sensors-detect"
+        sensors-detect --auto
+    fi
+
     load_hardware_monitoring_config
 
     # Add cron job using standardized cron job creation
@@ -3157,7 +3334,17 @@ setup_advanced_security_tools() {
 
     # Configure ClamAV using standardized cron job creation
     if command -v clamscan >/dev/null 2>&1; then
+        # Stop any running freshclam processes to avoid lock conflicts
+        systemctl stop clamav-freshclam 2>/dev/null || true
+        pkill -f freshclam 2>/dev/null || true
+        sleep 2
+
+        # Update ClamAV definitions
         freshclam || log_warn "Failed to update ClamAV definitions"
+
+        # Restart freshclam daemon
+        systemctl start clamav-freshclam 2>/dev/null || true
+
         local antivirus_command="cd $PROJECT_ROOT && just antivirus-scan"
         if ! standard_create_cron_job "antivirus-scan" "0 4 * * *" "$antivirus_command" "root" "DangerPrep antivirus scan"; then
             log_error "Failed to create antivirus scan cron job"
@@ -3200,7 +3387,7 @@ configure_rootless_docker() {
 
         # Add Docker's official GPG key with error handling
         if enhanced_spin "Adding Docker GPG key" \
-            "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg"; then
+            bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg"; then
             enhanced_status_indicator "success" "Docker GPG key added"
         else
             enhanced_status_indicator "failure" "Failed to add Docker GPG key"
@@ -3591,12 +3778,18 @@ detect_and_configure_nvme_storage() {
 
         # Unmount any mounted partitions
         log_info "Unmounting existing partitions..."
-        for partition in $(lsblk -n -o NAME "${nvme_device}" | grep -v "^${nvme_devices[0]}$"); do
-            local partition_path="/dev/${partition}"
-            if mountpoint -q "/dev/${partition}" 2>/dev/null; then
-                umount "${partition_path}" 2>/dev/null || true
+        while IFS= read -r line; do
+            if [[ -n "$line" ]]; then
+                local partition_name mountpoint
+                read -r partition_name _ _ mountpoint <<< "$line"
+                local partition_path="/dev/${partition_name}"
+
+                if [[ -n "$mountpoint" && "$mountpoint" != "" ]]; then
+                    log_info "Unmounting ${partition_path} from ${mountpoint}..."
+                    umount "${mountpoint}" 2>/dev/null || umount -l "${mountpoint}" 2>/dev/null || true
+                fi
             fi
-        done
+        done < <(lsblk -n -o NAME,SIZE,FSTYPE,MOUNTPOINT "${nvme_device}" | grep -v "^${nvme_devices[0]} ")
     fi
 
     # Create new partition layout
@@ -3611,8 +3804,19 @@ create_nvme_partitions() {
 
     log_info "Creating new partition layout on ${nvme_device}..."
 
-    # Wipe existing partition table
+    # Ensure device is not busy and wipe existing partition table
+    sync
+    sleep 1
+
+    # Force kernel to re-read partition table
+    partprobe "${nvme_device}" 2>/dev/null || true
+    sleep 1
+
+    # Wipe existing partition table and filesystem signatures
     wipefs -a "${nvme_device}" 2>/dev/null || true
+    dd if=/dev/zero of="${nvme_device}" bs=1M count=10 2>/dev/null || true
+    sync
+    sleep 1
 
     # Create GPT partition table and partitions using parted
     log_info "Creating GPT partition table..."
@@ -4481,6 +4685,22 @@ create_new_user() {
     if [[ -n "$pi_groups" ]]; then
         usermod -a -G "$pi_groups" "$username"
         log_debug "Added $username to groups: $pi_groups"
+    fi
+
+    # Add new user to hardware groups if FriendlyElec hardware is detected
+    if [[ "$IS_FRIENDLYELEC" == true ]]; then
+        log_info "Adding $username to hardware groups..."
+
+        # Add to common hardware groups
+        local hardware_groups=("gpio" "gpio-admin" "pwm" "i2c" "spi" "dialout" "video" "render")
+        for group in "${hardware_groups[@]}"; do
+            if getent group "$group" >/dev/null 2>&1; then
+                usermod -a -G "$group" "$username" 2>/dev/null || true
+                log_debug "Added $username to $group group"
+            fi
+        done
+
+        log_success "User $username added to hardware groups"
     fi
 
     # Add to sudo group if not already included
