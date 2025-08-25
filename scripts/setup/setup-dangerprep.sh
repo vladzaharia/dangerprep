@@ -3151,9 +3151,40 @@ setup_file_integrity_monitoring() {
     # Load AIDE configuration first
     load_aide_config
 
-    # Initialize AIDE database
-    aide --init --config=/etc/aide/aide.conf
-    [[ -f /var/lib/aide/aide.db.new ]] && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+    # Add common exclusions to prevent permission issues and hanging
+    cat >> /etc/aide/aide.conf << 'EOF'
+
+# DangerPrep exclusions to prevent permission issues and hanging
+!/run/user
+!/proc
+!/sys
+!/dev
+!/tmp
+!/var/tmp
+!/var/cache
+!/var/log/journal
+!/var/lib/docker
+!/var/lib/containerd
+!/snap
+!/home/*/snap
+!/home/*/.cache
+!/home/*/.local/share/Trash
+!/root/.cache
+!/root/.local/share/Trash
+EOF
+
+    # Initialize AIDE database with timeout to prevent hanging
+    log_info "Initializing AIDE database (this may take a few minutes)..."
+
+    # Use timeout to prevent hanging (15 minutes should be enough)
+    if timeout 900 aide --init --config=/etc/aide/aide.conf 2>/dev/null; then
+        [[ -f /var/lib/aide/aide.db.new ]] && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+        log_success "AIDE database initialized successfully"
+    else
+        log_warn "AIDE initialization timed out or failed, skipping file integrity monitoring"
+        log_info "You can manually initialize AIDE later with: aide --init"
+        return 0
+    fi
 
     # Add cron job using standardized cron job creation
     local aide_command="cd $PROJECT_ROOT && just aide-check"
@@ -3776,20 +3807,69 @@ detect_and_configure_nvme_storage() {
             return 0
         fi
 
-        # Unmount any mounted partitions
+        # Aggressively unmount any mounted partitions
         log_info "Unmounting existing partitions..."
+
+        # First, get all mounted partitions for this device
+        local mounted_partitions=()
         while IFS= read -r line; do
             if [[ -n "$line" ]]; then
                 local partition_name mountpoint
                 read -r partition_name _ _ mountpoint <<< "$line"
-                local partition_path="/dev/${partition_name}"
-
-                if [[ -n "$mountpoint" && "$mountpoint" != "" ]]; then
-                    log_info "Unmounting ${partition_path} from ${mountpoint}..."
-                    umount "${mountpoint}" 2>/dev/null || umount -l "${mountpoint}" 2>/dev/null || true
+                if [[ -n "$mountpoint" && "$mountpoint" != "" && "$mountpoint" != "[SWAP]" ]]; then
+                    mounted_partitions+=("${partition_name}:${mountpoint}")
                 fi
             fi
         done < <(lsblk -n -o NAME,SIZE,FSTYPE,MOUNTPOINT "${nvme_device}" | grep -v "^${nvme_devices[0]} ")
+
+        # Unmount each partition with multiple attempts
+        for partition_info in "${mounted_partitions[@]}"; do
+            local partition_name="${partition_info%%:*}"
+            local mountpoint="${partition_info##*:}"
+            local partition_path="/dev/${partition_name}"
+
+            log_info "Unmounting ${partition_path} from ${mountpoint}..."
+
+            # Kill any processes using the mountpoint
+            if command -v fuser >/dev/null 2>&1; then
+                fuser -km "${mountpoint}" 2>/dev/null || true
+                sleep 1
+            fi
+
+            # Try multiple unmount methods
+            local unmount_success=false
+
+            # Method 1: Normal unmount
+            if umount "${mountpoint}" 2>/dev/null; then
+                unmount_success=true
+                log_info "Successfully unmounted ${mountpoint}"
+            # Method 2: Force unmount
+            elif umount -f "${mountpoint}" 2>/dev/null; then
+                unmount_success=true
+                log_info "Force unmounted ${mountpoint}"
+            # Method 3: Lazy unmount
+            elif umount -l "${mountpoint}" 2>/dev/null; then
+                unmount_success=true
+                log_warn "Lazy unmounted ${mountpoint} (will complete when no longer busy)"
+            fi
+
+            if ! $unmount_success; then
+                log_warn "Failed to unmount ${mountpoint}, continuing anyway"
+            fi
+        done
+
+        # Wait for lazy unmounts to complete and sync
+        sync
+        sleep 3
+
+        # Final check - if any partitions are still mounted, this is a problem
+        local still_mounted
+        still_mounted=$(lsblk -n -o MOUNTPOINT "${nvme_device}" | grep -v "^$" | wc -l)
+        if [[ $still_mounted -gt 0 ]]; then
+            log_error "Some partitions are still mounted. Manual intervention may be required."
+            lsblk "${nvme_device}"
+            return 1
+        fi
     fi
 
     # Create new partition layout

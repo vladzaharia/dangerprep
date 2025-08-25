@@ -36,25 +36,23 @@ SKIP_PACKAGES=false
 # - log_debug, log_info, log_warn, log_error, log_success
 # All functions support structured logging and automatic file logging when LOG_FILE is set
 
-# Source shared banner utility with error handling
+# Source shared utilities with proper error handling
 declare SCRIPT_DIR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
-if [[ -f "$SCRIPT_DIR/../shared/banner.sh" ]]; then
-    # shellcheck source=../shared/banner.sh
-    source "$SCRIPT_DIR/../shared/banner.sh"
-else
-    log_warn "Banner utility not found, continuing without banner"
-    show_cleanup_banner() { echo "DangerPrep Cleanup"; }
-fi
 
-# Source gum utilities for enhanced user interaction
+# Source gum utilities first for logging functions
 if [[ -f "$SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
     # shellcheck source=../shared/gum-utils.sh
     source "$SCRIPT_DIR/../shared/gum-utils.sh"
 else
-    log_warn "Gum utilities not found, using basic interaction"
-    # Provide fallback functions
+    echo "WARNING: Gum utilities not found, using basic interaction"
+    # Provide fallback functions including logging
+    log_debug() { echo "[DEBUG] $*"; }
+    log_info() { echo "[INFO] $*"; }
+    log_warn() { echo "[WARN] $*"; }
+    log_error() { echo "[ERROR] $*"; }
+    log_success() { echo "[SUCCESS] $*"; }
     enhanced_input() { local prompt="$1"; local default="${2:-}"; read -r -p "${prompt}: " result; echo "${result:-${default}}"; }
     enhanced_confirm() { local question="$1"; read -r -p "${question} [y/N]: " reply; [[ "${reply}" =~ ^[Yy] ]]; }
     enhanced_choose() { local prompt="$1"; shift; echo "${prompt}"; select opt in "$@"; do echo "${opt}"; break; done; }
@@ -64,6 +62,16 @@ else
     # Provide fallback directory functions
     get_log_file_path() { echo "/tmp/dangerprep-cleanup-$$.log"; }
     get_backup_dir_path() { local dir; dir="/tmp/dangerprep-cleanup-$(date +%Y%m%d-%H%M%S)-$$"; mkdir -p "$dir"; echo "$dir"; }
+    gum_available() { return 1; }
+fi
+
+# Source shared banner utility after logging functions are available
+if [[ -f "$SCRIPT_DIR/../shared/banner.sh" ]]; then
+    # shellcheck source=../shared/banner.sh
+    source "$SCRIPT_DIR/../shared/banner.sh"
+else
+    log_warn "Banner utility not found, continuing without banner"
+    show_cleanup_banner() { echo "DangerPrep Cleanup"; }
 fi
 
 # Initialize dynamic paths with fallback support
