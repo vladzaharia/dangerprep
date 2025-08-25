@@ -4,7 +4,7 @@
 
 # Source required utilities
 DOCKER_ENV_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$(dirname "$(dirname "${DOCKER_ENV_SCRIPT_DIR}")")")"
+DOCKER_ENV_PROJECT_ROOT="$(dirname "$(dirname "$(dirname "${DOCKER_ENV_SCRIPT_DIR}")")")"
 
 # Source gum utilities for consistent user interaction
 if [[ -f "$DOCKER_ENV_SCRIPT_DIR/../../shared/gum-utils.sh" ]]; then
@@ -121,16 +121,16 @@ configure_service_environment() {
     local service_dir
     case "${service_name}" in
         "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower")
-            service_dir="${PROJECT_ROOT}/docker/infrastructure/${service_name}"
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/infrastructure/${service_name}"
             ;;
         "jellyfin"|"komga"|"romm")
-            service_dir="${PROJECT_ROOT}/docker/media/${service_name}"
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/media/${service_name}"
             ;;
         "docmost"|"onedev")
-            service_dir="${PROJECT_ROOT}/docker/services/${service_name}"
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/services/${service_name}"
             ;;
         "kiwix-sync"|"nfs-sync"|"offline-sync")
-            service_dir="${PROJECT_ROOT}/docker/sync/${service_name}"
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/sync/${service_name}"
             ;;
         *)
             log_warn "Unknown service directory structure for: ${service_name}"
