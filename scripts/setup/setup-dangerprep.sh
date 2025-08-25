@@ -2568,8 +2568,8 @@ install_essential_packages() {
     fi
 
     # Clean up package cache
-    enhanced_spin "Cleaning package cache" apt autoremove -y
-    enhanced_spin "Cleaning package cache" apt autoclean
+    enhanced_spin "Cleaning package cache" bash -c "apt autoremove -y"
+    enhanced_spin "Cleaning package cache" bash -c "apt autoclean"
 
     if [[ $install_result -eq 0 ]]; then
         log_success "Essential packages installation completed"
@@ -3450,10 +3450,6 @@ configure_rootless_docker() {
 
         if [[ $install_result -eq 0 ]]; then
             # Add user to docker group (will be updated when user account is created)
-            if id ubuntu >/dev/null 2>&1; then
-                usermod -aG docker ubuntu
-                enhanced_status_indicator "success" "Added ubuntu user to docker group"
-            fi
             log_success "Docker installed successfully"
         else
             log_error "Docker installation failed"
@@ -3463,31 +3459,6 @@ configure_rootless_docker() {
         enhanced_status_indicator "info" "Docker already installed"
     fi
 
-    # Configure rootless Docker for user (will be updated when user account is created)
-    if [[ ! -f /home/ubuntu/.config/systemd/user/docker.service ]]; then
-        log_info "Setting up rootless Docker for ubuntu user..."
-
-        # Install rootless Docker dependencies using standardized pattern
-        local rootless_packages="uidmap,dbus-user-session"
-        install_packages_with_selection "Rootless Docker" "Installing rootless Docker dependencies" "Dependencies:$rootless_packages"
-
-        # Set up rootless Docker for ubuntu user
-        if enhanced_spin "Configuring rootless Docker" \
-            "sudo -u ubuntu bash -c 'dockerd-rootless-setuptool.sh install'"; then
-            enhanced_status_indicator "success" "Rootless Docker setup completed"
-
-            # Add environment variables to user profile
-            sudo -u ubuntu bash -c 'echo "export PATH=/home/ubuntu/bin:\$PATH" >> /home/ubuntu/.bashrc'
-            sudo -u ubuntu bash -c 'echo "export DOCKER_HOST=unix:///run/user/1000/docker.sock" >> /home/ubuntu/.bashrc'
-
-            log_success "Rootless Docker configured for ubuntu user"
-        else
-            enhanced_status_indicator "failure" "Failed to configure rootless Docker"
-            log_warn "Continuing with standard Docker configuration"
-        fi
-    else
-        enhanced_status_indicator "info" "Rootless Docker already configured"
-    fi
 
     log_success "Docker configuration completed"
 }
@@ -3516,7 +3487,7 @@ setup_docker_services() {
 
     # Create Docker networks with error handling
     if ! docker network ls --format "{{.Name}}" | grep -q "^traefik$"; then
-        if enhanced_spin "Creating Docker network: traefik" "docker network create traefik"; then
+        if enhanced_spin "Creating Docker network: traefik" bash -c "docker network create traefik"; then
             enhanced_status_indicator "success" "Created Docker network: traefik"
         else
             enhanced_status_indicator "failure" "Failed to create Docker network: traefik"
@@ -3568,7 +3539,7 @@ setup_docker_services() {
     if [[ -d "${PROJECT_ROOT}/docker" ]]; then
         log_info "Copying Docker configurations..."
         if enhanced_spin "Copying Docker configurations" \
-            "cp -r '${PROJECT_ROOT}'/docker/* '${INSTALL_ROOT}'/docker/ 2>/dev/null || true"; then
+            bash -c "cp -r '${PROJECT_ROOT}'/docker/* '${INSTALL_ROOT}'/docker/ 2>/dev/null || true"; then
             enhanced_status_indicator "success" "Docker configurations copied"
         else
             enhanced_status_indicator "warning" "Some Docker configurations may not have been copied"
@@ -4784,10 +4755,42 @@ create_new_user() {
         log_success "User $username added to hardware groups"
     fi
 
+    # Add new user to Docker group if Docker is installed
+    if command -v docker >/dev/null 2>&1; then
+        log_info "Adding $username to Docker group..."
+        if getent group "docker" >/dev/null 2>&1; then
+            usermod -a -G "docker" "$username" 2>/dev/null || true
+            log_success "User $username added to Docker group"
+        else
+            log_warn "Docker group not found - user will need to be added to Docker group manually"
+        fi
+    fi
+
     # Add to sudo group if not already included
     usermod -a -G sudo "$username"
 
-    # Handle SSH key setup based on configuration
+    # Create .ssh directory for new user
+    if ! standard_create_directory "/home/$username/.ssh" "700" "$username" "$username"; then
+        log_error "Failed to create SSH directory for $username"
+        return 1
+    fi
+
+    # Generate ECDSA SSH key pair for the new user
+    log_info "Generating ECDSA SSH key pair for $username..."
+    local ssh_key_path="/home/$username/.ssh/id_ecdsa"
+
+    if sudo -u "$username" ssh-keygen -t ecdsa -b 521 -f "$ssh_key_path" -N "" -C "$username@$(hostname)"; then
+        log_success "ECDSA SSH key pair generated successfully"
+        log_info "Public key location: ${ssh_key_path}.pub"
+
+        # Display the public key for easy copying
+        log_info "Public key content:"
+        cat "${ssh_key_path}.pub"
+    else
+        log_error "Failed to generate ECDSA SSH key pair"
+    fi
+
+    # Handle additional SSH key setup based on configuration
     if [[ "${IMPORT_GITHUB_KEYS:-no}" == "yes" ]] && [[ -n "${GITHUB_USERNAME:-}" ]]; then
         log_info "Importing SSH keys from GitHub..."
         if import_github_ssh_keys "$GITHUB_USERNAME" "$username"; then
@@ -4798,12 +4801,6 @@ create_new_user() {
         fi
     elif [[ "$transfer_ssh" == "yes" ]] && [[ -d "/home/pi/.ssh" ]]; then
         log_info "Transferring SSH keys from pi user..."
-
-        # Create .ssh directory for new user
-        if ! standard_create_directory "/home/$username/.ssh" "700" "$username" "$username"; then
-            log_error "Failed to create SSH directory for $username"
-            return 1
-        fi
 
         # Copy SSH files individually with proper permissions
         for ssh_file in /home/pi/.ssh/*; do
@@ -4819,8 +4816,6 @@ create_new_user() {
         done
 
         log_success "SSH keys transferred from pi user"
-    else
-        log_info "No SSH key setup requested - you can configure SSH keys manually later"
     fi
 
     # Update configuration files that reference pi user
