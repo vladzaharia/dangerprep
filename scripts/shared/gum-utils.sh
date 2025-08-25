@@ -62,11 +62,23 @@ enhanced_input() {
     [[ -n "${default}" ]] && gum_args+=(--value "${default}")
     [[ -n "${placeholder}" ]] && gum_args+=(--placeholder "${placeholder}")
 
-    # Handle empty array properly
+    # Sanitize prompt to prevent shell interpretation issues
+    # Remove any potential problematic characters and ensure single line
+    local safe_prompt="${prompt//[$'\n\r\t']/ }"  # Replace newlines/tabs with spaces
+    safe_prompt="${safe_prompt//  / }"            # Replace double spaces with single
+    safe_prompt="${safe_prompt# }"                # Remove leading space
+    safe_prompt="${safe_prompt% }"                # Remove trailing space
+
+    # Truncate if too long to prevent display issues
+    if [[ ${#safe_prompt} -gt 100 ]]; then
+        safe_prompt="${safe_prompt:0:97}..."
+    fi
+
+    # Handle empty array properly with proper quoting
     if [[ ${#gum_args[@]} -gt 0 ]]; then
-        "${gum_cmd}" input --prompt "${prompt} " "${gum_args[@]}"
+        "${gum_cmd}" input --prompt "${safe_prompt} " "${gum_args[@]}"
     else
-        "${gum_cmd}" input --prompt "${prompt} "
+        "${gum_cmd}" input --prompt "${safe_prompt} "
     fi
 }
 
@@ -81,7 +93,19 @@ enhanced_password() {
 
     [[ -n "${placeholder}" ]] && gum_args+=(--placeholder "${placeholder}")
 
-    "${gum_cmd}" input --prompt "${prompt} " "${gum_args[@]}"
+    # Sanitize prompt to prevent shell interpretation issues
+    # Remove any potential problematic characters and ensure single line
+    local safe_prompt="${prompt//[$'\n\r\t']/ }"  # Replace newlines/tabs with spaces
+    safe_prompt="${safe_prompt//  / }"            # Replace double spaces with single
+    safe_prompt="${safe_prompt# }"                # Remove leading space
+    safe_prompt="${safe_prompt% }"                # Remove trailing space
+
+    # Truncate if too long to prevent display issues
+    if [[ ${#safe_prompt} -gt 100 ]]; then
+        safe_prompt="${safe_prompt:0:97}..."
+    fi
+
+    "${gum_cmd}" input --prompt "${safe_prompt} " "${gum_args[@]}"
 }
 
 # Enhanced confirmation function with gum integration
@@ -99,11 +123,23 @@ enhanced_confirm() {
         gum_args+=(--default=false)
     fi
 
-    # Handle array expansion properly
+    # Sanitize question to prevent shell interpretation issues
+    # Remove any potential problematic characters and ensure single line
+    local safe_question="${question//[$'\n\r\t']/ }"  # Replace newlines/tabs with spaces
+    safe_question="${safe_question//  / }"            # Replace double spaces with single
+    safe_question="${safe_question# }"                # Remove leading space
+    safe_question="${safe_question% }"                # Remove trailing space
+
+    # Truncate if too long to prevent display issues
+    if [[ ${#safe_question} -gt 100 ]]; then
+        safe_question="${safe_question:0:97}..."
+    fi
+
+    # Handle array expansion properly with proper quoting
     if [[ ${#gum_args[@]} -gt 0 ]]; then
-        "${gum_cmd}" confirm "${question}" "${gum_args[@]}"
+        "${gum_cmd}" confirm "${safe_question}" "${gum_args[@]}"
     else
-        "${gum_cmd}" confirm "${question}"
+        "${gum_cmd}" confirm "${safe_question}"
     fi
 }
 
@@ -117,7 +153,19 @@ enhanced_choose() {
     local gum_cmd
     gum_cmd=$(get_gum_cmd)
 
-    "${gum_cmd}" choose --header "${prompt}" "${options[@]}"
+    # Sanitize prompt to prevent shell interpretation issues
+    # Remove any potential problematic characters and ensure single line
+    local safe_prompt="${prompt//[$'\n\r\t']/ }"  # Replace newlines/tabs with spaces
+    safe_prompt="${safe_prompt//  / }"            # Replace double spaces with single
+    safe_prompt="${safe_prompt# }"                # Remove leading space
+    safe_prompt="${safe_prompt% }"                # Remove trailing space
+
+    # Truncate if too long to prevent display issues
+    if [[ ${#safe_prompt} -gt 100 ]]; then
+        safe_prompt="${safe_prompt:0:97}..."
+    fi
+
+    "${gum_cmd}" choose --header "${safe_prompt}" "${options[@]}"
 }
 
 # Enhanced multi-choice function with gum integration
@@ -130,7 +178,19 @@ enhanced_multi_choose() {
     local gum_cmd
     gum_cmd=$(get_gum_cmd)
 
-    "${gum_cmd}" choose --no-limit --selected="*" --header "${prompt}" "${options[@]}"
+    # Sanitize prompt to prevent shell interpretation issues
+    # Remove any potential problematic characters and ensure single line
+    local safe_prompt="${prompt//[$'\n\r\t']/ }"  # Replace newlines/tabs with spaces
+    safe_prompt="${safe_prompt//  / }"            # Replace double spaces with single
+    safe_prompt="${safe_prompt# }"                # Remove leading space
+    safe_prompt="${safe_prompt% }"                # Remove trailing space
+
+    # Truncate if too long to prevent display issues
+    if [[ ${#safe_prompt} -gt 100 ]]; then
+        safe_prompt="${safe_prompt:0:97}..."
+    fi
+
+    "${gum_cmd}" choose --no-limit --selected="*" --header "${safe_prompt}" "${options[@]}"
 }
 
 # Enhanced progress spinner function with gum integration
