@@ -5013,6 +5013,9 @@ set -euo pipefail
 
 # Configuration
 NEW_USERNAME="$new_username"
+SSH_PORT="${SSH_PORT}"
+FAIL2BAN_BANTIME="${FAIL2BAN_BANTIME}"
+FAIL2BAN_MAXRETRY="${FAIL2BAN_MAXRETRY}"
 LOG_FILE="/var/log/dangerprep-finalization.log"
 
 # Logging setup
@@ -5035,8 +5038,178 @@ log_success() {
     echo "\$(date): [SUCCESS] \$*"
 }
 
+# Apply SSH hardening configuration
+apply_ssh_hardening() {
+    log_info "Configuring SSH hardening..."
+
+    # Configuration variables (passed from main setup)
+    local SSH_PORT="${SSH_PORT}"
+    local NEW_USERNAME="\$NEW_USERNAME"
+
+    # Create SSH privilege separation directory if missing
+    if [[ ! -d /run/sshd ]]; then
+        log_info "Creating SSH privilege separation directory..."
+        mkdir -p /run/sshd
+        chmod 755 /run/sshd
+    fi
+
+    # Apply SSH configuration template
+    log_info "Applying SSH configuration..."
+    cat > /etc/ssh/sshd_config << 'SSHD_CONFIG'
+# DangerPrep SSH Configuration - Hardened for 2025
+Port \${SSH_PORT}
+
+# Protocol and encryption (2025 standards - Ed25519 preferred)
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+
+# Authentication
+PermitRootLogin no
+PubkeyAuthentication yes
+AuthorizedKeysFile /home/%u/.ssh/authorized_keys
+PasswordAuthentication no
+PermitEmptyPasswords no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+GSSAPIAuthentication no
+UsePAM yes
+
+# Modern public key algorithms (2025 standards)
+PubkeyAcceptedAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
+
+# Security settings
+X11Forwarding no
+PrintMotd no
+PrintLastLog yes
+TCPKeepAlive no
+StrictModes yes
+IgnoreRhosts yes
+HostbasedAuthentication no
+PermitUserEnvironment no
+Compression no
+ClientAliveInterval 300
+ClientAliveCountMax 2
+LoginGraceTime 30
+MaxAuthTries 3
+MaxSessions 4
+MaxStartups 10:30:60
+
+# Modern ciphers and algorithms (2025 standards - AEAD ciphers only)
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
+KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256
+
+# Certificate authority signature algorithms (2025 standards)
+CASignatureAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
+
+# Logging
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# Banner
+Banner /etc/ssh/ssh_banner
+
+# Allow specific users only
+AllowUsers \${NEW_USERNAME}
+
+# Forwarding and tunneling (balanced security vs usability)
+AllowAgentForwarding no
+AllowTcpForwarding local
+GatewayPorts no
+PermitTunnel no
+
+# Additional 2025 security settings
+Protocol 2
+RequiredRSASize 2048
+SSHD_CONFIG
+
+    # Set proper permissions
+    chmod 644 /etc/ssh/sshd_config
+
+    # Test SSH configuration
+    if sshd -t 2>/dev/null; then
+        log_success "SSH configuration is valid"
+
+        # Restart SSH service
+        systemctl restart ssh
+        log_success "SSH service restarted with hardened configuration"
+        log_info "SSH is now configured on port \${SSH_PORT} with key-only authentication"
+    else
+        log_error "SSH configuration is invalid, keeping original configuration"
+        return 1
+    fi
+}
+
+# Apply fail2ban configuration with correct SSH port
+apply_fail2ban_config() {
+    log_info "Configuring fail2ban with SSH port \${SSH_PORT}..."
+
+    # Create fail2ban jail.local configuration
+    cat > /etc/fail2ban/jail.local << 'FAIL2BAN_CONFIG'
+# DangerPrep Fail2ban Configuration
+
+[DEFAULT]
+# Ban settings
+bantime = \${FAIL2BAN_BANTIME}
+findtime = 600
+maxretry = \${FAIL2BAN_MAXRETRY}
+backend = systemd
+
+# Email notifications (disabled by default)
+destemail = root@localhost
+sendername = Fail2Ban
+mta = sendmail
+
+# Action
+action = %(action_mwl)s
+
+[sshd]
+enabled = true
+port = \${SSH_PORT}
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = \${FAIL2BAN_MAXRETRY}
+bantime = \${FAIL2BAN_BANTIME}
+
+[nginx-http-auth]
+enabled = true
+filter = nginx-http-auth
+logpath = /var/log/nginx/error.log
+maxretry = 3
+bantime = 3600
+
+[nginx-botsearch]
+enabled = true
+filter = nginx-botsearch
+logpath = /var/log/nginx/access.log
+maxretry = 2
+bantime = 86400
+
+[recidive]
+enabled = true
+filter = recidive
+logpath = /var/log/fail2ban.log
+action = %(action_mwl)s
+bantime = 604800  # 1 week
+findtime = 86400   # 1 day
+maxretry = 5
+FAIL2BAN_CONFIG
+
+    # Restart fail2ban to apply new configuration
+    systemctl restart fail2ban
+    log_success "Fail2ban configured and restarted with SSH port \${SSH_PORT}"
+}
+
 main() {
     log_info "Starting DangerPrep reboot finalization..."
+
+    # Apply SSH hardening now that user account is created
+    log_info "Applying SSH hardening configuration..."
+    apply_ssh_hardening
+
+    # Apply fail2ban configuration with correct SSH port
+    log_info "Applying fail2ban configuration..."
+    apply_fail2ban_config
 
     # Kill any processes still running as pi user
     local pi_processes
@@ -5497,9 +5670,7 @@ main() {
         "install_essential_packages:Installing essential packages"
         "setup_automatic_updates:Setting up automatic updates"
         "detect_and_configure_nvme_storage:Detecting and configuring NVMe storage"
-        "configure_ssh_hardening:Configuring SSH hardening"
         "load_motd_config:Loading MOTD configuration"
-        "setup_fail2ban:Setting up Fail2ban"
         "configure_kernel_hardening:Configuring kernel hardening"
         "setup_file_integrity_monitoring:Setting up file integrity monitoring"
         "setup_hardware_monitoring:Setting up hardware monitoring"
@@ -5656,8 +5827,8 @@ main() {
     log_success "DangerPrep setup completed successfully!"
     log_info "Next steps:"
     log_info "1. Reboot the system to complete setup and apply all configurations"
-    log_info "2. SSH hardening will be activated on reboot (port ${SSH_PORT})"
-    log_info "3. Log in with your new user account"
+    log_info "2. SSH hardening and fail2ban will be activated on reboot (port ${SSH_PORT})"
+    log_info "3. Log in with your new user account: ${NEW_USERNAME}"
     log_info "4. The pi user will be automatically removed on reboot"
 
     return 0
