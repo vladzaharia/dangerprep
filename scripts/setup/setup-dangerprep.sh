@@ -3435,7 +3435,8 @@ configure_rootless_docker() {
         fi
 
         # Update package index and install Docker packages
-        if enhanced_spin "Updating package index" "apt update"; then
+        if enhanced_spin "Updating package index" \
+            bash -c "apt update"; then
             enhanced_status_indicator "success" "Package index updated"
         else
             enhanced_status_indicator "failure" "Failed to update package index"
