@@ -107,8 +107,13 @@ collect_global_environment_variables() {
         export TZ
     fi
 
-    # INSTALL_ROOT should already be set, but ensure it's exported
-    export INSTALL_ROOT="${INSTALL_ROOT:-/dangerprep}"
+    # INSTALL_ROOT should already be set as readonly, just ensure it's exported
+    if [[ -n "${INSTALL_ROOT:-}" ]]; then
+        export INSTALL_ROOT
+    else
+        log_error "INSTALL_ROOT not set - this should be set by the main setup script"
+        return 1
+    fi
 
     log_debug "Global environment variables configured: TZ=${TZ}, INSTALL_ROOT=${INSTALL_ROOT}"
 }
@@ -370,9 +375,16 @@ export_critical_variables() {
             log_debug "Exported ${var_name} to shell environment"
             ;;
         "INSTALL_ROOT")
-            # Many services need this path
-            export "${var_name}=${var_value}"
-            log_debug "Exported ${var_name} to shell environment"
+            # Many services need this path - but it may be readonly from main script
+            if [[ -n "${INSTALL_ROOT:-}" ]]; then
+                # INSTALL_ROOT is already set (likely readonly), just ensure it's exported
+                export INSTALL_ROOT
+                log_debug "Exported existing ${var_name} to shell environment"
+            else
+                # INSTALL_ROOT not set, safe to export with new value
+                export "${var_name}=${var_value}"
+                log_debug "Exported ${var_name} to shell environment"
+            fi
             ;;
         *)
             # Most variables don't need shell export, only env file
@@ -407,9 +419,23 @@ load_and_export_env_file() {
 
             # Only export critical variables to avoid polluting environment
             case "${var_name}" in
-                "GITHUB_USERNAME"|"GITHUB_TOKEN"|"ACME_EMAIL"|"INSTALL_ROOT")
+                "GITHUB_USERNAME"|"GITHUB_TOKEN"|"ACME_EMAIL")
                     export "${var_name}=${var_value}"
                     log_debug "Exported ${var_name} from env file"
+                    ;;
+                "INSTALL_ROOT")
+                    # INSTALL_ROOT may be readonly from main script
+                    if [[ -n "${INSTALL_ROOT:-}" ]]; then
+                        export INSTALL_ROOT
+                        log_debug "Exported existing ${var_name} from env file"
+                    else
+                        export "${var_name}=${var_value}"
+                        log_debug "Exported ${var_name} from env file"
+                    fi
+                    ;;
+                *)
+                    # Most variables don't need shell export
+                    log_debug "Variable ${var_name} not exported to shell environment"
                     ;;
             esac
         fi
