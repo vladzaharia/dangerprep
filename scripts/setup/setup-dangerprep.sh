@@ -1072,6 +1072,22 @@ else
     exit 1
 fi
 
+# Source Docker environment configuration helper
+declare DOCKER_ENV_CONFIG_PATH
+DOCKER_ENV_CONFIG_PATH="${SCRIPT_DIR}/helpers/docker-env-config.sh"
+if [[ -f "${DOCKER_ENV_CONFIG_PATH}" ]]; then
+    # shellcheck source=helpers/docker-env-config.sh
+    source "${DOCKER_ENV_CONFIG_PATH}"
+else
+    log_warn "Docker environment configuration helper not found at ${DOCKER_ENV_CONFIG_PATH}"
+    log_warn "Docker services will use default configuration"
+    # Provide fallback function
+    collect_docker_environment_configuration() {
+        log_debug "Docker environment configuration helper not available, skipping"
+        return 0
+    }
+fi
+
 # Initialize dynamic paths with fallback support
 initialize_paths() {
     if command -v get_log_file_path >/dev/null 2>&1; then
@@ -1798,6 +1814,9 @@ collect_configuration() {
 
     # Docker services configuration
     collect_docker_services_configuration
+
+    # Docker environment configuration (after service selection)
+    collect_docker_environment_configuration
 
     # FriendlyElec-specific configuration
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
