@@ -185,20 +185,42 @@ parse_and_process_env_directives() {
     while IFS= read -r line; do
         ((line_num++))
 
+        # Ensure variables are clean at the start of each iteration
+        # This prevents any potential contamination from previous iterations
+        if [[ -z "${pending_directive:-}" ]]; then
+            pending_description=""
+        fi
+
         # Check for directive comments
         if [[ "${line}" =~ ^#[[:space:]]*(PROMPT|PASSWORD|EMAIL|GENERATE|OPTIONAL|REQUIRED):[[:space:]]*(.*)$ ]]; then
             pending_directive="${BASH_REMATCH[1]}"
+            # Capture description with explicit string isolation to prevent variable expansion
             pending_description="${BASH_REMATCH[2]}"
+
+            # Immediately isolate the description to prevent any potential contamination
+            # Use printf to ensure we get exactly what was captured, no more, no less
+            pending_description="$(printf '%s' "${pending_description}")"
+
+            # Debug: Log the raw captured description
+            log_debug "Raw captured description: '${pending_description}'"
+            log_debug "Raw description length: ${#pending_description}"
+
             # Clean up the description - remove any problematic characters and ensure it's a single line
             pending_description="${pending_description//[$'\n\r\t']/ }"  # Replace newlines/tabs with spaces
             pending_description="${pending_description//  / }"           # Replace double spaces with single
             pending_description="${pending_description# }"               # Remove leading space
             pending_description="${pending_description% }"               # Remove trailing space
+
             # Truncate if too long to prevent issues
             if [[ ${#pending_description} -gt 100 ]]; then
                 pending_description="${pending_description:0:97}..."
             fi
+
+            # Final isolation to ensure no contamination
+            pending_description="$(printf '%s' "${pending_description}")"
+
             log_debug "Found directive comment: ${pending_directive} - '${pending_description}'"
+            log_debug "Cleaned description length: ${#pending_description}"
             continue
         fi
 
@@ -211,13 +233,18 @@ parse_and_process_env_directives() {
             log_debug "Description: '${pending_description}'"
             log_debug "Current value: '${var_value}'"
 
-            if process_env_directive "${env_file}" "${var_name}" "${pending_directive}" "${pending_description}"; then
+            # Create a local copy of the description to prevent contamination
+            local local_description
+            local_description="$(printf '%s' "${pending_description}")"
+
+            if process_env_directive "${env_file}" "${var_name}" "${pending_directive}" "${local_description}"; then
                 ((variables_processed++))
             fi
 
-            # Clear pending directive
+            # Aggressively clear pending directive and description
             pending_directive=""
             pending_description=""
+            unset local_description
         fi
 
         # Clear pending directive if we hit a non-comment, non-variable line
@@ -258,7 +285,18 @@ process_env_directive() {
     local new_value=""
 
     # Sanitize description to prevent shell injection or parsing issues
-    local safe_description="${description}"
+    # Use printf to ensure we get exactly the input string with no expansion
+    local safe_description
+    safe_description="$(printf '%s' "${description}")"
+
+    # Debug: Log the description before and after sanitization
+    log_debug "Original description for ${var_name}: '${description}'"
+    log_debug "Original description length: ${#description}"
+    log_debug "Original description hex dump:"
+    printf '%s' "${description}" | hexdump -C | head -3 | while read -r line; do
+        log_debug "  ${line}"
+    done
+
     # Remove any potentially problematic characters
     safe_description="${safe_description//[\$\`\\\"\']/}"
     # Ensure it's not empty
@@ -266,8 +304,15 @@ process_env_directive() {
         safe_description="Enter value for ${var_name}"
     fi
 
+    # Final isolation to prevent any contamination
+    safe_description="$(printf '%s' "${safe_description}")"
+
+    log_debug "Sanitized description for ${var_name}: '${safe_description}'"
+    log_debug "Sanitized description length: ${#safe_description}"
+
     case "${directive}" in
         "PROMPT"|"REQUIRED")
+            log_debug "About to call enhanced_input with: '${safe_description}'"
             new_value=$(enhanced_input "${safe_description}" "" "Enter value for ${var_name}")
             ;;
         "PASSWORD")
