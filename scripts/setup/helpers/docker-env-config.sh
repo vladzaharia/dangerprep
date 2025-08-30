@@ -225,7 +225,7 @@ parse_and_process_env_directives() {
         fi
 
         # Check for variable definitions after directive comments
-        if [[ -n "${pending_directive}" ]] && [[ "${line}" =~ ^([A-Z_][A-Z0-9_]*)=(.*)$ ]]; then
+        if [[ -n "${pending_directive}" ]] && [[ "${line}" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
             local var_name="${BASH_REMATCH[1]}"
             local var_value="${BASH_REMATCH[2]}"
 
@@ -248,7 +248,7 @@ parse_and_process_env_directives() {
         fi
 
         # Clear pending directive if we hit a non-comment, non-variable line
-        if [[ "${line}" =~ ^[^#] ]] && [[ ! "${line}" =~ ^[A-Z_][A-Z0-9_]*= ]]; then
+        if [[ "${line}" =~ ^[^#] ]] && [[ ! "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
             pending_directive=""
             pending_description=""
         fi
