@@ -13,13 +13,14 @@ if [[ -f "$DOCKER_ENV_SCRIPT_DIR/../../shared/gum-utils.sh" ]]; then
 fi
 
 # Supported directive types in environment files
-# Format: # DIRECTIVE: description
-# PROMPT: Regular text input
-# PASSWORD: Hidden password input
-# EMAIL: Email input with validation
-# GENERATE: Auto-generate secure value
-# OPTIONAL: Optional field, can be skipped
-# REQUIRED: Must be provided (same as PROMPT)
+# Format: # DIRECTIVE[parameters]: description (parameters are optional)
+# PROMPT[type,OPTIONAL]: User input with optional type validation
+#   - type: email (email validation), pw/password (hidden input), or omit for text input
+#   - OPTIONAL: field can be skipped
+# GENERATE[type,size,OPTIONAL]: Auto-generate secure value
+#   - type: b64/base64, hex, bcrypt, pw/password, or omit for default generation
+#   - size: length of generated value (default: 24)
+#   - OPTIONAL: field can be skipped
 
 # Main function to collect Docker environment configuration
 collect_docker_environment_configuration() {
@@ -191,10 +192,10 @@ parse_and_process_env_directives() {
             pending_description=""
         fi
 
-        # Check for directive comments - now supports parameterized format like GENERATE[type,size] or PROMPT[type,OPTIONAL]
-        if [[ "${line}" =~ ^#[[:space:]]*(PROMPT|PASSWORD|EMAIL|GENERATE|OPTIONAL|REQUIRED)(\[[^]]*\])?:[[:space:]]*(.*)$ ]]; then
+        # Check for directive comments - supports both PROMPT/GENERATE with or without parameters
+        if [[ "${line}" =~ ^#[[:space:]]*(PROMPT|GENERATE)(\[[^]]*\])?:[[:space:]]*(.*)$ ]]; then
             pending_directive="${BASH_REMATCH[1]}"
-            pending_directive_params="${BASH_REMATCH[2]}"  # Includes brackets, e.g., "[b64,32]" or "[email,OPTIONAL]"
+            pending_directive_params="${BASH_REMATCH[2]}"  # Includes brackets, e.g., "[b64,32]" or "[email,OPTIONAL]", or empty
             # Capture description with explicit string isolation to prevent variable expansion
             pending_description="${BASH_REMATCH[3]}"
 
@@ -303,6 +304,11 @@ process_env_directive() {
         done
     fi
 
+    # Set default size if not specified
+    if [[ -z "${param_size}" ]]; then
+        param_size="24"  # Default size for generated values
+    fi
+
     # For resumable setup: check if variable was already configured by user in a previous run
     # We detect this by checking if the variable exists in the env file AND has a different value
     # than what's in the example file (indicating user input was already collected)
@@ -362,8 +368,8 @@ process_env_directive() {
     fi
 
     case "${directive}" in
-        "PROMPT"|"REQUIRED")
-            # Handle parameterized PROMPT types
+        "PROMPT")
+            # Handle PROMPT types (with or without parameters)
             case "${param_type}" in
                 "email")
                     while true; do
@@ -378,40 +384,17 @@ process_env_directive() {
                 "pw"|"password")
                     new_value=$(enhanced_password "${safe_description}" "Enter password for ${var_name}")
                     ;;
-                *)
-                    # Default text input
+                ""|*)
+                    # Default text input (no parameter or unknown parameter)
                     log_debug "About to call enhanced_input with: '${safe_description}'"
                     new_value=$(enhanced_input "${safe_description}" "" "Enter value for ${var_name}")
                     ;;
             esac
             ;;
-        "PASSWORD")
-            # Legacy PASSWORD directive - convert to PROMPT[pw]
-            new_value=$(enhanced_password "${safe_description}" "Enter password for ${var_name}")
-            ;;
-        "EMAIL")
-            # Legacy EMAIL directive - convert to PROMPT[email]
-            while true; do
-                new_value=$(enhanced_input "${safe_description}" "" "Enter valid email address")
-                if [[ "${new_value}" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
-                    break
-                else
-                    log_warn "Please enter a valid email address"
-                fi
-            done
-            ;;
         "GENERATE")
+            # Handle GENERATE with or without parameters
             new_value=$(generate_secure_value "${var_name}" "${param_type}" "${param_size}")
             log_info "Auto-generated secure value for ${var_name}"
-            ;;
-        "OPTIONAL")
-            # Legacy OPTIONAL directive - now handled above with parameter
-            if enhanced_confirm "Configure ${var_name}?" "false"; then
-                new_value=$(enhanced_input "${safe_description}" "" "Enter value for ${var_name}")
-            else
-                log_debug "Skipping optional variable ${var_name}"
-                return 0
-            fi
             ;;
         *)
             log_warn "Unknown directive: ${directive} for variable ${var_name}"
@@ -419,8 +402,8 @@ process_env_directive() {
             ;;
     esac
 
-    # Validate required variables
-    if [[ "${directive}" == "REQUIRED" || "${directive}" == "PROMPT" ]] && [[ -z "${new_value}" ]]; then
+    # Validate required variables (PROMPT without OPTIONAL parameter)
+    if [[ "${directive}" == "PROMPT" && "${is_optional}" != "true" ]] && [[ -z "${new_value}" ]]; then
         log_error "Required variable ${var_name} cannot be empty"
         return 1
     fi
@@ -445,87 +428,52 @@ generate_secure_value() {
     # Set default size if not specified
     local size="${param_size:-24}"
 
-    # Handle parameterized generation types
-    if [[ -n "${param_type}" ]]; then
-        case "${param_type}" in
-            "b64"|"base64")
-                # Generate base64 encoded value
-                openssl rand -base64 "${size}" | tr -d "=+/" | cut -c1-"${size}" || {
-                    log_error "Failed to generate base64 value for ${var_name}"
-                    return 1
-                }
-                ;;
-            "hex")
-                # Generate hexadecimal value
-                openssl rand -hex "$((size / 2))" | cut -c1-"${size}" || {
-                    log_error "Failed to generate hex value for ${var_name}"
-                    return 1
-                }
-                ;;
-            "bcrypt")
-                # Generate bcrypt hash for admin user (special case for Traefik)
-                local admin_password
-                admin_password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-16 || {
-                    log_error "Failed to generate admin password"
-                    return 1
-                })
-                local auth_hash
-                auth_hash=$(openssl passwd -apr1 "${admin_password}" || {
-                    log_error "Failed to generate password hash"
-                    return 1
-                })
-                echo "admin:${auth_hash}"
-                log_info "Generated admin credentials - Username: admin, Password: ${admin_password}"
-                ;;
-            "pw"|"password")
-                # Generate alphanumeric password
-                openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
-                    log_error "Failed to generate password for ${var_name}"
-                    return 1
-                }
-                ;;
-            *)
-                log_warn "Unknown generation type '${param_type}' for ${var_name}, using default"
-                openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
-                    log_error "Failed to generate secure value for ${var_name}"
-                    return 1
-                }
-                ;;
-        esac
-    else
-        # Legacy behavior - determine type based on variable name
-        case "${var_name}" in
-            *"PASSWORD"*|*"SECRET"*|*"KEY"*)
-                # Generate secure password/key
-                openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
-                    log_error "Failed to generate secure password for ${var_name}"
-                    return 1
-                }
-                ;;
-            "TRAEFIK_AUTH_USERS")
-                # Generate htpasswd format for admin user
-                local admin_password
-                admin_password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-16 || {
-                    log_error "Failed to generate admin password"
-                    return 1
-                })
-                local auth_hash
-                auth_hash=$(openssl passwd -apr1 "${admin_password}" || {
-                    log_error "Failed to generate password hash"
-                    return 1
-                })
-                echo "admin:${auth_hash}"
-                log_info "Generated Traefik admin credentials - Username: admin, Password: ${admin_password}"
-                ;;
-            *)
-                # Default secure random string
-                openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
-                    log_error "Failed to generate secure value for ${var_name}"
-                    return 1
-                }
-                ;;
-        esac
-    fi
+    # Handle generation types (with or without parameters)
+    case "${param_type}" in
+        "b64"|"base64")
+            # Generate base64 encoded value
+            openssl rand -base64 "${size}" | tr -d "=+/" | cut -c1-"${size}" || {
+                log_error "Failed to generate base64 value for ${var_name}"
+                return 1
+            }
+            ;;
+        "hex")
+            # Generate hexadecimal value
+            openssl rand -hex "$((size / 2))" | cut -c1-"${size}" || {
+                log_error "Failed to generate hex value for ${var_name}"
+                return 1
+            }
+            ;;
+        "bcrypt")
+            # Generate bcrypt hash for admin user (special case for Traefik)
+            local admin_password
+            admin_password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-16 || {
+                log_error "Failed to generate admin password"
+                return 1
+            })
+            local auth_hash
+            auth_hash=$(openssl passwd -apr1 "${admin_password}" || {
+                log_error "Failed to generate password hash"
+                return 1
+            })
+            echo "admin:${auth_hash}"
+            log_info "Generated admin credentials - Username: admin, Password: ${admin_password}"
+            ;;
+        "pw"|"password")
+            # Generate alphanumeric password
+            openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
+                log_error "Failed to generate password for ${var_name}"
+                return 1
+            }
+            ;;
+        ""|*)
+            # Default generation when no type specified or unknown type
+            openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
+                log_error "Failed to generate secure value for ${var_name}"
+                return 1
+            }
+            ;;
+    esac
 }
 
 # Update variable in environment file
