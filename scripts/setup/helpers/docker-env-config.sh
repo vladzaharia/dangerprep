@@ -191,11 +191,12 @@ parse_and_process_env_directives() {
             pending_description=""
         fi
 
-        # Check for directive comments
-        if [[ "${line}" =~ ^#[[:space:]]*(PROMPT|PASSWORD|EMAIL|GENERATE|OPTIONAL|REQUIRED):[[:space:]]*(.*)$ ]]; then
+        # Check for directive comments - now supports parameterized format like GENERATE[type,size] or PROMPT[type,OPTIONAL]
+        if [[ "${line}" =~ ^#[[:space:]]*(PROMPT|PASSWORD|EMAIL|GENERATE|OPTIONAL|REQUIRED)(\[[^]]*\])?:[[:space:]]*(.*)$ ]]; then
             pending_directive="${BASH_REMATCH[1]}"
+            pending_directive_params="${BASH_REMATCH[2]}"  # Includes brackets, e.g., "[b64,32]" or "[email,OPTIONAL]"
             # Capture description with explicit string isolation to prevent variable expansion
-            pending_description="${BASH_REMATCH[2]}"
+            pending_description="${BASH_REMATCH[3]}"
 
             # Immediately isolate the description to prevent any potential contamination
             # Use printf to ensure we get exactly what was captured, no more, no less
@@ -219,7 +220,7 @@ parse_and_process_env_directives() {
             # Final isolation to ensure no contamination
             pending_description="$(printf '%s' "${pending_description}")"
 
-            log_debug "Found directive comment: ${pending_directive} - '${pending_description}'"
+            log_debug "Found directive comment: ${pending_directive}${pending_directive_params} - '${pending_description}'"
             log_debug "Cleaned description length: ${#pending_description}"
             continue
         fi
@@ -237,12 +238,13 @@ parse_and_process_env_directives() {
             local local_description
             local_description="$(printf '%s' "${pending_description}")"
 
-            if process_env_directive "${env_file}" "${var_name}" "${pending_directive}" "${local_description}"; then
+            if process_env_directive "${env_file}" "${var_name}" "${pending_directive}" "${local_description}" "${pending_directive_params}"; then
                 ((variables_processed++))
             fi
 
             # Aggressively clear pending directive and description
             pending_directive=""
+            pending_directive_params=""
             pending_description=""
             unset local_description
         fi
@@ -250,6 +252,7 @@ parse_and_process_env_directives() {
         # Clear pending directive if we hit a non-comment, non-variable line
         if [[ "${line}" =~ ^[^#] ]] && [[ ! "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
             pending_directive=""
+            pending_directive_params=""
             pending_description=""
         fi
 
@@ -270,6 +273,35 @@ process_env_directive() {
     local var_name="$2"
     local directive="$3"
     local description="$4"
+    local directive_params="$5"  # e.g., "[b64,32]" or "[email,OPTIONAL]"
+
+    # Parse directive parameters
+    local param_type=""
+    local param_size=""
+    local is_optional="false"
+
+    if [[ -n "${directive_params}" ]]; then
+        # Remove brackets and split parameters
+        local params_content="${directive_params#[}"
+        params_content="${params_content%]}"
+
+        # Split by comma and process each parameter
+        IFS=',' read -ra PARAM_ARRAY <<< "${params_content}"
+        for param in "${PARAM_ARRAY[@]}"; do
+            param=$(echo "${param}" | xargs)  # Trim whitespace
+            case "${param}" in
+                "OPTIONAL")
+                    is_optional="true"
+                    ;;
+                [0-9]*)
+                    param_size="${param}"
+                    ;;
+                *)
+                    param_type="${param}"
+                    ;;
+            esac
+        done
+    fi
 
     # For resumable setup: check if variable was already configured by user in a previous run
     # We detect this by checking if the variable exists in the env file AND has a different value
@@ -321,15 +353,44 @@ process_env_directive() {
     log_debug "Sanitized description for ${var_name}: '${safe_description}'"
     log_debug "Sanitized description length: ${#safe_description}"
 
+    # Handle OPTIONAL parameter for any directive type
+    if [[ "${is_optional}" == "true" ]]; then
+        if ! enhanced_confirm "Configure ${var_name}?" "false"; then
+            log_debug "Skipping optional variable ${var_name}"
+            return 0
+        fi
+    fi
+
     case "${directive}" in
         "PROMPT"|"REQUIRED")
-            log_debug "About to call enhanced_input with: '${safe_description}'"
-            new_value=$(enhanced_input "${safe_description}" "" "Enter value for ${var_name}")
+            # Handle parameterized PROMPT types
+            case "${param_type}" in
+                "email")
+                    while true; do
+                        new_value=$(enhanced_input "${safe_description}" "" "Enter valid email address")
+                        if [[ "${new_value}" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+                            break
+                        else
+                            log_warn "Please enter a valid email address"
+                        fi
+                    done
+                    ;;
+                "pw"|"password")
+                    new_value=$(enhanced_password "${safe_description}" "Enter password for ${var_name}")
+                    ;;
+                *)
+                    # Default text input
+                    log_debug "About to call enhanced_input with: '${safe_description}'"
+                    new_value=$(enhanced_input "${safe_description}" "" "Enter value for ${var_name}")
+                    ;;
+            esac
             ;;
         "PASSWORD")
+            # Legacy PASSWORD directive - convert to PROMPT[pw]
             new_value=$(enhanced_password "${safe_description}" "Enter password for ${var_name}")
             ;;
         "EMAIL")
+            # Legacy EMAIL directive - convert to PROMPT[email]
             while true; do
                 new_value=$(enhanced_input "${safe_description}" "" "Enter valid email address")
                 if [[ "${new_value}" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
@@ -340,10 +401,11 @@ process_env_directive() {
             done
             ;;
         "GENERATE")
-            new_value=$(generate_secure_value "${var_name}")
+            new_value=$(generate_secure_value "${var_name}" "${param_type}" "${param_size}")
             log_info "Auto-generated secure value for ${var_name}"
             ;;
         "OPTIONAL")
+            # Legacy OPTIONAL directive - now handled above with parameter
             if enhanced_confirm "Configure ${var_name}?" "false"; then
                 new_value=$(enhanced_input "${safe_description}" "" "Enter value for ${var_name}")
             else
@@ -377,38 +439,93 @@ process_env_directive() {
 # Generate secure values for auto-generated variables
 generate_secure_value() {
     local var_name="$1"
+    local param_type="$2"    # e.g., "b64", "hex", "bcrypt", "pw"
+    local param_size="$3"    # e.g., "32", "16", "24"
 
-    case "${var_name}" in
-        *"PASSWORD"*|*"SECRET"*|*"KEY"*)
-            # Generate secure password/key
-            openssl rand -base64 32 | tr -d "=+/" | cut -c1-24 || {
-                log_error "Failed to generate secure password for ${var_name}"
-                return 1
-            }
-            ;;
-        "TRAEFIK_AUTH_USERS")
-            # Generate htpasswd format for admin user
-            local admin_password
-            admin_password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-16 || {
-                log_error "Failed to generate admin password"
-                return 1
-            })
-            local auth_hash
-            auth_hash=$(openssl passwd -apr1 "${admin_password}" || {
-                log_error "Failed to generate password hash"
-                return 1
-            })
-            echo "admin:${auth_hash}"
-            log_info "Generated Traefik admin credentials - Username: admin, Password: ${admin_password}"
-            ;;
-        *)
-            # Default secure random string
-            openssl rand -base64 24 | tr -d "=+/" || {
-                log_error "Failed to generate secure value for ${var_name}"
-                return 1
-            }
-            ;;
-    esac
+    # Set default size if not specified
+    local size="${param_size:-24}"
+
+    # Handle parameterized generation types
+    if [[ -n "${param_type}" ]]; then
+        case "${param_type}" in
+            "b64"|"base64")
+                # Generate base64 encoded value
+                openssl rand -base64 "${size}" | tr -d "=+/" | cut -c1-"${size}" || {
+                    log_error "Failed to generate base64 value for ${var_name}"
+                    return 1
+                }
+                ;;
+            "hex")
+                # Generate hexadecimal value
+                openssl rand -hex "$((size / 2))" | cut -c1-"${size}" || {
+                    log_error "Failed to generate hex value for ${var_name}"
+                    return 1
+                }
+                ;;
+            "bcrypt")
+                # Generate bcrypt hash for admin user (special case for Traefik)
+                local admin_password
+                admin_password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-16 || {
+                    log_error "Failed to generate admin password"
+                    return 1
+                })
+                local auth_hash
+                auth_hash=$(openssl passwd -apr1 "${admin_password}" || {
+                    log_error "Failed to generate password hash"
+                    return 1
+                })
+                echo "admin:${auth_hash}"
+                log_info "Generated admin credentials - Username: admin, Password: ${admin_password}"
+                ;;
+            "pw"|"password")
+                # Generate alphanumeric password
+                openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
+                    log_error "Failed to generate password for ${var_name}"
+                    return 1
+                }
+                ;;
+            *)
+                log_warn "Unknown generation type '${param_type}' for ${var_name}, using default"
+                openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
+                    log_error "Failed to generate secure value for ${var_name}"
+                    return 1
+                }
+                ;;
+        esac
+    else
+        # Legacy behavior - determine type based on variable name
+        case "${var_name}" in
+            *"PASSWORD"*|*"SECRET"*|*"KEY"*)
+                # Generate secure password/key
+                openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
+                    log_error "Failed to generate secure password for ${var_name}"
+                    return 1
+                }
+                ;;
+            "TRAEFIK_AUTH_USERS")
+                # Generate htpasswd format for admin user
+                local admin_password
+                admin_password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-16 || {
+                    log_error "Failed to generate admin password"
+                    return 1
+                })
+                local auth_hash
+                auth_hash=$(openssl passwd -apr1 "${admin_password}" || {
+                    log_error "Failed to generate password hash"
+                    return 1
+                })
+                echo "admin:${auth_hash}"
+                log_info "Generated Traefik admin credentials - Username: admin, Password: ${admin_password}"
+                ;;
+            *)
+                # Default secure random string
+                openssl rand -base64 32 | tr -d "=+/" | cut -c1-"${size}" || {
+                    log_error "Failed to generate secure value for ${var_name}"
+                    return 1
+                }
+                ;;
+        esac
+    fi
 }
 
 # Update variable in environment file
