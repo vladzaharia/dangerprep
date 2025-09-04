@@ -1,6 +1,6 @@
 #!/bin/bash
 # Docker Environment Configuration Helper
-# Dynamically parses environment files for configuration directives
+# Updated to use the new cleanroom environment parsing system
 
 # Source required utilities
 DOCKER_ENV_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,6 +10,15 @@ DOCKER_ENV_PROJECT_ROOT="$(dirname "$(dirname "$(dirname "${DOCKER_ENV_SCRIPT_DI
 if [[ -f "$DOCKER_ENV_SCRIPT_DIR/../../shared/gum-utils.sh" ]]; then
     # shellcheck source=../../shared/gum-utils.sh
     source "$DOCKER_ENV_SCRIPT_DIR/../../shared/gum-utils.sh"
+fi
+
+# Source the new cleanroom environment parser
+if [[ -f "$DOCKER_ENV_SCRIPT_DIR/docker-env-parser.sh" ]]; then
+    # shellcheck source=./docker-env-parser.sh
+    source "$DOCKER_ENV_SCRIPT_DIR/docker-env-parser.sh"
+else
+    log_error "New environment parser not found: $DOCKER_ENV_SCRIPT_DIR/docker-env-parser.sh"
+    log_error "Falling back to legacy implementation"
 fi
 
 # Supported directive types in environment files
@@ -42,7 +51,124 @@ collect_docker_environment_configuration() {
     # Collect global environment variables first
     collect_global_environment_variables
 
-    # Process each selected Docker service
+    # Use the new cleanroom environment parser
+    if command -v process_selected_services_environments >/dev/null 2>&1; then
+        log_info "Using new cleanroom environment parser"
+        if process_selected_services_environments; then
+            log_success "Successfully configured environment using new parser"
+            export DOCKER_ENV_CONFIGURED="true"
+            return 0
+        else
+            log_warn "New parser failed, falling back to legacy implementation"
+        fi
+    fi
+
+    # Fallback to legacy implementation
+    log_info "Using legacy environment configuration"
+    process_services_legacy
+
+    # Mark configuration as complete
+    export DOCKER_ENV_CONFIGURED="true"
+
+    return 0
+}
+
+# Process selected services using the new cleanroom environment parser
+process_selected_services_environments() {
+    log_info "Processing selected Docker services with cleanroom parser"
+
+    # Build list of environment files for selected services
+    local -a env_files=()
+
+    while IFS= read -r service_line; do
+        if [[ -n "${service_line}" ]]; then
+            # Extract service name from the selection (remove description)
+            local service_name
+            service_name=$(echo "${service_line}" | sed 's/ (.*//' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+
+            # Map display names to internal service names
+            case "${service_name}" in
+                "traefik") service_name="traefik" ;;
+                "arcane") service_name="arcane" ;;
+                "jellyfin") service_name="jellyfin" ;;
+                "komga") service_name="komga" ;;
+                "kiwix") service_name="kiwix-sync" ;;
+                "raspap") service_name="raspap" ;;
+                "step-ca") service_name="step-ca" ;;
+                "adguard") service_name="adguard" ;;
+                "tailscale") service_name="tailscale" ;;
+                "romm") service_name="romm" ;;
+                "docmost") service_name="docmost" ;;
+                "onedev") service_name="onedev" ;;
+                "portainer") service_name="portainer" ;;
+                "watchtower") service_name="watchtower" ;;
+            esac
+
+            # Find the environment file for this service
+            local env_file
+            env_file=$(find_service_env_file "${service_name}")
+            if [[ -n "$env_file" && -f "$env_file" ]]; then
+                env_files+=("$env_file")
+                log_debug "Added environment file for ${service_name}: $env_file"
+            else
+                log_warn "No environment file found for service: ${service_name}"
+            fi
+        fi
+    done <<< "${SELECTED_DOCKER_SERVICES}"
+
+    # Process all found environment files using the new parser
+    if [[ ${#env_files[@]} -gt 0 ]]; then
+        log_info "Processing ${#env_files[@]} environment files"
+        if process_multiple_files "${env_files[@]}"; then
+            log_success "Successfully processed all environment files"
+            return 0
+        else
+            log_error "Failed to process some environment files"
+            return 1
+        fi
+    else
+        log_warn "No environment files found for selected services"
+        return 1
+    fi
+}
+
+# Find environment file for a service
+find_service_env_file() {
+    local service_name="$1"
+
+    # Determine service directory structure
+    local service_dir
+    case "${service_name}" in
+        "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn")
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/infrastructure/${service_name}"
+            ;;
+        "jellyfin"|"komga"|"romm")
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/media/${service_name}"
+            ;;
+        "docmost"|"onedev")
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/services/${service_name}"
+            ;;
+        "kiwix-sync"|"nfs-sync"|"offline-sync")
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/sync/${service_name}"
+            ;;
+        *)
+            log_debug "Unknown service directory structure for: ${service_name}"
+            return 1
+            ;;
+    esac
+
+    local env_example="${service_dir}/compose.env.example"
+    if [[ -f "$env_example" ]]; then
+        echo "$env_example"
+        return 0
+    else
+        log_debug "Environment example file not found: $env_example"
+        return 1
+    fi
+}
+
+# Legacy processing function (fallback)
+process_services_legacy() {
     local services_configured=0
     local services_failed=0
 
@@ -90,11 +216,6 @@ collect_docker_environment_configuration() {
     if [[ ${services_failed} -gt 0 ]]; then
         log_warn "${services_failed} services will use default configuration"
     fi
-
-    # Mark configuration as complete
-    export DOCKER_ENV_CONFIGURED="true"
-
-    return 0
 }
 
 # Collect global environment variables
@@ -193,7 +314,7 @@ parse_and_process_env_directives() {
         fi
 
         # Check for directive comments - supports both PROMPT/GENERATE with or without parameters
-        if [[ "${line}" =~ ^#[[:space:]]*(PROMPT|GENERATE)(\[[^]]*\])?:[[:space:]]*(.*)$ ]]; then
+        if [[ "${line}" =~ ^#[[:space:]]*(PROMPT|GENERATE)(\[[^]]*\])?[[:space:]]*:[[:space:]]*(.*)$ ]]; then
             pending_directive="${BASH_REMATCH[1]}"
             pending_directive_params="${BASH_REMATCH[2]}"  # Includes brackets, e.g., "[b64,32]" or "[email,OPTIONAL]", or empty
             # Capture description with explicit string isolation to prevent variable expansion
