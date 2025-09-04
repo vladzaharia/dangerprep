@@ -157,15 +157,18 @@ parse_environment_file() {
 
         if parse_variable_line "$line"; then
             # Found a variable assignment
+            local var_name="$PARSE_VAR_NAME"
+            local var_value="$PARSE_VAR_VALUE"
+
             if [[ -n "$pending_directive" ]]; then
                 # Process the directive-variable pair
                 log_debug "Processing directive-variable pair: $pending_directive -> $var_name"
-                
+
                 if ! "$callback_function" "$env_file" "$var_name" "$var_value" \
                     "$pending_directive" "$pending_description" "$pending_params"; then
                     log_warn "Failed to process $var_name at line $line_number"
                 fi
-                
+
                 # Clear pending directive
                 pending_directive=""
                 pending_description=""
