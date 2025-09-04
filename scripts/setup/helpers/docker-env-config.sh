@@ -131,11 +131,30 @@ process_selected_services_environments() {
     # Process all found environment files using the new parser
     if [[ ${#env_files[@]} -gt 0 ]]; then
         log_info "Processing ${#env_files[@]} environment files"
-        if process_multiple_files "${env_files[@]}"; then
-            log_success "Successfully processed all environment files"
+
+        local processed=0
+        local failed=0
+
+        for env_file in "${env_files[@]}"; do
+            local service_name
+            service_name=$(basename "$(dirname "$env_file")")
+
+            log_info "Processing environment for: $service_name"
+
+            if process_environment_file "$env_file"; then
+                ((processed++))
+                log_success "✅ Successfully processed $service_name environment"
+            else
+                ((failed++))
+                log_error "❌ Failed to process $service_name environment"
+            fi
+        done
+
+        if [[ $failed -eq 0 ]]; then
+            log_success "Successfully processed all $processed environment files"
             return 0
         else
-            log_error "Failed to process some environment files"
+            log_error "Failed to process $failed out of $((processed + failed)) environment files"
             return 1
         fi
     else
