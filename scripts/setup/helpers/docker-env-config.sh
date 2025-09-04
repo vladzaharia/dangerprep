@@ -12,13 +12,25 @@ if [[ -f "$DOCKER_ENV_SCRIPT_DIR/../../shared/gum-utils.sh" ]]; then
     source "$DOCKER_ENV_SCRIPT_DIR/../../shared/gum-utils.sh"
 fi
 
-# Source the new cleanroom environment parser
-if [[ -f "$DOCKER_ENV_SCRIPT_DIR/docker-env-parser.sh" ]]; then
-    # shellcheck source=./docker-env-parser.sh
-    source "$DOCKER_ENV_SCRIPT_DIR/docker-env-parser.sh"
+# Source the new cleanroom environment parser modules
+if [[ -f "$DOCKER_ENV_SCRIPT_DIR/env-parser.sh" ]] && \
+   [[ -f "$DOCKER_ENV_SCRIPT_DIR/prompt-handler.sh" ]] && \
+   [[ -f "$DOCKER_ENV_SCRIPT_DIR/generate-handler.sh" ]] && \
+   [[ -f "$DOCKER_ENV_SCRIPT_DIR/env-processor.sh" ]] && \
+   [[ -f "$DOCKER_ENV_SCRIPT_DIR/env-error-handler.sh" ]]; then
+
+    # Source all modules
+    source "$DOCKER_ENV_SCRIPT_DIR/env-parser.sh"
+    source "$DOCKER_ENV_SCRIPT_DIR/prompt-handler.sh"
+    source "$DOCKER_ENV_SCRIPT_DIR/generate-handler.sh"
+    source "$DOCKER_ENV_SCRIPT_DIR/env-processor.sh"
+    source "$DOCKER_ENV_SCRIPT_DIR/env-error-handler.sh"
+
+    log_debug "Loaded cleanroom environment parser modules"
+    CLEANROOM_PARSER_AVAILABLE=true
 else
-    log_error "New environment parser not found: $DOCKER_ENV_SCRIPT_DIR/docker-env-parser.sh"
-    log_error "Falling back to legacy implementation"
+    log_warn "Cleanroom environment parser modules not found, using legacy implementation"
+    CLEANROOM_PARSER_AVAILABLE=false
 fi
 
 # Supported directive types in environment files
@@ -51,8 +63,8 @@ collect_docker_environment_configuration() {
     # Collect global environment variables first
     collect_global_environment_variables
 
-    # Use the new cleanroom environment parser
-    if command -v process_selected_services_environments >/dev/null 2>&1; then
+    # Use the new cleanroom environment parser if available
+    if [[ "$CLEANROOM_PARSER_AVAILABLE" == "true" ]]; then
         log_info "Using new cleanroom environment parser"
         if process_selected_services_environments; then
             log_success "Successfully configured environment using new parser"
@@ -215,6 +227,33 @@ process_services_legacy() {
 
     if [[ ${services_failed} -gt 0 ]]; then
         log_warn "${services_failed} services will use default configuration"
+    fi
+}
+
+# Add missing utility functions for compatibility
+enhanced_error() {
+    local message="$1"
+    local details="${2:-}"
+
+    if command -v enhanced_section >/dev/null 2>&1; then
+        enhanced_section "Error" "$message" "❌"
+        [[ -n "$details" ]] && echo "  $details"
+    else
+        echo "❌ ERROR: $message"
+        [[ -n "$details" ]] && echo "  $details"
+    fi
+}
+
+enhanced_success() {
+    local message="$1"
+    local details="${2:-}"
+
+    if command -v enhanced_section >/dev/null 2>&1; then
+        enhanced_section "Success" "$message" "✅"
+        [[ -n "$details" ]] && echo "  $details"
+    else
+        echo "✅ SUCCESS: $message"
+        [[ -n "$details" ]] && echo "  $details"
     fi
 }
 
