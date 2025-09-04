@@ -151,11 +151,11 @@ handle_generate_directive() {
         size=24
     fi
     
-    # Check if user wants to configure optional fields
+    # For optional fields, ask if user wants to generate them
     if [[ "$is_optional" == "true" ]]; then
         local configure_msg="Generate secure value for $var_name?"
         [[ -n "$description" ]] && configure_msg="Generate $var_name ($description)?"
-        
+
         if ! enhanced_confirm "$configure_msg" "true"; then
             log_debug "User chose to skip optional variable $var_name"
             echo ""
@@ -163,14 +163,8 @@ handle_generate_directive() {
         fi
     fi
     
-    # Check if we should regenerate existing values
-    if [[ -n "$current_value" && "$current_value" != "change_me_"* ]]; then
-        if ! enhanced_confirm "Regenerate $var_name? (current value will be replaced)" "false"; then
-            log_debug "Keeping existing value for $var_name"
-            echo "$current_value"
-            return 0
-        fi
-    fi
+    # Always generate for GENERATE directives (values in examples are just examples)
+    log_debug "Generating new secure value for $var_name"
     
     # Generate value based on type
     local generated_value
@@ -236,23 +230,10 @@ validate_generate_parameters() {
 needs_generate_update() {
     local current_value="$1"
     local is_optional="$2"
-    
-    # Always generate for placeholder values
-    if [[ "$current_value" == "change_me_"* ]]; then
-        return 0
-    fi
-    
-    # For optional fields with existing values, don't regenerate by default
-    if [[ "$is_optional" == "true" && -n "$current_value" ]]; then
-        return 1
-    fi
-    
-    # For required fields, generate if empty
-    if [[ -z "$current_value" ]]; then
-        return 0
-    fi
-    
-    return 1
+
+    # Always generate for GENERATE directives - these are meant to be auto-generated
+    # The values in .example files are just examples, not actual secure values
+    return 0
 }
 
 # =============================================================================

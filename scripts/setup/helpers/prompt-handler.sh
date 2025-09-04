@@ -139,11 +139,11 @@ handle_prompt_directive() {
     
     log_debug "Handling PROMPT for $var_name (type: '$param_type', optional: $is_optional)"
     
-    # Check if user wants to configure optional fields
+    # For optional fields, ask if user wants to configure them
     if [[ "$is_optional" == "true" ]]; then
         local configure_msg="Configure $var_name?"
         [[ -n "$description" ]] && configure_msg="Configure $var_name ($description)?"
-        
+
         if ! enhanced_confirm "$configure_msg" "false"; then
             log_debug "User chose to skip optional variable $var_name"
             echo ""
@@ -197,23 +197,10 @@ validate_prompt_parameters() {
 needs_prompt_update() {
     local current_value="$1"
     local is_optional="$2"
-    
-    # Always prompt for placeholder values
-    if [[ "$current_value" == "change_me_"* ]]; then
-        return 0
-    fi
-    
-    # For optional fields, check if user wants to update
-    if [[ "$is_optional" == "true" && -n "$current_value" ]]; then
-        return 1  # Don't prompt by default for optional fields with values
-    fi
-    
-    # For required fields, prompt if empty or placeholder
-    if [[ -z "$current_value" || "$current_value" == "change_me_"* ]]; then
-        return 0
-    fi
-    
-    return 1
+
+    # Always prompt for PROMPT directives - these are meant to be configured by user
+    # The values in .example files are just examples, not defaults
+    return 0
 }
 
 # =============================================================================
