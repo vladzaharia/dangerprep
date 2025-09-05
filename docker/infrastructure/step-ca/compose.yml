@@ -5,9 +5,10 @@ services:
     ports:
       - "9000:9000"
     volumes:
-      - step-ca:/home/step
+      - /data/step-ca:/home/step
     env_file:
       - compose.env
+    user: "1337:1337"
     environment:
       # Override specific settings for DangerPrep
       - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
@@ -43,7 +44,7 @@ services:
       dockerfile: docker/infrastructure/step-ca/Dockerfile
     restart: unless-stopped
     volumes:
-      - step-ca:/ca-data:ro
+      - /data/step-ca:/ca-data:ro
       - /data/cdn-assets:/cdn-assets
     env_file:
       - compose.env
@@ -51,7 +52,7 @@ services:
       # Override specific settings for ca-download service
       - CA_NAME=${DOCKER_STEPCA_INIT_NAME:-DangerPrep Internal CA}
       - CA_URL=https://ca.danger:9000
-    user: "1000:1000"  # Use same UID as step-ca container
+    user: "1337:1337"  # Use same UID as step-ca container
     labels:
       - "traefik.enable=true"
 
@@ -85,9 +86,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-volumes:
-  step-ca:
 
 networks:
   traefik:

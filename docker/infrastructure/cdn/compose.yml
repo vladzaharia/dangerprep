@@ -9,6 +9,7 @@ services:
       - ./assets:/app/assets:ro
     env_file:
       - compose.env
+    user: "1337:1337"
     ports:
       - 8080:8080
     labels:

@@ -14,6 +14,7 @@ services:
       - ${INSTALL_ROOT}/secrets/romm/redis_password:/run/secrets/redis_password:ro
     env_file:
       - compose.env
+    user: "1337:1337"
     environment:
       # Use file-based secrets for enhanced security
       - ROMM_AUTH_SECRET_KEY_FILE=/run/secrets/romm_auth_secret_key

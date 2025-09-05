@@ -10,6 +10,7 @@ services:
       - ${INSTALL_ROOT}/secrets/watchtower/gotify_token:/run/secrets/gotify_token:ro
     env_file:
       - compose.env
+    user: "1337:1337"
     environment:
       # Use file-based secrets for enhanced security
       - WATCHTOWER_HTTP_API_TOKEN_FILE=/run/secrets/watchtower_api_token
