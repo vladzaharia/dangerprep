@@ -1,0 +1,179 @@
+{
+    // DangerPrep fastfetch configuration
+    // Displays system information with the DangerPrep logo
+    
+    "logo": {
+        "type": "file",
+        "source": "/opt/dangerprep/scripts/shared/dangerprep-logo.txt",
+        "color": {
+            "1": "magenta",     // Alternating side borders (primary)
+            "2": "blue",        // Alternating side borders (secondary) 
+            "3": "cyan",        // "Danger" part of logo
+            "4": "blue",        // "Prep" part of logo
+            "9": "reset"        // Reset color
+        },
+        "padding": {
+            "right": 4
+        }
+    },
+    
+    "modules": [
+        // Welcome and portal information
+        {
+            "type": "custom",
+            "format": "System Portal: https://portal.danger"
+        },
+        {
+            "type": "custom",
+            "format": "Documentation: https://github.com/vladzaharia/dangerprep"
+        },
+        {
+            "type": "break"
+        },
+
+        // Core system information
+        {
+            "type": "title",
+            "key": "System Information",
+            "keyColor": "yellow"
+        },
+        {
+            "type": "host",
+            "key": "  Hostname",
+            "format": "{name}"
+        },
+        {
+            "type": "os",
+            "key": "  OS",
+            "format": "{name} {version}"
+        },
+        {
+            "type": "kernel",
+            "key": "  Kernel",
+            "format": "{release}"
+        },
+        {
+            "type": "uptime",
+            "key": "  Uptime",
+            "format": "{uptime}"
+        },
+        {
+            "type": "break"
+        },
+
+        // Performance monitoring
+        {
+            "type": "title",
+            "key": "Performance",
+            "keyColor": "cyan"
+        },
+        {
+            "type": "cpu",
+            "key": "  CPU",
+            "format": "{name} @ {freq-max} GHz"
+        },
+        {
+            "type": "cpuusage",
+            "key": "  CPU Usage",
+            "format": "{usage}%"
+        },
+        {
+            "type": "loadavg",
+            "key": "  Load Average",
+            "format": "{load1}, {load5}, {load15}"
+        },
+        {
+            "type": "memory",
+            "key": "  Memory",
+            "format": "{used} / {total} ({percentage}%)"
+        },
+        {
+            "type": "swap",
+            "key": "  Swap",
+            "format": "{used} / {total} ({percentage}%)"
+        },
+        {
+            "type": "processes",
+            "key": "  Processes",
+            "format": "{count}"
+        },
+        {
+            "type": "break"
+        },
+
+        // Storage information
+        {
+            "type": "title",
+            "key": "Storage",
+            "keyColor": "green"
+        },
+        {
+            "type": "disk",
+            "key": "  Root Disk",
+            "format": "{used} / {size} ({percentage}%)",
+            "folders": ["/"]
+        },
+        {
+            "type": "diskio",
+            "key": "  Disk I/O",
+            "format": "R: {read}/s | W: {write}/s"
+        },
+        {
+            "type": "break"
+        },
+
+        // Network status - critical for router
+        {
+            "type": "title",
+            "key": "Network Status",
+            "keyColor": "blue"
+        },
+        {
+            "type": "localip",
+            "key": "  Interfaces",
+            "format": "{ifname}: {ipv4}",
+            "showIpv6": false,
+            "showLoopback": false
+        },
+        {
+            "type": "dns",
+            "key": "  DNS Servers",
+            "format": "{servers}"
+        },
+        {
+            "type": "netio",
+            "key": "  Network I/O",
+            "format": "↓ {download}/s | ↑ {upload}/s"
+        },
+        {
+            "type": "wifi",
+            "key": "  Wi-Fi",
+            "format": "{ssid} ({security})"
+        },
+        {
+            "type": "break"
+        },
+
+        // Services status
+        {
+            "type": "title",
+            "key": "Services",
+            "keyColor": "magenta"
+        },
+        {
+            "type": "command",
+            "key": "  Docker",
+            "text": "if command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker 2>/dev/null; then echo \"$(docker ps --format '{{.Names}}' | wc -l) containers running\"; else echo 'Not available'; fi"
+        },
+        {
+            "type": "initsystem",
+            "key": "  Init System",
+            "format": "{name} {version}"
+        },
+        {
+            "type": "packages",
+            "key": "  Packages",
+            "format": "{dpkg} (dpkg)"
+        }
+    ]
+}
