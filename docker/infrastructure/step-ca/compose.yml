@@ -43,7 +43,7 @@ services:
       dockerfile: docker/infrastructure/step-ca/Dockerfile
     restart: unless-stopped
     volumes:
-      - /data/step-ca:/ca-data:ro
+      - step-ca:/ca-data:ro
       - /data/cdn-assets:/cdn-assets
     env_file:
       - compose.env
@@ -84,7 +84,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
 
 volumes:
   step-ca:
