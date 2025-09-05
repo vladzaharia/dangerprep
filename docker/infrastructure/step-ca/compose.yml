@@ -9,7 +9,7 @@ services:
       - ./init-ca.sh:/docker-entrypoint.d/init-ca.sh:ro
       - ./fix-permissions.sh:/docker-entrypoint.d/00-fix-permissions.sh:ro
       # Mount CA password as secret file
-      - ${INSTALL_ROOT}/secrets/step-ca/ca_password:/tmp/ca_password:ro
+      - ${INSTALL_ROOT}/secrets/step-ca/ca_password:/home/step/secrets/password:ro
     env_file:
       - compose.env
     environment:

@@ -6,7 +6,13 @@ set -e
 
 INSTALL_ROOT="${INSTALL_ROOT:-$(pwd)}"
 SECRETS_DIR="${INSTALL_ROOT}/secrets/step-ca"
-DATA_DIR="${INSTALL_ROOT}/data/step-ca"
+
+# Use direct mount point if available, otherwise fallback to INSTALL_ROOT
+if mountpoint -q /data 2>/dev/null; then
+    DATA_DIR="/data/step-ca"
+else
+    DATA_DIR="${INSTALL_ROOT}/data/step-ca"
+fi
 
 echo "🔐 Preparing step-ca secrets and permissions..."
 
