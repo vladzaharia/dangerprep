@@ -108,7 +108,6 @@ process_selected_services_environments() {
                 "raspap") service_name="raspap" ;;
                 "step-ca") service_name="step-ca" ;;
                 "adguard") service_name="adguard" ;;
-                "tailscale") service_name="tailscale" ;;
                 "romm") service_name="romm" ;;
                 "docmost") service_name="docmost" ;;
                 "onedev") service_name="onedev" ;;
@@ -219,7 +218,6 @@ process_services_legacy() {
                 "raspap") service_name="raspap" ;;
                 "step-ca") service_name="step-ca" ;;
                 "adguard") service_name="adguard" ;;
-                "tailscale") service_name="tailscale" ;;
                 "romm") service_name="romm" ;;
                 "docmost") service_name="docmost" ;;
                 "onedev") service_name="onedev" ;;
