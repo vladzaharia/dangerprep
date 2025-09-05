@@ -122,6 +122,87 @@ create_env_from_example() {
 # DIRECTIVE PROCESSING
 # =============================================================================
 
+# Process a single directive-variable pair with a specific target file
+# This version uses CURRENT_ENV_FILE to determine which file to update
+process_directive_variable_with_target() {
+    local source_file="$1"  # The file being parsed (example file)
+    local var_name="$2"
+    local current_value="$3"
+    local directive="$4"
+    local description="$5"
+    local params="$6"
+
+    # Use the target env file for updates
+    local target_env_file="${CURRENT_ENV_FILE:-$source_file}"
+
+    # Get the current value from the target file, not the source file
+    local actual_current_value="$current_value"
+    if [[ "$target_env_file" != "$source_file" && -f "$target_env_file" ]]; then
+        # Read the actual current value from the target file
+        if grep -q "^${var_name}=" "$target_env_file"; then
+            actual_current_value=$(grep "^${var_name}=" "$target_env_file" | cut -d'=' -f2- | head -n1)
+        fi
+    fi
+
+    log_debug "Processing $directive directive for $var_name (target: $(basename "$target_env_file"))"
+
+    # Parse directive parameters
+    parse_directive_parameters "$params"
+    local param_type="$PARAM_TYPE"
+    local param_size="$PARAM_SIZE"
+    local is_optional="$IS_OPTIONAL"
+
+    # Validate parameters based on directive type
+    case "$directive" in
+        "PROMPT")
+            if ! validate_prompt_parameters "$param_type" "$param_size" "$is_optional"; then
+                log_warn "Invalid parameters for PROMPT directive on $var_name"
+            fi
+            ;;
+        "GENERATE")
+            if ! validate_generate_parameters "$param_type" "$param_size" "$is_optional"; then
+                log_warn "Invalid parameters for GENERATE directive on $var_name"
+            fi
+            ;;
+    esac
+
+    # Handle the directive
+    local new_value=""
+    case "$directive" in
+        "PROMPT")
+            new_value=$(handle_prompt_directive "$var_name" "$actual_current_value" \
+                "$param_type" "$is_optional" "$description")
+            ;;
+        "GENERATE")
+            new_value=$(handle_generate_directive "$var_name" "$actual_current_value" \
+                "$param_type" "$param_size" "$is_optional" "$description")
+            ;;
+        *)
+            log_error "Unknown directive: $directive"
+            return 1
+            ;;
+    esac
+
+    # Update the target environment file if we got a new value
+    if [[ -n "$new_value" && "$new_value" != "$actual_current_value" ]]; then
+        if update_env_variable "$target_env_file" "$var_name" "$new_value"; then
+            log_info "Updated $var_name"
+
+            # Export critical variables to shell environment
+            export_critical_variable "$var_name" "$new_value"
+        else
+            log_error "Failed to update $var_name in $(basename "$target_env_file")"
+            return 1
+        fi
+    elif [[ -n "$new_value" ]]; then
+        log_debug "No change needed for $var_name (current value is already correct)"
+    else
+        log_debug "No value provided for $var_name (skipped or optional)"
+    fi
+
+    return 0
+}
+
 # Process a single directive-variable pair
 # This is the callback function used by parse_environment_file
 process_directive_variable() {
@@ -214,11 +295,15 @@ process_environment_file() {
         fi
     fi
     
-    # Parse and process the environment file
-    if ! parse_environment_file "$env_file" "process_directive_variable"; then
-        log_error "Failed to process environment file: $env_file"
+    # Parse the EXAMPLE file (which contains the directives) but update the actual env file
+    # We need to set a global variable so the callback knows which file to update
+    export CURRENT_ENV_FILE="$env_file"
+    if ! parse_environment_file "$example_file" "process_directive_variable_with_target"; then
+        log_error "Failed to process environment file: $example_file"
+        unset CURRENT_ENV_FILE
         return 1
     fi
+    unset CURRENT_ENV_FILE
     
     log_info "Successfully processed $(basename "$env_file")"
     return 0
@@ -338,6 +423,7 @@ validate_env_file() {
 # Export this module's functions
 export -f update_env_variable
 export -f create_env_from_example
+export -f process_directive_variable_with_target
 export -f process_directive_variable
 export -f process_environment_file
 export -f process_multiple_env_files
