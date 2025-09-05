@@ -5,7 +5,7 @@ services:
     ports:
       - "9000:9000"
     volumes:
-      - /data/step-ca:/home/step
+      - step-ca:/home/step
     env_file:
       - compose.env
     environment:
@@ -86,6 +86,8 @@ services:
       start_period: 10s
 
 
+volumes:
+  step-ca:
 
 networks:
   traefik:
