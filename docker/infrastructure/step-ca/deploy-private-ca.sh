@@ -7,6 +7,13 @@ set -e
 INSTALL_ROOT="${INSTALL_ROOT:-$(pwd)}"
 STEP_CA_DIR="${INSTALL_ROOT}/docker/infrastructure/step-ca"
 
+# Determine data directory based on mount points
+if mountpoint -q /data 2>/dev/null; then
+    STEP_CA_DATA_DIR="/data/step-ca"
+else
+    STEP_CA_DATA_DIR="${INSTALL_ROOT}/data/step-ca"
+fi
+
 echo "🔐 DangerPrep Private CA Deployment"
 echo "===================================="
 echo ""
@@ -130,7 +137,7 @@ echo "  • CDN service: https://cdn.danger"
 echo "  • step-ca running at: https://ca.danger:9000"
 echo "  • ACME directory: https://ca.danger:9000/acme/acme/directory"
 echo "  • Download service: http://root.danger"
-echo "  • Root certificate: ${INSTALL_ROOT}/data/step-ca/certs/root_ca.crt"
+echo "  • Root certificate: ${STEP_CA_DATA_DIR}/certs/root_ca.crt"
 echo ""
 echo "🔧 Next Steps:"
 echo "  1. Configure your DNS to point ca.danger, root.danger, and cdn.danger to this server"
@@ -147,7 +154,7 @@ echo "  • List provisioners: docker exec step-ca_step-ca_1 step ca provisioner
 echo "  • Check certificate: step ca certificate test.danger test.crt test.key --provisioner acme"
 echo ""
 echo "🔐 Security Notes:"
-echo "  • Root certificate is at: ${INSTALL_ROOT}/data/step-ca/certs/root_ca.crt"
+echo "  • Root certificate is at: ${STEP_CA_DATA_DIR}/certs/root_ca.crt"
 echo "  • CA password is stored in: ${STEP_CA_DIR}/compose.env"
 echo "  • Keep backups of the CA data directory"
 echo "  • Only install the root certificate on trusted devices"

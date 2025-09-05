@@ -5,9 +5,17 @@ set -e
 # This script should be run after step-ca is initialized
 
 INSTALL_ROOT="${INSTALL_ROOT:-$(pwd)}"
-STEP_CA_DATA_DIR="${INSTALL_ROOT}/data/step-ca"
+
+# Use direct mount points if available, otherwise fallback to INSTALL_ROOT
+if mountpoint -q /data 2>/dev/null; then
+    STEP_CA_DATA_DIR="/data/step-ca"
+    TRAEFIK_DATA_DIR="/data/traefik"
+else
+    STEP_CA_DATA_DIR="${INSTALL_ROOT}/data/step-ca"
+    TRAEFIK_DATA_DIR="${INSTALL_ROOT}/data/traefik"
+fi
+
 ROOT_CERT_PATH="${STEP_CA_DATA_DIR}/certs/root_ca.crt"
-TRAEFIK_DATA_DIR="${INSTALL_ROOT}/data/traefik"
 
 echo "Setting up step-ca trust configuration..."
 
