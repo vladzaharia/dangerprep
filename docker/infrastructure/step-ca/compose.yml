@@ -51,6 +51,7 @@ services:
       # Override specific settings for ca-download service
       - CA_NAME=${DOCKER_STEPCA_INIT_NAME:-DangerPrep Internal CA}
       - CA_URL=https://ca.danger:9000
+    user: "1000:1000"  # Use same UID as step-ca container
     labels:
       - "traefik.enable=true"
 
