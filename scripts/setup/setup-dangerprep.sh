@@ -2554,7 +2554,7 @@ install_essential_packages() {
         while IFS= read -r category; do
             case "$category" in
                 *"Convenience packages"*)
-                    package_categories+=("Convenience:vim,nano,htop,tree,zip,jq,rsync,screen,tmux")
+                    package_categories+=("Convenience:vim,nano,htop,tree,zip,jq,rsync,screen,tmux,fastfetch")
                     ;;
                 *"Network packages"*)
                     package_categories+=("Network:netplan.io,iproute2,wondershaper,iperf3")
@@ -3109,6 +3109,31 @@ configure_ssh_hardening() {
 load_motd_config() {
     log_info "Loading MOTD configuration..."
 
+    # Create fastfetch configuration directory
+    mkdir -p /opt/dangerprep/scripts/shared
+
+    # Copy the fastfetch logo file
+    local logo_source="${CONFIG_DIR}/system/dangerprep-logo.txt"
+    local logo_target="/opt/dangerprep/scripts/shared/dangerprep-logo.txt"
+
+    if [[ -f "$logo_source" ]]; then
+        cp "$logo_source" "$logo_target"
+        log_info "Installed DangerPrep fastfetch logo"
+    else
+        log_warn "Fastfetch logo source not found: $logo_source"
+    fi
+
+    # Copy the fastfetch configuration file
+    local config_source="${CONFIG_DIR}/system/fastfetch-dangerprep.jsonc"
+    local config_target="/opt/dangerprep/fastfetch-dangerprep.jsonc"
+
+    if [[ -f "$config_source" ]]; then
+        cp "$config_source" "$config_target"
+        log_info "Installed DangerPrep fastfetch configuration"
+    else
+        log_warn "Fastfetch configuration source not found: $config_source"
+    fi
+
     # Copy the MOTD banner script to the system
     local motd_source="${CONFIG_DIR}/system/01-dangerprep-banner"
     local motd_target="/etc/update-motd.d/01-dangerprep-banner"
@@ -3549,9 +3574,58 @@ setup_advanced_security_tools() {
     log_success "Advanced security tools configured"
 }
 
+# Create Docker system account for containers
+create_docker_system_account() {
+    log_info "Creating Docker system account for containers..."
+
+    # Check if dockerapp group already exists
+    if ! getent group dockerapp >/dev/null 2>&1; then
+        if enhanced_spin "Creating dockerapp group (GID 1337)" \
+            bash -c "groupadd --gid 1337 dockerapp"; then
+            enhanced_status_indicator "success" "Created dockerapp group with GID 1337"
+        else
+            enhanced_status_indicator "failure" "Failed to create dockerapp group"
+            return 1
+        fi
+    else
+        enhanced_status_indicator "info" "dockerapp group already exists"
+    fi
+
+    # Check if dockerapp user already exists
+    if ! id dockerapp >/dev/null 2>&1; then
+        if enhanced_spin "Creating dockerapp user (UID 1337)" \
+            bash -c "useradd --system --uid 1337 --gid 1337 --no-create-home --shell /usr/sbin/nologin dockerapp"; then
+            enhanced_status_indicator "success" "Created dockerapp system account with UID/GID 1337"
+            log_info "dockerapp account: no home directory, no login shell"
+        else
+            enhanced_status_indicator "failure" "Failed to create dockerapp user"
+            return 1
+        fi
+    else
+        enhanced_status_indicator "info" "dockerapp user already exists"
+    fi
+
+    # Verify the account was created correctly
+    local user_info
+    user_info=$(getent passwd dockerapp 2>/dev/null || echo "")
+    if [[ -n "$user_info" ]]; then
+        log_debug "dockerapp account details: $user_info"
+        enhanced_status_indicator "success" "Docker system account verified"
+    else
+        enhanced_status_indicator "failure" "Failed to verify dockerapp account"
+        return 1
+    fi
+
+    log_success "Docker system account (dockerapp) created successfully"
+    return 0
+}
+
 # Configure rootless Docker using standardized patterns
 configure_rootless_docker() {
     enhanced_section "Docker Installation" "Installing and configuring Docker with rootless support" "🐳"
+
+    # Create Docker system account for containers
+    create_docker_system_account
 
     # Install Docker using official repository (secure method)
     if ! command -v docker >/dev/null 2>&1; then
@@ -5091,19 +5165,55 @@ create_new_user() {
         log_success "User $username added to hardware groups"
     fi
 
-    # Add new user to Docker group if Docker is installed
-    if command -v docker >/dev/null 2>&1; then
-        log_info "Adding $username to Docker group..."
-        if getent group "docker" >/dev/null 2>&1; then
-            usermod -a -G "docker" "$username" 2>/dev/null || true
-            log_success "User $username added to Docker group"
-        else
-            log_warn "Docker group not found - user will need to be added to Docker group manually"
-        fi
+    # Add new user to essential system administration groups
+    log_info "Adding $username to system administration groups..."
+
+    # Define essential system administration groups
+    local admin_groups=(
+        "sudo"          # Sudo access for administrative commands
+        "adm"           # Access to system logs in /var/log
+        "systemd-journal" # Access to systemd journal logs
+        "lxd"           # LXD container management (if available)
+        "netdev"        # Network device management
+        "plugdev"       # Access to pluggable devices
+        "staff"         # Access to /usr/local and /home
+    )
+
+    # Add Docker group if Docker is installed
+    if command -v docker >/dev/null 2>&1 && getent group "docker" >/dev/null 2>&1; then
+        admin_groups+=("docker")
     fi
 
-    # Add to sudo group if not already included
-    usermod -a -G sudo "$username"
+    # Add groups that exist on the system
+    local added_groups=()
+    local missing_groups=()
+
+    for group in "${admin_groups[@]}"; do
+        if getent group "$group" >/dev/null 2>&1; then
+            if usermod -a -G "$group" "$username" 2>/dev/null; then
+                added_groups+=("$group")
+                log_debug "Added $username to $group group"
+            else
+                log_warn "Failed to add $username to $group group"
+            fi
+        else
+            missing_groups+=("$group")
+            log_debug "Group $group does not exist on system"
+        fi
+    done
+
+    # Report results
+    if [[ ${#added_groups[@]} -gt 0 ]]; then
+        enhanced_status_indicator "success" "Added to ${#added_groups[@]} admin groups: ${added_groups[*]}"
+        log_success "User $username added to system administration groups"
+    else
+        enhanced_status_indicator "warning" "No admin groups were added"
+        log_warn "User may have limited system administration access"
+    fi
+
+    if [[ ${#missing_groups[@]} -gt 0 ]]; then
+        log_debug "Groups not available on system: ${missing_groups[*]}"
+    fi
 
     # Create .ssh directory for new user
     if ! standard_create_directory "/home/$username/.ssh" "700" "$username" "$username"; then

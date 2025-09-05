@@ -964,6 +964,11 @@ remove_configurations() {
 
     # Remove MOTD banner and restore Ubuntu defaults (optimistic cleanup)
     [[ -f /etc/update-motd.d/01-dangerprep-banner ]] && rm -f /etc/update-motd.d/01-dangerprep-banner 2>/dev/null || true
+
+    # Remove fastfetch configuration files
+    [[ -f /opt/dangerprep/fastfetch-dangerprep.jsonc ]] && rm -f /opt/dangerprep/fastfetch-dangerprep.jsonc 2>/dev/null || true
+    [[ -f /opt/dangerprep/scripts/shared/dangerprep-logo.txt ]] && rm -f /opt/dangerprep/scripts/shared/dangerprep-logo.txt 2>/dev/null || true
+
     # Re-enable default Ubuntu MOTD components that were disabled
     [[ -f /etc/update-motd.d/10-help-text ]] && chmod +x /etc/update-motd.d/10-help-text 2>/dev/null || true
     [[ -f /etc/update-motd.d/50-motd-news ]] && chmod +x /etc/update-motd.d/50-motd-news 2>/dev/null || true

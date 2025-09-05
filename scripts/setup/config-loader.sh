@@ -220,6 +220,8 @@ validate_config_files() {
         "$CONFIG_DIR/system/50unattended-upgrades.tmpl"
         "$CONFIG_DIR/system/20auto-upgrades.tmpl"
         "$CONFIG_DIR/system/01-dangerprep-banner"
+        "$CONFIG_DIR/system/fastfetch-dangerprep.jsonc"
+        "$CONFIG_DIR/system/dangerprep-logo.txt"
 
         # Docker configs
         "$CONFIG_DIR/docker/daemon.json.tmpl"
