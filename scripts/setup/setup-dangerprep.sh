@@ -5116,10 +5116,7 @@ configure_user_accounts() {
     create_new_user "$new_username" "$new_password" "$new_fullname" "$transfer_ssh_keys"
 
     log_success "User account configuration completed"
-    log_info "Next steps after setup completion:"
-    log_info "1. Log out of current session"
-    log_info "2. Log in as: $new_username"
-    log_info "3. Run: sudo /dangerprep/scripts/setup/finalize-user-migration.sh"
+    log_info ""
 }
 
 # Create new user account with proper configuration
@@ -5650,18 +5647,43 @@ FAIL2BAN_CONFIG
 }
 
 main() {
+    # Record start time for performance tracking
+    START_TIME=\$(date +%s)
+
+    log_info "=========================================="
     log_info "Starting DangerPrep reboot finalization..."
+    log_info "=========================================="
+    log_info "Timestamp: \$(date)"
+    log_info "Hostname: \$(hostname)"
+    log_info "Kernel: \$(uname -r)"
+    log_info "Uptime: \$(uptime)"
+    log_info "Service: \${SYSTEMD_UNIT_NAME:-manual}"
+    log_info "PID: \$$"
+    log_info "User: \$(whoami)"
+    log_info "Working directory: \$(pwd)"
+    log_info "Script path: \$0"
+    log_info "=========================================="
 
     # BOOT FIX: Check if pi user still exists before proceeding
+    log_info "Checking if pi user exists..."
     if ! id pi >/dev/null 2>&1; then
         log_info "Pi user already removed, finalization already completed"
+        log_info "Cleaning up finalization services..."
         # Clean up this service and exit successfully
         systemctl disable dangerprep-finalize.service 2>/dev/null || true
+        systemctl disable dangerprep-finalize-graphical.service 2>/dev/null || true
         rm -f /etc/systemd/system/dangerprep-finalize.service 2>/dev/null || true
+        rm -f /etc/systemd/system/dangerprep-finalize-graphical.service 2>/dev/null || true
         systemctl daemon-reload 2>/dev/null || true
         rm -f "\$0" 2>/dev/null || true
+        log_success "Finalization cleanup completed - pi user was already removed"
         exit 0
     fi
+
+    log_info "Pi user found, proceeding with finalization..."
+    log_info "Pi user info: \$(id pi 2>/dev/null || echo 'Failed to get pi user info')"
+    log_info "Pi user groups: \$(groups pi 2>/dev/null || echo 'Failed to get pi user groups')"
+    log_info "Pi user processes: \$(pgrep -u pi | wc -l) running"
 
     # Apply SSH hardening now that user account is created
     log_info "Applying SSH hardening configuration..."
@@ -5677,14 +5699,39 @@ main() {
 
     # BOOT FIX: More robust process termination
     log_info "Safely terminating pi user processes..."
+    local pi_processes
+    pi_processes=\$(pgrep -u pi 2>/dev/null | wc -l)
+    log_info "Found \$pi_processes processes running as pi user"
+
     if pgrep -u pi >/dev/null 2>&1; then
-        log_info "Terminating processes for pi user..."
-        # First try graceful termination
+        log_info "Listing pi user processes before termination:"
+        ps -u pi -o pid,ppid,cmd 2>/dev/null | head -20 | while read -r line; do
+            log_info "  \$line"
+        done
+
+        log_info "Attempting graceful termination (SIGTERM)..."
         pkill -TERM -u pi 2>/dev/null || true
         sleep 3
-        # Then force kill if needed
-        pkill -KILL -u pi 2>/dev/null || true
-        sleep 2
+
+        # Check remaining processes
+        local remaining_processes
+        remaining_processes=\$(pgrep -u pi 2>/dev/null | wc -l)
+        log_info "Processes remaining after SIGTERM: \$remaining_processes"
+
+        if pgrep -u pi >/dev/null 2>&1; then
+            log_warn "Some processes still running, attempting force kill (SIGKILL)..."
+            ps -u pi -o pid,ppid,cmd 2>/dev/null | head -10 | while read -r line; do
+                log_warn "  Still running: \$line"
+            done
+            pkill -KILL -u pi 2>/dev/null || true
+            sleep 2
+
+            # Final check
+            remaining_processes=\$(pgrep -u pi 2>/dev/null | wc -l)
+            log_info "Processes remaining after SIGKILL: \$remaining_processes"
+        fi
+    else
+        log_info "No processes found running as pi user"
     fi
 
     # Transfer ownership of any remaining pi user files
@@ -5694,34 +5741,113 @@ main() {
 
     # BOOT FIX: More robust user removal
     log_info "Removing pi user account..."
-    if userdel -r pi 2>/dev/null; then
+    log_info "Pi user home directory: \$(ls -la /home/pi 2>/dev/null | wc -l) items"
+    log_info "Pi user disk usage: \$(du -sh /home/pi 2>/dev/null || echo 'N/A')"
+
+    # Check for any remaining processes one more time
+    if pgrep -u pi >/dev/null 2>&1; then
+        log_warn "Warning: Pi user still has running processes during removal attempt"
+        ps -u pi -o pid,ppid,cmd 2>/dev/null | head -5 | while read -r line; do
+            log_warn "  Active process: \$line"
+        done
+    fi
+
+    # Attempt user removal with detailed logging
+    log_info "Attempting to remove pi user with home directory..."
+    if userdel -r pi 2>/tmp/userdel.log; then
         log_success "Pi user removed successfully with home directory"
-    elif userdel pi 2>/dev/null; then
+    elif userdel pi 2>/tmp/userdel.log; then
         log_warn "Pi user removed but home directory may remain"
+        if [[ -f /tmp/userdel.log ]]; then
+            log_warn "userdel output: \$(cat /tmp/userdel.log)"
+        fi
         # Clean up home directory manually
         if [[ -d "/home/pi" ]]; then
             log_info "Removing pi home directory manually..."
-            rm -rf /home/pi 2>/dev/null || true
+            local home_size
+            home_size=\$(du -sh /home/pi 2>/dev/null | cut -f1 || echo "unknown")
+            log_info "Home directory size: \$home_size"
+            if rm -rf /home/pi 2>/tmp/rmdir.log; then
+                log_success "Pi home directory removed manually"
+            else
+                log_warn "Failed to remove pi home directory: \$(cat /tmp/rmdir.log 2>/dev/null || echo 'No error log')"
+            fi
         fi
     else
         log_error "Failed to remove pi user, but system should still boot"
+        if [[ -f /tmp/userdel.log ]]; then
+            log_error "userdel error: \$(cat /tmp/userdel.log)"
+        fi
         # Don't exit with error - let boot continue
     fi
 
+    # Verify user removal
+    if id pi >/dev/null 2>&1; then
+        log_error "Pi user still exists after removal attempt"
+        log_error "Pi user info: \$(id pi 2>/dev/null)"
+    else
+        log_success "Pi user successfully removed from system"
+    fi
+
+    # Check home directory status
+    if [[ -d "/home/pi" ]]; then
+        log_warn "Pi home directory still exists: \$(ls -la /home/pi 2>/dev/null | wc -l) items"
+    else
+        log_success "Pi home directory successfully removed"
+    fi
+
     # Remove pi crontab if it exists
-    rm -f /var/spool/cron/crontabs/pi 2>/dev/null || true
+    log_info "Checking for pi user crontab..."
+    if [[ -f /var/spool/cron/crontabs/pi ]]; then
+        log_info "Removing pi user crontab..."
+        rm -f /var/spool/cron/crontabs/pi 2>/dev/null || true
+        log_success "Pi user crontab removed"
+    else
+        log_info "No pi user crontab found"
+    fi
 
     # Clean up this service
-    log_info "Cleaning up finalization service..."
-    systemctl disable dangerprep-finalize.service 2>/dev/null || true
+    log_info "Cleaning up finalization services..."
+    log_info "Disabling dangerprep-finalize.service..."
+    if systemctl disable dangerprep-finalize.service 2>/dev/null; then
+        log_success "dangerprep-finalize.service disabled"
+    else
+        log_warn "Failed to disable dangerprep-finalize.service"
+    fi
+
+    log_info "Disabling dangerprep-finalize-graphical.service..."
+    if systemctl disable dangerprep-finalize-graphical.service 2>/dev/null; then
+        log_success "dangerprep-finalize-graphical.service disabled"
+    else
+        log_warn "Failed to disable dangerprep-finalize-graphical.service"
+    fi
+
+    log_info "Removing service files..."
     rm -f /etc/systemd/system/dangerprep-finalize.service 2>/dev/null || true
-    systemctl daemon-reload 2>/dev/null || true
+    rm -f /etc/systemd/system/dangerprep-finalize-graphical.service 2>/dev/null || true
+
+    log_info "Reloading systemd daemon..."
+    if systemctl daemon-reload 2>/dev/null; then
+        log_success "Systemd daemon reloaded"
+    else
+        log_warn "Failed to reload systemd daemon"
+    fi
+
+    # Create completion marker
+    log_info "Creating completion marker..."
+    touch /var/lib/dangerprep-finalization-complete 2>/dev/null || true
+    echo "\$(date): Pi user finalization completed successfully" >> /var/lib/dangerprep-finalization-complete 2>/dev/null || true
 
     # Remove this script
+    log_info "Removing finalization script..."
     rm -f "\$0" 2>/dev/null || true
 
+    log_info "=========================================="
     log_success "DangerPrep finalization completed successfully!"
     log_info "Pi user has been removed and system is ready for use"
+    log_info "Completion time: \$(date)"
+    log_info "Total runtime: \$((\$(date +%s) - \${START_TIME:-\$(date +%s)})) seconds"
+    log_info "=========================================="
 }
 
 # BOOT FIX: Run main function with error handling to prevent boot hangs
@@ -5739,28 +5865,80 @@ EOF
     local service_file="/etc/systemd/system/dangerprep-finalize.service"
     cat > "$service_file" << EOF
 [Unit]
-Description=DangerPrep Finalization Service
-After=multi-user.target network.target
-Before=getty@tty1.service lightdm.service gdm.service
+Description=DangerPrep Finalization Service - Pi User Cleanup
+Documentation=file:///dangerprep/scripts/setup/README.md
+After=multi-user.target network.target systemd-user-sessions.service
+Before=getty@tty1.service lightdm.service gdm.service display-manager.service
 DefaultDependencies=yes
-# BOOT FIX: Conflict with getty to prevent autologin attempts during user removal
+# Prevent conflicts with login services during user removal
 Conflicts=getty@tty1.service
+# Only run if pi user exists (condition for cleanup)
+ConditionUser=pi
+# Ensure we run early in the boot process but after essential services
+Wants=systemd-user-sessions.service
 
 [Service]
 Type=oneshot
 ExecStart=$cleanup_script
+# Create a status file to track completion
+ExecStartPost=/bin/touch /var/lib/dangerprep-finalization-complete
 RemainAfterExit=yes
-TimeoutStartSec=300
-StandardOutput=journal
-StandardError=journal
-# BOOT FIX: Don't fail boot if finalization has issues
-SuccessExitStatus=0 1
+TimeoutStartSec=600
+# Increase timeout for user cleanup operations
+TimeoutStopSec=60
+StandardOutput=journal+console
+StandardError=journal+console
+# Don't fail boot if finalization has issues, but log them
+SuccessExitStatus=0 1 2
+# Restart on failure with delay
+Restart=on-failure
+RestartSec=30
+# Limit restart attempts
+StartLimitBurst=3
+StartLimitIntervalSec=300
+# Set working directory
+WorkingDirectory=/tmp
+# Run with full privileges for user management
+User=root
+Group=root
+# Security settings
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectSystem=false
+ProtectHome=false
 
 [Install]
 WantedBy=multi-user.target
+# Also wanted by graphical target in case system boots to GUI
+Also=dangerprep-finalize-graphical.service
 EOF
 
-    # Enable the service using standardized service management
+    # Create a companion service for graphical target
+    local graphical_service_file="/etc/systemd/system/dangerprep-finalize-graphical.service"
+    cat > "$graphical_service_file" << EOF
+[Unit]
+Description=DangerPrep Finalization Service - Graphical Target
+Documentation=file:///dangerprep/scripts/setup/README.md
+After=graphical.target
+Before=display-manager.service
+ConditionUser=pi
+ConditionPathExists=!/var/lib/dangerprep-finalization-complete
+
+[Service]
+Type=oneshot
+ExecStart=$cleanup_script
+ExecStartPost=/bin/touch /var/lib/dangerprep-finalization-complete
+RemainAfterExit=yes
+TimeoutStartSec=600
+StandardOutput=journal+console
+StandardError=journal+console
+SuccessExitStatus=0 1 2
+
+[Install]
+WantedBy=graphical.target
+EOF
+
+    # Enable the services using standardized service management
     if ! standard_service_operation "" "reload"; then
         log_error "Failed to reload systemd daemon"
         return 1
@@ -5771,8 +5949,22 @@ EOF
         return 1
     fi
 
-    log_success "Reboot finalization service created and enabled"
-    log_info "Pi user will be removed automatically on next reboot"
+    if ! standard_service_operation "dangerprep-finalize-graphical" "enable"; then
+        log_warn "Failed to enable graphical finalization service (non-critical)"
+    fi
+
+    # Create status tracking directory
+    mkdir -p /var/lib
+
+    # Validate service configuration
+    if systemctl is-enabled dangerprep-finalize.service >/dev/null 2>&1; then
+        log_success "Reboot finalization service created and enabled"
+        log_info "Pi user will be removed automatically on next reboot"
+        log_info "Manual fallback available: sudo /dangerprep/scripts/setup/finalize-user-migration.sh"
+    else
+        log_warn "Finalization service may not be properly enabled"
+        log_info "Manual cleanup will be required: sudo /dangerprep/scripts/setup/finalize-user-migration.sh"
+    fi
 }
 
 # Create emergency recovery service to prevent permanent boot hangs
@@ -6448,6 +6640,43 @@ main() {
         potential_blockers+=("no emergency recovery")
     fi
 
+    # Check if pi user cleanup is properly configured
+    if [[ -n "${NEW_USERNAME:-}" ]] && id pi >/dev/null 2>&1; then
+        log_info "🔍 Validating pi user cleanup configuration..."
+
+        # Check if finalization service exists and is enabled
+        if systemctl is-enabled dangerprep-finalize.service >/dev/null 2>&1; then
+            log_info "✅ Pi user cleanup service enabled"
+        else
+            log_warn "⚠️  Pi user cleanup service not enabled"
+            potential_blockers+=("pi cleanup service not enabled")
+        fi
+
+        # Check if finalization script exists
+        if [[ -f /usr/local/bin/dangerprep-finalize.sh ]]; then
+            log_info "✅ Pi user cleanup script created"
+        else
+            log_warn "⚠️  Pi user cleanup script missing"
+            potential_blockers+=("pi cleanup script missing")
+        fi
+
+        # Check if manual cleanup script exists
+        if [[ -f /dangerprep/scripts/setup/finalize-user-migration.sh ]]; then
+            log_info "✅ Manual cleanup script available"
+        else
+            log_warn "⚠️  Manual cleanup script missing"
+            potential_blockers+=("manual cleanup script missing")
+        fi
+
+        # Validate service configuration
+        if systemctl cat dangerprep-finalize.service 2>/dev/null | grep -q "ConditionUser=pi"; then
+            log_info "✅ Pi user cleanup service properly configured"
+        else
+            log_warn "⚠️  Pi user cleanup service configuration issue"
+            potential_blockers+=("pi cleanup service misconfigured")
+        fi
+    fi
+
     # Final warnings and instructions
     log_info ""
     if [[ ${#potential_blockers[@]} -eq 0 ]]; then
@@ -6469,10 +6698,18 @@ main() {
         log_info "3. Emergency: User 'emergency' with password 'emergency123' (if created)"
         log_info "4. Recovery: Check logs at /var/log/dangerprep-*.log"
         log_info ""
+        log_info "🔄 PI USER CLEANUP VERIFICATION:"
+        log_info "After reboot, verify pi user removal:"
+        log_info "- Check user removal: id pi (should fail)"
+        log_info "- Check cleanup logs: journalctl -u dangerprep-finalize"
+        log_info "- Check completion: ls -la /var/lib/dangerprep-finalization-complete"
+        log_info "- Manual cleanup: sudo /dangerprep/scripts/setup/finalize-user-migration.sh"
+        log_info ""
         log_info "🔧 TROUBLESHOOTING:"
         log_info "- If system hangs: Power cycle and check console"
         log_info "- If SSH fails: Check port ${SSH_PORT:-2222} and firewall"
         log_info "- If services fail: Use 'systemctl status <service>' to diagnose"
+        log_info "- If pi user remains: Run manual cleanup script"
         log_info "- Emergency recovery: Service runs automatically if needed"
     fi
 
