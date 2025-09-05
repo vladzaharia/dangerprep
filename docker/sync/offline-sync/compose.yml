@@ -6,8 +6,8 @@ services:
     restart: unless-stopped
     privileged: true  # Required for USB device access and mounting
     volumes:
-      - ${INSTALL_ROOT}/data/offline-sync:/app/data
-      - ${INSTALL_ROOT}/content:/content
+      - /data/offline-sync:/app/data
+      - /content:/content
       - ./config.yaml:/app/data/config.yaml:ro
       - /dev:/dev  # Device access for USB detection
       - /run/udev:/run/udev:ro  # udev for device information

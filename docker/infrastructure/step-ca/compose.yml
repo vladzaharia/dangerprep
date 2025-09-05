@@ -5,7 +5,7 @@ services:
     ports:
       - "9000:9000"  # step-ca HTTPS API
     volumes:
-      - ${INSTALL_ROOT}/data/step-ca:/home/step
+      - /data/step-ca:/home/step
       - ./init-ca.sh:/docker-entrypoint.d/init-ca.sh:ro
       - ./fix-permissions.sh:/docker-entrypoint.d/00-fix-permissions.sh:ro
       # Mount CA password as secret file
@@ -50,8 +50,8 @@ services:
       dockerfile: docker/infrastructure/step-ca/Dockerfile
     restart: unless-stopped
     volumes:
-      - ${INSTALL_ROOT}/data/step-ca:/ca-data:ro
-      - ${INSTALL_ROOT}/data/cdn-assets:/cdn-assets
+      - /data/step-ca:/ca-data:ro
+      - /data/cdn-assets:/cdn-assets
     env_file:
       - compose.env
     environment:

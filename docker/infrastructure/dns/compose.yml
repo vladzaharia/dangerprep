@@ -4,8 +4,8 @@ services:
     image: adguard/adguardhome:latest
     restart: unless-stopped
     volumes:
-      - ${INSTALL_ROOT}/data/adguard/work:/opt/adguardhome/work
-      - ${INSTALL_ROOT}/data/adguard/conf:/opt/adguardhome/conf
+      - /data/adguard/work:/opt/adguardhome/work
+      - /data/adguard/conf:/opt/adguardhome/conf
     env_file:
       - compose.env
     labels:
@@ -40,7 +40,7 @@ services:
       - "5353:53/tcp"   # DNS port (changed to avoid conflict with RaspAP)
       - "5353:53/udp"   # DNS port (changed to avoid conflict with RaspAP)
     volumes:
-      - ${INSTALL_ROOT}/data/local-dns:/etc/coredns
+      - /data/local-dns:/etc/coredns
       - ./Corefile:/etc/coredns/Corefile:ro
     command: ["-conf", "/etc/coredns/Corefile"]
     env_file:
@@ -69,7 +69,7 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${INSTALL_ROOT}/data/local-dns:/dns-config
+      - /data/local-dns:/dns-config
       - ./scripts:/scripts:ro
     env_file:
       - compose.env

@@ -5,7 +5,7 @@ services:
       dockerfile: docker/infrastructure/cdn/Dockerfile
     restart: unless-stopped
     volumes:
-      - ${INSTALL_ROOT}/data/cdn:/app/data
+      - /data/cdn:/app/data
       - ./assets:/app/assets:ro
     env_file:
       - compose.env

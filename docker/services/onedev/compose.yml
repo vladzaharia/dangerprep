@@ -5,7 +5,7 @@ services:
     depends_on:
       - postgres
     volumes:
-      - ${INSTALL_ROOT}/data/onedev:/opt/onedev
+      - /data/onedev:/opt/onedev
       - /var/run/docker.sock:/var/run/docker.sock
       # Mount secrets as files for enhanced security
       - ${INSTALL_ROOT}/secrets/onedev/db_password:/run/secrets/db_password:ro
@@ -51,7 +51,7 @@ services:
     image: postgres:15.4
     restart: unless-stopped
     volumes:
-      - ${INSTALL_ROOT}/data/onedev/postgres:/var/lib/postgresql/data
+      - /data/onedev/postgres:/var/lib/postgresql/data
     env_file:
       - compose.env
     environment:

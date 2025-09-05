@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${INSTALL_ROOT}/data/portainer:/data
+      - /data/portainer:/data
     env_file:
       - compose.env
     labels:
