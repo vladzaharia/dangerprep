@@ -1868,7 +1868,7 @@ collect_package_configuration() {
     # Define package categories (same as in install_essential_packages)
     local package_categories=(
         "Convenience packages (vim, nano, htop, etc.)"
-        "Network packages (netplan, tc, iperf3, etc.)"
+        "Network packages (netplan, tc, iperf3, tailscale, etc.)"
         "Security packages (fail2ban, aide, clamav, etc.)"
         "Monitoring packages (sensors, collectd, etc.)"
         "Backup packages (borgbackup, restic)"
@@ -1909,7 +1909,6 @@ collect_docker_services_configuration() {
         "RaspAP (Network Management)"
         "Step-CA (Certificate Authority)"
         "AdGuard Home (DNS Filtering)"
-        "Tailscale (VPN)"
     )
 
     log_info "Select which Docker services to install:"
@@ -2583,6 +2582,12 @@ install_essential_packages() {
     # Install FriendlyElec-specific packages if configured
     if [[ "$IS_FRIENDLYELEC" == true ]] && [[ -n "$FRIENDLYELEC_INSTALL_PACKAGES" ]]; then
         install_friendlyelec_packages
+    fi
+
+    # Install Tailscale if Network packages were selected
+    if [[ -n "$SELECTED_PACKAGE_CATEGORIES" ]] && echo "$SELECTED_PACKAGE_CATEGORIES" | grep -q "Network packages"; then
+        log_info "Installing Tailscale (Network package)..."
+        setup_tailscale
     fi
 
     # Clean up package cache
