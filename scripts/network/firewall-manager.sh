@@ -133,9 +133,10 @@ reset_firewall() {
     iptables -t mangle -F
     iptables -X
 
-    # Set default policies
-    iptables -P INPUT DROP
-    iptables -P FORWARD DROP
+    # BOOT FIX: Set safer default policies to prevent boot hangs
+    # Don't set DROP policies immediately - set them after allowing essential traffic
+    iptables -P INPUT ACCEPT
+    iptables -P FORWARD ACCEPT
     iptables -P OUTPUT ACCEPT
 
     # Allow loopback traffic
@@ -188,12 +189,23 @@ reset_firewall() {
         iptables -A INPUT -i "$WIFI_INTERFACE" -p icmp --icmp-type echo-request -j ACCEPT
     fi
 
+    # BOOT FIX: Now set restrictive policies after allowing essential traffic
+    log "Setting restrictive policies after allowing essential traffic..."
+    iptables -P INPUT DROP
+    iptables -P FORWARD DROP
+    iptables -P OUTPUT ACCEPT
+
     # Save rules
     mkdir -p /etc/iptables
-    iptables-save > /etc/iptables/rules.v4
+    if iptables-save > /etc/iptables/rules.v4; then
+        success "Firewall rules saved successfully"
+    else
+        log "Warning: Failed to save firewall rules"
+    fi
 
     success "Firewall reset to default DangerPrep configuration"
     log "SSH port: $SSH_PORT, WAN: $WAN_INTERFACE, WiFi: $WIFI_INTERFACE"
+    log "BOOT SAFETY: Essential traffic allowed before restrictive policies applied"
 }
 
 add_port_forward() {
