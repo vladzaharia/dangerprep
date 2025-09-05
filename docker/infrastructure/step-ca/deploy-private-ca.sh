@@ -51,11 +51,16 @@ cd "$INSTALL_ROOT"
 docker compose -f docker/infrastructure/cdn/compose.yml up -d
 echo "✅ CDN service started"
 
-# Step 2: Make scripts executable
-echo "🔧 Setting up scripts..."
+# Step 2: Make scripts executable and prepare secrets
+echo "🔧 Setting up scripts and secrets..."
 chmod +x "${STEP_CA_DIR}/setup-ca-trust.sh"
 chmod +x "${STEP_CA_DIR}/init-ca.sh"
-echo "✅ Scripts made executable"
+chmod +x "${STEP_CA_DIR}/fix-permissions.sh"
+chmod +x "${STEP_CA_DIR}/prepare-secrets.sh"
+
+# Prepare secrets with proper permissions
+"${STEP_CA_DIR}/prepare-secrets.sh"
+echo "✅ Scripts made executable and secrets prepared"
 
 # Step 3: Start step-ca services
 echo "🚀 Starting step-ca services..."

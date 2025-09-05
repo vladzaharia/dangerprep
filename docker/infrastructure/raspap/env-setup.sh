@@ -41,15 +41,26 @@ function update_webgui_auth() {
     declare user=$1
     declare pass=$2
 
+    # Ensure directory exists
+    mkdir -p "$(dirname "$raspap_auth")"
+
     if ! [ -f $raspap_auth ]
     then
         # If the raspap.auth file doesn't exist, create it with default values
         default_user=admin
-        default_pass=$(php ${password_generator} secret)
+        if command -v php >/dev/null 2>&1; then
+            default_pass=$(php ${password_generator} secret)
+        else
+            # Fallback if PHP is not available
+            default_pass="admin"
+        fi
 
         echo "$default_user" > "$raspap_auth"
         echo "$default_pass" >> "$raspap_auth"
-        chown www-data:www-data $raspap_auth # To allow later updating from the webgui
+        # Only change ownership if www-data user exists
+        if id "www-data" >/dev/null 2>&1; then
+            chown www-data:www-data $raspap_auth
+        fi
     fi
 
     if [ -z $user ]
@@ -63,8 +74,13 @@ function update_webgui_auth() {
         # If no password var is set, keep the existing password value
         pass=$(tail $raspap_auth -n+2)
     else
-        # Hash password
-        pass=$(php /home/password-generator.php ${pass})
+        # Hash password if PHP is available
+        if command -v php >/dev/null 2>&1; then
+            pass=$(php /home/password-generator.php ${pass})
+        else
+            # Use plain text password as fallback
+            echo "Warning: PHP not available, using plain text password"
+        fi
     fi
 
     echo "$user" > "$raspap_auth"
@@ -80,9 +96,22 @@ function update_webgui_port() {
         # Only update if env var is set
         return
     fi
+
+    # Ensure lighttpd config exists
+    mkdir -p "$(dirname "$lighttpd_conf")"
+    if [ ! -f "$lighttpd_conf" ]; then
+        # Create basic lighttpd config if it doesn't exist
+        cat > "$lighttpd_conf" << EOF
+server.port                 = 80
+server.document-root        = "/var/www/html"
+server.username             = "www-data"
+server.groupname            = "www-data"
+EOF
+    fi
+
     old="server.port                 = [0-9]*"
     new="server.port                 = ${port}"
-    sudo sed -i "s/$old/$new/g" ${lighttpd_conf}
+    sed -i "s/$old/$new/g" "${lighttpd_conf}" 2>/dev/null || echo "Warning: Could not update lighttpd port"
 }
 
 update_confs() {
@@ -114,16 +143,20 @@ function replace_in_conf() {
     val=$2
     path=$3
 
+    # Ensure directory and file exist
+    mkdir -p "$(dirname "$path")"
+    touch "$path"
+
     old="$key"=".*"
     new="$key"="$val"
 
-    if [ -z "$(grep "$old" $path)" ]
+    if [ -z "$(grep "$old" "$path" 2>/dev/null)" ]
     then
         # Add value
-        echo $new >> $path
+        echo "$new" >> "$path"
     else
         # Value exists in conf
-        sudo sed -i "s/$old/$new/g" $path
+        sed -i "s/$old/$new/g" "$path" 2>/dev/null || echo "$new" >> "$path"
     fi
 }
 
