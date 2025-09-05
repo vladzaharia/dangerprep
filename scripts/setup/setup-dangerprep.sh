@@ -5550,9 +5550,6 @@ EOF
 
     log_success "Reboot finalization service created and enabled"
     log_info "Pi user will be removed automatically on next reboot"
-
-    # BOOT FIX: Create emergency recovery mechanisms
-    create_emergency_recovery_service
 }
 
 # Create emergency recovery service to prevent permanent boot hangs
@@ -5631,6 +5628,7 @@ EOF
     systemctl daemon-reload
 
     log_success "Emergency recovery service created and enabled"
+}
 
 # Generate sync service configurations
 generate_sync_configs() {
@@ -6043,6 +6041,7 @@ main() {
         "setup_encrypted_backups:Setting up encrypted backups"
         "configure_user_accounts:Configuring user accounts"
         "configure_screen_lock:Configuring screen lock settings"
+        "create_emergency_recovery_service:Creating emergency recovery service"
         "start_all_services:Starting all services"
         "verify_setup:Verifying setup"
     )
