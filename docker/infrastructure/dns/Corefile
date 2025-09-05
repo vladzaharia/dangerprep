@@ -10,7 +10,7 @@ danger {
 
 # Fallback to upstream DNS (AdGuard Home)
 . {
-    forward . 172.20.0.2:53
+    forward . dns-adguardhome-1:53
     log
     errors
     cache 30
