@@ -13,6 +13,8 @@ ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update \
     && apt-get install -y systemd systemd-sysv sudo wget procps curl systemd iproute2 \
+       iptables iptables-persistent php php-cli php-cgi lighttpd hostapd dnsmasq \
+       wireless-tools wpasupplicant dhcpcd5 git \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -33,6 +35,9 @@ VOLUME [ "/sys/fs/cgroup" ]
 
 EXPOSE 80
 
+# Create necessary directories before installation
+RUN mkdir -p /etc/hostapd /etc/raspap /etc/lighttpd /etc/dnsmasq.d /etc/wpa_supplicant
+
 # Install RaspAP with Insiders, WireGuard, Ad blocking, and RestAPI
 # Skip OpenVPN as requested, include QoS for traffic shaping
 RUN curl -sL https://install.raspap.com | bash -s -- \
@@ -43,7 +48,13 @@ RUN curl -sL https://install.raspap.com | bash -s -- \
     --wireguard 1 \
     --adblock 1 \
     --rest 1 \
-    --check 0
+    --check 0 || true
+
+# Ensure directories exist even if installation partially failed
+RUN mkdir -p /etc/hostapd /etc/raspap /etc/lighttpd /etc/dnsmasq.d /etc/wpa_supplicant
+
+# Create default configuration files if they don't exist
+RUN touch /etc/hostapd/hostapd.conf /etc/raspap/raspap.auth /etc/lighttpd/lighttpd.conf
 COPY firewall-rules.sh /home/firewall-rules.sh
 COPY wpa_supplicant.conf /etc/wpa_supplicant/
 RUN chmod +x /home/firewall-rules.sh

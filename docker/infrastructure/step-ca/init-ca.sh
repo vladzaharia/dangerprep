@@ -7,7 +7,18 @@ set -e
 echo "Configuring step-ca post-initialization..."
 
 # Wait for step-ca to be fully initialized
-sleep 5
+sleep 10
+
+# Check if password file exists and is readable
+if [ ! -f "/home/step/secrets/password" ]; then
+    echo "Warning: Password file not found, step-ca may not start properly"
+    exit 0
+fi
+
+if [ ! -r "/home/step/secrets/password" ]; then
+    echo "Warning: Password file not readable, step-ca may not start properly"
+    exit 0
+fi
 
 # Check if ACME provisioner already exists
 if ! step ca provisioner list --ca-url https://localhost:9000 --root /home/step/certs/root_ca.crt | grep -q "acme"; then
