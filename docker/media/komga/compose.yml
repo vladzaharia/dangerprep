@@ -3,10 +3,10 @@ services:
     image: gotson/komga:latest
     restart: unless-stopped
     volumes:
-      - ${INSTALL_ROOT}/data/komga/config:/config
-      - ${INSTALL_ROOT}/content/books:/books:ro
-      - ${INSTALL_ROOT}/content/comics:/comics:ro
-      - ${INSTALL_ROOT}/content/magazines:/magazines:ro
+      - /data/komga/config:/config
+      - /content/books:/books:ro
+      - /content/comics:/comics:ro
+      - /content/magazines:/magazines:ro
     env_file:
       - compose.env
     labels:

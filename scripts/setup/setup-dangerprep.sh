@@ -3647,42 +3647,137 @@ setup_docker_services() {
     fi
 
     # Set up directory structure using standardized directory creation
-    local directories=(
+    # Create base directories under INSTALL_ROOT
+    local base_directories=(
         "${INSTALL_ROOT}/docker:755:root:root"
-        "${INSTALL_ROOT}/data:755:root:root"
-        "${INSTALL_ROOT}/content:755:root:root"
         "${INSTALL_ROOT}/nfs:755:root:root"
-        "${INSTALL_ROOT}/data/traefik:755:root:root"
-        "${INSTALL_ROOT}/data/arcane:755:root:root"
-        "${INSTALL_ROOT}/data/jellyfin:755:root:root"
-        "${INSTALL_ROOT}/data/komga:755:root:root"
-        "${INSTALL_ROOT}/data/kiwix:755:root:root"
-        "${INSTALL_ROOT}/data/logs:755:root:root"
-        "${INSTALL_ROOT}/data/backups:755:root:root"
-        "${INSTALL_ROOT}/data/raspap:755:root:root"
-        "${INSTALL_ROOT}/content/movies:755:root:root"
-        "${INSTALL_ROOT}/content/tv:755:root:root"
-        "${INSTALL_ROOT}/content/webtv:755:root:root"
-        "${INSTALL_ROOT}/content/music:755:root:root"
-        "${INSTALL_ROOT}/content/audiobooks:755:root:root"
-        "${INSTALL_ROOT}/content/books:755:root:root"
-        "${INSTALL_ROOT}/content/comics:755:root:root"
-        "${INSTALL_ROOT}/content/magazines:755:root:root"
-        "${INSTALL_ROOT}/content/games/roms:755:root:root"
-        "${INSTALL_ROOT}/content/kiwix:755:root:root"
+        "${INSTALL_ROOT}/secrets:755:root:root"
+    )
+
+    # Create data directories on the dedicated /data partition
+    local data_directories=(
+        "/data/traefik:755:root:root"
+        "/data/arcane:755:root:root"
+        "/data/jellyfin/config:755:root:root"
+        "/data/jellyfin/cache:755:root:root"
+        "/data/komga/config:755:root:root"
+        "/data/kiwix:755:root:root"
+        "/data/logs:755:root:root"
+        "/data/backups:755:root:root"
+        "/data/raspap:755:root:root"
+        "/data/step-ca:755:root:root"
+        "/data/cdn:755:root:root"
+        "/data/cdn-assets:755:root:root"
+        "/data/offline-sync:755:root:root"
+        "/data/sync:755:root:root"
+        "/data/romm/config:755:root:root"
+        "/data/romm/assets:755:root:root"
+        "/data/romm/resources:755:root:root"
+        "/data/docmost:755:root:root"
+        "/data/docmost/postgres:755:root:root"
+        "/data/docmost/redis:755:root:root"
+        "/data/onedev:755:root:root"
+        "/data/onedev/postgres:755:root:root"
+        "/data/portainer:755:root:root"
+        "/data/adguard/work:755:root:root"
+        "/data/adguard/conf:755:root:root"
+        "/data/local-dns:755:root:root"
+    )
+
+    # Create content directories on the dedicated /content partition
+    local content_directories=(
+        "/content/movies:755:root:root"
+        "/content/tv:755:root:root"
+        "/content/webtv:755:root:root"
+        "/content/music:755:root:root"
+        "/content/audiobooks:755:root:root"
+        "/content/books:755:root:root"
+        "/content/comics:755:root:root"
+        "/content/magazines:755:root:root"
+        "/content/games/roms:755:root:root"
+        "/content/kiwix:755:root:root"
     )
 
     log_info "Creating directory structure..."
-    for dir_spec in "${directories[@]}"; do
+
+    # Create base directories under INSTALL_ROOT
+    for dir_spec in "${base_directories[@]}"; do
         IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
         if standard_create_directory "$dir_path" "$mode" "$owner" "$group"; then
-            log_debug "Created directory: $dir_path"
+            log_debug "Created base directory: $dir_path"
         else
-            log_error "Failed to create directory: $dir_path"
+            log_error "Failed to create base directory: $dir_path"
             return 1
         fi
     done
-    enhanced_status_indicator "success" "Directory structure created"
+
+    # Create data directories on /data partition (if mounted)
+    if mountpoint -q /data 2>/dev/null; then
+        log_info "Creating data directories on /data partition..."
+        for dir_spec in "${data_directories[@]}"; do
+            IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
+            if standard_create_directory "$dir_path" "$mode" "$owner" "$group"; then
+                log_debug "Created data directory: $dir_path"
+            else
+                log_error "Failed to create data directory: $dir_path"
+                return 1
+            fi
+        done
+    else
+        log_warn "/data partition not mounted, creating fallback directories under ${INSTALL_ROOT}/data"
+        # Fallback: create directories under INSTALL_ROOT if /data is not available
+        if ! standard_create_directory "${INSTALL_ROOT}/data" "755" "root" "root"; then
+            log_error "Failed to create fallback data directory: ${INSTALL_ROOT}/data"
+            return 1
+        fi
+
+        for dir_spec in "${data_directories[@]}"; do
+            IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
+            # Replace /data with ${INSTALL_ROOT}/data for fallback
+            fallback_path="${dir_path/\/data/${INSTALL_ROOT}/data}"
+            if standard_create_directory "$fallback_path" "$mode" "$owner" "$group"; then
+                log_debug "Created fallback data directory: $fallback_path"
+            else
+                log_error "Failed to create fallback data directory: $fallback_path"
+                return 1
+            fi
+        done
+    fi
+
+    # Create content directories on /content partition (if mounted)
+    if mountpoint -q /content 2>/dev/null; then
+        log_info "Creating content directories on /content partition..."
+        for dir_spec in "${content_directories[@]}"; do
+            IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
+            if standard_create_directory "$dir_path" "$mode" "$owner" "$group"; then
+                log_debug "Created content directory: $dir_path"
+            else
+                log_error "Failed to create content directory: $dir_path"
+                return 1
+            fi
+        done
+    else
+        log_warn "/content partition not mounted, creating fallback directories under ${INSTALL_ROOT}/content"
+        # Fallback: create directories under INSTALL_ROOT if /content is not available
+        if ! standard_create_directory "${INSTALL_ROOT}/content" "755" "root" "root"; then
+            log_error "Failed to create fallback content directory: ${INSTALL_ROOT}/content"
+            return 1
+        fi
+
+        for dir_spec in "${content_directories[@]}"; do
+            IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
+            # Replace /content with ${INSTALL_ROOT}/content for fallback
+            fallback_path="${dir_path/\/content/${INSTALL_ROOT}/content}"
+            if standard_create_directory "$fallback_path" "$mode" "$owner" "$group"; then
+                log_debug "Created fallback content directory: $fallback_path"
+            else
+                log_error "Failed to create fallback content directory: $fallback_path"
+                return 1
+            fi
+        done
+    fi
+
+    enhanced_status_indicator "success" "Directory structure created with NVMe partition integration"
 
     # Copy Docker configurations if they exist using standardized file operations
     if [[ -d "${PROJECT_ROOT}/docker" ]]; then
@@ -4128,9 +4223,26 @@ create_nvme_partitions() {
     fi
 
     # Create subdirectories for organization using standardized directory creation
-    local data_subdirs=("/data/config" "/data/logs" "/data/backups" "/data/cache")
-    local content_subdirs=("/content/media" "/content/documents" "/content/downloads" "/content/sync")
+    # These match the service-specific directories that Docker containers expect
+    local data_subdirs=(
+        "/data/traefik" "/data/arcane" "/data/jellyfin/config" "/data/jellyfin/cache"
+        "/data/komga/config" "/data/kiwix" "/data/logs" "/data/backups" "/data/raspap"
+        "/data/step-ca" "/data/cdn" "/data/cdn-assets" "/data/offline-sync" "/data/sync"
+        "/data/romm/config" "/data/romm/assets" "/data/romm/resources"
+        "/data/docmost" "/data/docmost/postgres" "/data/docmost/redis"
+        "/data/onedev" "/data/onedev/postgres" "/data/portainer"
+        "/data/adguard/work" "/data/adguard/conf" "/data/local-dns"
+        "/data/config" "/data/cache"
+    )
 
+    local content_subdirs=(
+        "/content/movies" "/content/tv" "/content/webtv" "/content/music"
+        "/content/audiobooks" "/content/books" "/content/comics" "/content/magazines"
+        "/content/games/roms" "/content/kiwix" "/content/media" "/content/documents"
+        "/content/downloads" "/content/sync"
+    )
+
+    log_info "Creating data subdirectories on /data partition..."
     for subdir in "${data_subdirs[@]}"; do
         if ! standard_create_directory "$subdir" "755" "root" "root"; then
             log_error "Failed to create directory: $subdir"
@@ -4138,6 +4250,7 @@ create_nvme_partitions() {
         fi
     done
 
+    log_info "Creating content subdirectories on /content partition..."
     for subdir in "${content_subdirs[@]}"; do
         if ! standard_create_directory "$subdir" "755" "root" "root"; then
             log_error "Failed to create directory: $subdir"

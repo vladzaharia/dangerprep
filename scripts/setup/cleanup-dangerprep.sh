@@ -770,12 +770,19 @@ cleanup_raspap() {
     fi
 
     # Remove RaspAP data directory if it exists
-    if [[ -d "${install_root}/data/raspap" ]]; then
+    local raspap_data_dir=""
+    if mountpoint -q /data 2>/dev/null && [[ -d "/data/raspap" ]]; then
+        raspap_data_dir="/data/raspap"
+    elif [[ -d "${install_root}/data/raspap" ]]; then
+        raspap_data_dir="${install_root}/data/raspap"
+    fi
+
+    if [[ -n "$raspap_data_dir" ]]; then
         if [[ "$PRESERVE_DATA" == true ]]; then
-            log_info "Preserving RaspAP data directory (--preserve-data flag set)"
+            log_info "Preserving RaspAP data directory (--preserve-data flag set): $raspap_data_dir"
         else
-            log_info "Removing RaspAP data directory..."
-            rm -rf "${install_root}/data/raspap" 2>/dev/null || true
+            log_info "Removing RaspAP data directory: $raspap_data_dir"
+            rm -rf "$raspap_data_dir" 2>/dev/null || true
         fi
     fi
 
@@ -1240,20 +1247,49 @@ remove_data() {
     # Get install root from environment or default
     local install_root="${DANGERPREP_INSTALL_ROOT:-/opt/dangerprep}"
 
-    # Remove Docker data
-    rm -rf "$install_root/data" 2>/dev/null || true
+    # Remove Docker configurations and NFS
     rm -rf "$install_root/docker" 2>/dev/null || true
     rm -rf "$install_root/nfs" 2>/dev/null || true
 
-    # Remove content directories (be careful here)
-    if [[ -d "$install_root/content" ]]; then
-        log_warn "WARNING: This will delete all media files in $install_root/content"
-        read -p "Remove content directories? (yes/no): " -r
+    # Handle data directories - check if using direct mounts or fallback
+    if mountpoint -q /data 2>/dev/null; then
+        log_warn "WARNING: This will delete all application data on the /data partition"
+        read -p "Remove data directories on /data partition? (yes/no): " -r
         if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-            rm -rf "$install_root/content" 2>/dev/null || true
-            log_success "Content directories removed"
+            # Remove service directories but preserve mount point
+            find /data -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+            log_success "Data directories on /data partition removed"
         else
-            log_info "Content directories preserved"
+            log_info "Data directories on /data partition preserved"
+        fi
+    else
+        # Fallback: remove data under install root
+        rm -rf "$install_root/data" 2>/dev/null || true
+        log_info "Fallback data directories under $install_root removed"
+    fi
+
+    # Handle content directories - check if using direct mounts or fallback
+    if mountpoint -q /content 2>/dev/null; then
+        log_warn "WARNING: This will delete all media files on the /content partition"
+        read -p "Remove content directories on /content partition? (yes/no): " -r
+        if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+            # Remove content directories but preserve mount point
+            find /content -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+            log_success "Content directories on /content partition removed"
+        else
+            log_info "Content directories on /content partition preserved"
+        fi
+    else
+        # Fallback: remove content under install root
+        if [[ -d "$install_root/content" ]]; then
+            log_warn "WARNING: This will delete all media files in $install_root/content"
+            read -p "Remove content directories? (yes/no): " -r
+            if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+                rm -rf "$install_root/content" 2>/dev/null || true
+                log_success "Fallback content directories removed"
+            else
+                log_info "Fallback content directories preserved"
+            fi
         fi
     fi
 

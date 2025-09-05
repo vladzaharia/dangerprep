@@ -6,13 +6,13 @@ services:
       - "7359:7359/udp"  # Auto-discovery
       - "1900:1900/udp"  # DLNA
     volumes:
-      - ${INSTALL_ROOT}/data/jellyfin/config:/config
-      - ${INSTALL_ROOT}/data/jellyfin/cache:/cache
-      - ${INSTALL_ROOT}/content/movies:/media/movies:ro
-      - ${INSTALL_ROOT}/content/tv:/media/tv:ro
-      - ${INSTALL_ROOT}/content/webtv:/media/webtv:ro
-      - ${INSTALL_ROOT}/content/music:/media/music:ro
-      - ${INSTALL_ROOT}/content/audiobooks:/media/audiobooks:ro
+      - /data/jellyfin/config:/config
+      - /data/jellyfin/cache:/cache
+      - /content/movies:/media/movies:ro
+      - /content/tv:/media/tv:ro
+      - /content/webtv:/media/webtv:ro
+      - /content/music:/media/music:ro
+      - /content/audiobooks:/media/audiobooks:ro
     env_file:
       - compose.env
     devices:

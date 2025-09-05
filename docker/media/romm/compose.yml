@@ -3,10 +3,10 @@ services:
     image: rommapp/romm:latest
     restart: unless-stopped
     volumes:
-      - ${INSTALL_ROOT}/data/romm/config:/romm/config
-      - ${INSTALL_ROOT}/data/romm/assets:/romm/assets
-      - ${INSTALL_ROOT}/data/romm/resources:/romm/resources
-      - ${INSTALL_ROOT}/content/games/roms:/romm/library:ro
+      - /data/romm/config:/romm/config
+      - /data/romm/assets:/romm/assets
+      - /data/romm/resources:/romm/resources
+      - /content/games/roms:/romm/library:ro
       - ${INSTALL_ROOT}/nfs/games:/nfs/games:ro
       # Mount secrets as files for enhanced security
       - ${INSTALL_ROOT}/secrets/romm/auth_secret_key:/run/secrets/romm_auth_secret_key:ro
