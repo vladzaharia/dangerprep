@@ -877,20 +877,80 @@ import_github_ssh_keys() {
     local temp_keys_file
     temp_keys_file=$(mktemp)
 
-    if ! curl -s -f "$github_keys_url" > "$temp_keys_file"; then
+    log_info "Fetching SSH keys from: $github_keys_url"
+
+    # Use curl with better error handling and timeout
+    if ! curl -s -f --max-time 30 --retry 3 --retry-delay 2 \
+        -H "Accept: application/vnd.github.v3+json" \
+        -H "User-Agent: DangerPrep-Setup/1.0" \
+        "$github_keys_url" > "$temp_keys_file" 2>/tmp/curl_error.log; then
+
         log_error "Failed to fetch SSH keys from GitHub for user: $github_username"
-        log_error "Please verify the username is correct and the user has public SSH keys"
+
+        # Show curl error details if available
+        if [[ -f /tmp/curl_error.log ]]; then
+            local curl_error
+            curl_error=$(cat /tmp/curl_error.log 2>/dev/null)
+            if [[ -n "$curl_error" ]]; then
+                log_error "Curl error: $curl_error"
+            fi
+            rm -f /tmp/curl_error.log
+        fi
+
+        # Check if it's a network issue or user not found
+        local http_code
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$github_keys_url" 2>/dev/null || echo "000")
+
+        case "$http_code" in
+            "404")
+                log_error "GitHub user '$github_username' not found"
+                log_error "Please verify the username is correct"
+                ;;
+            "403")
+                log_error "GitHub API rate limit exceeded or access forbidden"
+                log_error "Please try again later"
+                ;;
+            "000")
+                log_error "Network connection failed"
+                log_error "Please check your internet connection"
+                ;;
+            *)
+                log_error "HTTP error code: $http_code"
+                log_error "Please verify the username is correct and try again"
+                ;;
+        esac
+
         rm -f "$temp_keys_file"
         return 1
     fi
 
     # Check if any keys were returned
-    if [[ ! -s "$temp_keys_file" ]] || ! grep -q '"key"' "$temp_keys_file" 2>/dev/null; then
-        log_error "No SSH keys found for GitHub user: $github_username"
-        log_error "Please add SSH keys to your GitHub account first"
+    if [[ ! -s "$temp_keys_file" ]]; then
+        log_error "Empty response from GitHub API for user: $github_username"
         rm -f "$temp_keys_file"
         return 1
     fi
+
+    # Validate JSON response
+    if ! grep -q '"key"' "$temp_keys_file" 2>/dev/null; then
+        log_error "No SSH keys found for GitHub user: $github_username"
+        log_error "Please add SSH keys to your GitHub account first"
+        log_info "You can add SSH keys at: https://github.com/settings/keys"
+
+        # Show first few lines of response for debugging
+        log_debug "GitHub API response (first 3 lines):"
+        head -3 "$temp_keys_file" 2>/dev/null | while read -r line; do
+            log_debug "  $line"
+        done
+
+        rm -f "$temp_keys_file"
+        return 1
+    fi
+
+    # Count available keys
+    local available_keys
+    available_keys=$(grep -c '"key"' "$temp_keys_file" 2>/dev/null || echo "0")
+    log_info "Found $available_keys SSH keys in GitHub account"
 
     # Extract SSH keys from JSON response and create authorized_keys file
     local authorized_keys_file="$ssh_dir/authorized_keys"
@@ -902,21 +962,43 @@ import_github_ssh_keys() {
     echo "# Imported on: $(date)" >> "$temp_auth_keys"
     echo "" >> "$temp_auth_keys"
 
-    # Parse JSON and extract keys
+    # Parse JSON and extract keys with better validation
     local key_count=0
+    local skipped_count=0
+
+    log_info "Parsing and validating SSH keys..."
+
     while IFS= read -r line; do
         if [[ "$line" =~ \"key\":[[:space:]]*\"([^\"]+)\" ]]; then
             local ssh_key="${BASH_REMATCH[1]}"
-            # Validate SSH key format (basic check)
-            if [[ "$ssh_key" =~ ^(ssh-rsa|ssh-ed25519|ssh-dss|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521)[[:space:]] ]]; then
-                echo "$ssh_key" >> "$temp_auth_keys"
-                ((key_count++))
-                log_debug "Added SSH key: ${ssh_key:0:50}..."
+
+            # More comprehensive SSH key validation
+            if [[ "$ssh_key" =~ ^(ssh-rsa|ssh-ed25519|ssh-dss|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521)[[:space:]][A-Za-z0-9+/]+ ]]; then
+                # Additional validation: check key length
+                local key_parts
+                read -ra key_parts <<< "$ssh_key"
+                local key_type="${key_parts[0]}"
+                local key_data="${key_parts[1]}"
+
+                # Validate key data length (basic check)
+                if [[ ${#key_data} -gt 50 ]]; then
+                    echo "$ssh_key" >> "$temp_auth_keys"
+                    ((key_count++))
+                    log_debug "Added $key_type SSH key: ${ssh_key:0:60}..."
+                else
+                    log_warn "Skipped short SSH key: ${ssh_key:0:50}..."
+                    ((skipped_count++))
+                fi
             else
                 log_warn "Skipped invalid SSH key format: ${ssh_key:0:50}..."
+                ((skipped_count++))
             fi
         fi
     done < "$temp_keys_file"
+
+    if [[ $skipped_count -gt 0 ]]; then
+        log_warn "Skipped $skipped_count invalid SSH keys"
+    fi
 
     if [[ $key_count -eq 0 ]]; then
         log_error "No valid SSH keys found in GitHub response"
@@ -5094,16 +5176,76 @@ configure_user_accounts() {
         break
     done
 
-    # Ask about SSH key transfer
-    if [[ -d "/home/pi/.ssh" ]] && [[ -n "$(ls -A /home/pi/.ssh 2>/dev/null)" ]]; then
-        transfer_ssh_keys=$(enhanced_confirm "Transfer SSH Keys" "Transfer SSH keys from pi user to new user?" "yes")
+    # SSH key configuration options
+    echo
+    log_info "🔑 SSH Key Configuration"
+
+    local ssh_options=()
+    local has_pi_keys=false
+
+    # Check if pi user has SSH keys
+    if [[ -d "/home/pi/.ssh" && -f "/home/pi/.ssh/authorized_keys" ]]; then
+        has_pi_keys=true
+        ssh_options+=("Transfer existing SSH keys from pi user")
     fi
+
+    # Always offer GitHub import option
+    ssh_options+=("Import SSH keys from GitHub account")
+    ssh_options+=("Skip SSH key setup (configure manually later)")
+
+    local ssh_choice
+    if [[ ${#ssh_options[@]} -gt 1 ]]; then
+        ssh_choice=$(enhanced_choose "SSH Key Setup" "${ssh_options[@]}")
+    else
+        # Only one option available
+        ssh_choice="${ssh_options[0]}"
+    fi
+
+    # Set variables based on choice
+    local import_github_keys="no"
+    local github_username=""
+
+    case "$ssh_choice" in
+        *"Transfer existing SSH keys"*)
+            transfer_ssh_keys="yes"
+            import_github_keys="no"
+            github_username=""
+            ;;
+        *"Import SSH keys from GitHub"*)
+            transfer_ssh_keys="no"
+            import_github_keys="yes"
+            # Get GitHub username
+            github_username=$(enhanced_input "GitHub Username" "" "Enter your GitHub username to import SSH keys")
+            while [[ -z "$github_username" ]]; do
+                log_warn "GitHub username cannot be empty"
+                github_username=$(enhanced_input "GitHub Username" "" "Enter your GitHub username to import SSH keys")
+            done
+            ;;
+        *)
+            transfer_ssh_keys="no"
+            import_github_keys="no"
+            github_username=""
+            ;;
+    esac
+
+    # Set global variables for use in create_new_user
+    IMPORT_GITHUB_KEYS="$import_github_keys"
+    GITHUB_USERNAME="$github_username"
 
     # Show configuration summary
     enhanced_section "User Configuration Summary" "Review new user account settings" "📋"
     log_info "Username: $new_username"
     log_info "Full Name: ${new_fullname:-'(not specified)'}"
-    log_info "Transfer SSH Keys: $transfer_ssh_keys"
+
+    # Show SSH key configuration
+    if [[ "$import_github_keys" == "yes" ]]; then
+        log_info "SSH Keys: Import from GitHub (@$github_username)"
+    elif [[ "$transfer_ssh_keys" == "yes" ]]; then
+        log_info "SSH Keys: Transfer from pi user"
+    else
+        log_info "SSH Keys: Manual setup required"
+    fi
+
     log_info "Groups: Will inherit all groups from pi user"
     log_info "Sudo Access: Yes"
 
