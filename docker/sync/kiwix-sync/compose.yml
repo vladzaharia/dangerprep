@@ -7,6 +7,7 @@ services:
     command: ["kiwix-serve", "--port", "80", "--library", "/data/library.xml"]
     env_file:
       - compose.env
+    user: "1337:1337"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.kiwix.rule=Host(`kiwix.danger`)"
@@ -41,6 +42,7 @@ services:
       - ./config.yaml:/app/data/config.yaml:ro
     env_file:
       - compose.env
+    user: "1337:1337"
     labels:
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

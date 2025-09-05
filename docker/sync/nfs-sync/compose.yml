@@ -11,6 +11,7 @@ services:
       - ./config.yaml:/app/data/config.yaml:ro
     env_file:
       - compose.env
+    user: "1337:1337"
     labels:
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

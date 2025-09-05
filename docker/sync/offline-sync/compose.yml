@@ -17,6 +17,7 @@ services:
       - /var/run/dbus:/var/run/dbus  # Alternative D-Bus path
     env_file:
       - compose.env
+    user: "1337:1337"
     labels:
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

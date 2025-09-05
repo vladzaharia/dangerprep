@@ -9,6 +9,7 @@ services:
       - /content/magazines:/magazines:ro
     env_file:
       - compose.env
+    user: "1337:1337"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.komga.rule=Host(`komga.danger`)"

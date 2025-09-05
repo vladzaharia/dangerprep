@@ -12,6 +12,7 @@ services:
       - ${INSTALL_ROOT}/secrets/docmost/db_password:/run/secrets/db_password:ro
     env_file:
       - compose.env
+    user: "1337:1337"
     environment:
       - APP_URL=https://docs.danger
       - REDIS_URL=redis://redis:6379
@@ -47,6 +48,7 @@ services:
       - /data/docmost/postgres:/var/lib/postgresql/data
     env_file:
       - compose.env
+    user: "1337:1337"
     environment:
       - POSTGRES_DB=docmost
       - POSTGRES_USER=docmost
@@ -70,6 +72,7 @@ services:
       - /data/docmost/redis:/data
     env_file:
       - compose.env
+    user: "1337:1337"
     labels:
       - "traefik.enable=false"
       - "com.centurylinklabs.watchtower.enable=true"

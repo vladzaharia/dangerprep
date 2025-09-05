@@ -8,6 +8,7 @@ services:
       - /data/adguard/conf:/opt/adguardhome/conf
     env_file:
       - compose.env
+    user: "1337:1337"
     labels:
       - "traefik.enable=true"
 
@@ -45,6 +46,7 @@ services:
     command: ["-conf", "/etc/coredns/Corefile"]
     env_file:
       - compose.env
+    user: "1337:1337"
     labels:
       - "traefik.enable=false"
       # DNS registration for internal resolution
@@ -73,6 +75,7 @@ services:
       - ./scripts:/scripts:ro
     env_file:
       - compose.env
+    user: "1337:1337"
     command: ["/scripts/dns-registrar.sh"]
     labels:
       - "traefik.enable=false"

@@ -7,10 +7,11 @@ services:
       - /data/arcane:/app/data
     env_file:
       - compose.env
+    user: "1337:1337"
     environment:
       - APP_ENV=production
-      - PUID=1000
-      - PGID=1000
+      - PUID=1337
+      - PGID=1337
       - PUBLIC_SESSION_SECRET=${PUBLIC_SESSION_SECRET}
     labels:
       - "traefik.enable=true"
