@@ -3,22 +3,15 @@ services:
     image: smallstep/step-ca:latest
     restart: unless-stopped
     ports:
-      - "9000:9000"  # step-ca HTTPS API
+      - "9000:9000"
     volumes:
       - /data/step-ca:/home/step
-      - ./init-ca.sh:/docker-entrypoint.d/init-ca.sh:ro
-      - ./fix-permissions.sh:/docker-entrypoint.d/00-fix-permissions.sh:ro
-      # Mount CA password as secret file
-      - ${INSTALL_ROOT}/secrets/step-ca/ca_password:/home/step/secrets/password:ro
     env_file:
       - compose.env
     environment:
-      - DOCKER_STEPCA_INIT_NAME=${STEP_CA_NAME:-DangerPrep Internal CA}
-      - DOCKER_STEPCA_INIT_DNS_NAMES=${STEP_CA_DNS_NAMES:-ca.danger,step-ca.danger,localhost}
+      # Override specific settings for DangerPrep
       - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
       - DOCKER_STEPCA_INIT_ACME=true
-      # Step-CA will automatically read password from /home/step/secrets/password
-      - DOCKER_STEPCA_INIT_PASSWORD_FILE=/home/step/secrets/password
     labels:
       - "traefik.enable=true"
       
@@ -55,7 +48,8 @@ services:
     env_file:
       - compose.env
     environment:
-      - CA_NAME=${STEP_CA_NAME:-DangerPrep Internal CA}
+      # Override specific settings for ca-download service
+      - CA_NAME=${DOCKER_STEPCA_INIT_NAME:-DangerPrep Internal CA}
       - CA_URL=https://ca.danger:9000
     labels:
       - "traefik.enable=true"
