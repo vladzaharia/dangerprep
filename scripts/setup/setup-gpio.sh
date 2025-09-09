@@ -308,7 +308,7 @@ test_hardware_interfaces() {
     if [[ ${spi_devices} -gt 0 ]]; then
         log_success "SPI interface available (${spi_devices} devices)"
     else
-        log_warn "SPI interface not available"
+        log_info "SPI interface not available (normal for many systems)"
     fi
 }
 

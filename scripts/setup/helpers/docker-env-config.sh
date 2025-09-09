@@ -107,7 +107,7 @@ process_selected_services_environments() {
                 "kiwix") service_name="kiwix-sync" ;;
                 "raspap") service_name="raspap" ;;
                 "step-ca") service_name="step-ca" ;;
-                "adguard") service_name="adguard" ;;
+                "adguard"|"adguard-home") service_name="dns" ;;
                 "romm") service_name="romm" ;;
                 "docmost") service_name="docmost" ;;
                 "onedev") service_name="onedev" ;;
@@ -217,7 +217,7 @@ process_services_legacy() {
                 "kiwix") service_name="kiwix-sync" ;;
                 "raspap") service_name="raspap" ;;
                 "step-ca") service_name="step-ca" ;;
-                "adguard") service_name="adguard" ;;
+                "adguard"|"adguard-home") service_name="dns" ;;
                 "romm") service_name="romm" ;;
                 "docmost") service_name="docmost" ;;
                 "onedev") service_name="onedev" ;;
@@ -633,7 +633,9 @@ generate_secure_value() {
                 log_error "Failed to generate password hash"
                 return 1
             })
-            echo "admin:${auth_hash}"
+            # Escape dollar signs for Docker Compose by doubling them
+            local escaped_hash="${auth_hash//\$/\$\$}"
+            echo "admin:${escaped_hash}"
             log_info "Generated admin credentials - Username: admin, Password: ${admin_password}"
             ;;
         "pw"|"password")

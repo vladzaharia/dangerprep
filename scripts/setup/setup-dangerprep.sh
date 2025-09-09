@@ -161,10 +161,17 @@ install_packages_with_selection() {
             continue
         fi
 
-        # Install package with standardized pattern
-        enhanced_spin "Installing ${package} (${installed_count}/${total_packages})" \
-            env DEBIAN_FRONTEND=noninteractive apt install -y "${package}"
-        local install_result=$?
+        # Special handling for fastfetch
+        if [[ "${package}" == "fastfetch" ]]; then
+            enhanced_spin "Installing ${package} (${installed_count}/${total_packages})" \
+                install_fastfetch_package
+            local install_result=$?
+        else
+            # Install package with standardized pattern
+            enhanced_spin "Installing ${package} (${installed_count}/${total_packages})" \
+                env DEBIAN_FRONTEND=noninteractive apt install -y "${package}"
+            local install_result=$?
+        fi
 
         if [[ ${install_result} -eq 0 ]]; then
             enhanced_status_indicator "success" "Installed ${package}"
@@ -1388,6 +1395,60 @@ show_progress() {
 
     if [[ $current -eq $total ]]; then
         printf "\n"
+    fi
+}
+
+# Install fastfetch package with fallback to GitHub release
+install_fastfetch_package() {
+    log_debug "Installing fastfetch with fallback to GitHub release"
+
+    # Try standard package installation first
+    if env DEBIAN_FRONTEND=noninteractive apt install -y fastfetch 2>/dev/null; then
+        log_debug "Fastfetch installed from repository"
+        return 0
+    fi
+
+    log_debug "Repository installation failed, trying GitHub release"
+
+    # Detect architecture
+    local arch
+    case "$(uname -m)" in
+        x86_64|amd64)   arch="amd64" ;;
+        aarch64|arm64)  arch="arm64" ;;
+        armv7l)         arch="armhf" ;;
+        *)
+            log_warn "Unsupported architecture for fastfetch: $(uname -m)"
+            return 1
+            ;;
+    esac
+
+    # Download and install from GitHub releases
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    local deb_file="${temp_dir}/fastfetch-linux-${arch}.deb"
+
+    # Get latest release URL
+    local download_url
+    download_url=$(curl -s https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest | \
+                   grep "browser_download_url.*linux-${arch}.deb" | \
+                   cut -d '"' -f 4)
+
+    if [[ -z "$download_url" ]]; then
+        log_warn "Could not find fastfetch download URL for architecture: ${arch}"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+
+    # Download and install
+    if curl -L -o "$deb_file" "$download_url" && \
+       dpkg -i "$deb_file" 2>/dev/null; then
+        log_debug "Fastfetch installed from GitHub release"
+        rm -rf "$temp_dir"
+        return 0
+    else
+        log_warn "Failed to install fastfetch from GitHub release"
+        rm -rf "$temp_dir"
+        return 1
     fi
 }
 
@@ -3246,6 +3307,35 @@ setup_fail2ban() {
     log_success "Fail2ban configured and started"
 }
 
+# Check BBR congestion control availability
+check_bbr_availability() {
+    log_debug "Checking BBR congestion control availability"
+
+    # Check if BBR is in available congestion control algorithms
+    if grep -q bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null; then
+        log_debug "BBR found in available congestion control algorithms"
+        return 0
+    fi
+
+    # Try to load the tcp_bbr module if it's not loaded
+    if ! lsmod | grep -q tcp_bbr; then
+        log_debug "tcp_bbr module not loaded, attempting to load it"
+        if modprobe tcp_bbr 2>/dev/null; then
+            log_debug "tcp_bbr module loaded successfully"
+            # Check again after loading the module
+            if grep -q bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null; then
+                log_debug "BBR now available after loading module"
+                return 0
+            fi
+        else
+            log_debug "Failed to load tcp_bbr module (normal for some kernels)"
+        fi
+    fi
+
+    log_debug "BBR congestion control not available on this system"
+    return 1
+}
+
 # Configure kernel hardening
 configure_kernel_hardening() {
     log_info "Configuring kernel hardening..."
@@ -3275,8 +3365,8 @@ configure_kernel_hardening() {
                 case "$param" in
                     "net.ipv4.tcp_congestion_control")
                         # Check if BBR is available before applying
-                        if ! grep -q bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null; then
-                            log_warn "BBR congestion control not available, using default"
+                        if ! check_bbr_availability; then
+                            log_info "BBR congestion control not available, using system default (normal for many kernels)"
                             continue
                         fi
                         ;;
@@ -4292,10 +4382,10 @@ create_nvme_partitions() {
     local content_partition="${nvme_device}p2"
 
     log_info "Formatting /data partition (${data_partition})..."
-    mkfs.ext4 -F -L "dangerprep-data" "${data_partition}"
+    mkfs.ext4 -F -L "danger-data" "${data_partition}"
 
     log_info "Formatting /content partition (${content_partition})..."
-    mkfs.ext4 -F -L "dangerprep-content" "${content_partition}"
+    mkfs.ext4 -F -L "danger-content" "${content_partition}"
 
     # Create mount points using standardized directory creation
     if ! standard_create_directory "/data" "755" "root" "root"; then
@@ -4361,12 +4451,12 @@ create_nvme_partitions() {
 
     # Add new entries only for successfully mounted partitions
     if [[ -n "${data_partition}" ]] && mountpoint -q /data; then
-        echo "LABEL=dangerprep-data /data ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+        echo "LABEL=danger-data /data ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
         log_info "Added data partition to fstab with nofail option"
     fi
 
     if [[ -n "${content_partition}" ]] && mountpoint -q /content; then
-        echo "LABEL=dangerprep-content /content ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+        echo "LABEL=danger-content /content ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
         log_info "Added content partition to fstab with nofail option"
     fi
 
@@ -4422,8 +4512,8 @@ create_nvme_partitions() {
     if gum_available; then
         log_info "📋 Final NVMe Partition Layout"
         enhanced_table "Partition,Mount,Size,Filesystem,Label" \
-            "${data_partition},/data,256GB,ext4,dangerprep-data" \
-            "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}"),ext4,dangerprep-content"
+            "${data_partition},/data,256GB,ext4,danger-data" \
+            "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}"),ext4,danger-content"
     fi
 
     log_success "NVMe partitions created and mounted successfully"
@@ -5087,16 +5177,26 @@ setup_raspap() {
         log_info "GitHub credentials found - RaspAP Insiders features will be available"
     fi
 
-    # Build and start RaspAP container
+    # Build and start RaspAP container with timeout handling
     log_info "Building and starting RaspAP container..."
     local raspap_compose_dir="${PROJECT_ROOT}/docker/infrastructure/raspap"
     if [[ -d "${raspap_compose_dir}" && -f "${raspap_compose_dir}/compose.yml" ]]; then
         # BOOT FIX: Don't fail setup if RaspAP container has issues
-        if docker compose -f "${raspap_compose_dir}/compose.yml" up -d --build; then
+        log_info "RaspAP build may take 10-15 minutes due to Insiders installation..."
+
+        # Use timeout to prevent hanging builds (20 minutes max)
+        if timeout 1200 docker compose -f "${raspap_compose_dir}/compose.yml" up -d --build; then
             log_success "RaspAP container started successfully"
         else
-            log_warn "RaspAP container failed to start - can be fixed after boot"
-            log_info "You can manually start RaspAP later with: docker compose -f ${raspap_compose_dir}/compose.yml up -d"
+            local exit_code=$?
+            if [[ $exit_code -eq 124 ]]; then
+                log_warn "RaspAP build timed out after 20 minutes - can be fixed after boot"
+                log_info "The build process was taking too long and was terminated"
+            else
+                log_warn "RaspAP container failed to start - can be fixed after boot"
+            fi
+            log_info "You can manually start RaspAP later with: docker compose -f ${raspap_compose_dir}/compose.yml up -d --build"
+            log_info "Or check build logs with: docker compose -f ${raspap_compose_dir}/compose.yml logs"
         fi
     else
         log_warn "RaspAP compose directory or file not found: ${raspap_compose_dir}"
@@ -6086,13 +6186,29 @@ EOF
         return 1
     fi
 
+    # Enable finalization service with detailed error reporting
+    log_debug "Attempting to enable dangerprep-finalize.service"
     if ! standard_service_operation "dangerprep-finalize" "enable"; then
         log_error "Failed to enable finalization service"
+        # Try manual enable with more detailed error output
+        log_debug "Attempting manual systemctl enable with error output"
+        if ! systemctl enable dangerprep-finalize.service 2>&1 | tee /tmp/systemctl-enable.log; then
+            log_error "Manual enable also failed. Error output:"
+            cat /tmp/systemctl-enable.log 2>/dev/null | while read -r line; do
+                log_error "  $line"
+            done
+        fi
         return 1
     fi
 
+    # Enable graphical finalization service (non-critical)
+    log_debug "Attempting to enable dangerprep-finalize-graphical.service"
     if ! standard_service_operation "dangerprep-finalize-graphical" "enable"; then
         log_warn "Failed to enable graphical finalization service (non-critical)"
+        # Log the error but don't fail
+        systemctl enable dangerprep-finalize-graphical.service 2>&1 | while read -r line; do
+            log_debug "  graphical service enable: $line"
+        done
     fi
 
     # Create status tracking directory
@@ -6380,6 +6496,40 @@ setup_encrypted_backups() {
     log_success "Encrypted backup system configured"
 }
 
+# Enable essential system services
+enable_essential_services() {
+    enhanced_section "Essential Services" "Enabling critical system services" "⚙️"
+
+    # Essential services that must be enabled for proper system operation
+    local essential_services=(
+        "ssh:SSH remote access"
+        "systemd-networkd:Network management"
+        "systemd-resolved:DNS resolution"
+        "fail2ban:Intrusion prevention"
+    )
+
+    local enabled_count=0
+    local total_services=${#essential_services[@]}
+
+    for service_info in "${essential_services[@]}"; do
+        local service_name="${service_info%%:*}"
+        local service_desc="${service_info##*:}"
+
+        log_debug "Enabling essential service: $service_name ($service_desc)"
+
+        if standard_service_operation "$service_name" "enable"; then
+            enhanced_status_indicator "success" "$service_name enabled"
+            ((enabled_count++))
+        else
+            # BOOT FIX: Don't fail setup if individual services have issues
+            enhanced_status_indicator "warning" "Failed to enable $service_name - can be fixed after boot"
+            log_warn "Service $service_name failed to enable, but continuing setup"
+        fi
+    done
+
+    log_info "Enabled $enabled_count/$total_services essential services"
+}
+
 # Start all services using standardized service management
 start_all_services() {
     enhanced_section "Service Startup" "Starting all configured services" "🚀"
@@ -6389,6 +6539,8 @@ start_all_services() {
         "fail2ban"
         "docker"
         "tailscaled"
+        "systemd-networkd"
+        "systemd-resolved"
     )
 
     local started_count=0
@@ -6599,6 +6751,7 @@ main() {
         "configure_user_accounts:Configuring user accounts"
         "configure_screen_lock:Configuring screen lock settings"
         "create_emergency_recovery_service:Creating emergency recovery service"
+        "enable_essential_services:Enabling essential system services"
         "start_all_services:Starting all services"
         "verify_setup:Verifying setup"
     )

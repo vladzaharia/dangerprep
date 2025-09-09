@@ -118,11 +118,14 @@ generate_api_token() {
 generate_bcrypt_hash() {
     local username="$1"
     local password="$2"
-    echo "$password" | htpasswd -nBi "$username" 2>/dev/null || {
+    local hash
+    hash=$(echo "$password" | htpasswd -nBi "$username" 2>/dev/null) || {
         # Fallback if htpasswd not available
         warning "htpasswd not available, using openssl for basic auth"
-        echo "$username:$(openssl passwd -apr1 "$password")"
+        hash="$username:$(openssl passwd -apr1 "$password")"
     }
+    # Escape dollar signs for Docker Compose by doubling them
+    echo "${hash//\$/\$\$}"
 }
 
 # Check if secret file exists and should be regenerated

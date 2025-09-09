@@ -84,9 +84,12 @@ generate_bcrypt() {
         log_error "Failed to generate bcrypt hash for $var_name"
         return 1
     }
-    
+
+    # Escape dollar signs for Docker Compose by doubling them
+    local escaped_hash="${auth_hash//\$/\$\$}"
+
     # For Traefik auth format: username:hash
-    local auth_string="admin:$auth_hash"
+    local auth_string="admin:$escaped_hash"
     
     # Log the generated credentials securely
     log_info "Generated authentication credentials for $var_name"

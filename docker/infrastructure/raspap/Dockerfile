@@ -40,15 +40,29 @@ RUN mkdir -p /etc/hostapd /etc/raspap /etc/lighttpd /etc/dnsmasq.d /etc/wpa_supp
 
 # Install RaspAP with Insiders, WireGuard, Ad blocking, and RestAPI
 # Skip OpenVPN as requested, include QoS for traffic shaping
-RUN curl -sL https://install.raspap.com | bash -s -- \
-    --yes \
-    --insiders \
-    --name ${GITHUB_USERNAME} \
-    --token ${GITHUB_TOKEN} \
-    --wireguard 1 \
-    --adblock 1 \
-    --rest 1 \
-    --check 0 || true
+# Add timeout and retry logic for network operations
+RUN timeout 600 bash -c ' \
+    for i in {1..3}; do \
+        echo "RaspAP installation attempt $i/3..."; \
+        if curl -sL --connect-timeout 30 --max-time 300 https://install.raspap.com | bash -s -- \
+            --yes \
+            --insiders \
+            --name ${GITHUB_USERNAME} \
+            --token ${GITHUB_TOKEN} \
+            --wireguard 1 \
+            --adblock 1 \
+            --rest 1 \
+            --check 0; then \
+            echo "RaspAP installation successful"; \
+            exit 0; \
+        else \
+            echo "RaspAP installation attempt $i failed, retrying..."; \
+            sleep 10; \
+        fi; \
+    done; \
+    echo "All RaspAP installation attempts failed"; \
+    exit 1; \
+    '
 
 # Ensure directories exist even if installation partially failed
 RUN mkdir -p /etc/hostapd /etc/raspap /etc/lighttpd /etc/dnsmasq.d /etc/wpa_supplicant

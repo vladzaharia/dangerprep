@@ -218,39 +218,51 @@ enhanced_log() {
     local gum_cmd
     gum_cmd=$(get_gum_cmd)
 
+    # Validate structured arguments format (should be key=value pairs)
+    local valid_structured_args=()
+    for arg in "${structured_args[@]}"; do
+        if [[ "$arg" =~ ^[a-zA-Z_][a-zA-Z0-9_]*=.* ]]; then
+            valid_structured_args+=("$arg")
+        else
+            # Skip invalid structured arguments to prevent gum errors
+            # Use direct echo to avoid recursive call to enhanced_log
+            [[ "${DEBUG:-}" == "true" ]] && echo "[DEBUG] Skipping invalid structured argument: $arg" >&2
+        fi
+    done
+
     case "${level}" in
         "error"|"ERROR")
-            if [[ ${#structured_args[@]} -gt 0 ]]; then
-                "${gum_cmd}" log --structured --level error --time rfc3339 "${message}" "${structured_args[@]}"
+            if [[ ${#valid_structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level error --time rfc3339 "${message}" "${valid_structured_args[@]}"
             else
                 "${gum_cmd}" log --level error --time rfc3339 "${message}"
             fi
             ;;
         "warn"|"WARN"|"warning"|"WARNING")
-            if [[ ${#structured_args[@]} -gt 0 ]]; then
-                "${gum_cmd}" log --structured --level warn --time rfc3339 "${message}" "${structured_args[@]}"
+            if [[ ${#valid_structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level warn --time rfc3339 "${message}" "${valid_structured_args[@]}"
             else
                 "${gum_cmd}" log --level warn --time rfc3339 "${message}"
             fi
             ;;
         "info"|"INFO")
-            if [[ ${#structured_args[@]} -gt 0 ]]; then
-                "${gum_cmd}" log --structured --level info --time rfc3339 "${message}" "${structured_args[@]}"
+            if [[ ${#valid_structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level info --time rfc3339 "${message}" "${valid_structured_args[@]}"
             else
                 "${gum_cmd}" log --level info --time rfc3339 "${message}"
             fi
             ;;
         "debug"|"DEBUG")
             [[ "${DEBUG:-}" != "true" ]] && return 0
-            if [[ ${#structured_args[@]} -gt 0 ]]; then
-                "${gum_cmd}" log --structured --level debug --time rfc3339 "${message}" "${structured_args[@]}"
+            if [[ ${#valid_structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level debug --time rfc3339 "${message}" "${valid_structured_args[@]}"
             else
                 "${gum_cmd}" log --level debug --time rfc3339 "${message}"
             fi
             ;;
         "success"|"SUCCESS")
-            if [[ ${#structured_args[@]} -gt 0 ]]; then
-                "${gum_cmd}" log --structured --level info --time rfc3339 "SUCCESS: ${message}" "${structured_args[@]}"
+            if [[ ${#valid_structured_args[@]} -gt 0 ]]; then
+                "${gum_cmd}" log --structured --level info --time rfc3339 "SUCCESS: ${message}" "${valid_structured_args[@]}"
             else
                 "${gum_cmd}" log --level info --time rfc3339 "SUCCESS: ${message}"
             fi
