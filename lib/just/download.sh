@@ -58,9 +58,9 @@ get_latest_version() {
     local latest_url="$GITHUB_API_URL/releases/latest"
     
     if command -v curl > /dev/null 2>&1; then
-        curl -s "$latest_url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+        curl -4 -s "$latest_url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
     elif command -v wget > /dev/null 2>&1; then
-        wget -qO- "$latest_url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+        wget -4 -qO- "$latest_url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
     else
         error "Neither curl nor wget found. Cannot download version information."
         exit 1
@@ -109,9 +109,9 @@ download_just() {
     script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
     if command -v curl > /dev/null 2>&1; then
-        curl -L -o "${script_dir}/${archive_name}" "$download_url"
+        curl -4 -L -o "${script_dir}/${archive_name}" "$download_url"
     elif command -v wget > /dev/null 2>&1; then
-        wget -O "${script_dir}/${archive_name}" "$download_url"
+        wget -4 -O "${script_dir}/${archive_name}" "$download_url"
     else
         error "Neither curl nor wget found. Cannot download binary."
         exit 1

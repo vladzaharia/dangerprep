@@ -3,8 +3,8 @@
 # Downloads the latest release or clones the repository and runs setup
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
-#   wget -qO- https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
+#   curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
+#   wget -4 -qO- https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
 #
 # Options:
 #   --clone     Force git clone instead of release download
@@ -67,19 +67,19 @@ Options:
 
 Examples:
   # Download and run directly (recommended):
-  curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
+  curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
 
   # Or with wget:
-  wget -qO- https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
+  wget -4 -qO- https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
 
   # Force git clone:
-  curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --clone
+  curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --clone
 
   # Force update existing installation:
-  curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --update
+  curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --update
 
   # Dry run (show what would be done):
-  curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | bash -s -- --dry-run
+  curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | bash -s -- --dry-run
 
 EOF
 }
@@ -147,9 +147,9 @@ get_latest_release() {
     log_info "Checking for latest release..."
 
     if command -v curl >/dev/null 2>&1; then
-        response=$(curl -s "$api_url" 2>/dev/null || echo "")
+        response=$(curl -4 -s "$api_url" 2>/dev/null || echo "")
     elif command -v wget >/dev/null 2>&1; then
-        response=$(wget -qO- "$api_url" 2>/dev/null || echo "")
+        response=$(wget -4 -qO- "$api_url" 2>/dev/null || echo "")
     fi
 
     # Check if we got a valid response
@@ -193,9 +193,9 @@ download_release() {
 
     # Download the tarball
     if command -v curl >/dev/null 2>&1; then
-        curl -L -o "$tarball_path" "$tarball_url"
+        curl -4 -L -o "$tarball_path" "$tarball_url"
     elif command -v wget >/dev/null 2>&1; then
-        wget -O "$tarball_path" "$tarball_url"
+        wget -4 -O "$tarball_path" "$tarball_url"
     fi
 
     # Extract to install directory
