@@ -4416,7 +4416,7 @@ detect_network_interfaces() {
     enhanced_status_indicator "success" "Primary WAN: ${WAN_INTERFACE}"
     enhanced_status_indicator "success" "Primary WiFi: ${WIFI_INTERFACE}"
 
-All detected interfaces will be available for configuration." "39" "39"
+    enhanced_status_indicator "info" "All detected interfaces will be available for configuration."
 
     # Export for use in templates and RaspAP configuration
     export WAN_INTERFACE WIFI_INTERFACE
