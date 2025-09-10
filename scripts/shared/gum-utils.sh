@@ -220,15 +220,17 @@ enhanced_log() {
 
     # Validate structured arguments format (should be key=value pairs)
     local valid_structured_args=()
-    for arg in "${structured_args[@]}"; do
-        if [[ "$arg" =~ ^[a-zA-Z_][a-zA-Z0-9_]*=.* ]]; then
-            valid_structured_args+=("$arg")
-        else
-            # Skip invalid structured arguments to prevent gum errors
-            # Use direct echo to avoid recursive call to enhanced_log
-            [[ "${DEBUG:-}" == "true" ]] && echo "[DEBUG] Skipping invalid structured argument: $arg" >&2
-        fi
-    done
+    if [[ ${#structured_args[@]} -gt 0 ]]; then
+        for arg in "${structured_args[@]}"; do
+            if [[ "$arg" =~ ^[a-zA-Z_][a-zA-Z0-9_]*=.* ]]; then
+                valid_structured_args+=("$arg")
+            else
+                # Skip invalid structured arguments to prevent gum errors
+                # Use direct echo to avoid recursive call to enhanced_log
+                [[ "${DEBUG:-}" == "true" ]] && echo "[DEBUG] Skipping invalid structured argument: $arg" >&2
+            fi
+        done
+    fi
 
     case "${level}" in
         "error"|"ERROR")

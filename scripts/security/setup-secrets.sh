@@ -156,12 +156,12 @@ generate_all_secrets() {
 update_all_env_files() {
     log "Updating environment files with generated secrets..."
     
-    local update_args=()
     if [[ "$DRY_RUN" == "true" ]]; then
-        update_args+=("--dry-run")
+        log "[DRY RUN] Would run: $SCRIPT_DIR/update-env-secrets.sh --dry-run"
+        return 0
     fi
-    
-    "$SCRIPT_DIR/update-env-secrets.sh" "${update_args[@]}"
+
+    "$SCRIPT_DIR/update-env-secrets.sh"
 }
 
 # Set secure permissions

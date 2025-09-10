@@ -162,9 +162,15 @@ install_packages_with_selection() {
 
         # Special handling for fastfetch
         if [[ "${package}" == "fastfetch" ]]; then
-            enhanced_spin "Installing ${package} (${installed_count}/${total_packages})" \
-                install_fastfetch_package
-            local install_result=$?
+            # Call function directly since enhanced_spin can't execute bash functions
+            printf "Installing ${package} (${installed_count}/${total_packages})... "
+            if install_fastfetch_package >/dev/null 2>&1; then
+                echo "✓"
+                local install_result=0
+            else
+                echo "✗"
+                local install_result=1
+            fi
         else
             # Install package with standardized pattern
             enhanced_spin "Installing ${package} (${installed_count}/${total_packages})" \
@@ -963,33 +969,42 @@ import_github_ssh_keys() {
     local key_count=0
     local skipped_count=0
 
-    while IFS= read -r line; do
-        if [[ "$line" =~ \"key\":[[:space:]]*\"([^\"]+)\" ]]; then
-            local ssh_key="${BASH_REMATCH[1]}"
+    # Check if jq is available for reliable JSON parsing
+    if ! command -v jq >/dev/null 2>&1; then
+        log_error "jq is required for SSH key parsing but not found"
+        rm -f "$temp_keys_file" "$temp_auth_keys"
+        return 1
+    fi
 
-            # More comprehensive SSH key validation
-            if [[ "$ssh_key" =~ ^(ssh-rsa|ssh-ed25519|ssh-dss|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521)[[:space:]][A-Za-z0-9+/]+ ]]; then
-                # Additional validation: check key length
-                local key_parts
-                read -ra key_parts <<< "$ssh_key"
-                local key_type="${key_parts[0]}"
-                local key_data="${key_parts[1]}"
+    # Extract all SSH keys from JSON using jq
+    local keys_array
+    mapfile -t keys_array < <(jq -r '.[].key' "$temp_keys_file" 2>/dev/null)
 
-                # Validate key data length (basic check)
-                if [[ ${#key_data} -gt 50 ]]; then
-                    echo "$ssh_key" >> "$temp_auth_keys"
-                    ((key_count++))
-                    log_debug "Added $key_type SSH key: ${ssh_key:0:60}..."
-                else
-                    log_warn "Skipped short SSH key: ${ssh_key:0:50}..."
-                    ((skipped_count++))
-                fi
+    for ssh_key in "${keys_array[@]}"; do
+        [[ -z "$ssh_key" || "$ssh_key" == "null" ]] && continue
+
+        # More comprehensive SSH key validation
+        if [[ "$ssh_key" =~ ^(ssh-rsa|ssh-ed25519|ssh-dss|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521)[[:space:]][A-Za-z0-9+/]+ ]]; then
+            # Additional validation: check key length
+            local key_parts
+            read -ra key_parts <<< "$ssh_key"
+            local key_type="${key_parts[0]}"
+            local key_data="${key_parts[1]}"
+
+            # Validate key data length (basic check)
+            if [[ ${#key_data} -gt 50 ]]; then
+                echo "$ssh_key" >> "$temp_auth_keys"
+                ((key_count++))
+                log_debug "Added $key_type SSH key: ${ssh_key:0:60}..."
             else
-                log_warn "Skipped invalid SSH key format: ${ssh_key:0:50}..."
+                log_warn "Skipped short SSH key: ${ssh_key:0:50}..."
                 ((skipped_count++))
             fi
+        else
+            log_warn "Skipped invalid SSH key format: ${ssh_key:0:50}..."
+            ((skipped_count++))
         fi
-    done < "$temp_keys_file"
+    done
 
     if [[ $skipped_count -gt 0 ]]; then
         enhanced_status_indicator "warning" "Skipped $skipped_count invalid SSH keys"
@@ -1645,6 +1660,37 @@ set_default_configuration_values() {
         NVME_PARTITION_CONFIRMED="false"
     fi
 
+    # Set default package selection (all categories for non-interactive mode)
+    if [[ -z "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
+        SELECTED_PACKAGE_CATEGORIES="Convenience packages (vim, nano, htop, etc.)
+Network packages (netplan, tc, iperf3, tailscale, etc.)
+Security packages (fail2ban, aide, clamav, etc.)
+Monitoring packages (sensors, collectd, etc.)
+Backup packages (borgbackup, restic)
+Automatic update packages"
+    fi
+
+    # Set default Docker services selection (core services for non-interactive mode)
+    if [[ -z "${SELECTED_DOCKER_SERVICES:-}" ]]; then
+        SELECTED_DOCKER_SERVICES="traefik:Traefik (Reverse Proxy)
+arcane:Arcane (Dashboard)
+jellyfin:Jellyfin (Media Server)
+komga:Komga (Comic/Book Server)"
+    fi
+
+    # Set default FriendlyElec configuration if applicable
+    if [[ "$IS_FRIENDLYELEC" == true ]]; then
+        if [[ -z "${FRIENDLYELEC_INSTALL_PACKAGES:-}" ]]; then
+            FRIENDLYELEC_INSTALL_PACKAGES="Hardware acceleration packages (Mesa, GStreamer)
+Development packages (kernel headers, build tools)"
+        fi
+
+        if [[ -z "${FRIENDLYELEC_ENABLE_FEATURES:-}" ]]; then
+            FRIENDLYELEC_ENABLE_FEATURES="Hardware acceleration
+GPIO/PWM access"
+        fi
+    fi
+
     # Export all variables for use in templates and other functions
     export WIFI_SSID WIFI_PASSWORD LAN_NETWORK LAN_IP DHCP_START DHCP_END
     export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
@@ -2019,14 +2065,14 @@ collect_docker_services_configuration() {
 
     # Define available Docker services
     local docker_services=(
-        "Traefik (Reverse Proxy)"
-        "Arcane (Dashboard)"
-        "Jellyfin (Media Server)"
-        "Komga (Comic/Book Server)"
-        "Kiwix (Offline Wikipedia)"
-        "RaspAP (Network Management)"
-        "Step-CA (Certificate Authority)"
-        "AdGuard Home (DNS Filtering)"
+        "traefik:Traefik (Reverse Proxy)"
+        "arcane:Arcane (Dashboard)"
+        "jellyfin:Jellyfin (Media Server)"
+        "komga:Komga (Comic/Book Server)"
+        "kiwix-sync:Kiwix (Offline Wikipedia)"
+        "raspap:RaspAP (Network Management)"
+        "step-ca:Step-CA (Certificate Authority)"
+        "dns:AdGuard Home (DNS Filtering)"
     )
 
     log_info "Select which Docker services to install:"
@@ -4224,8 +4270,11 @@ deploy_selected_docker_services() {
     while IFS= read -r service_line; do
         [[ -z "$service_line" ]] && continue
 
-        local service_name="${service_line%%:*}"  # Extract service name before colon
+        local service_name="${service_line%%:*}"  # Extract service name before first colon
         service_name="${service_name// /}"        # Remove any spaces
+
+        # Convert to lowercase for consistency
+        service_name="${service_name,,}"
 
         if [[ -n "$service_name" ]]; then
             if deploy_docker_service "$service_name"; then
@@ -4266,6 +4315,13 @@ deploy_docker_service() {
             ;;
         "kiwix-sync"|"nfs-sync"|"offline-sync")
             service_dir="${PROJECT_ROOT}/docker/sync/${service_name}"
+            ;;
+        # Handle legacy service names that might still be in configuration
+        "adguardhome"|"adguard")
+            service_dir="${PROJECT_ROOT}/docker/infrastructure/dns"
+            ;;
+        "kiwix")
+            service_dir="${PROJECT_ROOT}/docker/sync/kiwix-sync"
             ;;
         *)
             log_warn "Unknown service directory structure for: ${service_name}"
@@ -5396,10 +5452,34 @@ setup_raspap() {
     # Note: RaspAP container deployment is now handled by deploy_selected_docker_services()
     # This function now only handles configuration that needs to happen after deployment
 
-    # Configure DNS forwarding for DangerPrep integration (no wait needed)
+    # Wait for RaspAP container to be fully started before configuring DNS
     if [[ -f "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh" ]]; then
-        log_info "Configuring DNS forwarding for DangerPrep integration..."
-        "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh"
+        log_info "Waiting for RaspAP container to be ready..."
+
+        # Wait up to 60 seconds for RaspAP container to be running and healthy
+        local wait_count=0
+        local max_wait=60
+        while [[ $wait_count -lt $max_wait ]]; do
+            if docker ps --format "{{.Names}}" | grep -q "^raspap$" && \
+               docker exec raspap test -f /var/run/lighttpd.pid 2>/dev/null; then
+                log_info "RaspAP container is ready"
+                break
+            fi
+            sleep 1
+            ((wait_count++))
+        done
+
+        if [[ $wait_count -ge $max_wait ]]; then
+            log_warn "RaspAP container not ready after ${max_wait}s, skipping DNS configuration"
+            log_warn "You can configure DNS manually later using: $PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh"
+        else
+            log_info "Configuring DNS forwarding for DangerPrep integration..."
+            if "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh"; then
+                log_success "RaspAP DNS configuration completed"
+            else
+                log_warn "RaspAP DNS configuration failed, can be configured manually later"
+            fi
+        fi
     fi
 
     log_success "RaspAP configured for WiFi management"
@@ -5588,9 +5668,20 @@ create_new_user() {
 
     # Get pi user's groups and add new user to same groups
     local pi_groups
-    pi_groups=$(groups pi | cut -d: -f2 | tr ' ' '\n' | grep -v "^pi$" | tr '\n' ',' | sed 's/,$//')
-    if [[ -n "$pi_groups" ]]; then
-        usermod -a -G "$pi_groups" "$username"
+    if id pi >/dev/null 2>&1; then
+        pi_groups=$(groups pi 2>/dev/null | cut -d: -f2 | tr ' ' '\n' | grep -v "^pi$" | grep -v "^$" | tr '\n' ',' | sed 's/,$//')
+        if [[ -n "$pi_groups" ]]; then
+            log_debug "Adding $username to pi user's groups: $pi_groups"
+            if usermod -a -G "$pi_groups" "$username" 2>/dev/null; then
+                enhanced_status_indicator "success" "Added $username to pi user's groups"
+            else
+                log_warn "Failed to add $username to some pi user groups (groups may not exist)"
+            fi
+        else
+            log_debug "No additional groups found for pi user"
+        fi
+    else
+        log_debug "Pi user not found, skipping group inheritance"
     fi
 
     # Add new user to hardware groups if FriendlyElec hardware is detected

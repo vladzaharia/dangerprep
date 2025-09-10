@@ -94,25 +94,24 @@ process_selected_services_environments() {
 
     while IFS= read -r service_line; do
         if [[ -n "${service_line}" ]]; then
-            # Extract service name from the selection (remove description)
+            # Extract service name from the selection (handle new format: service_name:Description)
             local service_name
-            service_name=$(echo "${service_line}" | sed 's/ (.*//' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+            if [[ "${service_line}" == *":"* ]]; then
+                # New format: extract service name before first colon
+                service_name="${service_line%%:*}"
+            else
+                # Legacy format: remove description in parentheses
+                service_name=$(echo "${service_line}" | sed 's/ (.*//' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+            fi
 
-            # Map display names to internal service names
+            # Convert to lowercase for consistency
+            service_name="${service_name,,}"
+
+            # Map any remaining display names to internal service names
             case "${service_name}" in
-                "traefik") service_name="traefik" ;;
-                "arcane") service_name="arcane" ;;
-                "jellyfin") service_name="jellyfin" ;;
-                "komga") service_name="komga" ;;
                 "kiwix") service_name="kiwix-sync" ;;
-                "raspap") service_name="raspap" ;;
-                "step-ca") service_name="step-ca" ;;
                 "adguard"|"adguard-home") service_name="dns" ;;
-                "romm") service_name="romm" ;;
-                "docmost") service_name="docmost" ;;
-                "onedev") service_name="onedev" ;;
-                "portainer") service_name="portainer" ;;
-                "watchtower") service_name="watchtower" ;;
+                # All other services should already have correct names
             esac
 
             # Find the environment file for this service
@@ -180,6 +179,13 @@ find_service_env_file() {
             ;;
         "kiwix-sync"|"nfs-sync"|"offline-sync")
             service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/sync/${service_name}"
+            ;;
+        # Handle legacy service names that might still be in configuration
+        "adguardhome"|"adguard")
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/infrastructure/dns"
+            ;;
+        "kiwix")
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/sync/kiwix-sync"
             ;;
         *)
             log_debug "Unknown service directory structure for: ${service_name}"
@@ -303,7 +309,7 @@ configure_service_environment() {
     # Determine service directory structure
     local service_dir
     case "${service_name}" in
-        "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower")
+        "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn")
             service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/infrastructure/${service_name}"
             ;;
         "jellyfin"|"komga"|"romm")
@@ -314,6 +320,13 @@ configure_service_environment() {
             ;;
         "kiwix-sync"|"nfs-sync"|"offline-sync")
             service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/sync/${service_name}"
+            ;;
+        # Handle legacy service names that might still be in configuration
+        "adguardhome"|"adguard")
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/infrastructure/dns"
+            ;;
+        "kiwix")
+            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/sync/kiwix-sync"
             ;;
         *)
             log_warn "Unknown service directory structure for: ${service_name}"
