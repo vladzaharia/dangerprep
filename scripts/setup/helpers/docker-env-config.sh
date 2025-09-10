@@ -203,8 +203,69 @@ collect_global_environment_variables() {
 
     # Set timezone if not already configured
     if [[ -z "${TZ:-}" ]]; then
-        export TZ="America/Los_Angeles"
-        log_debug "Set default timezone: $TZ"
+        # Check if we're in interactive mode
+        if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
+            log_info "Select your timezone for Docker services:"
+
+            # Common timezone options
+            local timezone_options=(
+                "America/New_York (Eastern Time)"
+                "America/Chicago (Central Time)"
+                "America/Denver (Mountain Time)"
+                "America/Los_Angeles (Pacific Time)"
+                "America/Phoenix (Arizona Time)"
+                "America/Anchorage (Alaska Time)"
+                "Pacific/Honolulu (Hawaii Time)"
+                "UTC (Coordinated Universal Time)"
+                "Europe/London (GMT/BST)"
+                "Europe/Paris (CET/CEST)"
+                "Asia/Tokyo (JST)"
+                "Australia/Sydney (AEST/AEDT)"
+                "Other (enter manually)"
+            )
+
+            local selected_timezone
+            if command -v enhanced_choose >/dev/null 2>&1; then
+                selected_timezone=$(enhanced_choose "Timezone Selection" "${timezone_options[@]}")
+            else
+                # Fallback if enhanced_choose is not available
+                echo "Available timezones:"
+                for i in "${!timezone_options[@]}"; do
+                    echo "$((i+1)). ${timezone_options[i]}"
+                done
+                read -p "Select timezone (1-${#timezone_options[@]}): " selection
+                if [[ "$selection" =~ ^[0-9]+$ ]] && [[ "$selection" -ge 1 ]] && [[ "$selection" -le "${#timezone_options[@]}" ]]; then
+                    selected_timezone="${timezone_options[$((selection-1))]}"
+                fi
+            fi
+
+            if [[ -n "$selected_timezone" ]]; then
+                if [[ "$selected_timezone" == "Other"* ]]; then
+                    # Manual entry
+                    local manual_tz
+                    if command -v enhanced_input >/dev/null 2>&1; then
+                        manual_tz=$(enhanced_input "Timezone" "America/Los_Angeles" "Enter timezone (e.g., America/New_York)")
+                    else
+                        read -p "Enter timezone (e.g., America/New_York): " manual_tz
+                    fi
+                    if [[ -n "$manual_tz" ]]; then
+                        export TZ="$manual_tz"
+                    else
+                        export TZ="America/Los_Angeles"
+                    fi
+                else
+                    # Extract timezone from selection (before the parentheses)
+                    export TZ="${selected_timezone%% (*}"
+                fi
+            else
+                export TZ="America/Los_Angeles"
+            fi
+        else
+            export TZ="America/Los_Angeles"
+        fi
+        log_info "Set timezone: $TZ"
+    else
+        log_debug "Using existing timezone: $TZ"
     fi
 
     # Set installation root if not already configured

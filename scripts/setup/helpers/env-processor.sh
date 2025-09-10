@@ -34,6 +34,52 @@ fi
 # FILE OPERATIONS
 # =============================================================================
 
+# Create backup of environment file
+backup_env_file() {
+    local env_file="$1"
+
+    if [[ ! -f "$env_file" ]]; then
+        log_debug "No backup needed - file doesn't exist: $env_file"
+        return 0
+    fi
+
+    local backup_dir
+    backup_dir="$(dirname "$env_file")/backups"
+
+    # Create backup directory if it doesn't exist
+    if [[ ! -d "$backup_dir" ]]; then
+        if ! mkdir -p "$backup_dir" 2>/dev/null; then
+            # Fallback to temp directory
+            backup_dir="/tmp"
+        fi
+    fi
+
+    local backup_file="${backup_dir}/$(basename "$env_file").backup-$(date +%Y%m%d-%H%M%S)"
+
+    if cp "$env_file" "$backup_file" 2>/dev/null; then
+        log_debug "Created backup: $(basename "$backup_file")"
+        echo "$backup_file"
+        return 0
+    else
+        log_warn "Failed to create backup of $(basename "$env_file")"
+        return 1
+    fi
+}
+
+# Check if file is writable
+check_file_writable() {
+    local file="$1"
+
+    if [[ -f "$file" ]]; then
+        [[ -w "$file" ]]
+    else
+        # Check if directory is writable for new file creation
+        local dir
+        dir="$(dirname "$file")"
+        [[ -w "$dir" ]]
+    fi
+}
+
 # Safely update a variable in an environment file
 update_env_variable() {
     local env_file="$1"
@@ -280,21 +326,26 @@ process_directive_variable() {
 process_environment_file() {
     local example_file="$1"
     local env_file="${2:-}"
-    
+
     # Determine env file path if not provided
     if [[ -z "$env_file" ]]; then
         env_file="${example_file%.example}"
     fi
-    
+
     log_info "Processing environment file: $(basename "$example_file")"
-    
+
     # Create env file from example if it doesn't exist
     if [[ ! -f "$env_file" ]]; then
         if ! create_env_from_example "$example_file" "$env_file"; then
             return 1
         fi
     fi
-    
+
+    # First, process template substitutions for common variables
+    if ! process_template_substitutions "$env_file"; then
+        log_warn "Template substitution failed for $(basename "$env_file"), continuing with directive processing"
+    fi
+
     # Parse the EXAMPLE file (which contains the directives) but update the actual env file
     # We need to set a global variable so the callback knows which file to update
     export CURRENT_ENV_FILE="$env_file"
@@ -304,7 +355,7 @@ process_environment_file() {
         return 1
     fi
     unset CURRENT_ENV_FILE
-    
+
     log_info "Successfully processed $(basename "$env_file")"
     return 0
 }
@@ -343,6 +394,71 @@ process_multiple_env_files() {
     fi
     
     return 0
+}
+
+# =============================================================================
+# TEMPLATE PROCESSING
+# =============================================================================
+
+# Process template substitutions in environment files
+process_template_substitutions() {
+    local env_file="$1"
+
+    if [[ ! -f "$env_file" ]]; then
+        log_error "Environment file not found: $env_file"
+        return 1
+    fi
+
+    log_debug "Processing template substitutions in $(basename "$env_file")"
+
+    # Create backup before modifying
+    local backup_file
+    backup_file=$(backup_env_file "$env_file")
+
+    # Read file content
+    local content
+    content=$(cat "$env_file")
+
+    # Process common environment variables if they exist
+    local common_vars=(
+        "TZ" "SSH_PORT" "WIFI_SSID" "WIFI_PASSWORD" "WIFI_INTERFACE" "WAN_INTERFACE"
+        "LAN_IP" "LAN_NETWORK" "DHCP_START" "DHCP_END" "FAIL2BAN_BANTIME" "FAIL2BAN_MAXRETRY"
+        "PROJECT_ROOT" "INSTALL_ROOT"
+    )
+
+    local substitutions_made=0
+    for var in "${common_vars[@]}"; do
+        local var_value="${!var:-}"
+        if [[ -n "$var_value" ]]; then
+            # Check if this variable placeholder exists in the content
+            if [[ "$content" == *"{{${var}}}"* ]]; then
+                # Escape special characters for sed
+                local escaped_value
+                escaped_value=$(printf '%s\n' "$var_value" | sed 's/[[\.*^$()+?{|]/\\&/g')
+
+                # Perform substitution
+                content="${content//\{\{${var}\}\}/$var_value}"
+                ((substitutions_made++))
+                log_debug "Substituted {{$var}} with $var_value"
+            fi
+        fi
+    done
+
+    # Write processed content back to file if substitutions were made
+    if [[ $substitutions_made -gt 0 ]]; then
+        if echo "$content" > "$env_file"; then
+            log_info "Applied $substitutions_made template substitutions to $(basename "$env_file")"
+            return 0
+        else
+            log_error "Failed to write template substitutions to $env_file"
+            # Restore from backup if available
+            [[ -n "$backup_file" && -f "$backup_file" ]] && cp "$backup_file" "$env_file"
+            return 1
+        fi
+    else
+        log_debug "No template substitutions needed for $(basename "$env_file")"
+        return 0
+    fi
 }
 
 # =============================================================================
@@ -421,10 +537,13 @@ validate_env_file() {
 }
 
 # Export this module's functions
+export -f backup_env_file
+export -f check_file_writable
 export -f update_env_variable
 export -f create_env_from_example
 export -f process_directive_variable_with_target
 export -f process_directive_variable
+export -f process_template_substitutions
 export -f process_environment_file
 export -f process_multiple_env_files
 export -f export_critical_variable
