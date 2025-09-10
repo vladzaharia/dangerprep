@@ -6551,16 +6551,8 @@ if ! systemctl is-active ssh >/dev/null 2>&1; then
     systemctl start ssh 2>/dev/null || true
 fi
 
-# Create emergency user if no regular users exist (excluding system users)
-if ! getent passwd | grep -E ":(100[0-9]|[0-9]{4,}):" | grep -v nobody >/dev/null; then
-    log_info "No regular users found, creating emergency user"
-    if ! id emergency >/dev/null 2>&1; then
-        useradd -m -s /bin/bash -G sudo emergency 2>/dev/null || true
-        echo "emergency:emergency123" | chpasswd 2>/dev/null || true
-        log_info "Emergency user created: emergency/emergency123"
-        echo "EMERGENCY: User 'emergency' created with password 'emergency123'" > /etc/motd
-    fi
-fi
+log_info "Recovery service active - check system logs for issues"
+log_info "For access issues, use console recovery mode or reinstall"
 
 log_info "Emergency recovery completed"
 EOF
@@ -7257,8 +7249,7 @@ main() {
         log_info "📋 POST-REBOOT ACCESS INSTRUCTIONS:"
         log_info "1. Primary: SSH as ${NEW_USERNAME} on port ${SSH_PORT:-2222}"
         log_info "2. Fallback: Console login as ${NEW_USERNAME}"
-        log_info "3. Emergency: User 'emergency' with password 'emergency123' (if created)"
-        log_info "4. Recovery: Check logs at /var/log/dangerprep-*.log"
+        log_info "3. Recovery: Check logs at /var/log/dangerprep-*.log"
         log_info ""
         log_info "🔄 PI USER CLEANUP VERIFICATION:"
         log_info "After reboot, verify pi user removal:"

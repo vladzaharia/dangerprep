@@ -189,8 +189,8 @@ configure_lan_interfaces() {
                 
             "wifi")
                 # Configure WiFi as AP
-                local ap_ssid="DangerPrep"
-                local ap_password="emergency2024"
+                local ap_ssid="${WIFI_SSID:-DangerPrep}"
+                local ap_password="${WIFI_PASSWORD:-$(openssl rand -base64 12)}"
                 
                 # Stop any existing hotspot
                 nmcli connection delete "DangerPrep-AP-$interface" 2>/dev/null || true
