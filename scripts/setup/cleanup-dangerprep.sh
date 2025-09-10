@@ -1240,7 +1240,7 @@ remove_packages() {
             log_debug "✓ Removed ${package}"
         else
             ((++failed_count))
-            log_warn"✗ Failed to remove ${package}"
+            log_warn "✗ Failed to remove ${package}"
         fi
     done
 
