@@ -374,8 +374,7 @@ export_critical_variable() {
     done
 }
 
-# Find all compose environment example files in a directory tree
-# Includes both compose.env.example and compose.<service>.env.example files
+# Find all compose.env.example files in a directory tree
 find_env_example_files() {
     local search_dir="$1"
 
@@ -384,11 +383,7 @@ find_env_example_files() {
         return 1
     fi
 
-    # Find both standard and service-specific environment example files
-    {
-        find "$search_dir" -name "compose.env.example" -type f
-        find "$search_dir" -name "compose.*.env.example" -type f
-    } | sort -u
+    find "$search_dir" -name "compose.env.example" -type f | sort
 }
 
 # Validate environment file structure
