@@ -13,13 +13,29 @@ A comprehensive emergency router and content hub system built as a TypeScript mo
 - **Access**: Root access (sudo) to the system
 
 ### One-Command Deployment
+
+**Recommended: Bootstrap Script (Downloads Latest Release)**
+```bash
+# Download and run the bootstrap script directly
+curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
+
+# Or with wget
+wget -qO- https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
+
+# Force git clone instead of release download
+curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --clone
+```
+
+**Alternative: Manual Clone and Deploy**
 ```bash
 # Clone the repository
-git clone https://github.com/vladzaharia/dangerprep.git dangerprep
-cd dangerprep
+git clone https://github.com/vladzaharia/dangerprep.git /dangerprep
+cd /dangerprep
 
-# Deploy the entire system using bundled just
-./lib/just/just deploy
+# Download required tools and deploy
+bash lib/gum/download.sh
+bash lib/just/download.sh
+sudo scripts/setup/setup-dangerprep.sh
 ```
 
 ### System Requirements
