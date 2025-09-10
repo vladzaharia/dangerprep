@@ -43,7 +43,7 @@ DangerPrep is an emergency router and content hub system designed for travel and
 - **Docker Engine** - Container runtime
 - **Tailscale** - VPN and subnet routing
 - **Network Management** - Dynamic interface management and routing scenarios
-- **Security Hardening** - 2025 best practices implementation
+- **Security Hardening** - best practices implementation
 
 ### 3. Infrastructure Layer
 

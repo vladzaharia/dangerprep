@@ -1,9 +1,9 @@
 #!/bin/bash
-# DangerPrep Cleanup Script - 2025 Best Practices Edition
+# DangerPrep Cleanup Script
 # Safely removes DangerPrep configuration and restores original system state
 # Implements comprehensive error handling, validation, and safety measures
 
-# Modern shell script security and error handling - 2025 best practices
+# Modern shell script security and error handling
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -106,7 +106,7 @@ initialize_paths() {
     fi
 }
 
-# Enhanced utility functions for 2025 best practices
+# Enhanced utility functions
 
 # Bash version check
 check_bash_version() {
@@ -373,9 +373,14 @@ DESCRIPTION:
     • Remove network configurations and restore originals
     • Remove all DangerPrep configuration files and scripts
     • Clean up user configurations (rootless Docker, etc.)
+    • Remove created user accounts and system users
+    • Unmount DangerPrep partitions and clean fstab entries
+    • Remove finalization services and scripts
+    • Clean up hardware groups and device permissions
     • Optionally remove installed packages
     • Remove Docker containers, images, and networks
     • Optionally remove data directories
+    • Remove configuration state files
     • Restore system to pre-DangerPrep state
 
 SAFETY FEATURES:
@@ -897,6 +902,10 @@ remove_configurations() {
     # Remove configuration directories (optimistic cleanup)
     [[ -d /etc/dangerprep ]] && rm -rf /etc/dangerprep 2>/dev/null || true
     [[ -d /var/lib/dangerprep ]] && rm -rf /var/lib/dangerprep 2>/dev/null || true
+
+    # Remove configuration state files specifically
+    [[ -f /etc/dangerprep/setup-config.conf ]] && rm -f /etc/dangerprep/setup-config.conf 2>/dev/null || true
+    [[ -f /etc/dangerprep/install-state.conf ]] && rm -f /etc/dangerprep/install-state.conf 2>/dev/null || true
     [[ -d /etc/cloudflared ]] && rm -rf /etc/cloudflared 2>/dev/null || true
     [[ -f /etc/unbound/unbound.conf.d/dangerprep.conf ]] && rm -f /etc/unbound/unbound.conf.d/dangerprep.conf 2>/dev/null || true
     [[ -f /var/lib/unbound/root.hints ]] && rm -f /var/lib/unbound/root.hints 2>/dev/null || true
@@ -1089,9 +1098,10 @@ remove_packages() {
 
     # Define package categories
     local security_packages=(
-        "aide" "rkhunter" "chkrootkit" "clamav" "clamav-daemon"
+        "aide" "rkhunter" "chkrootkit" "clamav" "clamav-daemon" "clamav-freshclam"
         "lynis" "ossec-hids" "acct" "psacct" "suricata"
         "apparmor" "apparmor-utils" "libpam-pwquality" "libpam-tmpdir"
+        "fail2ban" "ufw"
     )
 
     local network_packages=(
@@ -1111,6 +1121,7 @@ remove_packages() {
 
     local other_packages=(
         "tailscale" "unattended-upgrades" "certbot" "python3-certbot-nginx" "nfs-common"
+        "fastfetch" "docker-ce" "docker-ce-cli" "containerd.io" "docker-buildx-plugin" "docker-compose-plugin"
     )
 
     # Interactive package removal if gum is available
@@ -1339,6 +1350,296 @@ cleanup_user_configs() {
     rm -rf /run/user/1000/docker 2>/dev/null || true
 }
 
+# Clean up created user accounts
+cleanup_user_accounts() {
+    log_info "Cleaning up created user accounts..."
+
+    # Check if we have information about created users from setup config
+    local config_file="/etc/dangerprep/setup-config.conf"
+    local created_username=""
+
+    if [[ -f "$config_file" ]]; then
+        # Extract username from config file
+        created_username=$(grep "^NEW_USERNAME=" "$config_file" 2>/dev/null | cut -d'=' -f2 | tr -d '"' || echo "")
+    fi
+
+    # If no config file, try to detect likely DangerPrep users (excluding system users)
+    if [[ -z "$created_username" ]]; then
+        log_info "No setup config found, checking for likely DangerPrep users..."
+
+        # Look for users with UID >= 1000 that aren't ubuntu, pi, or other common users
+        local potential_users
+        mapfile -t potential_users < <(awk -F: '$3 >= 1000 && $1 !~ /^(ubuntu|pi|nobody|systemd-|_)/ {print $1}' /etc/passwd)
+
+        if [[ ${#potential_users[@]} -gt 0 ]]; then
+            log_info "Found potential DangerPrep users: ${potential_users[*]}"
+
+            # In interactive mode, ask which users to remove
+            if [[ "${FORCE_CLEANUP:-false}" != "true" ]] && [[ "${DRY_RUN:-false}" != "true" ]]; then
+                for user in "${potential_users[@]}"; do
+                    if enhanced_confirm "Remove user account: $user?" "false"; then
+                        created_username="$user"
+                        break
+                    fi
+                done
+            fi
+        fi
+    fi
+
+    # Remove the created user account if found
+    if [[ -n "$created_username" ]] && id "$created_username" >/dev/null 2>&1; then
+        log_info "Removing user account: $created_username"
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_info "[DRY RUN] Would remove user: $created_username"
+        else
+            # Kill any processes owned by the user
+            pkill -u "$created_username" 2>/dev/null || true
+            sleep 2
+
+            # Remove user and home directory
+            if userdel -r "$created_username" 2>/dev/null; then
+                log_success "Removed user account: $created_username"
+                REMOVED_ITEMS+=("user: $created_username")
+
+                # Clean up subuid/subgid entries
+                if [[ -f /etc/subuid ]]; then
+                    sed -i "/^${created_username}:/d" /etc/subuid 2>/dev/null || true
+                fi
+                if [[ -f /etc/subgid ]]; then
+                    sed -i "/^${created_username}:/d" /etc/subgid 2>/dev/null || true
+                fi
+            else
+                log_warn "Failed to remove user account: $created_username"
+                FAILED_REMOVALS+=("user: $created_username")
+            fi
+        fi
+    else
+        log_info "No created user accounts found to remove"
+    fi
+}
+
+# Clean up system users created by DangerPrep
+cleanup_system_users() {
+    log_info "Cleaning up system users..."
+
+    # Remove dockerapp system user (UID 1337)
+    if id dockerapp >/dev/null 2>&1; then
+        log_info "Removing dockerapp system user..."
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_info "[DRY RUN] Would remove system user: dockerapp"
+        else
+            if userdel dockerapp 2>/dev/null; then
+                log_success "Removed dockerapp system user"
+                REMOVED_ITEMS+=("system user: dockerapp")
+            else
+                log_warn "Failed to remove dockerapp system user"
+                FAILED_REMOVALS+=("system user: dockerapp")
+            fi
+        fi
+    fi
+
+    # Remove dockerapp group if it exists
+    if getent group dockerapp >/dev/null 2>&1; then
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_info "[DRY RUN] Would remove group: dockerapp"
+        else
+            if groupdel dockerapp 2>/dev/null; then
+                log_success "Removed dockerapp group"
+                REMOVED_ITEMS+=("group: dockerapp")
+            else
+                log_warn "Failed to remove dockerapp group"
+                FAILED_REMOVALS+=("group: dockerapp")
+            fi
+        fi
+    fi
+}
+
+# Clean up mount points and fstab entries
+cleanup_mount_points() {
+    log_info "Cleaning up mount points and fstab entries..."
+
+    # Unmount DangerPrep partitions
+    local mount_points=("/data" "/content")
+
+    for mount_point in "${mount_points[@]}"; do
+        if mountpoint -q "$mount_point" 2>/dev/null; then
+            log_info "Unmounting $mount_point..."
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY RUN] Would unmount: $mount_point"
+            else
+                if umount "$mount_point" 2>/dev/null; then
+                    log_success "Unmounted $mount_point"
+                    REMOVED_ITEMS+=("mount: $mount_point")
+                else
+                    log_warn "Failed to unmount $mount_point"
+                    FAILED_REMOVALS+=("mount: $mount_point")
+                fi
+            fi
+        fi
+    done
+
+    # Remove fstab entries for DangerPrep partitions
+    if [[ -f /etc/fstab ]]; then
+        log_info "Removing DangerPrep entries from /etc/fstab..."
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_info "[DRY RUN] Would remove fstab entries for /data and /content"
+        else
+            # Backup fstab before modification
+            cp /etc/fstab "${BACKUP_DIR}/fstab.backup-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+
+            # Remove entries for /data and /content
+            sed -i '\|/data|d' /etc/fstab 2>/dev/null || true
+            sed -i '\|/content|d' /etc/fstab 2>/dev/null || true
+            sed -i '/LABEL=danger-data/d' /etc/fstab 2>/dev/null || true
+            sed -i '/LABEL=danger-content/d' /etc/fstab 2>/dev/null || true
+
+            log_success "Removed DangerPrep fstab entries"
+            REMOVED_ITEMS+=("fstab entries: /data, /content")
+        fi
+    fi
+
+    # Remove mount point directories if they're empty
+    for mount_point in "${mount_points[@]}"; do
+        if [[ -d "$mount_point" ]] && [[ -z "$(ls -A "$mount_point" 2>/dev/null)" ]]; then
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY RUN] Would remove empty directory: $mount_point"
+            else
+                if rmdir "$mount_point" 2>/dev/null; then
+                    log_success "Removed empty mount point: $mount_point"
+                    REMOVED_ITEMS+=("directory: $mount_point")
+                fi
+            fi
+        fi
+    done
+}
+
+# Clean up finalization services and scripts
+cleanup_finalization_services() {
+    log_info "Cleaning up finalization services and scripts..."
+
+    # Remove finalization services
+    local finalization_services=(
+        "dangerprep-finalize.service"
+        "dangerprep-finalize-graphical.service"
+        "dangerprep-recovery.service"
+    )
+
+    for service in "${finalization_services[@]}"; do
+        local service_file="/etc/systemd/system/$service"
+        if [[ -f "$service_file" ]]; then
+            log_info "Removing finalization service: $service"
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY RUN] Would remove service: $service"
+            else
+                # Stop and disable service first
+                systemctl stop "$service" 2>/dev/null || true
+                systemctl disable "$service" 2>/dev/null || true
+
+                # Remove service file
+                if rm -f "$service_file" 2>/dev/null; then
+                    log_success "Removed service: $service"
+                    REMOVED_ITEMS+=("service: $service")
+                else
+                    log_warn "Failed to remove service: $service"
+                    FAILED_REMOVALS+=("service: $service")
+                fi
+            fi
+        fi
+    done
+
+    # Remove finalization scripts
+    local finalization_scripts=(
+        "/usr/local/bin/dangerprep-finalize.sh"
+        "/dangerprep/scripts/setup/finalize-user-migration.sh"
+    )
+
+    for script in "${finalization_scripts[@]}"; do
+        if [[ -f "$script" ]]; then
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY RUN] Would remove script: $script"
+            else
+                if rm -f "$script" 2>/dev/null; then
+                    log_success "Removed script: $script"
+                    REMOVED_ITEMS+=("script: $script")
+                else
+                    log_warn "Failed to remove script: $script"
+                    FAILED_REMOVALS+=("script: $script")
+                fi
+            fi
+        fi
+    done
+
+    # Remove completion markers
+    local completion_markers=(
+        "/var/lib/dangerprep-finalization-complete"
+    )
+
+    for marker in "${completion_markers[@]}"; do
+        if [[ -f "$marker" ]]; then
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY RUN] Would remove completion marker: $marker"
+            else
+                if rm -f "$marker" 2>/dev/null; then
+                    log_success "Removed completion marker: $marker"
+                    REMOVED_ITEMS+=("marker: $marker")
+                fi
+            fi
+        fi
+    done
+
+    # Reload systemd after removing services
+    if [[ "$DRY_RUN" != "true" ]]; then
+        systemctl daemon-reload 2>/dev/null || true
+    fi
+}
+
+# Clean up hardware groups created by GPIO setup
+cleanup_hardware_groups() {
+    log_info "Cleaning up hardware groups..."
+
+    # Hardware groups that might be created by the GPIO setup script
+    local hardware_groups=(
+        "gpio"
+        "pwm"
+        "i2c"
+        "spi"
+        "uart"
+        "hardware"
+    )
+
+    for group in "${hardware_groups[@]}"; do
+        if getent group "$group" >/dev/null 2>&1; then
+            # Check if this is a system group that we shouldn't remove
+            local group_id
+            group_id=$(getent group "$group" | cut -d: -f3)
+
+            # Only remove groups with GID >= 1000 (user groups) or specific DangerPrep groups
+            if [[ "$group_id" -ge 1000 ]] || [[ "$group" == "hardware" ]]; then
+                log_info "Removing hardware group: $group"
+
+                if [[ "$DRY_RUN" == "true" ]]; then
+                    log_info "[DRY RUN] Would remove group: $group"
+                else
+                    if groupdel "$group" 2>/dev/null; then
+                        log_success "Removed hardware group: $group"
+                        REMOVED_ITEMS+=("group: $group")
+                    else
+                        log_warn "Failed to remove hardware group: $group (may be in use)"
+                        FAILED_REMOVALS+=("group: $group")
+                    fi
+                fi
+            else
+                log_debug "Skipping system group: $group (GID: $group_id)"
+            fi
+        fi
+    done
+}
+
 # Final cleanup
 final_cleanup() {
     log_info "Performing final cleanup..."
@@ -1403,6 +1704,30 @@ final_cleanup() {
     # Remove iptables rules file (optimistic cleanup)
     [[ -f /etc/iptables/rules.v4 ]] && rm -f /etc/iptables/rules.v4 2>/dev/null || true
 
+    # Remove any remaining DangerPrep-related files that might have been missed
+    rm -f /usr/local/bin/dangerprep 2>/dev/null || true
+    rm -rf /opt/dangerprep 2>/dev/null || true
+
+    # Remove any remaining configuration state files
+    rm -f /etc/dangerprep/setup-config.conf 2>/dev/null || true
+    rm -f /etc/dangerprep/install-state.conf 2>/dev/null || true
+
+    # Remove dangerprep directory if empty
+    if [[ -d /etc/dangerprep ]] && [[ -z "$(ls -A /etc/dangerprep 2>/dev/null)" ]]; then
+        rmdir /etc/dangerprep 2>/dev/null || true
+    fi
+
+    # Clean up any remaining Docker-related files
+    rm -rf /home/*/bin/docker* 2>/dev/null || true
+    rm -rf /home/*/.config/systemd/user/docker* 2>/dev/null || true
+
+    # Remove any remaining hardware-specific configurations
+    rm -f /etc/udev/rules.d/99-dangerprep-*.rules 2>/dev/null || true
+
+    # Final udev reload
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger 2>/dev/null || true
+
     log_success "Final cleanup completed"
 }
 
@@ -1454,6 +1779,11 @@ show_enhanced_completion() {
     echo "  ✓ Network configuration restored to original state"
     echo "  ✓ All DangerPrep configurations and scripts removed"
     echo "  ✓ User configurations cleaned (rootless Docker, etc.)"
+    echo "  ✓ Created user accounts removed (if found)"
+    echo "  ✓ System users removed (dockerapp, etc.)"
+    echo "  ✓ Mount points unmounted and fstab entries removed"
+    echo "  ✓ Finalization services and scripts removed"
+    echo "  ✓ Hardware groups cleaned up"
     echo "  ✓ Docker containers and networks removed"
     echo "  ✓ Security tools configurations removed"
     echo "  ✓ Firewall rules reset to default"
@@ -1461,6 +1791,7 @@ show_enhanced_completion() {
     echo "  ✓ FriendlyElec/RK3588 specific configurations removed"
     echo "  ✓ MOTD banner removed and Ubuntu defaults restored"
     echo "  ✓ Hardware acceleration settings reset to defaults"
+    echo "  ✓ Configuration state files removed"
 
     if [[ "$PRESERVE_DATA" == "true" ]]; then
         echo "  ✓ Data directories preserved"
@@ -1569,6 +1900,11 @@ main() {
         "restore_network:Restoring network configuration"
         "remove_configurations:Removing configurations"
         "cleanup_user_configs:Cleaning up user configurations"
+        "cleanup_user_accounts:Cleaning up created user accounts"
+        "cleanup_system_users:Cleaning up system users"
+        "cleanup_mount_points:Cleaning up mount points and fstab"
+        "cleanup_finalization_services:Cleaning up finalization services"
+        "cleanup_hardware_groups:Cleaning up hardware groups"
         "remove_packages:Removing packages"
         "remove_data:Removing data directories"
         "final_cleanup:Performing final cleanup"

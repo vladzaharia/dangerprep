@@ -1,11 +1,11 @@
-# DangerPrep SSH Configuration - Hardened for 2025
+# DangerPrep SSH Configuration
 # Port changed from default 22 for security
 Port {{SSH_PORT}}
 
-# Protocol and encryption (2025 standards - Ed25519 preferred)
+# Protocol and encryption (Ed25519 preferred)
 HostKey /etc/ssh/ssh_host_ed25519_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
-# RSA keys deprecated for 2025 - uncomment only if needed for legacy clients
+# RSA keys deprecated for security, uncomment only if needed for legacy clients
 # HostKey /etc/ssh/ssh_host_rsa_key
 
 # Authentication
@@ -19,7 +19,7 @@ ChallengeResponseAuthentication no
 GSSAPIAuthentication no
 UsePAM yes
 
-# Modern public key algorithms (2025 standards)
+# Modern public key algorithms
 PubkeyAcceptedAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
 
 # Security settings
@@ -39,12 +39,12 @@ MaxAuthTries 3
 MaxSessions 4
 MaxStartups 10:30:60
 
-# Modern ciphers and algorithms (2025 standards - AEAD ciphers only)
+# Modern ciphers and algorithms (AEAD ciphers only)
 Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
 MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
 KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256
 
-# Certificate authority signature algorithms (2025 standards)
+# Certificate authority signature algorithms
 CASignatureAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
 
 # Logging
@@ -63,7 +63,7 @@ AllowTcpForwarding local
 GatewayPorts no
 PermitTunnel no
 
-# Additional 2025 security settings
+# Additional security settings
 Protocol 2
 RequiredRSASize 2048
 

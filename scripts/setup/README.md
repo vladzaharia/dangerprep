@@ -9,7 +9,7 @@ The DangerPrep setup script provides a complete, automated installation of:
 ### Core Features
 - **WiFi Hotspot**: "DangerPrep" with WPA2 security
 - **Network Routing**: LAN port as WAN, WiFi clients with full internet access
-- **Security Hardening**: 2025 best practices for Ubuntu 24.04
+- **Security Hardening**: For Ubuntu 24.04
 - **Docker Services**: Complete media and sync service stack
 - **Tailscale Integration**: Secure remote access and subnet routing
 - **Advanced DNS**: DNS over HTTPS/TLS with cloudflared and ad blocking
@@ -66,7 +66,7 @@ sudo ./scripts/setup/cleanup-dangerprep.sh
 
 ## What Gets Configured
 
-### System Hardening (2025 Enhanced)
+### System Hardening
 - **SSH**: Port 2222, key-only authentication, modern ciphers (Ed25519 support)
 - **Firewall**: Strict iptables rules with WAN port hardening and DDoS protection
 - **Fail2ban**: Intrusion prevention for SSH and web services
@@ -215,7 +215,7 @@ dangerprep fix-perms                # Fix file permissions
 dangerprep audit                    # Run security audit
 ```
 
-## Enhanced Security Features (2025)
+## Enhanced Security Features
 
 ### File Integrity Monitoring
 - **AIDE**: Daily file integrity checks

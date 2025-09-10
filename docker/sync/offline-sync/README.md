@@ -12,7 +12,7 @@ A TypeScript-based service for automatically synchronizing content between Micro
 - **File Verification**: Optional checksum verification for transfer integrity
 - **Comprehensive Logging**: Structured logging with rotation and multiple levels
 - **Health Monitoring**: Built-in health checks and statistics tracking
-- **Modern TypeScript**: Strict typing with no `any` types, following 2025 best practices
+- **Modern TypeScript**: Strict typing with no `any` typespractices
 
 ## Architecture
 

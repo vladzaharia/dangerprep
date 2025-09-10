@@ -1,9 +1,9 @@
 #!/bin/bash
-# DangerPrep Setup Script - 2025 Best Practices Edition
+# DangerPrep Setup Script
 # Complete system setup for Ubuntu 24.04 with modern security hardening
 # Uses external configuration templates for maintainability
 
-# Modern shell script security and error handling - 2025 best practices
+# Modern shell script security and error handling
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -33,7 +33,7 @@ CLEANUP_TASKS=()
 # - log_debug, log_info, log_warn, log_error, log_success
 # All functions support structured logging and automatic file logging when LOG_FILE is set
 
-# Enhanced utility functions for 2025 best practices
+# Enhanced utility functions
 
 # =============================================================================
 # STANDARDIZED HELPER FUNCTIONS
@@ -6048,10 +6048,10 @@ apply_ssh_hardening() {
     # Apply SSH configuration template
     log_info "Applying SSH configuration..."
     cat > /etc/ssh/sshd_config << 'SSHD_CONFIG'
-# DangerPrep SSH Configuration - Hardened for 2025
+# DangerPrep SSH Configuration
 Port \${SSH_PORT}
 
-# Protocol and encryption (2025 standards - Ed25519 preferred)
+# Protocol and encryption (Ed25519 preferred)
 HostKey /etc/ssh/ssh_host_ed25519_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
 
@@ -6066,7 +6066,7 @@ ChallengeResponseAuthentication no
 GSSAPIAuthentication no
 UsePAM yes
 
-# Modern public key algorithms (2025 standards)
+# Modern public key algorithms
 PubkeyAcceptedAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
 
 # Security settings
@@ -6086,12 +6086,12 @@ MaxAuthTries 3
 MaxSessions 4
 MaxStartups 10:30:60
 
-# Modern ciphers and algorithms (2025 standards - AEAD ciphers only)
+# Modern ciphers and algorithms (AEAD ciphers only)
 Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
 MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
 KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256
 
-# Certificate authority signature algorithms (2025 standards)
+# Certificate authority signature algorithms
 CASignatureAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
 
 # Logging
@@ -6110,7 +6110,7 @@ AllowTcpForwarding local
 GatewayPorts no
 PermitTunnel no
 
-# Additional 2025 security settings
+# Additional security settings
 Protocol 2
 RequiredRSASize 2048
 SSHD_CONFIG
