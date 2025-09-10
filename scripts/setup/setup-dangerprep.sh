@@ -2851,6 +2851,9 @@ update_system_packages() {
         return 1
     fi
 
+    # Remove the built-in FriendlyElec proxy
+    rm -rf /etc/apt/sources.list.d/ubuntu.sources
+
     export DEBIAN_FRONTEND=noninteractive
 
     # Update package lists with retry logic

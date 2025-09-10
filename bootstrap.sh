@@ -8,6 +8,7 @@
 #
 # Options:
 #   --clone     Force git clone instead of release download
+#   --update    Force update of existing installation
 #   --dry-run   Show what would be done without executing
 #   --help      Show this help message
 
@@ -18,8 +19,9 @@ REPO_OWNER="vladzaharia"
 REPO_NAME="dangerprep"
 REPO_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
 API_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}"
-INSTALL_DIR="/dangerprep"
+INSTALL_DIR="${INSTALL_DIR:-/dangerprep}"
 FORCE_CLONE=false
+FORCE_UPDATE=false
 DRY_RUN=false
 
 # Colors for output
@@ -59,6 +61,7 @@ Usage:
 
 Options:
   --clone     Force git clone instead of release download
+  --update    Force update of existing installation
   --dry-run   Show what would be done without executing
   --help      Show this help message
 
@@ -72,6 +75,9 @@ Examples:
   # Force git clone:
   curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --clone
 
+  # Force update existing installation:
+  curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --update
+
   # Dry run (show what would be done):
   curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | bash -s -- --dry-run
 
@@ -84,6 +90,10 @@ parse_args() {
         case $1 in
             --clone)
                 FORCE_CLONE=true
+                shift
+                ;;
+            --update)
+                FORCE_UPDATE=true
                 shift
                 ;;
             --dry-run)
@@ -193,6 +203,9 @@ download_release() {
     mkdir -p "$INSTALL_DIR"
     tar -xzf "$tarball_path" -C "$INSTALL_DIR" --strip-components=1
 
+    # Save version info for future updates
+    echo "$tag_name" > "$INSTALL_DIR/.dangerprep-version"
+
     # Cleanup
     rm -rf "$temp_dir"
 
@@ -222,6 +235,137 @@ clone_repository() {
     fi
 
     log_success "Repository cloned successfully"
+}
+
+# Check if an update is needed for release-based installation
+check_release_update_needed() {
+    local current_version="$1"
+    local latest_version="$2"
+
+    # If no current version file, update is needed
+    if [[ -z "$current_version" ]]; then
+        return 0
+    fi
+
+    # If versions differ, update is needed
+    if [[ "$current_version" != "$latest_version" ]]; then
+        return 0
+    fi
+
+    # No update needed
+    return 1
+}
+
+# Handle existing installation and determine if update is needed
+handle_existing_installation() {
+    # Check if installation directory exists
+    if [[ ! -d "$INSTALL_DIR" ]]; then
+        log_info "No existing installation found"
+        return 0
+    fi
+
+    log_info "Existing installation detected at $INSTALL_DIR"
+
+    # Check if it's a git-based installation
+    if [[ -d "$INSTALL_DIR/.git" ]]; then
+        log_info "Git-based installation detected"
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            if [[ "$FORCE_UPDATE" == "true" ]]; then
+                log_info "[DRY RUN] Would force update git repository"
+            else
+                log_info "[DRY RUN] Would update git repository"
+            fi
+            log_info "[DRY RUN] Would run: cd $INSTALL_DIR && git pull origin main"
+            log_success "[DRY RUN] Git repository would be updated"
+            return 0
+        fi
+
+        if [[ "$FORCE_UPDATE" == "true" ]]; then
+            log_info "Force updating git repository..."
+        else
+            log_info "Updating git repository..."
+        fi
+        cd "$INSTALL_DIR"
+
+        # Check if we have uncommitted changes
+        if ! git diff-index --quiet HEAD --; then
+            log_warn "Uncommitted changes detected in $INSTALL_DIR"
+            log_warn "Stashing changes before update..."
+            git stash push -m "Bootstrap script auto-stash $(date)"
+        fi
+
+        # Pull latest changes
+        if git pull origin main; then
+            log_success "Git repository updated successfully"
+        else
+            log_error "Failed to update git repository"
+            return 1
+        fi
+
+        return 0
+    fi
+
+    # Check if it's a release-based installation
+    if [[ -f "$INSTALL_DIR/.dangerprep-version" ]]; then
+        local current_version
+        current_version=$(cat "$INSTALL_DIR/.dangerprep-version" 2>/dev/null || echo "")
+
+        log_info "Release-based installation detected (version: ${current_version:-unknown})"
+
+        # Get latest release info
+        local release_info
+        if ! release_info=$(get_latest_release); then
+            log_warn "Could not check for updates (no releases found)"
+            return 0
+        fi
+
+        local latest_version="${release_info%|*}"
+
+        if check_release_update_needed "$current_version" "$latest_version" || [[ "$FORCE_UPDATE" == "true" ]]; then
+            if [[ "$FORCE_UPDATE" == "true" ]]; then
+                log_info "Forcing update: $current_version → $latest_version"
+            else
+                log_info "Update available: $current_version → $latest_version"
+            fi
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY RUN] Would backup current installation"
+                log_info "[DRY RUN] Would download and extract: $latest_version"
+                log_info "[DRY RUN] Would update version file"
+                log_success "[DRY RUN] Release would be updated"
+                return 0
+            fi
+
+            # Create backup of current installation
+            local backup_dir="${INSTALL_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
+            log_info "Creating backup at $backup_dir..."
+            cp -r "$INSTALL_DIR" "$backup_dir"
+
+            # Download and extract new release
+            log_info "Downloading and installing update..."
+            download_release "$release_info"
+
+            log_success "Installation updated from $current_version to $latest_version"
+            log_info "Backup available at: $backup_dir"
+        else
+            log_success "Installation is up to date (version: $current_version)"
+        fi
+
+        return 0
+    fi
+
+    # Unknown installation type
+    log_warn "Existing installation found but type could not be determined"
+    log_warn "Directory exists but no .git or .dangerprep-version found"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would proceed with installation (may overwrite existing files)"
+        return 0
+    fi
+
+    # Let the main function handle this case
+    return 0
 }
 
 # Run the setup process
@@ -281,26 +425,34 @@ main() {
     # Check dependencies
     check_dependencies
 
-    # Check if install directory already exists
+    # Handle existing installation (update if needed)
+    local installation_exists=false
     if [[ -d "$INSTALL_DIR" ]]; then
-        log_warn "Directory $INSTALL_DIR already exists"
-        log_info "Continuing with existing directory..."
+        installation_exists=true
+        handle_existing_installation
     fi
 
-    # Determine installation method
-    if [[ "$FORCE_CLONE" == "true" ]]; then
-        log_info "Forcing git clone (--clone flag specified)"
-        clone_repository
-    else
-        # Try to get latest release
-        local release_info
-        if release_info=$(get_latest_release); then
-            log_success "Found latest release, downloading..."
-            download_release "$release_info"
-        else
-            log_warn "No releases found, falling back to git clone"
+    # Only proceed with fresh installation if no existing installation
+    if [[ "$installation_exists" == "false" ]]; then
+        log_info "Performing fresh installation..."
+
+        # Determine installation method
+        if [[ "$FORCE_CLONE" == "true" ]]; then
+            log_info "Forcing git clone (--clone flag specified)"
             clone_repository
+        else
+            # Try to get latest release
+            local release_info
+            if release_info=$(get_latest_release); then
+                log_success "Found latest release, downloading..."
+                download_release "$release_info"
+            else
+                log_warn "No releases found, falling back to git clone"
+                clone_repository
+            fi
         fi
+    else
+        log_info "Using existing/updated installation"
     fi
 
     # Run the setup process

@@ -1232,7 +1232,7 @@ remove_packages() {
 
     for package in "${packages_to_remove[@]}"; do
         enhanced_spin "Removing ${package}" \
-            apt remove -y "${package}" DEBIAN_FRONTEND=noninteractive
+            DEBIAN_FRONTEND=noninteractive apt remove -y "${package}"
         local remove_result=$?
 
         if [[ ${remove_result} -eq 0 ]]; then
