@@ -1130,7 +1130,7 @@ validate_port_number() {
 # Configuration variables with enhanced validation
 declare SCRIPT_DIR PROJECT_ROOT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly SCRIPT_DIR PROJECT_ROOT
 readonly INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-/opt/dangerprep}"
 
@@ -1141,9 +1141,9 @@ LOCK_FILE="/var/run/dangerprep-setup.lock"
 
 # Source shared banner utility with error handling
 declare BANNER_SCRIPT_PATH
-BANNER_SCRIPT_PATH="${SCRIPT_DIR}/../shared/banner.sh"
+BANNER_SCRIPT_PATH="${SCRIPT_DIR}/shared/banner.sh"
 if [[ -f "${BANNER_SCRIPT_PATH}" ]]; then
-    # shellcheck source=../shared/banner.sh
+    # shellcheck source=shared/banner.sh
     source "${BANNER_SCRIPT_PATH}"
 else
     log_warn "Banner utility not found at ${BANNER_SCRIPT_PATH}, continuing without banner"
@@ -1153,9 +1153,9 @@ fi
 
 # Source gum utilities for enhanced user interaction (required)
 declare GUM_UTILS_PATH
-GUM_UTILS_PATH="${SCRIPT_DIR}/../shared/gum-utils.sh"
+GUM_UTILS_PATH="${SCRIPT_DIR}/shared/gum-utils.sh"
 if [[ -f "${GUM_UTILS_PATH}" ]]; then
-    # shellcheck source=../shared/gum-utils.sh
+    # shellcheck source=shared/gum-utils.sh
     source "${GUM_UTILS_PATH}"
 else
     echo "ERROR: Required gum utilities not found at ${GUM_UTILS_PATH}" >&2
@@ -1165,9 +1165,9 @@ fi
 
 # Source Docker environment configuration helper
 declare DOCKER_ENV_CONFIG_PATH
-DOCKER_ENV_CONFIG_PATH="${SCRIPT_DIR}/helpers/docker-env-config.sh"
+DOCKER_ENV_CONFIG_PATH="${SCRIPT_DIR}/setup/docker-env-config.sh"
 if [[ -f "${DOCKER_ENV_CONFIG_PATH}" ]]; then
-    # shellcheck source=helpers/docker-env-config.sh
+    # shellcheck source=setup/docker-env-config.sh
     source "${DOCKER_ENV_CONFIG_PATH}"
 else
     log_warn "Docker environment configuration helper not found at ${DOCKER_ENV_CONFIG_PATH}"
@@ -1590,11 +1590,11 @@ parse_arguments() {
 
 # Load configuration utilities with error handling
 load_configuration() {
-    local config_loader="$SCRIPT_DIR/config-loader.sh"
+    local config_loader="$SCRIPT_DIR/setup/config-loader.sh"
 
     if [[ -f "$config_loader" ]]; then
         log_debug "Loading configuration utilities from: $config_loader"
-        # shellcheck source=config-loader.sh
+        # shellcheck source=setup/config-loader.sh
         if ! source "$config_loader"; then
             log_error "Failed to load configuration utilities"
             return 1
@@ -5172,19 +5172,19 @@ configure_friendlyelec_gpio_pwm() {
     load_gpio_pwm_config
 
     # Make GPIO setup script executable
-    chmod +x "$SCRIPT_DIR/setup-gpio.sh"
+    chmod +x "$SCRIPT_DIR/setup/setup-gpio.sh"
 
     # Run GPIO/PWM setup with proper user context
     local target_user="${ORIGINAL_USER:-${SUDO_USER:-}}"
     if [[ -n "$target_user" && "$target_user" != "root" ]]; then
-        if "$SCRIPT_DIR/setup-gpio.sh" setup "$target_user"; then
+        if "$SCRIPT_DIR/setup/setup-gpio.sh" setup "$target_user"; then
             log_success "GPIO and PWM interfaces configured for user: $target_user"
         else
             log_warn "GPIO and PWM setup completed with warnings for user: $target_user"
         fi
     else
         log_warn "No target user found for GPIO/PWM setup, skipping user group assignment"
-        if "$SCRIPT_DIR/setup-gpio.sh" setup; then
+        if "$SCRIPT_DIR/setup/setup-gpio.sh" setup; then
             log_success "GPIO and PWM interfaces configured (no user groups assigned)"
         else
             log_warn "GPIO and PWM setup completed with warnings"
@@ -7289,7 +7289,7 @@ cleanup_on_error() {
     log_error "Setup failed. Running comprehensive cleanup..."
 
     # Run the full cleanup script to completely reverse all changes
-    local cleanup_script="$SCRIPT_DIR/cleanup-dangerprep.sh"
+    local cleanup_script="$SCRIPT_DIR/cleanup.sh"
 
     if [[ -f "$cleanup_script" ]]; then
         log_warn "Running cleanup script to restore system to original state..."

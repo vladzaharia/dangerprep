@@ -9,9 +9,9 @@ set -euo pipefail
 PROMPT_HANDLER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source gum utilities (includes logging functions)
-if [[ -f "$PROMPT_HANDLER_SCRIPT_DIR/../../shared/gum-utils.sh" ]]; then
+if [[ -f "$PROMPT_HANDLER_SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
     # shellcheck source=../../shared/gum-utils.sh
-    source "$PROMPT_HANDLER_SCRIPT_DIR/../../shared/gum-utils.sh"
+    source "$PROMPT_HANDLER_SCRIPT_DIR/../shared/gum-utils.sh"
 fi
 
 # Source environment parser for validation functions

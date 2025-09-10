@@ -69,24 +69,28 @@ help:
 # System Management
 deploy:
     @echo "Deploying DangerPrep system..."
-    @sudo ./scripts/setup/setup-dangerprep.sh
+    @sudo ./scripts/setup.sh
 
 cleanup:
     @echo "Cleaning up DangerPrep system..."
-    @sudo ./scripts/setup/cleanup-dangerprep.sh
+    @sudo ./scripts/cleanup.sh
 
 update:
-    @./scripts/system/system-update.sh
+    @echo "Update functionality not yet implemented in new structure"
+    # @./scripts/system/system-update.sh
 
 uninstall:
-    @./scripts/system/system-uninstall.sh
+    @echo "Uninstall functionality not yet implemented in new structure"
+    # @./scripts/system/system-uninstall.sh
 
 # Service management
 start:
-    @./scripts/docker/start-services.sh
+    @echo "Service start functionality not yet implemented in new structure"
+    # @./scripts/docker/start-services.sh
 
 stop:
-    @./scripts/docker/stop-services.sh
+    @echo "Service stop functionality not yet implemented in new structure"
+    # @./scripts/docker/stop-services.sh
 
 restart:
     @echo "Restarting DangerPrep services..."
@@ -95,7 +99,12 @@ restart:
     @just start
 
 status:
-    @./scripts/docker/service-status.sh
+    @echo "Service status functionality not yet implemented in new structure"
+    # @./scripts/docker/service-status.sh
+
+# NOTE: The following commands reference scripts that were removed during cleanup
+# These commands are preserved for reference but will not work until the scripts are reimplemented
+# Only setup.sh and cleanup.sh are currently functional
 
 # WAN Management
 wan-list:

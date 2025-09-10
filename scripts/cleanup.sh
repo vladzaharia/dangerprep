@@ -42,9 +42,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 
 # Source gum utilities first for logging functions
-if [[ -f "$SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
-    # shellcheck source=../shared/gum-utils.sh
-    source "$SCRIPT_DIR/../shared/gum-utils.sh"
+if [[ -f "$SCRIPT_DIR/shared/gum-utils.sh" ]]; then
+    # shellcheck source=shared/gum-utils.sh
+    source "$SCRIPT_DIR/shared/gum-utils.sh"
 else
     echo "WARNING: Gum utilities not found, using basic interaction"
     # Provide fallback functions including logging
@@ -66,9 +66,9 @@ else
 fi
 
 # Source shared banner utility after logging functions are available
-if [[ -f "$SCRIPT_DIR/../shared/banner.sh" ]]; then
-    # shellcheck source=../shared/banner.sh
-    source "$SCRIPT_DIR/../shared/banner.sh"
+if [[ -f "$SCRIPT_DIR/shared/banner.sh" ]]; then
+    # shellcheck source=shared/banner.sh
+    source "$SCRIPT_DIR/shared/banner.sh"
 else
     log_warn "Banner utility not found, continuing without banner"
     show_cleanup_banner() { echo "DangerPrep Cleanup"; }

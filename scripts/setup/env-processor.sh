@@ -9,9 +9,9 @@ set -euo pipefail
 ENV_PROCESSOR_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source gum utilities (includes logging functions)
-if [[ -f "$ENV_PROCESSOR_SCRIPT_DIR/../../shared/gum-utils.sh" ]]; then
+if [[ -f "$ENV_PROCESSOR_SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
     # shellcheck source=../../shared/gum-utils.sh
-    source "$ENV_PROCESSOR_SCRIPT_DIR/../../shared/gum-utils.sh"
+    source "$ENV_PROCESSOR_SCRIPT_DIR/../shared/gum-utils.sh"
 fi
 
 # Source other modules

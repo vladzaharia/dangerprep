@@ -9,9 +9,9 @@ set -euo pipefail
 GENERATE_HANDLER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source gum utilities (includes logging functions)
-if [[ -f "$GENERATE_HANDLER_SCRIPT_DIR/../../shared/gum-utils.sh" ]]; then
+if [[ -f "$GENERATE_HANDLER_SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
     # shellcheck source=../../shared/gum-utils.sh
-    source "$GENERATE_HANDLER_SCRIPT_DIR/../../shared/gum-utils.sh"
+    source "$GENERATE_HANDLER_SCRIPT_DIR/../shared/gum-utils.sh"
 fi
 
 # =============================================================================

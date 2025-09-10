@@ -201,16 +201,12 @@ dangerprep/                   # Project root (TypeScript monorepo)
 │       ├── nfs-sync/       # NFS content synchronization
 │       ├── kiwix-sync/     # Kiwix offline content sync
 │       └── offline-sync/   # MicroSD card synchronization
-├── scripts/                # Management scripts (organized by category)
-│   ├── setup/              # Installation and cleanup scripts
-│   ├── docker/             # Docker service management
-│   ├── network/            # Network routing and management
-│   ├── backup/             # Backup and restore operations
-│   ├── monitoring/         # System and hardware monitoring
-│   ├── security/           # Security auditing and monitoring
-│   ├── system/             # System management and utilities
-│   ├── validation/         # System validation and testing
-│   └── shared/             # Shared utilities and templates
+├── scripts/                # Management scripts (setup and cleanup only)
+│   ├── setup.sh            # Main system setup script
+│   ├── cleanup.sh          # Main system cleanup script
+│   ├── setup/              # Setup helper scripts and configurations
+│   ├── cleanup/            # Cleanup helper scripts (if needed)
+│   └── shared/             # Shared utilities for both setup and cleanup
 ├── lib/                    # External libraries and tools
 │   ├── just/               # Bundled just command runner
 │   └── webawesome/         # Web Awesome icon library
