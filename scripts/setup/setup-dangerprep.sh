@@ -2065,14 +2065,26 @@ collect_docker_services_configuration() {
 
     # Define available Docker services
     local docker_services=(
+        # Infrastructure services
         "traefik:Traefik (Reverse Proxy)"
         "arcane:Arcane (Dashboard)"
+        "watchtower:Watchtower (Automatic Updates)"
+        "step-ca:Step-CA (Certificate Authority)"
+        "raspap:RaspAP (Network Management)"
+        "cdn:CDN (Content Delivery Network)"
+        "dns:AdGuard Home (DNS Filtering)"
+        "portainer:Portainer (Container Management)"
+        # Media services
         "jellyfin:Jellyfin (Media Server)"
         "komga:Komga (Comic/Book Server)"
+        "romm:ROMM (ROM Management)"
+        # Application services
+        "docmost:Docmost (Documentation)"
+        "onedev:OneDev (Git Server & CI/CD)"
+        # Sync services
         "kiwix-sync:Kiwix (Offline Wikipedia)"
-        "raspap:RaspAP (Network Management)"
-        "step-ca:Step-CA (Certificate Authority)"
-        "dns:AdGuard Home (DNS Filtering)"
+        "nfs-sync:NFS Sync (Network File Sync)"
+        "offline-sync:Offline Sync (Content Sync)"
     )
 
     log_info "Select which Docker services to install:"
