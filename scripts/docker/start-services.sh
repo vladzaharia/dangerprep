@@ -32,13 +32,19 @@ error() {
 
 # Detect Docker command based on setup
 detect_docker_command() {
+    # Get the original user if running with sudo
+    local target_user="${SUDO_USER:-$USER}"
+
     # Check if running as ubuntu user with rootless Docker
-    if [[ "$USER" == "ubuntu" ]] && [[ -S "/run/user/1000/docker.sock" ]]; then
+    if [[ "$target_user" == "ubuntu" ]] && [[ -S "/run/user/1000/docker.sock" ]]; then
         echo "docker"
     # Check if rootless Docker is available for current user
     elif [[ -S "/run/user/$(id -u)/docker.sock" ]]; then
         echo "docker"
-    # Check if user is in docker group
+    # Check if target user is in docker group
+    elif [[ -n "$target_user" ]] && groups "$target_user" 2>/dev/null | grep -q docker; then
+        echo "docker"
+    # Check if current user is in docker group (fallback)
     elif groups | grep -q docker; then
         echo "docker"
     # Fall back to sudo

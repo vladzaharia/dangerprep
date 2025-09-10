@@ -1658,6 +1658,12 @@ set_default_configuration_values() {
         log_debug "Set default GitHub key import: $IMPORT_GITHUB_KEYS"
     fi
 
+    # Set default storage configuration
+    if [[ -z "${NVME_PARTITION_CONFIRMED:-}" ]]; then
+        NVME_PARTITION_CONFIRMED="false"
+        log_debug "Set default NVMe partition confirmation: $NVME_PARTITION_CONFIRMED"
+    fi
+
     # Export all variables for use in templates and other functions
     export WIFI_SSID WIFI_PASSWORD LAN_NETWORK LAN_IP DHCP_START DHCP_END
     export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
@@ -1665,6 +1671,7 @@ set_default_configuration_values() {
     export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
     export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
+    export NVME_PARTITION_CONFIRMED NVME_DEVICE
 
     log_debug "Default configuration values set and exported"
 }
@@ -1709,6 +1716,10 @@ SELECTED_DOCKER_SERVICES="$SELECTED_DOCKER_SERVICES"
 # FriendlyElec Configuration
 FRIENDLYELEC_INSTALL_PACKAGES="$FRIENDLYELEC_INSTALL_PACKAGES"
 FRIENDLYELEC_ENABLE_FEATURES="$FRIENDLYELEC_ENABLE_FEATURES"
+
+# Storage Configuration
+NVME_PARTITION_CONFIRMED="$NVME_PARTITION_CONFIRMED"
+NVME_DEVICE="$NVME_DEVICE"
 
 # System Detection
 IS_FRIENDLYELEC="$IS_FRIENDLYELEC"
@@ -1969,6 +1980,9 @@ collect_configuration() {
     # User account configuration
     collect_user_account_configuration
 
+    # Storage configuration (NVMe drive setup)
+    collect_storage_configuration
+
     # Show comprehensive configuration summary
     show_complete_configuration_summary
 
@@ -1986,6 +2000,7 @@ collect_configuration() {
     export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
     export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
+    export NVME_PARTITION_CONFIRMED NVME_DEVICE
 
     # Save configuration for resumable installations
     save_configuration
@@ -2105,6 +2120,81 @@ collect_friendlyelec_configuration() {
     package_count=$(echo "$FRIENDLYELEC_INSTALL_PACKAGES" | wc -l)
     feature_count=$(echo "$FRIENDLYELEC_ENABLE_FEATURES" | wc -l)
     enhanced_status_indicator "success" "Selected $package_count package categories and $feature_count features"
+}
+
+# Collect storage configuration upfront
+collect_storage_configuration() {
+    echo
+    log_info "💾 Storage Configuration"
+    echo
+
+    # Check if NVMe devices exist
+    local nvme_devices=()
+    while IFS= read -r device; do
+        if [[ -n "$device" ]]; then
+            nvme_devices+=("$device")
+        fi
+    done < <(lsblk -d -n -o NAME 2>/dev/null | grep '^nvme' || true)
+
+    if [[ ${#nvme_devices[@]} -eq 0 ]]; then
+        log_info "No NVMe devices detected, skipping storage configuration"
+        export NVME_PARTITION_CONFIRMED="false"
+        return 0
+    fi
+
+    # Use the first NVMe device (typically nvme0n1)
+    local nvme_device="/dev/${nvme_devices[0]}"
+    log_info "Found NVMe device: ${nvme_device}"
+
+    # Get device information
+    local device_size
+    device_size=$(lsblk -b -d -n -o SIZE "${nvme_device}" 2>/dev/null || echo "0")
+    local device_size_gb=$((device_size / 1024 / 1024 / 1024))
+
+    log_info "NVMe device size: ${device_size_gb}GB"
+
+    if [[ ${device_size_gb} -lt 100 ]]; then
+        log_warn "NVMe device is smaller than expected (${device_size_gb}GB), skipping partitioning"
+        export NVME_PARTITION_CONFIRMED="false"
+        return 0
+    fi
+
+    # Check for existing partitions
+    local existing_partitions
+    existing_partitions=$(lsblk -n -o NAME "${nvme_device}" 2>/dev/null | grep -c -v "^${nvme_devices[0]}$" || echo "0")
+
+    if [[ ${existing_partitions} -gt 0 ]]; then
+        log_warn "Existing partitions detected on ${nvme_device}"
+
+        # Show current partitions
+        echo
+        log_info "Current partition layout:"
+        lsblk "${nvme_device}" 2>/dev/null || true
+        echo
+
+        enhanced_warning_box "DESTRUCTIVE OPERATION WARNING" \
+            "⚠️  REPARTITIONING WILL PERMANENTLY DESTROY ALL EXISTING DATA!\n\n• All files and partitions on ${nvme_device} will be erased\n• This action cannot be undone\n• Make sure you have backups of any important data\n\nNew partition layout will be:\n• 256GB partition for /data\n• Remaining space for /content" \
+            "danger"
+
+        if enhanced_confirm "I understand the risks and want to proceed with repartitioning ${nvme_device}" "false"; then
+            export NVME_PARTITION_CONFIRMED="true"
+            export NVME_DEVICE="${nvme_device}"
+            log_info "NVMe partitioning confirmed for ${nvme_device}"
+        else
+            export NVME_PARTITION_CONFIRMED="false"
+            log_info "NVMe partitioning declined - will skip storage setup"
+        fi
+    else
+        # No existing partitions, safe to proceed
+        if enhanced_confirm "Set up NVMe storage with 256GB /data and remaining space for /content?" "true"; then
+            export NVME_PARTITION_CONFIRMED="true"
+            export NVME_DEVICE="${nvme_device}"
+            log_info "NVMe partitioning confirmed for ${nvme_device}"
+        else
+            export NVME_PARTITION_CONFIRMED="false"
+            log_info "NVMe partitioning declined - will skip storage setup"
+        fi
+    fi
 }
 
 # Collect user account configuration upfront
@@ -2238,12 +2328,25 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
         user_config+=$'\n'"SSH Keys: Manual setup required"
     fi
 
+    # Storage configuration
+    local storage_config="NVMe Partitioning: "
+    if [[ "${NVME_PARTITION_CONFIRMED:-false}" == "true" ]]; then
+        storage_config+="Enabled"
+        if [[ -n "${NVME_DEVICE:-}" ]]; then
+            storage_config+=$'\n'"Device: ${NVME_DEVICE}"
+        fi
+        storage_config+=$'\n'"Layout: 256GB /data + remaining /content"
+    else
+        storage_config+="Disabled"
+    fi
+
     # Display all configuration cards
     enhanced_card "🌐 Network Configuration" "$network_config" "39" "39"
     enhanced_card "🔒 Security Configuration" "$security_config" "196" "196"
     enhanced_card "📦 Package Configuration" "$package_config" "33" "33"
     enhanced_card "🐳 Docker Configuration" "$docker_config" "34" "34"
     enhanced_card "👤 User Configuration" "$user_config" "35" "35"
+    enhanced_card "💾 Storage Configuration" "$storage_config" "93" "93"
 
     # FriendlyElec configuration if applicable
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
@@ -2285,8 +2388,60 @@ check_root_privileges() {
     fi
     rm -f /tmp/dangerprep-root-test
 
+    # Set up proper user context for sudo operations
+    setup_user_context
+
     log_debug "Root privileges confirmed"
     return 0
+}
+
+# Setup proper user context when running with sudo
+setup_user_context() {
+    # Determine the original user who ran sudo
+    if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
+        export ORIGINAL_USER="$SUDO_USER"
+        export ORIGINAL_UID="$SUDO_UID"
+        export ORIGINAL_GID="$SUDO_GID"
+        log_debug "Original user context: $ORIGINAL_USER (UID: $ORIGINAL_UID, GID: $ORIGINAL_GID)"
+    else
+        # Fallback: try to detect from environment or process tree
+        local detected_user
+        detected_user=$(who am i 2>/dev/null | awk '{print $1}' | head -1)
+        if [[ -n "$detected_user" && "$detected_user" != "root" ]]; then
+            export ORIGINAL_USER="$detected_user"
+            local user_info
+            user_info=$(id "$detected_user" 2>/dev/null)
+            if [[ $? -eq 0 ]]; then
+                export ORIGINAL_UID=$(id -u "$detected_user")
+                export ORIGINAL_GID=$(id -g "$detected_user")
+                log_debug "Detected user context: $ORIGINAL_USER (UID: $ORIGINAL_UID, GID: $ORIGINAL_GID)"
+            fi
+        else
+            log_warn "Unable to determine original user context"
+            export ORIGINAL_USER=""
+            export ORIGINAL_UID=""
+            export ORIGINAL_GID=""
+        fi
+    fi
+}
+
+# Get the appropriate user for operations (handles sudo context)
+get_target_user() {
+    # Return the original user who ran sudo, or fallback appropriately
+    if [[ -n "${ORIGINAL_USER:-}" && "$ORIGINAL_USER" != "root" ]]; then
+        echo "$ORIGINAL_USER"
+    elif [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
+        echo "$SUDO_USER"
+    else
+        # Last resort: try to find a non-root user
+        local non_root_user
+        non_root_user=$(getent passwd | grep -E ":(100[0-9]|[0-9]{4,}):" | grep -v nobody | head -1 | cut -d: -f1)
+        if [[ -n "$non_root_user" ]]; then
+            echo "$non_root_user"
+        else
+            echo ""
+        fi
+    fi
 }
 
 # Enhanced logging setup with proper permissions and rotation
@@ -2327,7 +2482,8 @@ EOF
     log_info "Project root: $PROJECT_ROOT"
     log_info "Log file: $LOG_FILE"
     log_info "Process ID: $$"
-    log_info "User: $(whoami) (UID: $EUID)"
+    log_info "Effective user: $(whoami) (UID: $EUID)"
+    log_info "Original user: ${ORIGINAL_USER:-unknown}"
     log_info "System: $(uname -a)"
 }
 
@@ -4041,6 +4197,9 @@ setup_docker_services() {
     # Setup secrets for Docker services
     setup_docker_secrets
 
+    # Deploy all selected Docker services
+    deploy_selected_docker_services
+
     log_success "Docker services configuration completed"
 }
 
@@ -4057,6 +4216,158 @@ setup_docker_secrets() {
         log_warn "Secret setup script not found, skipping secret generation"
         log_warn "You may need to manually configure secrets for Docker services"
     fi
+}
+
+# Deploy all selected Docker services
+deploy_selected_docker_services() {
+    log_info "Deploying selected Docker services..."
+
+    # Check if any services were selected
+    if [[ -z "${SELECTED_DOCKER_SERVICES:-}" ]]; then
+        log_warn "No Docker services selected for deployment"
+        return 0
+    fi
+
+    # BOOT FIX: Check disk space before Docker operations
+    if ! check_disk_space 3 "Docker service deployment"; then
+        log_warn "Insufficient disk space for Docker service deployment, skipping"
+        log_info "Docker services can be deployed later when more space is available"
+        return 0
+    fi
+
+    # Ensure Docker is running
+    if ! systemctl is-active docker >/dev/null 2>&1; then
+        log_warn "Docker service is not running, attempting to start..."
+        if ! standard_service_operation "docker" "start"; then
+            log_error "Failed to start Docker service, cannot deploy containers"
+            return 1
+        fi
+        sleep 5  # Give Docker a moment to fully start
+    fi
+
+    # Create Traefik network if it doesn't exist (required by most services)
+    if ! docker network ls | grep -q "traefik"; then
+        log_info "Creating Traefik network..."
+        if ! docker network create traefik; then
+            log_warn "Failed to create Traefik network, some services may not work properly"
+        fi
+    fi
+
+    # Parse selected services and deploy them
+    local services_deployed=0
+    local services_failed=0
+
+    while IFS= read -r service_line; do
+        [[ -z "$service_line" ]] && continue
+
+        local service_name="${service_line%%:*}"  # Extract service name before colon
+        service_name="${service_name// /}"        # Remove any spaces
+
+        if [[ -n "$service_name" ]]; then
+            log_info "Deploying Docker service: $service_name"
+
+            if deploy_docker_service "$service_name"; then
+                ((services_deployed++))
+                enhanced_status_indicator "success" "Deployed $service_name"
+            else
+                ((services_failed++))
+                enhanced_status_indicator "warning" "Failed to deploy $service_name (can be started manually later)"
+            fi
+        fi
+    done <<< "${SELECTED_DOCKER_SERVICES}"
+
+    # Summary
+    if [[ $services_deployed -gt 0 ]]; then
+        log_success "Successfully deployed $services_deployed Docker services"
+    fi
+
+    if [[ $services_failed -gt 0 ]]; then
+        log_warn "$services_failed services failed to deploy (can be started manually later)"
+        log_info "Use 'docker compose -f <service-path>/compose.yml up -d' to start failed services"
+    fi
+}
+
+# Deploy a single Docker service
+deploy_docker_service() {
+    local service_name="$1"
+
+    # Determine service directory structure
+    local service_dir
+    case "${service_name}" in
+        "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn")
+            service_dir="${PROJECT_ROOT}/docker/infrastructure/${service_name}"
+            ;;
+        "jellyfin"|"komga"|"romm")
+            service_dir="${PROJECT_ROOT}/docker/media/${service_name}"
+            ;;
+        "docmost"|"onedev")
+            service_dir="${PROJECT_ROOT}/docker/services/${service_name}"
+            ;;
+        "kiwix-sync"|"nfs-sync"|"offline-sync")
+            service_dir="${PROJECT_ROOT}/docker/sync/${service_name}"
+            ;;
+        *)
+            log_warn "Unknown service directory structure for: ${service_name}"
+            return 1
+            ;;
+    esac
+
+    local compose_file="${service_dir}/compose.yml"
+
+    # Check if service directory and compose file exist
+    if [[ ! -d "${service_dir}" ]]; then
+        log_warn "Service directory not found: ${service_dir}"
+        return 1
+    fi
+
+    if [[ ! -f "${compose_file}" ]]; then
+        log_warn "Compose file not found: ${compose_file}"
+        return 1
+    fi
+
+    # Load environment variables if available
+    local env_file="${service_dir}/compose.env"
+    if [[ -f "${env_file}" ]]; then
+        load_and_export_env_file "${env_file}"
+    fi
+
+    # Special handling for services that need building or have special requirements
+    case "${service_name}" in
+        "raspap")
+            # RaspAP needs build arguments and longer timeout
+            log_info "Building and starting RaspAP (may take 10-15 minutes)..."
+            if timeout 1200 docker compose -f "${compose_file}" up -d --build; then
+                return 0
+            else
+                local exit_code=$?
+                if [[ $exit_code -eq 124 ]]; then
+                    log_warn "RaspAP build timed out after 20 minutes"
+                else
+                    log_warn "RaspAP deployment failed"
+                fi
+                return 1
+            fi
+            ;;
+        "traefik")
+            # Traefik should be started first and given time to initialize
+            log_info "Starting Traefik (reverse proxy)..."
+            if docker compose -f "${compose_file}" up -d; then
+                sleep 5  # Give Traefik time to initialize
+                return 0
+            else
+                return 1
+            fi
+            ;;
+        *)
+            # Standard deployment for most services
+            log_debug "Starting ${service_name} with standard deployment..."
+            if docker compose -f "${compose_file}" up -d; then
+                return 0
+            else
+                return 1
+            fi
+            ;;
+    esac
 }
 
 # Setup container health monitoring using standardized patterns
@@ -4237,37 +4548,15 @@ detect_and_configure_nvme_storage() {
     local existing_partitions
     existing_partitions=$(lsblk -n -o NAME "${nvme_device}" | grep -c -v "^${nvme_devices[0]}$")
 
+    # Check if partitioning was confirmed during configuration
+    if [[ "${NVME_PARTITION_CONFIRMED:-false}" != "true" ]]; then
+        log_info "NVMe partitioning was not confirmed during configuration, skipping"
+        return 0
+    fi
+
     if [[ ${existing_partitions} -gt 0 ]]; then
-        log_warn "Existing partitions detected on ${nvme_device}"
+        log_info "Existing partitions detected on ${nvme_device} - proceeding with repartitioning as confirmed during configuration"
         lsblk "${nvme_device}"
-
-        enhanced_warning_box "EXISTING PARTITIONS DETECTED" \
-            "NVMe device ${nvme_device} contains existing partitions.\n\nCurrent partition layout:" \
-            "warning"
-
-        # Show current partitions in a table
-        local partition_data=()
-        partition_data+=("Partition,Size,Type,Mountpoint")
-
-        while IFS= read -r line; do
-            if [[ -n "$line" ]]; then
-                local name size fstype mountpoint
-                read -r name size fstype mountpoint <<< "$line"
-                partition_data+=("${name},${size},${fstype:-N/A},${mountpoint:-N/A}")
-            fi
-        done < <(lsblk -n -o NAME,SIZE,FSTYPE,MOUNTPOINT "${nvme_device}" | tail -n +2)
-
-        enhanced_table "${partition_data[0]}" "${partition_data[@]:1}"
-
-        echo
-        enhanced_warning_box "DESTRUCTIVE OPERATION WARNING" \
-            "⚠️  REPARTITIONING WILL PERMANENTLY DESTROY ALL EXISTING DATA!\n\n• All files and partitions on ${nvme_device} will be erased\n• This action cannot be undone\n• Make sure you have backups of any important data\n\nNew partition layout will be:\n• 256GB partition for /data\n• Remaining space for /content" \
-            "danger"
-
-        if ! enhanced_confirm "I understand the risks and want to proceed with repartitioning ${nvme_device}" "false"; then
-            log_info "NVMe partitioning cancelled by user"
-            return 0
-        fi
 
         # Aggressively unmount any mounted partitions
         log_info "Unmounting existing partitions..."
@@ -4897,11 +5186,21 @@ configure_friendlyelec_gpio_pwm() {
     # Make GPIO setup script executable
     chmod +x "$SCRIPT_DIR/setup-gpio.sh"
 
-    # Run GPIO/PWM setup
-    if "$SCRIPT_DIR/setup-gpio.sh" setup "$SUDO_USER"; then
-        log_success "GPIO and PWM interfaces configured"
+    # Run GPIO/PWM setup with proper user context
+    local target_user="${ORIGINAL_USER:-${SUDO_USER:-}}"
+    if [[ -n "$target_user" && "$target_user" != "root" ]]; then
+        if "$SCRIPT_DIR/setup-gpio.sh" setup "$target_user"; then
+            log_success "GPIO and PWM interfaces configured for user: $target_user"
+        else
+            log_warn "GPIO and PWM setup completed with warnings for user: $target_user"
+        fi
     else
-        log_warn "GPIO and PWM setup completed with warnings"
+        log_warn "No target user found for GPIO/PWM setup, skipping user group assignment"
+        if "$SCRIPT_DIR/setup-gpio.sh" setup; then
+            log_success "GPIO and PWM interfaces configured (no user groups assigned)"
+        else
+            log_warn "GPIO and PWM setup completed with warnings"
+        fi
     fi
 
     log_info "FriendlyElec GPIO and PWM configuration completed"
@@ -5177,37 +5476,10 @@ setup_raspap() {
         log_info "GitHub credentials found - RaspAP Insiders features will be available"
     fi
 
-    # Build and start RaspAP container with timeout handling
-    log_info "Building and starting RaspAP container..."
-    local raspap_compose_dir="${PROJECT_ROOT}/docker/infrastructure/raspap"
-    if [[ -d "${raspap_compose_dir}" && -f "${raspap_compose_dir}/compose.yml" ]]; then
-        # BOOT FIX: Don't fail setup if RaspAP container has issues
-        log_info "RaspAP build may take 10-15 minutes due to Insiders installation..."
+    # Note: RaspAP container deployment is now handled by deploy_selected_docker_services()
+    # This function now only handles configuration that needs to happen after deployment
 
-        # Use timeout to prevent hanging builds (20 minutes max)
-        if timeout 1200 docker compose -f "${raspap_compose_dir}/compose.yml" up -d --build; then
-            log_success "RaspAP container started successfully"
-        else
-            local exit_code=$?
-            if [[ $exit_code -eq 124 ]]; then
-                log_warn "RaspAP build timed out after 20 minutes - can be fixed after boot"
-                log_info "The build process was taking too long and was terminated"
-            else
-                log_warn "RaspAP container failed to start - can be fixed after boot"
-            fi
-            log_info "You can manually start RaspAP later with: docker compose -f ${raspap_compose_dir}/compose.yml up -d --build"
-            log_info "Or check build logs with: docker compose -f ${raspap_compose_dir}/compose.yml logs"
-        fi
-    else
-        log_warn "RaspAP compose directory or file not found: ${raspap_compose_dir}"
-        log_info "RaspAP setup skipped - can be configured manually after boot"
-    fi
-
-    # Wait for RaspAP to be ready
-    log_info "Waiting for RaspAP to initialize..."
-    sleep 60
-
-    # Configure DNS forwarding for DangerPrep integration
+    # Configure DNS forwarding for DangerPrep integration (no wait needed)
     if [[ -f "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh" ]]; then
         log_info "Configuring DNS forwarding for DangerPrep integration..."
         "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh"
@@ -5223,46 +5495,63 @@ setup_raspap() {
 configure_user_accounts() {
     log_info "Configuring user accounts..."
 
-    # Check if we're running as pi user
-    local current_user=$(whoami)
-    if [[ "$current_user" != "pi" ]]; then
-        log_warn "Not running as pi user. Skipping user account configuration."
-        log_info "Current user: $current_user"
+    # Check if pi user exists (since we're running with sudo, we need to check differently)
+    if ! id pi >/dev/null 2>&1; then
+        log_warn "Pi user does not exist. Skipping user account configuration."
+        log_info "Current effective user: $(whoami)"
+        log_info "Original user: ${ORIGINAL_USER:-unknown}"
+        return 0
+    fi
+
+    # Check if we're being run by the pi user (via sudo)
+    if [[ "${ORIGINAL_USER:-}" == "pi" ]]; then
+        log_info "Script was run by pi user via sudo - proceeding with user account configuration"
+    else
+        log_warn "Script was not run by pi user. Skipping user account configuration."
+        log_info "Original user: ${ORIGINAL_USER:-unknown}"
+        log_info "To configure user accounts, run this script as the pi user with sudo"
         return 0
     fi
 
     enhanced_section "User Account Configuration" "Replace default pi user with custom account" "👤"
 
-    # Collect new user information
-    local new_username
-    local new_password
-    local new_fullname
-    local transfer_ssh_keys="yes"
+    # Use pre-collected configuration if available
+    local new_username="${NEW_USERNAME:-}"
+    local new_password=""
+    local new_fullname="${NEW_USER_FULLNAME:-}"
+    local transfer_ssh_keys="${TRANSFER_SSH_KEYS:-yes}"
 
-    # Get username with validation
+    # If configuration wasn't collected upfront, collect it now (fallback)
+    if [[ -z "$new_username" ]]; then
+        log_info "User configuration not found, collecting now..."
+
+        # Get username with validation
+        while true; do
+            new_username=$(enhanced_input "New Username" "" "Enter username for new account (lowercase, no spaces)")
+            if [[ -z "$new_username" ]]; then
+                log_warn "Username cannot be empty"
+                continue
+            fi
+            if [[ ! "$new_username" =~ ^[a-z][a-z0-9_-]*$ ]]; then
+                log_warn "Username must start with lowercase letter and contain only lowercase letters, numbers, hyphens, and underscores"
+                continue
+            fi
+            if id "$new_username" >/dev/null 2>&1; then
+                log_warn "User $new_username already exists"
+                continue
+            fi
+            break
+        done
+
+        # Get full name
+        new_fullname=$(enhanced_input "Full Name" "" "Enter full name for new user (optional)")
+    else
+        log_info "Using pre-collected user configuration: $new_username"
+    fi
+
+    # Always collect password (for security, never store passwords in config)
     while true; do
-        new_username=$(enhanced_input "New Username" "" "Enter username for new account (lowercase, no spaces)")
-        if [[ -z "$new_username" ]]; then
-            log_warn "Username cannot be empty"
-            continue
-        fi
-        if [[ ! "$new_username" =~ ^[a-z][a-z0-9_-]*$ ]]; then
-            log_warn "Username must start with lowercase letter and contain only lowercase letters, numbers, hyphens, and underscores"
-            continue
-        fi
-        if id "$new_username" >/dev/null 2>&1; then
-            log_warn "User $new_username already exists"
-            continue
-        fi
-        break
-    done
-
-    # Get full name
-    new_fullname=$(enhanced_input "Full Name" "" "Enter full name for new user (optional)")
-
-    # Get password with confirmation
-    while true; do
-        new_password=$(enhanced_password "New Password" "Enter password for new user")
+        new_password=$(enhanced_password "New Password" "Enter password for $new_username")
         if [[ -z "$new_password" ]]; then
             log_warn "Password cannot be empty"
             continue
@@ -6345,18 +6634,8 @@ setup_tailscale() {
 setup_advanced_dns() {
     log_info "Setting up advanced DNS..."
 
-    # Start DNS infrastructure containers
-    log_info "Starting DNS containers (CoreDNS + AdGuard)..."
-    local dns_compose_dir="${PROJECT_ROOT}/docker/infrastructure/dns"
-    if [[ -d "${dns_compose_dir}" && -f "${dns_compose_dir}/compose.yml" ]]; then
-        docker compose -f "${dns_compose_dir}/compose.yml" up -d
-    else
-        log_warn "DNS compose directory or file not found: ${dns_compose_dir}"
-        log_warn "Skipping DNS container setup"
-    fi
-
-    # Wait for containers to be ready
-    sleep 10
+    # Note: DNS container deployment is now handled by deploy_selected_docker_services()
+    # This function now only handles configuration that needs to happen after deployment
 
     log_success "Advanced DNS configured via Docker containers"
 }
@@ -6365,28 +6644,8 @@ setup_advanced_dns() {
 setup_certificate_management() {
     log_info "Setting up certificate management..."
 
-    # Start Traefik for ACME/Let's Encrypt certificates
-    log_info "Starting Traefik for ACME certificate management..."
-    local traefik_compose_dir="${PROJECT_ROOT}/docker/infrastructure/traefik"
-    if [[ -d "${traefik_compose_dir}" && -f "${traefik_compose_dir}/compose.yml" ]]; then
-        docker compose -f "${traefik_compose_dir}/compose.yml" up -d
-    else
-        log_warn "Traefik compose directory or file not found: ${traefik_compose_dir}"
-        log_warn "Skipping Traefik setup"
-    fi
-
-    # Start Step-CA for internal certificate authority
-    log_info "Starting Step-CA for internal certificates..."
-    local stepca_compose_dir="${PROJECT_ROOT}/docker/infrastructure/step-ca"
-    if [[ -d "${stepca_compose_dir}" && -f "${stepca_compose_dir}/compose.yml" ]]; then
-        docker compose -f "${stepca_compose_dir}/compose.yml" up -d
-    else
-        log_warn "Step-CA compose directory or file not found: ${stepca_compose_dir}"
-        log_warn "Skipping Step-CA setup"
-    fi
-
-    # Wait for containers to be ready
-    sleep 15
+    # Note: Certificate management container deployment is now handled by deploy_selected_docker_services()
+    # This function now only handles configuration that needs to happen after deployment
 
     log_success "Certificate management configured via Docker containers"
 }
@@ -6769,10 +7028,15 @@ main() {
         echo
         log_info "Last completed phase: $last_completed_phase"
 
-        local resume_choice
-        resume_choice=$(enhanced_choose "Installation Options" \
-            "Resume from last completed phase" \
-            "Restart from beginning")
+        # In non-interactive mode or when configuration is pre-collected, automatically resume
+        local resume_choice="Resume from last completed phase"
+        if [[ "${NON_INTERACTIVE:-false}" != "true" ]] && [[ -t 0 ]] && [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
+            resume_choice=$(enhanced_choose "Installation Options" \
+                "Resume from last completed phase" \
+                "Restart from beginning")
+        else
+            log_info "Non-interactive mode: automatically resuming from last completed phase"
+        fi
 
         case "$resume_choice" in
             "Resume from last completed phase")
