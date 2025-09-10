@@ -2796,7 +2796,7 @@ update_system_packages() {
     export DEBIAN_FRONTEND=noninteractive
 
     # Update package lists with retry logic
-    if enhanced_spin "Updating package lists" retry_with_backoff 3 5 30 apt update; then
+    if retry_with_backoff 3 5 30 apt update; then
         enhanced_status_indicator "success" "Package lists updated"
     else
         enhanced_status_indicator "failure" "Failed to update package lists"
@@ -2804,7 +2804,7 @@ update_system_packages() {
     fi
 
     # Upgrade packages with retry logic
-    if enhanced_spin "Upgrading packages" retry_with_backoff 3 10 60 apt upgrade -y; then
+    if retry_with_backoff 3 10 60 apt upgrade -y; then
         enhanced_status_indicator "success" "System packages upgraded"
     else
         enhanced_status_indicator "failure" "Failed to upgrade packages"
