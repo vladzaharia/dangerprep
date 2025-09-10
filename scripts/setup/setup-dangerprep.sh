@@ -131,15 +131,14 @@ install_packages_with_selection() {
     fi
 
     # Show package summary and confirm (only if packages were interactively selected)
-    log_info "📋 Package Installation Summary: ${#selected_packages[@]} packages selected"
-    echo
+    enhanced_status_indicator "info" "Package Installation Summary: ${#selected_packages[@]} packages selected"
 
     # Only ask for confirmation if packages were selected interactively (not pre-selected from config)
     if [[ "$packages_preselected" == "false" ]] && ! enhanced_confirm "Proceed with package installation?" "true"; then
         log_info "Package installation cancelled by user"
         return 1
     elif [[ "$packages_preselected" == "true" ]]; then
-        log_info "Proceeding with installation of pre-selected packages..."
+        log_debug "Proceeding with installation of pre-selected packages"
     fi
 
     # Install selected packages with progress tracking
@@ -183,11 +182,10 @@ install_packages_with_selection() {
 
     # Report installation results
     if [[ ${#failed_packages[@]} -gt 0 ]]; then
-        log_warn "Failed to install ${#failed_packages[@]} packages: ${failed_packages[*]}"
-        log_info "These packages may not be available in the current repository"
+        enhanced_status_indicator "warning" "Failed to install ${#failed_packages[@]} packages (may not be available)"
     fi
 
-    log_success "Successfully installed $((total_packages - ${#failed_packages[@]}))/${total_packages} packages"
+    enhanced_status_indicator "success" "Installed $((total_packages - ${#failed_packages[@]}))/${total_packages} packages"
     return 0
 }
 
@@ -209,10 +207,8 @@ standard_installer_step() {
     fi
 
     # Execute the function directly (not through enhanced_spin since it expects commands, not functions)
-    log_info "Executing $step_description..."
     if "$step_function"; then
         enhanced_status_indicator "success" "$step_description completed"
-        log_success "$step_name completed successfully"
         return 0
     else
         local exit_code=$?
@@ -250,9 +246,9 @@ standard_secure_copy() {
     if [[ -f "$dest" ]]; then
         local backup_file="${BACKUP_DIR}/$(basename "$dest").backup-$(date +%Y%m%d-%H%M%S)"
         if cp "$dest" "$backup_file" 2>/dev/null; then
-            log_debug "Backed up existing file: $dest -> $backup_file"
+            log_debug "Backed up: $dest"
         else
-            log_warn "Failed to backup existing file: $dest"
+            log_warn "Failed to backup: $dest"
         fi
     fi
 
@@ -270,10 +266,10 @@ standard_secure_copy() {
     if cp "$src" "$dest"; then
         chmod "$mode" "$dest"
         chown "$owner:$group" "$dest"
-        log_debug "Securely copied: $src -> $dest (mode: $mode, owner: $owner:$group)"
+        log_debug "Copied: $src -> $dest"
         return 0
     else
-        log_error "Failed to copy file: $src -> $dest"
+        log_error "Failed to copy: $src -> $dest"
         return 1
     fi
 }
@@ -302,7 +298,7 @@ standard_create_directory() {
     if mkdir "${mkdir_opts[@]}" "$dir_path" 2>/dev/null || [[ -d "$dir_path" ]]; then
         chmod "$mode" "$dir_path"
         chown "$owner:$group" "$dir_path"
-        log_debug "Created directory: $dir_path (mode: $mode, owner: $owner:$group)"
+        log_debug "Created directory: $dir_path"
         return 0
     else
         log_error "Failed to create directory: $dir_path"
@@ -338,7 +334,7 @@ standard_set_permissions() {
     fi
 
     if chmod "${chmod_opts[@]}" "$mode" "$target_path"; then
-        log_debug "Set permissions: $target_path (mode: $mode)"
+        log_debug "Set permissions: $target_path"
     else
         log_error "Failed to set permissions: $target_path"
         return 1
@@ -357,7 +353,7 @@ standard_set_permissions() {
         fi
 
         if chown "${chown_opts[@]}" "$chown_target" "$target_path"; then
-            log_debug "Set ownership: $target_path (owner: $chown_target)"
+            log_debug "Set ownership: $target_path"
         else
             log_error "Failed to set ownership: $target_path"
             return 1
@@ -467,9 +463,9 @@ standard_create_service_file() {
     if echo "$service_content" > "$service_file"; then
         chmod 644 "$service_file"
         chown root:root "$service_file"
-        log_debug "Created service file: $service_file"
+        log_debug "Created service: $service_file"
     else
-        log_error "Failed to create service file: $service_file"
+        log_error "Failed to create service: $service_file"
         return 1
     fi
 
@@ -538,7 +534,7 @@ EOF
 
     # Set proper permissions for cron file
     if chmod 644 "$cron_file" && chown root:root "$cron_file"; then
-        log_debug "Created cron job: $job_name ($schedule)"
+        log_debug "Created cron job: $job_name"
         return 0
     else
         log_error "Failed to set permissions on cron job: $cron_file"
@@ -608,7 +604,7 @@ standard_create_env_file() {
     if echo "$content" > "$file_path"; then
         chmod "$mode" "$file_path"
         chown "$owner:$group" "$file_path"
-        log_debug "Created environment file: $file_path (mode: $mode)"
+        log_debug "Created environment file: $file_path"
         return 0
     else
         log_error "Failed to create environment file: $file_path"
@@ -677,10 +673,10 @@ standard_process_template() {
 
     # Write processed content
     if echo "$content" > "$output_file"; then
-        log_debug "Processed template: $template_file -> $output_file"
+        log_debug "Processed template: $output_file"
         return 0
     else
-        log_error "Failed to write processed template: $output_file"
+        log_error "Failed to write template: $output_file"
         return 1
     fi
 }
@@ -870,12 +866,12 @@ import_github_ssh_keys() {
         return 1
     fi
 
-    log_info "Importing SSH keys from GitHub account: $github_username"
+    enhanced_status_indicator "info" "Importing SSH keys from GitHub: $github_username"
 
     # Create .ssh directory for user if it doesn't exist
     local ssh_dir="/home/$local_username/.ssh"
     if ! standard_create_directory "$ssh_dir" "700" "$local_username" "$local_username"; then
-        log_error "Failed to create SSH directory for $local_username"
+        enhanced_status_indicator "failure" "Failed to create SSH directory"
         return 1
     fi
 
@@ -883,8 +879,6 @@ import_github_ssh_keys() {
     local github_keys_url="https://api.github.com/users/$github_username/keys"
     local temp_keys_file
     temp_keys_file=$(mktemp)
-
-    log_info "Fetching SSH keys from: $github_keys_url"
 
     # Use curl with better error handling and timeout
     if ! curl -s -f --max-time 30 --retry 3 --retry-delay 2 \
@@ -910,20 +904,16 @@ import_github_ssh_keys() {
 
         case "$http_code" in
             "404")
-                log_error "GitHub user '$github_username' not found"
-                log_error "Please verify the username is correct"
+                enhanced_status_indicator "failure" "GitHub user '$github_username' not found"
                 ;;
             "403")
-                log_error "GitHub API rate limit exceeded or access forbidden"
-                log_error "Please try again later"
+                enhanced_status_indicator "failure" "GitHub API rate limit exceeded"
                 ;;
             "000")
-                log_error "Network connection failed"
-                log_error "Please check your internet connection"
+                enhanced_status_indicator "failure" "Network connection failed"
                 ;;
             *)
-                log_error "HTTP error code: $http_code"
-                log_error "Please verify the username is correct and try again"
+                enhanced_status_indicator "failure" "HTTP error code: $http_code"
                 ;;
         esac
 
@@ -957,7 +947,7 @@ import_github_ssh_keys() {
     # Count available keys
     local available_keys
     available_keys=$(grep -c '"key"' "$temp_keys_file" 2>/dev/null || echo "0")
-    log_info "Found $available_keys SSH keys in GitHub account"
+    enhanced_status_indicator "info" "Found $available_keys SSH keys in GitHub account"
 
     # Extract SSH keys from JSON response and create authorized_keys file
     local authorized_keys_file="$ssh_dir/authorized_keys"
@@ -972,8 +962,6 @@ import_github_ssh_keys() {
     # Parse JSON and extract keys with better validation
     local key_count=0
     local skipped_count=0
-
-    log_info "Parsing and validating SSH keys..."
 
     while IFS= read -r line; do
         if [[ "$line" =~ \"key\":[[:space:]]*\"([^\"]+)\" ]]; then
@@ -1004,21 +992,20 @@ import_github_ssh_keys() {
     done < "$temp_keys_file"
 
     if [[ $skipped_count -gt 0 ]]; then
-        log_warn "Skipped $skipped_count invalid SSH keys"
+        enhanced_status_indicator "warning" "Skipped $skipped_count invalid SSH keys"
     fi
 
     if [[ $key_count -eq 0 ]]; then
-        log_error "No valid SSH keys found in GitHub response"
+        enhanced_status_indicator "failure" "No valid SSH keys found"
         rm -f "$temp_keys_file" "$temp_auth_keys"
         return 1
     fi
 
     # Install the authorized_keys file with proper permissions
     if standard_secure_copy "$temp_auth_keys" "$authorized_keys_file" "600" "$local_username" "$local_username"; then
-        log_success "Successfully imported $key_count SSH keys from GitHub account: $github_username"
         enhanced_status_indicator "success" "Imported $key_count SSH keys from GitHub"
     else
-        log_error "Failed to install authorized_keys file"
+        enhanced_status_indicator "failure" "Failed to install authorized_keys file"
         rm -f "$temp_keys_file" "$temp_auth_keys"
         return 1
     fi
@@ -1061,11 +1048,11 @@ retry_with_backoff() {
         local exit_code=$?
 
         if [[ $attempt -eq $max_attempts ]]; then
-            log_error "Command failed after $max_attempts attempts: $*"
+            enhanced_status_indicator "failure" "Command failed after $max_attempts attempts: $*"
             return $exit_code
         fi
 
-        log_warn "Command failed (exit code $exit_code), retrying in ${current_delay}s..."
+        enhanced_status_indicator "warning" "Command failed (exit code $exit_code), retrying in ${current_delay}s"
         sleep "$current_delay"
 
         # Exponential backoff with jitter
@@ -1578,8 +1565,8 @@ parse_arguments() {
                 exit 1
                 ;;
             *)
-                echo "ERROR: Unexpected argument: $1" >&2
-                echo "ERROR: Use --help for usage information" >&2
+                log_error "Unexpected argument: $1"
+                log_error "Use --help for usage information"
                 return 1
                 ;;
         esac
@@ -1599,16 +1586,15 @@ load_configuration() {
         fi
         log_debug "Configuration utilities loaded successfully"
     else
-        log_warn "Configuration loader not found: $config_loader"
-        log_warn "Some configuration features may not be available"
+        log_warn "Configuration loader not found, some features may not be available"
 
         # Provide minimal fallback functions
         validate_config_files() { return 0; }
-        load_ssh_config() { log_warn "SSH config loading not available"; }
-        load_fail2ban_config() { log_warn "Fail2ban config loading not available"; }
-        load_docker_config() { log_warn "Docker config loading not available"; }
-        load_watchtower_config() { log_warn "Watchtower config loading not available"; }
-        load_sync_configs() { log_warn "Sync config loading not available"; }
+        load_ssh_config() { log_debug "SSH config loading not available"; }
+        load_fail2ban_config() { log_debug "Fail2ban config loading not available"; }
+        load_docker_config() { log_debug "Docker config loading not available"; }
+        load_watchtower_config() { log_debug "Watchtower config loading not available"; }
+        load_sync_configs() { log_debug "Sync config loading not available"; }
         # Add other fallback functions as needed
     fi
 }
@@ -1632,36 +1618,31 @@ INSTALL_STATE_FILE="/etc/dangerprep/install-state.conf"
 
 # Set default configuration values for non-interactive mode
 set_default_configuration_values() {
-    log_info "Setting default configuration values..."
+    log_debug "Setting default configuration values"
 
     # Set default username if not already set
     if [[ -z "${NEW_USERNAME:-}" ]]; then
         NEW_USERNAME="dangerprep"
-        log_debug "Set default username: $NEW_USERNAME"
     fi
 
     # Set default full name if not already set
     if [[ -z "${NEW_USER_FULLNAME:-}" ]]; then
         NEW_USER_FULLNAME="DangerPrep User"
-        log_debug "Set default full name: $NEW_USER_FULLNAME"
     fi
 
     # Set default SSH key transfer settings
     if [[ -z "${TRANSFER_SSH_KEYS:-}" ]]; then
         TRANSFER_SSH_KEYS="yes"
-        log_debug "Set default SSH key transfer: $TRANSFER_SSH_KEYS"
     fi
 
     # Set default GitHub key import settings
     if [[ -z "${IMPORT_GITHUB_KEYS:-}" ]]; then
         IMPORT_GITHUB_KEYS="no"
-        log_debug "Set default GitHub key import: $IMPORT_GITHUB_KEYS"
     fi
 
     # Set default storage configuration
     if [[ -z "${NVME_PARTITION_CONFIRMED:-}" ]]; then
         NVME_PARTITION_CONFIRMED="false"
-        log_debug "Set default NVMe partition confirmation: $NVME_PARTITION_CONFIRMED"
     fi
 
     # Export all variables for use in templates and other functions
@@ -1673,12 +1654,12 @@ set_default_configuration_values() {
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
 
-    log_debug "Default configuration values set and exported"
+    log_debug "Configuration values set and exported"
 }
 
 # Save configuration to persistent storage
 save_configuration() {
-    log_info "Saving configuration for future runs..."
+    log_debug "Saving configuration for future runs"
 
     # Ensure config directory exists
     mkdir -p "$(dirname "$CONFIG_STATE_FILE")"
@@ -1732,10 +1713,9 @@ EOF
 # Load configuration from persistent storage
 load_saved_configuration() {
     if [[ -f "$CONFIG_STATE_FILE" ]]; then
-        log_info "Found saved configuration from previous run"
+        log_debug "Loading saved configuration from previous run"
         # shellcheck source=/dev/null
         source "$CONFIG_STATE_FILE"
-        log_debug "Loaded configuration from $CONFIG_STATE_FILE"
         return 0
     else
         log_debug "No saved configuration found"
@@ -1747,7 +1727,7 @@ load_saved_configuration() {
 clear_saved_configuration() {
     if [[ -f "$CONFIG_STATE_FILE" ]]; then
         rm -f "$CONFIG_STATE_FILE"
-        log_info "Cleared saved configuration"
+        log_debug "Cleared saved configuration"
     fi
 }
 
@@ -1802,7 +1782,7 @@ is_phase_completed() {
 clear_install_state() {
     if [[ -f "$INSTALL_STATE_FILE" ]]; then
         rm -f "$INSTALL_STATE_FILE"
-        log_info "Cleared installation state"
+        log_debug "Cleared installation state"
     fi
 }
 
@@ -1825,33 +1805,27 @@ get_last_completed_phase() {
 
 # Interactive configuration collection
 collect_configuration() {
-    log_info "Collecting configuration preferences..."
-
     # Check if we're in a non-interactive environment or mode
     if [[ "${NON_INTERACTIVE:-false}" == "true" ]] || [[ "${DRY_RUN:-false}" == "true" ]] || [[ ! -t 0 ]] || [[ ! -t 1 ]] || [[ "${TERM:-}" == "dumb" ]]; then
-        log_info "Non-interactive mode enabled, using default configuration values"
+        log_info "Using default configuration values (non-interactive mode)"
         set_default_configuration_values
         return 0
     fi
 
     # Additional check for SSH or remote sessions where interaction might not work well
     if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]] || [[ "${TERM:-}" == "screen"* ]]; then
-        log_warn "Remote/SSH session detected, using default configuration values"
-        log_info "Use --non-interactive flag to suppress this warning"
+        log_warn "Remote session detected, using defaults (use --non-interactive to suppress)"
         set_default_configuration_values
         return 0
     fi
 
     # Check for saved configuration from previous run
     if load_saved_configuration; then
-        echo
-        log_info "📋 Found Previous Configuration"
-        echo
+        enhanced_section "Previous Configuration Found" "Configuration from previous run detected" "📋"
 
         # Show current configuration summary
         show_complete_configuration_summary
 
-        echo
         local config_choice
         config_choice=$(enhanced_choose "Configuration Options" \
             "Use saved configuration" \
@@ -1860,15 +1834,15 @@ collect_configuration() {
 
         case "$config_choice" in
             "Use saved configuration")
-                log_info "Using saved configuration from previous run"
+                log_info "Using saved configuration"
                 return 0
                 ;;
             "Modify configuration")
-                log_info "Modifying existing configuration..."
+                log_debug "Modifying existing configuration"
                 # Continue with interactive collection but with current values as defaults
                 ;;
             "Start fresh (clear saved config)")
-                log_info "Starting with fresh configuration..."
+                log_debug "Starting with fresh configuration"
                 clear_saved_configuration
                 # Reset to defaults and continue with interactive collection
                 set_default_configuration_values
@@ -1878,21 +1852,18 @@ collect_configuration() {
 
 
     # Network configuration
-    log_info "📡 Network Configuration"
-    echo
+    enhanced_section "Network Configuration" "Configure WiFi hotspot and network settings" "📡"
 
     local new_wifi_ssid
     new_wifi_ssid=$(enhanced_input "WiFi Hotspot Name (SSID)" "${WIFI_SSID}" "Enter WiFi network name")
     if [[ -n "${new_wifi_ssid}" ]]; then
         WIFI_SSID="${new_wifi_ssid}"
-        log_debug "WiFi SSID set to: ${WIFI_SSID}"
     fi
 
     local new_wifi_password
     new_wifi_password=$(enhanced_input "WiFi Password" "${WIFI_PASSWORD}" "Enter WiFi password (min 8 chars)")
     if [[ -n "${new_wifi_password}" && ${#new_wifi_password} -ge 8 ]]; then
         WIFI_PASSWORD="${new_wifi_password}"
-        log_debug "WiFi password updated"
     elif [[ -n "${new_wifi_password}" ]]; then
         log_warn "WiFi password too short (minimum 8 characters), using default"
     fi
@@ -1904,7 +1875,6 @@ collect_configuration() {
         # Extract base IP for LAN_IP (replace last octet with 1)
         LAN_IP="${new_lan_network%/*}"
         LAN_IP="${LAN_IP%.*}.1"
-        log_debug "LAN network set to: ${LAN_NETWORK}, gateway: ${LAN_IP}"
     elif [[ -n "${new_lan_network}" ]]; then
         log_warn "Invalid network CIDR format, using default: ${LAN_NETWORK}"
     fi
@@ -1914,7 +1884,6 @@ collect_configuration() {
     new_dhcp_start=$(enhanced_input "DHCP Range Start" "${DHCP_START}" "First IP in DHCP pool")
     if [[ -n "${new_dhcp_start}" ]] && validate_ip_address "${new_dhcp_start}"; then
         DHCP_START="${new_dhcp_start}"
-        log_debug "DHCP start set to: ${DHCP_START}"
     elif [[ -n "${new_dhcp_start}" ]]; then
         log_warn "Invalid IP address format, using default: ${DHCP_START}"
     fi
@@ -1923,21 +1892,17 @@ collect_configuration() {
     new_dhcp_end=$(enhanced_input "DHCP Range End" "${DHCP_END}" "Last IP in DHCP pool")
     if [[ -n "${new_dhcp_end}" ]] && validate_ip_address "${new_dhcp_end}"; then
         DHCP_END="${new_dhcp_end}"
-        log_debug "DHCP end set to: ${DHCP_END}"
     elif [[ -n "${new_dhcp_end}" ]]; then
         log_warn "Invalid IP address format, using default: ${DHCP_END}"
     fi
 
-    echo
-    log_info "🔒 Security Configuration"
-    echo
+    enhanced_section "Security Configuration" "Configure SSH and security settings" "🔒"
 
     # SSH configuration
     local new_ssh_port
     new_ssh_port=$(enhanced_input "SSH Port" "${SSH_PORT}" "Port for SSH access")
     if [[ -n "${new_ssh_port}" ]] && validate_port_number "${new_ssh_port}"; then
         SSH_PORT="${new_ssh_port}"
-        log_debug "SSH port set to: ${SSH_PORT}"
     elif [[ -n "${new_ssh_port}" ]]; then
         log_warn "Invalid port number, using default: ${SSH_PORT}"
     fi
@@ -1947,7 +1912,6 @@ collect_configuration() {
     new_ban_time=$(enhanced_input "Fail2ban Ban Time (seconds)" "${FAIL2BAN_BANTIME}" "How long to ban IPs")
     if [[ -n "${new_ban_time}" ]] && [[ "${new_ban_time}" =~ ^[0-9]+$ ]]; then
         FAIL2BAN_BANTIME="${new_ban_time}"
-        log_debug "Fail2ban ban time set to: ${FAIL2BAN_BANTIME}"
     elif [[ -n "${new_ban_time}" ]]; then
         log_warn "Invalid ban time, using default: ${FAIL2BAN_BANTIME}"
     fi
@@ -1956,12 +1920,9 @@ collect_configuration() {
     new_max_retry=$(enhanced_input "Fail2ban Max Retry" "${FAIL2BAN_MAXRETRY}" "Failed attempts before ban")
     if [[ -n "${new_max_retry}" ]] && [[ "${new_max_retry}" =~ ^[0-9]+$ ]]; then
         FAIL2BAN_MAXRETRY="${new_max_retry}"
-        log_debug "Fail2ban max retry set to: ${FAIL2BAN_MAXRETRY}"
     elif [[ -n "${new_max_retry}" ]]; then
         log_warn "Invalid max retry value, using default: ${FAIL2BAN_MAXRETRY}"
     fi
-
-    echo
 
     # Package selection configuration
     collect_package_configuration
@@ -1987,7 +1948,6 @@ collect_configuration() {
     show_complete_configuration_summary
 
     # Final confirmation
-    echo
     if ! enhanced_confirm "Proceed with this complete configuration?" "true"; then
         log_info "Configuration cancelled by user"
         return 1
@@ -2641,20 +2601,21 @@ check_system_requirements() {
 show_setup_info() {
     # Use the shared banner utility
     show_setup_banner "$@"
-    echo
-    log_info "Logs: ${LOG_FILE}"
-    log_info "Backups: ${BACKUP_DIR}"
-    log_info "Install root: ${INSTALL_ROOT}"
+
+    enhanced_section "Setup Information" "Log and backup locations" "📁"
+    enhanced_status_indicator "info" "Logs: ${LOG_FILE}"
+    enhanced_status_indicator "info" "Backups: ${BACKUP_DIR}"
+    enhanced_status_indicator "info" "Install root: ${INSTALL_ROOT}"
 }
 
 # Show system information and detect FriendlyElec hardware
 show_system_info() {
-    log_info "System Information:"
-    log_info "OS: $(lsb_release -d | cut -f2)"
-    log_info "Kernel: $(uname -r)"
-    log_info "Architecture: $(uname -m)"
-    log_info "Memory: $(free -h | grep Mem | awk '{print $2}')"
-    log_info "Disk: $(df -h / | tail -1 | awk '{print $2}')"
+    enhanced_section "System Information" "Detected hardware and system details" "💻"
+    enhanced_status_indicator "info" "OS: $(lsb_release -d | cut -f2)"
+    enhanced_status_indicator "info" "Kernel: $(uname -r)"
+    enhanced_status_indicator "info" "Architecture: $(uname -m)"
+    enhanced_status_indicator "info" "Memory: $(free -h | grep Mem | awk '{print $2}')"
+    enhanced_status_indicator "info" "Disk: $(df -h / | tail -1 | awk '{print $2}')"
 
     # Detect platform and set FriendlyElec-specific flags
     detect_friendlyelec_platform
@@ -2678,7 +2639,7 @@ detect_friendlyelec_platform() {
         # Check for FriendlyElec hardware
         if [[ "$PLATFORM" =~ (NanoPi|NanoPC|CM3588) ]]; then
             IS_FRIENDLYELEC=true
-            log_info "FriendlyElec hardware detected"
+            enhanced_status_indicator "success" "FriendlyElec hardware detected"
 
             # Extract model information
             if [[ "$PLATFORM" =~ NanoPi[[:space:]]*M6 ]]; then
@@ -2701,15 +2662,15 @@ detect_friendlyelec_platform() {
                 FRIENDLYELEC_MODEL="Unknown FriendlyElec"
             fi
 
-            log_info "Model: $FRIENDLYELEC_MODEL"
-            log_info "SoC: $SOC_TYPE"
+            enhanced_status_indicator "info" "Model: $FRIENDLYELEC_MODEL"
+            enhanced_status_indicator "info" "SoC: $SOC_TYPE"
 
             # Detect additional hardware features
             detect_friendlyelec_features
         fi
     else
         PLATFORM="Generic x86_64"
-        log_info "Platform: $PLATFORM"
+        enhanced_status_indicator "info" "Platform: $PLATFORM"
     fi
 
     # Export variables for use in other functions
@@ -2753,45 +2714,53 @@ detect_friendlyelec_features() {
 
     # Log detected features
     if [[ ${#features[@]} -gt 0 ]]; then
-        log_info "Hardware features: ${features[*]}"
+        enhanced_status_indicator "info" "Hardware features: ${features[*]}"
     fi
 }
 
 # Pre-flight checks
 pre_flight_checks() {
-    log_info "Running pre-flight checks..."
-    
+    enhanced_section "Pre-flight Checks" "Validating system requirements" "✈️"
+
     # Check Ubuntu version
     if ! lsb_release -d | grep -q "Ubuntu 24.04"; then
-        log_warn "This script is designed for Ubuntu 24.04. Proceeding anyway..."
+        enhanced_status_indicator "warning" "Not Ubuntu 24.04, proceeding anyway"
+    else
+        enhanced_status_indicator "success" "Ubuntu 24.04 detected"
     fi
 
     # Check internet connectivity
     if ! ping -c 1 8.8.8.8 >/dev/null 2>&1; then
-        log_error "No internet connectivity. Please check your connection."
+        enhanced_status_indicator "failure" "No internet connectivity"
         return 1
+    else
+        enhanced_status_indicator "success" "Internet connectivity verified"
     fi
 
     # Check available disk space (minimum 10GB)
     available_space=$(df / | tail -1 | awk '{print $4}')
     if [[ $available_space -lt 10485760 ]]; then  # 10GB in KB
-        log_error "Insufficient disk space. At least 10GB required."
+        enhanced_status_indicator "failure" "Insufficient disk space (need 10GB)"
         return 1
+    else
+        enhanced_status_indicator "success" "Sufficient disk space available"
     fi
 
     # Validate configuration files
     if ! validate_config_files; then
-        log_error "Configuration file validation failed"
+        enhanced_status_indicator "failure" "Configuration validation failed"
         return 1
+    else
+        enhanced_status_indicator "success" "Configuration files validated"
     fi
 
-    log_success "Pre-flight checks completed"
+    enhanced_status_indicator "success" "All pre-flight checks passed"
 }
 
 # Backup original configurations
 backup_original_configs() {
-    log_info "Backing up original configurations..."
-    
+    enhanced_section "Configuration Backup" "Backing up original system configurations" "💾"
+
     local configs_to_backup=(
         "/etc/ssh/sshd_config"
         "/etc/sysctl.conf"
@@ -2800,47 +2769,52 @@ backup_original_configs() {
         "/etc/sensors3.conf"
         "/etc/netplan"
     )
-    
+
+    local backed_up=0
     for config in "${configs_to_backup[@]}"; do
         if [[ -e "$config" ]]; then
-            cp -r "$config" "$BACKUP_DIR/" 2>/dev/null || true
-            log_info "Backed up: $config"
+            if cp -r "$config" "$BACKUP_DIR/" 2>/dev/null; then
+                enhanced_status_indicator "success" "Backed up: $(basename "$config")"
+                ((backed_up++))
+            fi
         fi
     done
-    
-    log_success "Original configurations backed up to ${BACKUP_DIR}"
+
+    enhanced_status_indicator "success" "Backed up $backed_up configurations to ${BACKUP_DIR}"
 }
 
 # Update system packages
 update_system_packages() {
-    log_info "Updating system packages..."
+    enhanced_section "System Updates" "Updating system packages" "📦"
 
     # Check if we have root privileges for package operations
     if [[ $EUID -ne 0 ]]; then
-        log_error "Root privileges required for package operations"
+        enhanced_status_indicator "failure" "Root privileges required"
         return 1
     fi
 
     export DEBIAN_FRONTEND=noninteractive
 
     # Update package lists with retry logic
-    if ! retry_with_backoff 3 5 30 apt update; then
-        log_error "Failed to update package lists after multiple attempts"
+    if enhanced_spin "Updating package lists" retry_with_backoff 3 5 30 apt update; then
+        enhanced_status_indicator "success" "Package lists updated"
+    else
+        enhanced_status_indicator "failure" "Failed to update package lists"
         return 1
     fi
 
     # Upgrade packages with retry logic
-    if ! retry_with_backoff 3 10 60 apt upgrade -y; then
-        log_error "Failed to upgrade packages after multiple attempts"
+    if enhanced_spin "Upgrading packages" retry_with_backoff 3 10 60 apt upgrade -y; then
+        enhanced_status_indicator "success" "System packages upgraded"
+    else
+        enhanced_status_indicator "failure" "Failed to upgrade packages"
         return 1
     fi
-
-    log_success "System packages updated"
 }
 
 # Install essential packages using standardized pattern and upfront configuration
 install_essential_packages() {
-    log_info "📦 Installing essential packages based on configuration..."
+    enhanced_section "Essential Packages" "Installing packages based on configuration" "📦"
 
     # Core packages: Always installed (Essential for DangerPrep functionality)
     local core_packages="curl,wget,git,bc,unzip,software-properties-common,apt-transport-https,ca-certificates,gnupg,lsb-release,iptables,iptables-persistent"
@@ -2885,25 +2859,24 @@ install_essential_packages() {
 
     # Install Tailscale if Network packages were selected
     if [[ -n "$SELECTED_PACKAGE_CATEGORIES" ]] && echo "$SELECTED_PACKAGE_CATEGORIES" | grep -q "Network packages"; then
-        log_info "Installing Tailscale (Network package)..."
+        enhanced_status_indicator "info" "Installing Tailscale (Network package)"
         setup_tailscale
     fi
 
     # Clean up package cache
-    enhanced_spin "Cleaning package cache" bash -c "apt autoremove -y"
-    enhanced_spin "Cleaning package cache" bash -c "apt autoclean"
+    enhanced_spin "Cleaning package cache" bash -c "apt autoremove -y && apt autoclean"
 
     if [[ $install_result -eq 0 ]]; then
-        log_success "Essential packages installation completed"
+        enhanced_status_indicator "success" "Essential packages installation completed"
     else
-        log_error "Essential packages installation failed"
+        enhanced_status_indicator "failure" "Essential packages installation failed"
         return $install_result
     fi
 }
 
 # Install FriendlyElec-specific packages using standardized pattern and upfront configuration
 install_friendlyelec_packages() {
-    log_info "Installing FriendlyElec-specific packages based on configuration..."
+    enhanced_section "FriendlyElec Packages" "Installing hardware-specific packages" "🔧"
 
     # Build package categories based on upfront configuration
     local package_categories=()
@@ -2934,7 +2907,7 @@ install_friendlyelec_packages() {
         # Use standardized package installation function
         install_packages_with_selection "FriendlyElec Packages" "Installing FriendlyElec-specific packages based on your configuration" "${package_categories[@]}"
     else
-        log_info "No FriendlyElec packages selected for installation"
+        enhanced_status_indicator "info" "No FriendlyElec packages selected"
     fi
 
     # Install FriendlyElec kernel headers if available
@@ -2943,81 +2916,73 @@ install_friendlyelec_packages() {
     # Configure hardware-specific settings based on selected features
     configure_friendlyelec_hardware
 
-    log_success "FriendlyElec-specific packages installation completed"
+    enhanced_status_indicator "success" "FriendlyElec packages installation completed"
 }
 
 # Install FriendlyElec kernel headers
 install_friendlyelec_kernel_headers() {
-    log_info "Checking FriendlyElec kernel headers..."
-
     local current_kernel
     current_kernel=$(uname -r)
 
     # Check if kernel headers are already installed for current kernel
     if dpkg -l | grep -q "linux-headers-${current_kernel}"; then
-        log_info "Kernel headers for ${current_kernel} already installed"
+        enhanced_status_indicator "success" "Kernel headers already installed"
         return 0
     fi
 
     # Check if generic kernel headers are sufficient
     if dpkg -l | grep -q "linux-headers-generic" && [[ -d "/usr/src/linux-headers-${current_kernel}" ]]; then
-        log_info "Generic kernel headers already provide support for ${current_kernel}"
+        enhanced_status_indicator "success" "Generic kernel headers sufficient"
         return 0
     fi
 
     # Check if FriendlyElec-specific headers are already installed
     if dpkg -l | grep -q "^ii.*linux-headers.*${current_kernel}"; then
-        log_info "FriendlyElec kernel headers for ${current_kernel} already installed"
+        enhanced_status_indicator "success" "FriendlyElec kernel headers already installed"
         return 0
     fi
 
-    log_info "Installing FriendlyElec kernel headers for ${current_kernel}..."
+    enhanced_status_indicator "info" "Installing FriendlyElec kernel headers"
 
     # Check for pre-installed kernel headers in /opt/archives/
     if [[ -d /opt/archives ]]; then
         local kernel_headers
         kernel_headers=$(find /opt/archives -name "linux-headers-${current_kernel}*.deb" | head -1)
         if [[ -n "$kernel_headers" ]]; then
-            log_info "Found FriendlyElec kernel headers: $kernel_headers"
-            if dpkg -i "$kernel_headers" 2>/dev/null; then
-                log_success "Installed FriendlyElec kernel headers"
+            if enhanced_spin "Installing kernel headers from archive" dpkg -i "$kernel_headers"; then
+                enhanced_status_indicator "success" "Installed FriendlyElec kernel headers"
                 return 0
             else
-                log_warn "Failed to install FriendlyElec kernel headers from archive"
+                enhanced_status_indicator "warning" "Failed to install from archive"
             fi
-        else
-            log_debug "No matching FriendlyElec kernel headers found in /opt/archives/"
         fi
     fi
 
     # Try to download latest kernel headers if not found locally
-    log_info "Attempting to download kernel headers for ${current_kernel}..."
     local headers_url="http://112.124.9.243/archives/rk3588/linux-headers-${current_kernel}-latest.deb"
 
     if wget -q --spider "$headers_url" 2>/dev/null; then
-        log_info "Downloading kernel headers from FriendlyElec repository..."
-        if wget -O "/tmp/linux-headers-latest.deb" "$headers_url" 2>/dev/null; then
-            if dpkg -i "/tmp/linux-headers-latest.deb" 2>/dev/null; then
-                log_success "Downloaded and installed latest kernel headers"
+        if enhanced_spin "Downloading kernel headers" wget -O "/tmp/linux-headers-latest.deb" "$headers_url"; then
+            if enhanced_spin "Installing downloaded headers" dpkg -i "/tmp/linux-headers-latest.deb"; then
+                enhanced_status_indicator "success" "Downloaded and installed kernel headers"
                 rm -f "/tmp/linux-headers-latest.deb"
                 return 0
             else
-                log_warn "Failed to install downloaded kernel headers"
+                enhanced_status_indicator "warning" "Failed to install downloaded headers"
             fi
         else
-            log_warn "Failed to download kernel headers"
+            enhanced_status_indicator "warning" "Failed to download kernel headers"
         fi
     else
-        log_info "No online kernel headers available for ${current_kernel}"
+        enhanced_status_indicator "info" "No online kernel headers available"
     fi
 
     # Fall back to generic headers if available
     if ! dpkg -l | grep -q "linux-headers-generic"; then
-        log_info "Installing generic kernel headers as fallback..."
-        if apt-get install -y linux-headers-generic 2>/dev/null; then
-            log_success "Installed generic kernel headers"
+        if enhanced_spin "Installing generic kernel headers" apt-get install -y linux-headers-generic; then
+            enhanced_status_indicator "success" "Installed generic kernel headers"
         else
-            log_warn "Failed to install generic kernel headers"
+            enhanced_status_indicator "warning" "Failed to install generic headers"
         fi
     fi
 }
@@ -4100,98 +4065,103 @@ setup_docker_services() {
         "/content/kiwix:755:root:root"
     )
 
-    log_info "Creating directory structure..."
-
     # Create base directories under INSTALL_ROOT
+    local created_base=0
     for dir_spec in "${base_directories[@]}"; do
         IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
         if standard_create_directory "$dir_path" "$mode" "$owner" "$group"; then
-            log_debug "Created base directory: $dir_path"
+            ((created_base++))
         else
-            log_error "Failed to create base directory: $dir_path"
+            enhanced_status_indicator "failure" "Failed to create: $dir_path"
             return 1
         fi
     done
+    enhanced_status_indicator "success" "Created $created_base base directories"
 
     # Create data directories on /data partition (if mounted)
     if mountpoint -q /data 2>/dev/null; then
-        log_info "Creating data directories on /data partition..."
+        local created_data=0
         for dir_spec in "${data_directories[@]}"; do
             IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
             if standard_create_directory "$dir_path" "$mode" "$owner" "$group"; then
-                log_debug "Created data directory: $dir_path"
+                ((created_data++))
             else
-                log_error "Failed to create data directory: $dir_path"
+                enhanced_status_indicator "failure" "Failed to create: $dir_path"
                 return 1
             fi
         done
+        enhanced_status_indicator "success" "Created $created_data data directories on /data"
     else
-        log_warn "/data partition not mounted, creating fallback directories under ${INSTALL_ROOT}/data"
+        enhanced_status_indicator "warning" "/data partition not mounted, using fallback"
         # Fallback: create directories under INSTALL_ROOT if /data is not available
         if ! standard_create_directory "${INSTALL_ROOT}/data" "755" "root" "root"; then
-            log_error "Failed to create fallback data directory: ${INSTALL_ROOT}/data"
+            enhanced_status_indicator "failure" "Failed to create fallback data directory"
             return 1
         fi
 
+        local created_fallback=0
         for dir_spec in "${data_directories[@]}"; do
             IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
             # Replace /data with ${INSTALL_ROOT}/data for fallback
             fallback_path="${dir_path/\/data/${INSTALL_ROOT}/data}"
             if standard_create_directory "$fallback_path" "$mode" "$owner" "$group"; then
-                log_debug "Created fallback data directory: $fallback_path"
+                ((created_fallback++))
             else
-                log_error "Failed to create fallback data directory: $fallback_path"
+                enhanced_status_indicator "failure" "Failed to create: $fallback_path"
                 return 1
             fi
         done
+        enhanced_status_indicator "success" "Created $created_fallback fallback data directories"
     fi
 
     # Create content directories on /content partition (if mounted)
     if mountpoint -q /content 2>/dev/null; then
-        log_info "Creating content directories on /content partition..."
+        local created_content=0
         for dir_spec in "${content_directories[@]}"; do
             IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
             if standard_create_directory "$dir_path" "$mode" "$owner" "$group"; then
-                log_debug "Created content directory: $dir_path"
+                ((created_content++))
             else
-                log_error "Failed to create content directory: $dir_path"
+                enhanced_status_indicator "failure" "Failed to create: $dir_path"
                 return 1
             fi
         done
+        enhanced_status_indicator "success" "Created $created_content content directories on /content"
     else
-        log_warn "/content partition not mounted, creating fallback directories under ${INSTALL_ROOT}/content"
+        enhanced_status_indicator "warning" "/content partition not mounted, using fallback"
         # Fallback: create directories under INSTALL_ROOT if /content is not available
         if ! standard_create_directory "${INSTALL_ROOT}/content" "755" "root" "root"; then
-            log_error "Failed to create fallback content directory: ${INSTALL_ROOT}/content"
+            enhanced_status_indicator "failure" "Failed to create fallback content directory"
             return 1
         fi
 
+        local created_content_fallback=0
         for dir_spec in "${content_directories[@]}"; do
             IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
             # Replace /content with ${INSTALL_ROOT}/content for fallback
             fallback_path="${dir_path/\/content/${INSTALL_ROOT}/content}"
             if standard_create_directory "$fallback_path" "$mode" "$owner" "$group"; then
-                log_debug "Created fallback content directory: $fallback_path"
+                ((created_content_fallback++))
             else
-                log_error "Failed to create fallback content directory: $fallback_path"
+                enhanced_status_indicator "failure" "Failed to create: $fallback_path"
                 return 1
             fi
         done
+        enhanced_status_indicator "success" "Created $created_content_fallback fallback content directories"
     fi
 
-    enhanced_status_indicator "success" "Directory structure created with NVMe partition integration"
+    enhanced_status_indicator "success" "Directory structure created with NVMe integration"
 
     # Copy Docker configurations if they exist using standardized file operations
     if [[ -d "${PROJECT_ROOT}/docker" ]]; then
-        log_info "Copying Docker configurations..."
         if enhanced_spin "Copying Docker configurations" \
             bash -c "cp -r '${PROJECT_ROOT}'/docker/* '${INSTALL_ROOT}'/docker/ 2>/dev/null || true"; then
             enhanced_status_indicator "success" "Docker configurations copied"
         else
-            enhanced_status_indicator "warning" "Some Docker configurations may not have been copied"
+            enhanced_status_indicator "warning" "Some configurations may not have been copied"
         fi
     else
-        enhanced_status_indicator "info" "No Docker configurations found to copy"
+        enhanced_status_indicator "info" "No Docker configurations to copy"
     fi
 
     # Setup secrets for Docker services
@@ -4205,41 +4175,36 @@ setup_docker_services() {
 
 # Setup Docker secrets
 setup_docker_secrets() {
-    log_info "Setting up Docker secrets..."
-
     # Run the secret setup script
     if [[ -f "$PROJECT_ROOT/scripts/security/setup-secrets.sh" ]]; then
-        log_info "Generating and configuring secrets for all Docker services..."
-        "$PROJECT_ROOT/scripts/security/setup-secrets.sh"
-        log_success "Docker secrets configured"
+        if enhanced_spin "Generating Docker secrets" "$PROJECT_ROOT/scripts/security/setup-secrets.sh"; then
+            enhanced_status_indicator "success" "Docker secrets configured"
+        else
+            enhanced_status_indicator "warning" "Secret generation failed"
+        fi
     else
-        log_warn "Secret setup script not found, skipping secret generation"
-        log_warn "You may need to manually configure secrets for Docker services"
+        enhanced_status_indicator "warning" "Secret setup script not found, manual configuration needed"
     fi
 }
 
 # Deploy all selected Docker services
 deploy_selected_docker_services() {
-    log_info "Deploying selected Docker services..."
-
     # Check if any services were selected
     if [[ -z "${SELECTED_DOCKER_SERVICES:-}" ]]; then
-        log_warn "No Docker services selected for deployment"
+        enhanced_status_indicator "info" "No Docker services selected for deployment"
         return 0
     fi
 
     # BOOT FIX: Check disk space before Docker operations
     if ! check_disk_space 3 "Docker service deployment"; then
-        log_warn "Insufficient disk space for Docker service deployment, skipping"
-        log_info "Docker services can be deployed later when more space is available"
+        enhanced_status_indicator "warning" "Insufficient disk space, skipping Docker deployment"
         return 0
     fi
 
     # Ensure Docker is running
     if ! systemctl is-active docker >/dev/null 2>&1; then
-        log_warn "Docker service is not running, attempting to start..."
         if ! standard_service_operation "docker" "start"; then
-            log_error "Failed to start Docker service, cannot deploy containers"
+            enhanced_status_indicator "failure" "Failed to start Docker service"
             return 1
         fi
         sleep 5  # Give Docker a moment to fully start
@@ -4247,9 +4212,8 @@ deploy_selected_docker_services() {
 
     # Create Traefik network if it doesn't exist (required by most services)
     if ! docker network ls | grep -q "traefik"; then
-        log_info "Creating Traefik network..."
-        if ! docker network create traefik; then
-            log_warn "Failed to create Traefik network, some services may not work properly"
+        if ! enhanced_spin "Creating Traefik network" docker network create traefik; then
+            enhanced_status_indicator "warning" "Failed to create Traefik network"
         fi
     fi
 
@@ -4264,26 +4228,23 @@ deploy_selected_docker_services() {
         service_name="${service_name// /}"        # Remove any spaces
 
         if [[ -n "$service_name" ]]; then
-            log_info "Deploying Docker service: $service_name"
-
             if deploy_docker_service "$service_name"; then
                 ((services_deployed++))
                 enhanced_status_indicator "success" "Deployed $service_name"
             else
                 ((services_failed++))
-                enhanced_status_indicator "warning" "Failed to deploy $service_name (can be started manually later)"
+                enhanced_status_indicator "warning" "Failed: $service_name (can start manually)"
             fi
         fi
     done <<< "${SELECTED_DOCKER_SERVICES}"
 
     # Summary
     if [[ $services_deployed -gt 0 ]]; then
-        log_success "Successfully deployed $services_deployed Docker services"
+        enhanced_status_indicator "success" "Deployed $services_deployed Docker services"
     fi
 
     if [[ $services_failed -gt 0 ]]; then
-        log_warn "$services_failed services failed to deploy (can be started manually later)"
-        log_info "Use 'docker compose -f <service-path>/compose.yml up -d' to start failed services"
+        enhanced_status_indicator "warning" "$services_failed services failed (start manually with docker compose)"
     fi
 }
 
@@ -4447,57 +4408,13 @@ detect_network_interfaces() {
         log_friendlyelec_interface_details
     fi
 
-    # Show comprehensive interface enumeration
-    enhanced_section "Network Interface Enumeration" "Detected network interfaces and their status" "🌐"
+    # Show interface summary
+    enhanced_section "Network Interfaces" "Detected interfaces for RaspAP configuration" "🌐"
 
-    # Create table data for all interfaces with status indicators
-    local interface_data=()
-    interface_data+=("Interface,Type,Status,Speed,Driver")
-
-    # Add ethernet interfaces
-    for iface in "${ethernet_interfaces[@]}"; do
-        local status speed driver status_indicator
-        status=$(cat "/sys/class/net/${iface}/operstate" 2>/dev/null || echo "unknown")
-        speed=$(cat "/sys/class/net/${iface}/speed" 2>/dev/null || echo "unknown")
-        driver=$(readlink "/sys/class/net/${iface}/device/driver" 2>/dev/null | xargs basename || echo "unknown")
-        [[ "${speed}" != "unknown" ]] && speed="${speed}Mbps"
-
-        # Add status indicator
-        case "${status}" in
-            "up") status_indicator="🟢 ${status}" ;;
-            "down") status_indicator="🔴 ${status}" ;;
-            "unknown") status_indicator="⚪ ${status}" ;;
-            *) status_indicator="⚫ ${status}" ;;
-        esac
-
-        interface_data+=("${iface},Ethernet,${status_indicator},${speed},${driver}")
-    done
-
-    # Add WiFi interfaces
-    for iface in "${wifi_interfaces[@]}"; do
-        local status driver status_indicator
-        status=$(cat "/sys/class/net/${iface}/operstate" 2>/dev/null || echo "unknown")
-        driver=$(readlink "/sys/class/net/${iface}/device/driver" 2>/dev/null | xargs basename || echo "unknown")
-
-        # Add status indicator
-        case "${status}" in
-            "up") status_indicator="🟢 ${status}" ;;
-            "down") status_indicator="🔴 ${status}" ;;
-            "unknown") status_indicator="⚪ ${status}" ;;
-            *) status_indicator="⚫ ${status}" ;;
-        esac
-
-        interface_data+=("${iface},WiFi,${status_indicator},N/A,${driver}")
-    done
-
-    enhanced_table "${interface_data[0]}" "${interface_data[@]:1}"
-
-    echo
-    enhanced_card "🔧 RaspAP Configuration" "RaspAP will configure and manage all network interfaces
-
-Primary interfaces identified for RaspAP:
-• WAN Interface: ${WAN_INTERFACE}
-• WiFi Hotspot: ${WIFI_INTERFACE}
+    enhanced_status_indicator "info" "Ethernet interfaces: ${#ethernet_interfaces[@]} (${ethernet_interfaces[*]:-none})"
+    enhanced_status_indicator "info" "WiFi interfaces: ${#wifi_interfaces[@]} (${wifi_interfaces[*]:-none})"
+    enhanced_status_indicator "success" "Primary WAN: ${WAN_INTERFACE}"
+    enhanced_status_indicator "success" "Primary WiFi: ${WIFI_INTERFACE}"
 
 All detected interfaces will be available for configuration." "39" "39"
 
@@ -5657,7 +5574,7 @@ create_new_user() {
     local fullname="$3"
     local transfer_ssh="$4"
 
-    log_info "Creating user account: $username"
+    enhanced_status_indicator "info" "Creating user account: $username"
 
     # Create user with home directory
     if [[ -n "$fullname" ]]; then
@@ -5674,27 +5591,22 @@ create_new_user() {
     pi_groups=$(groups pi | cut -d: -f2 | tr ' ' '\n' | grep -v "^pi$" | tr '\n' ',' | sed 's/,$//')
     if [[ -n "$pi_groups" ]]; then
         usermod -a -G "$pi_groups" "$username"
-        log_debug "Added $username to groups: $pi_groups"
     fi
 
     # Add new user to hardware groups if FriendlyElec hardware is detected
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
-        log_info "Adding $username to hardware groups..."
-
         # Add to common hardware groups
         local hardware_groups=("gpio" "gpio-admin" "pwm" "i2c" "spi" "dialout" "video" "render")
+        local added_groups=0
         for group in "${hardware_groups[@]}"; do
             if getent group "$group" >/dev/null 2>&1; then
                 usermod -a -G "$group" "$username" 2>/dev/null || true
-                log_debug "Added $username to $group group"
+                ((added_groups++))
             fi
         done
 
-        log_success "User $username added to hardware groups"
+        enhanced_status_indicator "success" "Added $username to $added_groups hardware groups"
     fi
-
-    # Add new user to essential system administration groups
-    log_info "Adding $username to system administration groups..."
 
     # Define essential system administration groups
     local admin_groups=(
@@ -6908,7 +6820,7 @@ main() {
 
     # Parse command line arguments first
     if ! parse_arguments "$@"; then
-        echo "ERROR: Failed to parse command line arguments" >&2
+        log_error "Failed to parse command line arguments"
         exit 1
     fi
 
@@ -6920,15 +6832,15 @@ main() {
 
     # Check root privileges BEFORE setting up logging (which requires root)
     if ! check_root_privileges; then
-        echo "ERROR: This script must be run with root privileges" >&2
-        echo "Usage: sudo $0 [options]" >&2
-        echo "Current user: $(whoami) (UID: $EUID)" >&2
+        log_error "This script must be run with root privileges"
+        log_error "Usage: sudo $0 [options]"
+        log_error "Current user: $(whoami) (UID: $EUID)"
         exit 1
     fi
 
     # Initialize logging after root check
     if ! setup_logging; then
-        echo "ERROR: Failed to initialize logging" >&2
+        log_error "Failed to initialize logging"
         exit 1
     fi
 
