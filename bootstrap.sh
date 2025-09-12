@@ -376,8 +376,7 @@ run_setup() {
         log_info "[DRY RUN] Would change to directory: $INSTALL_DIR"
         log_info "[DRY RUN] Would set permissions: chmod -R 755 $INSTALL_DIR"
         log_info "[DRY RUN] Would run: bash lib/gum/download.sh"
-        log_info "[DRY RUN] Would run: bash lib/just/download.sh"
-        log_info "[DRY RUN] Would run: bash scripts/setup/setup-dangerprep.sh"
+        log_info "[DRY RUN] Would run: bash scripts/setup.sh"
         log_success "[DRY RUN] Setup process would complete here"
         return
     fi
@@ -391,12 +390,9 @@ run_setup() {
     log_info "Downloading gum..."
     bash lib/gum/download.sh
 
-    log_info "Downloading just..."
-    bash lib/just/download.sh
-
     # Run the main setup script
     log_info "Running main setup script..."
-    bash scripts/setup/setup-dangerprep.sh
+    bash scripts/setup.sh
 
     log_success "DangerPrep setup completed successfully!"
 }

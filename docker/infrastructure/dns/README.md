@@ -1,100 +1,71 @@
 # DNS Infrastructure
 
-This directory contains the DNS infrastructure for DangerPrep, including AdGuard Home for ad-blocking and a local DNS server for internal domain resolution.
+DNS infrastructure for DangerPrep, including AdGuard Home for ad-blocking and local DNS server for internal domain resolution.
 
 ## Components
 
-### AdGuard Home (`adguardhome` service)
+**AdGuard Home (`adguardhome`):**
+- Purpose: Ad-blocking and DNS filtering
+- Port: 53 (DNS), 3000 (Web Interface)
+- Access: `https://dns.${DOMAIN_NAME}`
 
-- **Purpose**: Ad-blocking and DNS filtering
-- **Port**: 53 (DNS), 3000 (Web Interface)
-- **Access**: `https://dns.${DOMAIN_NAME}`
+**CoreDNS (`coredns`):**
+- Purpose: Internal domain resolution
+- Port: 5353 (Alternative DNS)
+- Configuration: Managed by registrar service
 
-### CoreDNS (`coredns` service)
-
-- **Purpose**: Internal domain resolution
-- **Port**: 5353 (Alternative DNS)
-- **Configuration**: Managed by registrar service
-
-### DNS Registrar (`registrar` service)
-
-- **Purpose**: Watches Docker labels and updates DNS records
-- **Function**: Automatically registers services with `dns.register` labels
+**DNS Registrar (`registrar`):**
+- Purpose: Watches Docker labels and updates DNS records
+- Function: Automatically registers services with `dns.register` labels
 
 ## Quick Start
 
-1. **Configure Environment**:
-   ```bash
-   # Edit compose.dns.env with your values
-   nano compose.dns.env
-   ```
+```bash
+# 1. Configure environment
+nano compose.dns.env
 
-2. **Deploy**:
-   ```bash
-   docker compose up -d
-   ```
+# 2. Deploy
+docker compose up -d
 
-3. **Setup AdGuard**:
-   - Access `http://your-server-ip:3000`
-   - Follow setup wizard
-   - Set upstream DNS to `172.20.0.4:53`
+# 3. Setup AdGuard
+# Access http://your-server-ip:3000, follow setup wizard
+# Set upstream DNS to 172.20.0.4:53
+```
 
 ## Service Registration
 
 Services automatically register DNS entries using labels:
-
 ```yaml
 labels:
   - "dns.register=myservice.${DOMAIN_NAME}"
 ```
-
-This creates a DNS record: `myservice.yourdomain.com → service-ip`
+Creates DNS record: `myservice.yourdomain.com → service-ip`
 
 ## Network Architecture
 
 ```
-Client Request
-    ↓
-AdGuard Home (172.20.0.2:53)
-    ↓ (for local domains)
-CoreDNS (172.20.0.4:53)
-    ↓ (reads zone file)
-DNS Zone File (/data/local-dns/db.yourdomain.com)
-    ↓ (managed by)
-DNS Registrar (watches Docker labels)
+Client Request → AdGuard Home (172.20.0.2:53) → CoreDNS (172.20.0.4:53) → DNS Zone File → DNS Registrar
 ```
-
-## Configuration Files
-
-- **Corefile**: CoreDNS configuration
-- **scripts/dns-registrar.sh**: DNS registration logic
-- **compose.yml**: Service definitions
-- **compose.dns.env**: Environment variables
 
 ## Troubleshooting
 
-### Check DNS Resolution
+**Check DNS Resolution:**
 ```bash
-# Test local DNS
-nslookup jellyfin.yourdomain.com your-server-ip
-
-# Check zone file
-cat /data/local-dns/db.yourdomain.com
+nslookup jellyfin.yourdomain.com your-server-ip  # Test local DNS
+cat /data/local-dns/db.yourdomain.com            # Check zone file
 ```
 
-### Check Service Logs
+**Check Service Logs:**
 ```bash
 docker logs dns-adguardhome-1
 docker logs dns-coredns-1
 docker logs dns-registrar-1
 ```
 
-### Manual DNS Records
-Edit `/data/local-dns/db.yourdomain.com` and reload CoreDNS:
+**Manual DNS Records:**
 ```bash
-# Find the CoreDNS container name
-docker ps --format "{{.Names}}" | grep coredns
-# Reload configuration
+# Edit zone file and reload CoreDNS
+nano /data/local-dns/db.yourdomain.com
 docker exec dns-coredns-1 kill -HUP 1
 ```
 

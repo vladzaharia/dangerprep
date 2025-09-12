@@ -1,62 +1,40 @@
 # RaspAP Docker Integration for DangerPrep
 
-## Overview
-
-RaspAP provides comprehensive WiFi management, DHCP, DNS forwarding, firewall, and VPN integration for DangerPrep. This replaces the custom hostapd/dnsmasq setup with a professional web-based management interface.
+Comprehensive WiFi management, DHCP, DNS forwarding, firewall, and VPN integration for DangerPrep with professional web-based management interface.
 
 ## RaspAP Insiders Setup
 
-### GitHub Personal Access Token
-
-To enable RaspAP Insiders features, you need a GitHub Personal Access Token:
-
-1. **Create GitHub Personal Access Token**
-   - Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - Click "Generate new token (classic)"
-   - Set expiration as needed
-   - Select scope: "Full control of private repositories" (repo)
-   - Generate and copy the token
-
-2. **Configure Environment Variables**
+**GitHub Personal Access Token Required:**
+1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Generate new token with "Full control of private repositories" scope
+3. Configure environment variables:
    ```bash
-   # Copy the example environment file
    cp docker/infrastructure/raspap/compose.env.example docker/infrastructure/raspap/compose.env
-
-   # Edit the environment file
-   nano docker/infrastructure/raspap/compose.env
-
-   # Update these variables with your GitHub credentials:
+   # Edit compose.env with your GitHub credentials:
    GITHUB_USERNAME=your_actual_github_username
    GITHUB_TOKEN=your_actual_github_token
    ```
 
-### Insiders Features Available
-
-- **Tailscale VPN Integration**: Native Tailscale support with exit node capabilities
-- **Advanced Firewall**: Web-based firewall configuration and management
-- **Network Diagnostics**: Built-in network troubleshooting tools
-- **WPA3 Security**: Enhanced WiFi security protocols
-- **Multiple VPN Configs**: Support for multiple VPN configurations
-- **QoS Traffic Shaping**: Bandwidth management and prioritization
+**Insiders Features:**
+- Tailscale VPN Integration with exit node capabilities
+- Advanced Firewall with web-based configuration
+- Network Diagnostics and troubleshooting tools
+- WPA3 Security and enhanced protocols
+- QoS Traffic Shaping and bandwidth management
 
 ## DNS Integration
-
-RaspAP integrates with existing DangerPrep DNS services:
 
 ```
 WiFi Clients → RaspAP dnsmasq (port 53) → CoreDNS (port 5353, .danger domains) → AdGuard → Upstream DNS
 ```
 
-**Configuration via RaspAP Web Interface:**
+**Configuration:**
 1. Access `http://wifi.danger` or `http://192.168.120.1`
 2. Go to "DHCP Server" → "Advanced"
 3. Add DNS forwarding rules:
    ```
-   # Forward .danger domains to CoreDNS
-   server=/danger/127.0.0.1#5353
-
-   # Forward other domains to AdGuard
-   server=127.0.0.1#3000
+   server=/danger/127.0.0.1#5353    # Forward .danger domains to CoreDNS
+   server=127.0.0.1#3000            # Forward other domains to AdGuard
    ```
 
 ## Network Configuration
@@ -70,49 +48,26 @@ WiFi Clients → RaspAP dnsmasq (port 53) → CoreDNS (port 5353, .danger domain
 ## Deployment
 
 ```bash
-# Navigate to RaspAP directory
 cd docker/infrastructure/raspap
-
-# Ensure environment file is configured
-cp compose.env.example compose.env
-# Edit compose.env with your GitHub credentials
-
-# Start RaspAP container
+cp compose.env.example compose.env  # Edit with GitHub credentials
 docker compose up -d
-
-# Check container status
 docker compose logs -f raspap
 ```
 
-## Web Interface Access
+## Web Interface
 
 - **URL**: `http://wifi.danger` or `http://192.168.120.1`
-- **Username**: `admin` (configurable)
-- **Password**: `secret` (configurable)
+- **Default Credentials**: admin/secret (change immediately)
 
 ## Tailscale Integration
 
-With RaspAP Insiders:
+**With RaspAP Insiders:**
+1. Go to "VPN" → "Tailscale" in web interface
+2. Enable Tailscale service and follow authentication flow
+3. Optionally enable "Advertise as exit node"
 
-1. **Enable Tailscale**
-   - Go to "VPN" → "Tailscale" in web interface
-   - Enable Tailscale service
-   - Follow authentication flow
+## Security
 
-2. **Configure as Exit Node** (Optional)
-   - Enable "Advertise as exit node"
-   - Configure subnet routes for DangerPrep network
-
-## Security Notes
-
-1. **Change Default Credentials**
-   - Update `RASPAP_WEBGUI_USER` and `RASPAP_WEBGUI_PASS` in compose.env
-
-2. **GitHub Token Security**
-   - Use minimal required permissions
-   - Store securely (not in version control)
-   - Rotate tokens regularly
-
-3. **Network Security**
-   - Enable WPA3 if hardware supports it
-   - Configure firewall rules appropriately
+1. **Change Default Credentials** - Update `RASPAP_WEBGUI_USER` and `RASPAP_WEBGUI_PASS`
+2. **GitHub Token Security** - Use minimal permissions, store securely, rotate regularly
+3. **Network Security** - Enable WPA3 if supported, configure firewall rules

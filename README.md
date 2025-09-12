@@ -1,424 +1,168 @@
 # DangerPrep - Emergency Router & Content Hub
 
-A comprehensive emergency router and content hub system built as a TypeScript monorepo with Docker services, designed for travel and emergency scenarios. Supports multiple FriendlyElec hardware platforms running Ubuntu 24.04 LTS.
+Emergency router and content hub system built as a TypeScript monorepo with Docker services for travel and emergency scenarios. Supports FriendlyElec hardware platforms on Ubuntu 24.04 LTS.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- **Hardware**: FriendlyElec NanoPi M6, R6C, NanoPC-T6, or CM3588 (or generic x86_64)
-- **OS**: Ubuntu 24.04 LTS (Ubuntu Noble Desktop recommended for FriendlyElec hardware)
-- **Storage**: 2TB NVMe SSD (portable installation - can be deployed anywhere)
-- **Software**: Docker and Docker Compose (automatically installed by setup script)
-- **Access**: Root access (sudo) to the system
+- **Hardware**: FriendlyElec NanoPi M6/R6C/NanoPC-T6/CM3588 or generic x86_64
+- **OS**: Ubuntu 24.04 LTS
+- **Storage**: 2TB NVMe SSD recommended
+- **Access**: Root/sudo access
 
 ### One-Command Deployment
 
-**Recommended: Bootstrap Script (Downloads Latest Release)**
 ```bash
-# Download and run the bootstrap script directly
+# Download and run bootstrap script
 curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
 
-# Or with wget
-wget -qO- https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
-
-# Force git clone instead of release download
-curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --clone
-```
-
-**Alternative: Manual Clone and Deploy**
-```bash
-# Clone the repository
+# Or manual installation
 git clone https://github.com/vladzaharia/dangerprep.git /dangerprep
-cd /dangerprep
-
-# Download required tools and deploy
-bash lib/gum/download.sh
-bash lib/just/download.sh
-sudo scripts/setup/setup-dangerprep.sh
+cd /dangerprep && sudo scripts/setup.sh
 ```
-
-### System Requirements
-
-- **Just Command Runner**: Bundled in `lib/just/` (auto-downloaded)
-- **Installation Location**: Can be deployed anywhere (not tied to /opt)
-- **Environment Variable**: Set `DANGERPREP_INSTALL_ROOT` to customize installation directory
-- **Node.js**: 22+ (for TypeScript monorepo development)
-- **Yarn**: 4.5.3+ (package manager)
 
 ## 📋 System Overview
 
-### Supported Hardware
-
-**FriendlyElec Devices:**
-- **NanoPi M6** - RK3588S SoC with 1x GbE, M.2 WiFi, hardware acceleration
-- **NanoPi R6C** - RK3588S SoC with 2.5GbE + GbE, dual ethernet routing
-- **NanoPC-T6** - RK3588 SoC with dual GbE, high-performance computing
-- **CM3588** - RK3588 compute module with flexible I/O
-
-**Hardware Features:**
-- **Automatic Platform Detection** - Detects FriendlyElec hardware and configures optimizations
-- **RK3588/RK3588S Performance Tuning** - CPU governors, GPU optimization, memory tuning
-- **Hardware Acceleration** - Mali GPU, VPU video processing, 6TOPS NPU neural processing
-- **Thermal Management** - PWM fan control with intelligent temperature curves
-- **Multi-Ethernet Support** - Advanced routing for dual ethernet devices
-
 ### Core Services
 
-**Infrastructure Services:**
-- **🌐 Traefik**: Reverse proxy and load balancer with ACME/Let's Encrypt
-- **🔒 Step-CA**: Internal certificate authority with ACME support
-- **📡 CDN**: High-performance self-hosted CDN for Web Awesome and Font Awesome
-- **🌐 DNS**: CoreDNS + AdGuard Home + NextDNS chain with DoH/DoT
-- **👁️ Watchtower**: Automatic container updates
+**Infrastructure:**
+- **Traefik**: Reverse proxy with ACME/Let's Encrypt
+- **Step-CA**: Internal certificate authority
+- **CDN**: Self-hosted CDN for Web Awesome and Font Awesome
+- **DNS**: CoreDNS + AdGuard Home + NextDNS chain
+- **Watchtower**: Automatic container updates
 
-**Media Services:**
-- **�📺 Jellyfin**: Media streaming with hardware transcoding
-- **📚 Komga**: eBook and comic management
-- **🎮 RomM**: Game ROM management and emulation
+**Media:**
+- **Jellyfin**: Media streaming with hardware transcoding
+- **Komga**: eBook and comic management
+- **RomM**: Game ROM management
 
-**Sync Services (TypeScript):**
-- **🌍 Kiwix Sync**: Offline Wikipedia/educational content synchronization
-- **🔄 NFS Sync**: Content synchronization from central NAS
-- **� Offline Sync**: MicroSD card synchronization with auto-detection
+**Sync Services:**
+- **Kiwix Sync**: Offline Wikipedia/educational content
+- **NFS Sync**: Content synchronization from NAS
+- **Offline Sync**: MicroSD card synchronization
 
 ### Network Configuration
 
-- **LAN Network**: 192.168.120.0/22 (Tailscale site-to-site routing)
-- **Router IP**: 192.168.120.1
-- **Domain**: .danger (local resolution via DNS)
-- **WiFi Hotspot**: "DangerPrep" with WPA2 password "EXAMPLE_PASSWORD"
-- **Routing Scenarios**: WAN-to-WiFi, WiFi repeater, emergency local network
-- **Traefik**: Reverse proxy with Docker label-based routing and ACME/Let's Encrypt
-- **Tailscale**: VPN with subnet routing for secure remote access
-- **DNS Chain**: Client → CoreDNS → AdGuard Home → NextDNS (DoH/DoT)
+- **Network**: 192.168.120.0/22 with Tailscale routing
+- **Domain**: .danger (local DNS resolution)
+- **WiFi**: "DangerPrep" hotspot
+- **DNS Chain**: Client → CoreDNS → AdGuard → NextDNS
 
 ## 🌐 Service Access
 
-### Web Interfaces
-| Service | .danger Domain (HTTPS) | Description |
-|---------|------------------------|-------------|
-| Management Portal | <https://portal.danger> | Web-based system management |
-| Jellyfin Media | <https://jellyfin.danger> | Video streaming with hardware transcoding |
-| Komga Books | <https://komga.danger> | eBook and comic management |
-| RomM Game ROMs | <https://romm.danger> | Game ROM management and emulation |
-| Kiwix Offline Content | <https://kiwix.danger> | Offline Wikipedia and educational content |
-| Traefik Dashboard | <https://traefik.danger> | Reverse proxy dashboard |
-| DNS Management | <https://dns.danger> | AdGuard Home DNS management |
-| CDN Assets | <https://cdn.danger> | Self-hosted CDN for libraries |
-| Step-CA | <https://ca.danger> | Internal certificate authority |
+| Service | URL | Description |
+|---------|-----|-------------|
+| Portal | https://portal.danger | System management |
+| Jellyfin | https://jellyfin.danger | Media streaming |
+| Komga | https://komga.danger | eBook management |
+| RomM | https://romm.danger | Game ROM management |
+| Kiwix | https://kiwix.danger | Offline content |
+| Traefik | https://traefik.danger | Proxy dashboard |
+| DNS | https://dns.danger | DNS management |
+| CDN | https://cdn.danger | Asset delivery |
+| CA | https://ca.danger | Certificate authority |
 
 ## 🛠️ Management Commands
 
-### Service Management
 ```bash
-# Start all services
-just start
+# System Management
+./scripts/setup.sh             # Deploy/install system
+./scripts/cleanup.sh           # Remove system completely
 
-# Stop all services
-just stop
+# Service Management
+docker compose up -d           # Start services
+docker compose down            # Stop services
+docker compose restart        # Restart services
+docker compose ps             # Check status
 
-# Restart all services
-just restart
-
-# Check service status
-just status
-
-# Update entire system
-just update
-
-# Uninstall system (preserves data)
-just uninstall
-```
-
-### System Monitoring
-```bash
-# Generate health report
-just monitor
-
-# View recent service logs
-just logs
-
-# Create system backup
-just backup
-
-# Clean up Docker resources
-just clean
-```
-
-### Network Configuration
-```bash
-# Setup Tailscale (requires auth key)
-export TAILSCALE_AUTH_KEY="your-auth-key"
-just tailscale
-
-# Setup DNS with DoH/DoT
-just setup-dns
-
-# Validate DNS and SSL configuration
-just validate-dns
-
-# Generate Traefik authentication hash
-just generate-auth
+# Monitoring
+docker logs <service>          # View service logs
+docker system df              # Check disk usage
+docker system prune -f        # Clean up unused resources
 ```
 
 ## 📁 Directory Structure
 
 ```
-dangerprep/                   # Project root (TypeScript monorepo)
-├── packages/                 # TypeScript packages (Turborepo workspace)
-│   ├── _development/        # Development configuration packages
-│   │   ├── eslint/          # Shared ESLint configuration
-│   │   ├── prettier/        # Shared Prettier configuration
-│   │   └── typescript/      # Shared TypeScript configuration
-│   ├── common/              # Common utilities and helpers
-│   ├── configuration/       # Configuration management
-│   ├── errors/              # Error handling and types
-│   ├── files/               # File system operations
-│   ├── health/              # Health checking utilities
-│   ├── logging/             # Structured logging
-│   ├── notifications/       # Notification system
-│   ├── progress/            # Progress tracking
-│   ├── resilience/          # Retry and circuit breaker patterns
-│   ├── scheduling/          # Task scheduling
-│   ├── service/             # Base service class
-│   ├── sync/                # Sync utilities
-│   └── types/               # Shared TypeScript types
-├── docker/                  # Docker Compose configurations
-│   ├── infrastructure/      # Core infrastructure services
-│   │   ├── traefik/        # Reverse proxy
-│   │   ├── dns/            # DNS services (CoreDNS + AdGuard)
-│   │   ├── watchtower/     # Auto-updates
-│   │   ├── step-ca/        # Internal certificate authority
-│   │   └── cdn/            # Self-hosted CDN (TypeScript)
-│   ├── media/              # Media services
-│   │   ├── jellyfin/       # Video streaming
-│   │   ├── komga/          # eBook management
-│   │   └── romm/           # Game ROM management
-│   ├── services/           # Utility services
-│   │   └── portal/         # Management interface
-│   └── sync/               # Content synchronization services (TypeScript)
-│       ├── nfs-sync/       # NFS content synchronization
-│       ├── kiwix-sync/     # Kiwix offline content sync
-│       └── offline-sync/   # MicroSD card synchronization
-├── scripts/                # Management scripts (setup and cleanup only)
-│   ├── setup.sh            # Main system setup script
-│   ├── cleanup.sh          # Main system cleanup script
-│   ├── setup/              # Setup helper scripts and configurations
-│   ├── cleanup/            # Cleanup helper scripts (if needed)
-│   └── shared/             # Shared utilities for both setup and cleanup
-├── lib/                    # External libraries and tools
-│   ├── just/               # Bundled just command runner
-│   └── webawesome/         # Web Awesome icon library
-├── data/                   # Service data (container configs)
-├── content/                # Media content storage
-│   ├── movies/             # Movie files
-│   ├── tv/                 # TV show files
-│   ├── books/              # eBook files
-│   ├── games/roms/         # Game ROM files
-│   └── kiwix/              # Offline content (ZIM files)
-├── nfs/                    # NFS mount points
-├── package.json            # Root package.json (Turborepo workspace)
-├── turbo.json              # Turborepo configuration
-├── tsconfig.base.json      # Base TypeScript configuration
-├── eslint.config.js        # ESLint configuration
-├── prettier.config.js      # Prettier configuration
-└── justfile                # Just command definitions
+dangerprep/
+├── packages/               # TypeScript packages
+├── docker/                 # Docker services
+│   ├── infrastructure/     # Core services (traefik, dns, cdn, step-ca)
+│   ├── media/             # Media services (jellyfin, komga, romm)
+│   └── sync/              # Sync services (nfs, kiwix, offline)
+├── scripts/               # Setup and management scripts
+├── content/               # Media content storage
+└── data/                  # Service data and configs
 ```
 
 ## 🔧 Configuration
 
-### TypeScript Development
-
-The project uses a Turborepo monorepo with shared configurations:
+### Development
 
 ```bash
-# Install dependencies
-yarn install
-
-# Build all packages
-yarn build
-
-# Run development mode
-yarn dev
-
-# Lint and format
-yarn lint
-yarn format
-
-# Type checking
-yarn typecheck
+yarn install && yarn build    # Install and build
+yarn dev                      # Development mode
+yarn lint && yarn format     # Code quality
 ```
 
-### Content Synchronization
+### Sync Services
 
-Each sync service has its own YAML configuration:
-
-**NFS Sync** (`/data/nfs-sync/config.yaml`):
-```yaml
-sync_schedule: '0 2 * * *'  # Daily at 2 AM
-nfs_servers:
-  - host: "192.168.1.100"
-    path: "/mnt/media"
-content_types:
-  movies:
-    enabled: true
-    filters:
-      min_rating: 6.0
-      max_size_gb: 10
-```
-
-**Kiwix Sync** (`/data/kiwix-sync/config.yaml`):
-```yaml
-sync_schedule: '0 3 * * *'  # Daily at 3 AM
-mirrors:
-  - "https://download.kiwix.org/zim/"
-languages: ["en", "es", "fr"]
-```
-
-**Offline Sync** (`/data/offline-sync/config.yaml`):
-```yaml
-auto_detect: true
-sync_directories:
-  - source: "/content/movies"
-    target: "Movies"
-  - source: "/content/books"
-    target: "Books"
-```
+Configure sync services via YAML files in `/data/`:
+- **NFS Sync**: Schedule and server configuration
+- **Kiwix Sync**: Mirror URLs and language preferences
+- **Offline Sync**: Auto-detection and directory mapping
 
 ### Tailscale Setup
 
-1. Get an auth key from Tailscale admin console
-2. Set environment variable: `export TAILSCALE_AUTH_KEY="your-key"`
-3. Run: `just deploy` (Tailscale setup is included)
-4. Approve subnet routes in Tailscale admin console
+1. Get auth key from Tailscale admin console
+2. `export TAILSCALE_AUTH_KEY="key" && ./scripts/setup.sh`
+3. Approve subnet routes in admin console
 
-### DNS Configuration
-The system uses a DNS chain for resolution:
+## 📊 Monitoring
 
-- Client → CoreDNS (local .danger domains)
-- CoreDNS → AdGuard Home (ad-blocking)
-- AdGuard Home → NextDNS (external domains via DoH)
-- Network: 192.168.120.0/22 with site-to-site Tailscale
+- **Logs**: `docker logs <service>`
+- **Health**: Automated monitoring every 5-10 minutes
+- **System**: `/var/log/dangerprep/` for system logs
 
-## 📊 Monitoring & Logs
+## 🔒 Security
 
-### Log Locations
-
-- System logs: `/var/log/dangerprep/`
-- Service logs: `docker logs <service-name>`
-- DNS logs: `/var/log/dnsmasq.log`
-- Sync logs: `${INSTALL_ROOT}/data/sync/sync.log`
-
-### Health Monitoring
-The system includes automated health monitoring:
-
-- Service status checks every 10 minutes
-- DNS resolution monitoring every 5 minutes
-- Tailscale connectivity monitoring every 5 minutes
-- Storage and temperature monitoring
-
-## 🔒 Security Features
-
-### Network Security
-
-- Firewall configured for minimal attack surface
-- SSH access via Tailscale only (recommended)
+- Firewall with minimal attack surface
+- SSH access via Tailscale recommended
 - DNS filtering and ad blocking
-- Automatic security updates via Watchtower
-
-### Emergency Procedures
-```bash
-# Emergency lockdown (blocks all external access)
-/usr/local/bin/emergency-lockdown.sh
-
-# Emergency recovery
-/usr/local/bin/emergency-recovery.sh
-```
+- Automatic security updates
 
 ## 🚨 Troubleshooting
 
-### Common Issues
-
-**Services not starting:**
 ```bash
-# Check Docker status
+# Services not starting
 systemctl status docker
-
-# Check service logs
 docker logs <service-name>
+docker compose restart
 
-# Restart all services
-just restart
-```
-
-**DNS not working:**
-```bash
-# Test DNS resolution
-nslookup google.com 192.168.120.1
+# DNS issues
 nslookup portal.danger 192.168.120.1
+# Check DNS configuration in docker/infrastructure/dns/
 
-# Validate DNS configuration
-just validate-dns
-```
-
-**Tailscale connectivity issues:**
-```bash
-# Check Tailscale status
+# Tailscale issues
 tailscale status
+# Re-run setup if needed: ./scripts/setup.sh
 
-# Setup Tailscale
-export TAILSCALE_AUTH_KEY="your-key"
-just tailscale
+# System issues
+./scripts/cleanup.sh && ./scripts/setup.sh
 ```
 
-**Update issues:**
-```bash
-# Force update just binaries
-./lib/just/download.sh --force
-
-# Update entire system
-just update
-```
-
-### Getting Help
-
-1. Check service logs: `docker logs <service-name>` or `just logs`
-2. Run system health check: `just monitor-all`
-3. Run system validation: `just validate-all`
-4. Check hardware status: `just hardware-monitor`
-5. View all available commands: `just --list`
+**Getting Help**: `./scripts/setup.sh --help`, `docker logs <service>`
 
 ## 📚 Documentation
 
-### TypeScript Packages
-
-Each package in the monorepo has its own purpose:
-
-- **@dangerprep/service** - Base service class for standardized lifecycle management
-- **@dangerprep/configuration** - Configuration management with validation
-- **@dangerprep/logging** - Structured logging with rotation and multiple outputs
-- **@dangerprep/health** - Health checking utilities for services
-- **@dangerprep/scheduling** - Task scheduling and cron management
-- **@dangerprep/sync** - Sync utilities and base classes
-- **@dangerprep/progress** - Progress tracking for long-running operations
-- **@dangerprep/resilience** - Retry patterns and circuit breakers
-- **@dangerprep/notifications** - Notification system for alerts
-
-### Service Documentation
-
-- **Docker Services**: Each service directory contains README.md and deployment guides
-- **Scripts**: `scripts/README.md` contains comprehensive script documentation
-- **Setup**: `scripts/setup/README.md` covers installation and hardware support
-
-## 🤝 Contributing
-
-This is a personal emergency preparedness project. Feel free to adapt it for your own needs.
-
-## 📄 License
-
-This project is provided as-is for emergency preparedness purposes.
+Each service directory contains detailed README files. Key TypeScript packages:
+- **@dangerprep/service** - Base service class
+- **@dangerprep/configuration** - Configuration management
+- **@dangerprep/logging** - Structured logging
+- **@dangerprep/sync** - Sync utilities
 
 ---
 
-**⚠️ Emergency Use Only**: This system is designed for emergency and travel scenarios. Always ensure you have proper backups and alternative communication methods.
+**⚠️ Emergency Use Only**: Designed for emergency and travel scenarios. Ensure proper backups.
