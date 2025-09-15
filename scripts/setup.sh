@@ -4578,8 +4578,15 @@ detect_and_configure_nvme_storage() {
 
     # Check if partitioning was confirmed during configuration
     if [[ "${NVME_PARTITION_CONFIRMED:-false}" != "true" ]]; then
-        log_info "NVMe partitioning was not confirmed during configuration, skipping"
-        return 0
+        # Check if there are exactly 2 partitions that we can try to mount
+        if [[ ${existing_partitions} -eq 2 ]]; then
+            log_info "Partitioning was declined, but found exactly 2 partitions. Attempting to mount existing partitions..."
+            mount_existing_nvme_partitions "${nvme_device}"
+            return $?
+        else
+            log_info "NVMe partitioning was not confirmed during configuration, skipping"
+            return 0
+        fi
     fi
 
     if [[ ${existing_partitions} -gt 0 ]]; then
@@ -4834,6 +4841,236 @@ create_nvme_partitions() {
     fi
 
     log_success "NVMe partitions created and mounted successfully"
+}
+
+# Mount existing NVMe partitions without formatting
+mount_existing_nvme_partitions() {
+    local nvme_device="$1"
+
+    log_info "Attempting to mount existing partitions on ${nvme_device}..."
+
+    # Get the partition names
+    local data_partition="${nvme_device}p1"
+    local content_partition="${nvme_device}p2"
+
+    # Verify partitions exist
+    if [[ ! -b "${data_partition}" ]]; then
+        log_error "Expected partition ${data_partition} does not exist"
+        return 1
+    fi
+
+    if [[ ! -b "${content_partition}" ]]; then
+        log_error "Expected partition ${content_partition} does not exist"
+        return 1
+    fi
+
+    log_info "Found partitions: ${data_partition} and ${content_partition}"
+
+    # Show current partition information
+    log_info "Current partition layout:"
+    lsblk "${nvme_device}" 2>/dev/null || true
+
+    # Create mount points using standardized directory creation
+    if ! standard_create_directory "/data" "755" "root" "root"; then
+        log_error "Failed to create /data mount point"
+        return 1
+    fi
+
+    if ! standard_create_directory "/content" "755" "root" "root"; then
+        log_error "Failed to create /content mount point"
+        return 1
+    fi
+
+    # Create mount points if they don't exist (fallback)
+    mkdir -p /data /content
+
+    # Check if partitions are already mounted
+    local data_already_mounted=""
+    local content_already_mounted=""
+
+    if mountpoint -q /data 2>/dev/null; then
+        data_already_mounted=$(findmnt -n -o SOURCE /data 2>/dev/null || echo "")
+        log_info "/data is already mounted from: ${data_already_mounted}"
+    fi
+
+    if mountpoint -q /content 2>/dev/null; then
+        content_already_mounted=$(findmnt -n -o SOURCE /content 2>/dev/null || echo "")
+        log_info "/content is already mounted from: ${content_already_mounted}"
+    fi
+
+    # Backup fstab before making changes
+    cp /etc/fstab /etc/fstab.backup-$(date +%Y%m%d-%H%M%S)
+
+    # Mount data partition
+    local data_mount_success=false
+    if [[ "${data_already_mounted}" == "${data_partition}" ]]; then
+        log_info "Data partition already correctly mounted"
+        data_mount_success=true
+    elif [[ -n "${data_already_mounted}" ]]; then
+        log_warn "/data is mounted from different device (${data_already_mounted}), unmounting first"
+        umount /data 2>/dev/null || true
+    fi
+
+    if [[ "${data_mount_success}" != "true" ]]; then
+        log_info "Attempting to mount ${data_partition} to /data..."
+        if mount "${data_partition}" /data 2>/dev/null; then
+            log_success "Successfully mounted data partition"
+
+            # Test if mount is working properly
+            if touch /data/.mount-test 2>/dev/null && rm /data/.mount-test 2>/dev/null; then
+                log_info "Data partition mount verified"
+                data_mount_success=true
+            else
+                log_warn "Data partition mounted but not writable"
+                umount /data 2>/dev/null || true
+            fi
+        else
+            log_error "Failed to mount data partition: ${data_partition}"
+        fi
+    fi
+
+    # Mount content partition
+    local content_mount_success=false
+    if [[ "${content_already_mounted}" == "${content_partition}" ]]; then
+        log_info "Content partition already correctly mounted"
+        content_mount_success=true
+    elif [[ -n "${content_already_mounted}" ]]; then
+        log_warn "/content is mounted from different device (${content_already_mounted}), unmounting first"
+        umount /content 2>/dev/null || true
+    fi
+
+    if [[ "${content_mount_success}" != "true" ]]; then
+        log_info "Attempting to mount ${content_partition} to /content..."
+        if mount "${content_partition}" /content 2>/dev/null; then
+            log_success "Successfully mounted content partition"
+
+            # Test if mount is working properly
+            if touch /content/.mount-test 2>/dev/null && rm /content/.mount-test 2>/dev/null; then
+                log_info "Content partition mount verified"
+                content_mount_success=true
+            else
+                log_warn "Content partition mounted but not writable"
+                umount /content 2>/dev/null || true
+            fi
+        else
+            log_error "Failed to mount content partition: ${content_partition}"
+        fi
+    fi
+
+    # Update fstab for persistent mounting (only for successfully mounted partitions)
+    local fstab_updated=false
+
+    if [[ "${data_mount_success}" == "true" ]]; then
+        # Get UUID for data partition
+        local data_uuid
+        data_uuid=$(blkid -s UUID -o value "${data_partition}" 2>/dev/null || echo "")
+
+        if [[ -n "${data_uuid}" ]]; then
+            # Remove any existing entries for /data
+            sed -i '\|/data|d' /etc/fstab
+
+            # Add new entry using UUID
+            echo "UUID=${data_uuid} /data ext4 defaults,noatime 0 2" >> /etc/fstab
+            log_info "Added /data to fstab with UUID=${data_uuid}"
+            fstab_updated=true
+        else
+            log_warn "Could not get UUID for data partition, using device path in fstab"
+            sed -i '\|/data|d' /etc/fstab
+            echo "${data_partition} /data ext4 defaults,noatime 0 2" >> /etc/fstab
+            fstab_updated=true
+        fi
+    fi
+
+    if [[ "${content_mount_success}" == "true" ]]; then
+        # Get UUID for content partition
+        local content_uuid
+        content_uuid=$(blkid -s UUID -o value "${content_partition}" 2>/dev/null || echo "")
+
+        if [[ -n "${content_uuid}" ]]; then
+            # Remove any existing entries for /content
+            sed -i '\|/content|d' /etc/fstab
+
+            # Add new entry using UUID
+            echo "UUID=${content_uuid} /content ext4 defaults,noatime 0 2" >> /etc/fstab
+            log_info "Added /content to fstab with UUID=${content_uuid}"
+            fstab_updated=true
+        else
+            log_warn "Could not get UUID for content partition, using device path in fstab"
+            sed -i '\|/content|d' /etc/fstab
+            echo "${content_partition} /content ext4 defaults,noatime 0 2" >> /etc/fstab
+            fstab_updated=true
+        fi
+    fi
+
+    # Test fstab entries if we updated it
+    if [[ "${fstab_updated}" == "true" ]]; then
+        log_info "Testing fstab entries..."
+        if mount -a 2>/dev/null; then
+            log_success "fstab entries validated successfully"
+        else
+            log_warn "fstab validation failed, but continuing (entries may still work on reboot)"
+        fi
+    fi
+
+    # Report results
+    if [[ "${data_mount_success}" == "true" && "${content_mount_success}" == "true" ]]; then
+        log_success "Both existing partitions mounted successfully"
+
+        # Show final layout
+        if gum_available; then
+            log_info "📋 Mounted NVMe Partition Layout"
+            enhanced_table "Partition,Mount,Size,Filesystem" \
+                "${data_partition},/data,$(lsblk -n -o SIZE "${data_partition}"),$(lsblk -n -o FSTYPE "${data_partition}")" \
+                "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}"),$(lsblk -n -o FSTYPE "${content_partition}")"
+        fi
+
+        log_info "NVMe partition layout:"
+        log_info "  ${data_partition} -> /data ($(lsblk -n -o SIZE "${data_partition}"))"
+        log_info "  ${content_partition} -> /content ($(lsblk -n -o SIZE "${content_partition}"))"
+
+        return 0
+    elif [[ "${data_mount_success}" == "true" || "${content_mount_success}" == "true" ]]; then
+        log_warn "Partial success: only some partitions could be mounted"
+        return 0
+    else
+        log_error "Failed to mount any existing partitions"
+        return 1
+    fi
+}
+
+# Load and export environment variables from a file
+load_and_export_env_file() {
+    local env_file="$1"
+
+    if [[ ! -f "$env_file" ]]; then
+        log_warn "Environment file not found: $env_file"
+        return 1
+    fi
+
+    log_debug "Loading environment variables from $(basename "$env_file")"
+
+    # Read the file line by line and export variables
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip empty lines and comments
+        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+
+        # Check if line contains a variable assignment
+        if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            local var_name="${BASH_REMATCH[1]}"
+            local var_value="${BASH_REMATCH[2]}"
+
+            # Remove surrounding quotes if present
+            if [[ "$var_value" =~ ^\"(.*)\"$ ]] || [[ "$var_value" =~ ^\'(.*)\'$ ]]; then
+                var_value="${BASH_REMATCH[1]}"
+            fi
+
+            # Export the variable
+            export "$var_name=$var_value"
+            log_debug "Exported $var_name from $(basename "$env_file")"
+        fi
+    done < "$env_file"
+
+    return 0
 }
 
 # Enumerate Docker services that will be installed
