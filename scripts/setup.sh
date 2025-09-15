@@ -2407,7 +2407,7 @@ collect_storage_configuration() {
     # Configure NVMe storage (existing functionality)
     configure_nvme_storage_options
 
-    # Configure eMMC /home partition (new functionality)
+    # Configure eMMC /home and swap partitions (new functionality)
     configure_emmc_home_partition_options
 }
 
@@ -2485,7 +2485,7 @@ configure_nvme_storage_options() {
     fi
 }
 
-# Configure eMMC /home partition options (new functionality)
+# Configure eMMC /home and swap partition options (new functionality)
 configure_emmc_home_partition_options() {
     # Check for eMMC devices
     local emmc_devices=()
@@ -2576,28 +2576,29 @@ configure_emmc_home_partition_options() {
         fi
     fi
 
-    if [[ ${unpartitioned_gb} -lt 32 ]]; then
-        log_warn "Insufficient unpartitioned space on eMMC (${unpartitioned_gb}GB available, 32GB required)"
-        log_info "Cannot create dedicated /home partition - /home will remain on root filesystem"
+    if [[ ${unpartitioned_gb} -lt 48 ]]; then
+        log_warn "Insufficient unpartitioned space on eMMC (${unpartitioned_gb}GB available, 48GB required for 32GB /home + 16GB swap)"
+        log_info "Cannot create dedicated /home and swap partitions - will remain on root filesystem"
         export EMMC_HOME_PARTITION_CONFIRMED="false"
         export EMMC_DEVICE=""
         return 0
     fi
 
     log_info "Available unpartitioned space: ${unpartitioned_gb}GB"
+    local remaining_for_expansion=$((unpartitioned_gb - 48))
 
-    enhanced_info_box "eMMC /home Partition Setup" \
-        "📁 Create dedicated /home partition on eMMC\n\n• 32GB partition for user home directories\n• Remaining ${unpartitioned_gb}GB can expand root filesystem\n• Safe operation - no data loss on existing partitions\n• /home contents will be migrated to new partition" \
+    enhanced_info_box "eMMC Partition Setup" \
+        "📁 Create dedicated partitions on eMMC\n\n• 32GB /home partition for user home directories\n• 16GB swap partition for virtual memory\n• Remaining ${remaining_for_expansion}GB can expand root filesystem\n• Safe operation - no data loss on existing partitions\n• /home contents will be migrated to new partition" \
         "info"
 
-    if enhanced_confirm "Create 32GB /home partition on eMMC?" "true"; then
+    if enhanced_confirm "Create 32GB /home + 16GB swap partitions on eMMC?" "true"; then
         export EMMC_HOME_PARTITION_CONFIRMED="true"
         export EMMC_DEVICE="${emmc_device}"
-        log_info "eMMC /home partition creation confirmed for ${emmc_device}"
+        log_info "eMMC partition creation confirmed for ${emmc_device}"
     else
         export EMMC_HOME_PARTITION_CONFIRMED="false"
         export EMMC_DEVICE=""
-        log_info "/home partition creation declined - /home will remain on root filesystem"
+        log_info "Partition creation declined - /home and swap will remain on root filesystem"
     fi
 }
 
@@ -5684,15 +5685,15 @@ detect_and_configure_emmc_home_partition() {
         return 1
     fi
 
-    log_info "Setting up eMMC /home partition on ${EMMC_DEVICE}..."
+    log_info "Setting up eMMC /home and swap partitions on ${EMMC_DEVICE}..."
 
-    # Create eMMC /home partition
+    # Create eMMC /home and swap partitions
     create_emmc_home_partition "${EMMC_DEVICE}"
 
-    log_success "eMMC /home partition configuration completed"
+    log_success "eMMC /home and swap partition configuration completed"
 }
 
-# Create eMMC /home partition (32GB) in unpartitioned space
+# Create eMMC /home (32GB) and swap (16GB) partitions in unpartitioned space
 create_emmc_home_partition() {
     local emmc_device="$1"
 
@@ -5712,79 +5713,73 @@ create_emmc_home_partition() {
 
     log_info "Creating partition ${new_partition_num} for /home..."
 
-    # Get the end of the last partition to start the new partition there
-    local last_partition="${emmc_device}p${last_partition_num}"
-    local partition_end
-    partition_end=$(parted -s "${emmc_device}" print | grep "^ ${last_partition_num}" | awk '{print $3}')
+    # Strategy: Create partitions at the END of the disk in this order:
+    # 1. 16GB swap partition
+    # 2. 32GB /home partition
+    # 3. Later expand main partition to use remaining space
 
-    if [[ -z "$partition_end" ]]; then
-        log_error "Could not determine end of last partition"
-        return 1
-    fi
-
-    log_debug "Detected partition end: '${partition_end}'"
-
-    # Create 32GB partition for /home using parted
-    # The issue was using the end position as a size instead of an absolute position
-    # Let's use a percentage-based approach which is more reliable
-    log_info "Adding 32GB /home partition starting after ${partition_end}..."
-
-    # Get the total disk size to calculate percentages
+    # Get total disk size
     local disk_size_bytes
     disk_size_bytes=$(lsblk -b -d -n -o SIZE "${emmc_device}" 2>/dev/null || echo "0")
     local disk_size_gb=$((disk_size_bytes / 1024 / 1024 / 1024))
 
-    if [[ ${disk_size_gb} -lt 64 ]]; then
-        log_error "Disk too small for 32GB partition (${disk_size_gb}GB total)"
+    if [[ ${disk_size_gb} -lt 80 ]]; then
+        log_error "Disk too small for 32GB /home + 16GB swap (${disk_size_gb}GB total, need at least 80GB)"
         return 1
     fi
 
-    # Calculate the end position as start + 32GB
-    # Parse the start position and add 32GB to it
-    local start_pos_gb end_pos_gb
-    if [[ "$partition_end" =~ ^([0-9.]+)GB$ ]]; then
-        start_pos_gb="${BASH_REMATCH[1]}"
-        end_pos_gb=$(echo "$start_pos_gb + 32" | bc -l)
-        end_position="${end_pos_gb}GB"
-    elif [[ "$partition_end" =~ ^([0-9.]+)GiB$ ]]; then
-        start_pos_gb="${BASH_REMATCH[1]}"
-        end_pos_gb=$(echo "$start_pos_gb + 32" | bc -l)
-        end_position="${end_pos_gb}GiB"
-    elif [[ "$partition_end" =~ ^([0-9.]+)MB$ ]]; then
-        local start_pos_mb="${BASH_REMATCH[1]}"
-        local end_pos_mb=$(echo "$start_pos_mb + 32768" | bc -l)
-        end_position="${end_pos_mb}MB"
-    elif [[ "$partition_end" =~ ^([0-9.]+)MiB$ ]]; then
-        local start_pos_mib="${BASH_REMATCH[1]}"
-        local end_pos_mib=$(echo "$start_pos_mib + 32768" | bc -l)
-        end_position="${end_pos_mib}MiB"
-    else
-        log_error "Unsupported partition end format: ${partition_end}"
-        log_error "Expected format: [number]GB, [number]GiB, [number]MB, or [number]MiB"
+    # Calculate positions from the end:
+    # /home: last 32GB (disk_size-32 to disk_size)
+    # swap: 16GB before /home (disk_size-48 to disk_size-32)
+    local home_start_gb=$((disk_size_gb - 32))
+    local home_end_gb=${disk_size_gb}
+    local swap_start_gb=$((disk_size_gb - 48))
+    local swap_end_gb=$((disk_size_gb - 32))
+
+    # Create swap partition first (so it gets a lower partition number)
+    local swap_partition_num=$((last_partition_num + 1))
+    local home_partition_num=$((last_partition_num + 2))
+
+    log_info "Creating 16GB swap partition (${swap_start_gb}GB to ${swap_end_gb}GB)..."
+    if ! parted -s "${emmc_device}" mkpart primary linux-swap "${swap_start_gb}GB" "${swap_end_gb}GB"; then
+        log_error "Failed to create swap partition"
         return 1
     fi
 
-    log_info "Creating partition from ${partition_end} to ${end_position}"
-    log_debug "Partition creation command: parted -s ${emmc_device} mkpart primary ext4 '${partition_end}' '${end_position}'"
-
-    if ! parted -s "${emmc_device}" mkpart primary ext4 "${partition_end}" "${end_position}"; then
+    log_info "Creating 32GB /home partition (${home_start_gb}GB to ${home_end_gb}GB)..."
+    if ! parted -s "${emmc_device}" mkpart primary ext4 "${home_start_gb}GB" "${home_end_gb}GB"; then
         log_error "Failed to create /home partition"
-        log_error "Command failed: parted -s ${emmc_device} mkpart primary ext4 '${partition_end}' '${end_position}'"
         return 1
     fi
 
-    # Wait for kernel to recognize new partition
+    # Wait for kernel to recognize new partitions
     sleep 2
     partprobe "${emmc_device}"
     sleep 2
 
-    # Verify the partition was created
+    # Define partition device paths
+    local swap_partition="${emmc_device}p${swap_partition_num}"
+    local home_partition="${emmc_device}p${home_partition_num}"
+
+    # Verify the partitions were created
+    if [[ ! -b "${swap_partition}" ]]; then
+        log_error "New swap partition ${swap_partition} was not created"
+        return 1
+    fi
+
     if [[ ! -b "${home_partition}" ]]; then
         log_error "New /home partition ${home_partition} was not created"
         return 1
     fi
 
-    # Format the new partition
+    # Format the swap partition
+    log_info "Formatting swap partition (${swap_partition})..."
+    if ! mkswap -L "danger-swap" "${swap_partition}"; then
+        log_error "Failed to format swap partition"
+        return 1
+    fi
+
+    # Format the /home partition
     log_info "Formatting /home partition (${home_partition})..."
     if ! mkfs.ext4 -F -L "danger-home" "${home_partition}"; then
         log_error "Failed to format /home partition"
@@ -5825,19 +5820,27 @@ create_emmc_home_partition() {
     # Backup fstab before making changes
     cp /etc/fstab "/etc/fstab.backup-$(date +%Y%m%d-%H%M%S)"
 
-    # Add new /home partition to fstab
-    log_info "Adding /home partition to fstab..."
+    # Add new partitions to fstab
+    log_info "Adding swap and /home partitions to fstab..."
 
-    # Remove any existing /home entries
+    # Remove any existing /home and swap entries
     sed -i '\|/home|d' /etc/fstab
+    sed -i '\|swap|d' /etc/fstab
 
-    # Add new entry using LABEL
+    # Add new entries using LABEL
+    echo "LABEL=danger-swap none swap defaults,nofail 0 0" >> /etc/fstab
     echo "LABEL=danger-home /home ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
 
     # Verify fstab syntax
     if ! mount -a --fake 2>/dev/null; then
         log_error "fstab syntax error after adding /home partition"
         return 1
+    fi
+
+    # Activate swap
+    log_info "Activating swap partition..."
+    if ! swapon "${swap_partition}"; then
+        log_warn "Failed to activate swap partition (will be available after reboot)"
     fi
 
     # Mount the new /home partition
@@ -5853,17 +5856,19 @@ create_emmc_home_partition() {
         return 1
     fi
 
-    log_info "eMMC /home partition layout:"
+    log_info "eMMC partition layout:"
+    log_info "  ${swap_partition} -> swap (16GB)"
     log_info "  ${home_partition} -> /home (32GB)"
 
     # Show final layout
     if command -v gum >/dev/null 2>&1; then
-        log_info "📋 eMMC /home Partition Layout"
+        log_info "📋 eMMC Partition Layout"
         enhanced_table "Partition,Mount,Size,Filesystem,Label" \
+            "${swap_partition},swap,16GB,swap,danger-swap" \
             "${home_partition},/home,32GB,ext4,danger-home"
     fi
 
-    log_success "eMMC /home partition created and mounted successfully"
+    log_success "eMMC swap and /home partitions created and mounted successfully"
 }
 
 # Create NVMe partitions (256GB /data, rest /content)
