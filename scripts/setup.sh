@@ -5360,7 +5360,7 @@ mount_existing_nvme_partitions() {
     fi
 }
 
-# Load and export environment variables from a file
+# Load and export environment variables from a file, respecting script-defined variables
 load_and_export_env_file() {
     local env_file="$1"
 
@@ -5370,6 +5370,13 @@ load_and_export_env_file() {
     fi
 
     log_debug "Loading environment variables from $(basename "$env_file")"
+
+    # Define script-level variables that should not be overridden
+    local -a script_variables=(
+        "SCRIPT_NAME" "SCRIPT_VERSION" "REQUIRED_BASH_VERSION"
+        "SCRIPT_DIR" "PROJECT_ROOT" "INSTALL_ROOT"
+        "LOG_FILE" "BACKUP_DIR" "LOCK_FILE" "START_TIME"
+    )
 
     # Read the file line by line and export variables
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -5386,13 +5393,25 @@ load_and_export_env_file() {
                 var_value="${BASH_REMATCH[1]}"
             fi
 
-            # Check if variable is readonly before attempting to export
-            if declare -p "$var_name" 2>/dev/null | grep -q "declare -r"; then
-                log_debug "Skipping readonly variable $var_name from $(basename "$env_file")"
+            # Check if this is a script-defined variable that should not be overridden
+            local is_script_variable=false
+            for script_var in "${script_variables[@]}"; do
+                if [[ "$var_name" == "$script_var" ]]; then
+                    is_script_variable=true
+                    break
+                fi
+            done
+
+            if [[ "$is_script_variable" == "true" ]]; then
+                log_debug "Skipping script-defined variable $var_name from $(basename "$env_file") (using script value: ${!var_name})"
             else
-                # Export the variable
-                export "$var_name=$var_value"
-                log_debug "Exported $var_name from $(basename "$env_file")"
+                # Export the variable if it's not already defined or if it's not readonly
+                if declare -p "$var_name" 2>/dev/null | grep -q "declare -r"; then
+                    log_debug "Skipping readonly variable $var_name from $(basename "$env_file")"
+                else
+                    export "$var_name=$var_value"
+                    log_debug "Exported $var_name from $(basename "$env_file")"
+                fi
             fi
         fi
     done < "$env_file"
