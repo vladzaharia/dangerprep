@@ -3404,7 +3404,7 @@ EOF
         done
 
         # List directories
-        find "$BACKUP_DIR" -type d -mindepth 1 | sort | while read -r backup_dir; do
+        find "$BACKUP_DIR" -mindepth 1 -type d | sort | while read -r backup_dir; do
             local dirname=$(basename "$backup_dir")
             if [[ "$dirname" =~ \.backup-[0-9]{8}-[0-9]{6}$ ]]; then
                 local original_name="${dirname%.backup-*}"
