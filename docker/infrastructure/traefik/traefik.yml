@@ -31,7 +31,7 @@ certificatesResolvers:
 
   letsencrypt-cloudflare:
     acme:
-      email: ${CF_API_EMAIL}
+      email: ${ACME_EMAIL}
       storage: /data/letsencrypt-acme.json
       caServer: https://acme-v02.api.letsencrypt.org/directory
       dnsChallenge:

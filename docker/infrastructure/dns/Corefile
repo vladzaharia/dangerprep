@@ -16,8 +16,9 @@ danger.diy {
 }
 
 # Fallback to upstream DNS (AdGuard Home)
+# Use IP address instead of hostname to avoid circular dependency
 . {
-    forward . dns-adguardhome-1:53
+    forward . 172.20.0.2:53
     log
     errors
     cache 30

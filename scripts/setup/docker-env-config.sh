@@ -363,13 +363,16 @@ collect_global_environment_variables() {
     # Configure SMTP settings if not already configured
     collect_smtp_configuration
 
+    # Configure notification email settings
+    collect_notification_email_configuration
+
     # Set installation root if not already configured
     if [[ -z "${INSTALL_ROOT:-}" ]]; then
         export INSTALL_ROOT="${DOCKER_ENV_PROJECT_ROOT}"
         log_debug "Set installation root: $INSTALL_ROOT"
     fi
 
-    log_debug "Global environment variables configured: TZ=${TZ}, INSTALL_ROOT=${INSTALL_ROOT}, SMTP_HOST=${SMTP_HOST:-'not set'}"
+    log_debug "Global environment variables configured: TZ=${TZ}, INSTALL_ROOT=${INSTALL_ROOT}, SMTP_HOST=${SMTP_HOST:-'not set'}, NOTIFICATION_EMAIL=${NOTIFICATION_EMAIL:-'not set'}"
 }
 
 # Collect SMTP configuration for services that need email functionality
@@ -445,5 +448,36 @@ collect_smtp_configuration() {
     else
         log_debug "Using existing SMTP configuration or non-interactive mode"
     fi
+}
+
+# Collect notification email configuration for services that send notifications
+collect_notification_email_configuration() {
+    # Check if notification email is not already configured
+    if [[ -z "${NOTIFICATION_EMAIL:-}" ]]; then
+        # If SMTP is configured, use SMTP_FROM as default
+        local default_email="${SMTP_FROM:-admin@danger}"
+
+        if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
+            log_info "Configure notification email address for system alerts and updates?"
+
+            local notification_email
+            if command -v enhanced_input >/dev/null 2>&1; then
+                notification_email=$(enhanced_input "Notification Email" "$default_email" "Enter email address for system notifications (alerts, updates, etc.)")
+            else
+                read -p "Notification Email ($default_email): " notification_email
+            fi
+            export NOTIFICATION_EMAIL="${notification_email:-$default_email}"
+        else
+            # In non-interactive mode, use the default
+            export NOTIFICATION_EMAIL="$default_email"
+        fi
+
+        log_info "Notification email configured: $NOTIFICATION_EMAIL"
+    else
+        log_debug "Using existing notification email: $NOTIFICATION_EMAIL"
+    fi
+
+    # Also set ADMIN_EMAIL for backward compatibility with existing configurations
+    export ADMIN_EMAIL="${NOTIFICATION_EMAIL}"
 }
 

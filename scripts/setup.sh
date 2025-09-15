@@ -667,7 +667,8 @@ standard_process_template() {
     local common_vars=(
         "SSH_PORT" "WIFI_SSID" "WIFI_PASSWORD" "WIFI_INTERFACE" "WAN_INTERFACE"
         "LAN_IP" "LAN_NETWORK" "DHCP_START" "DHCP_END" "FAIL2BAN_BANTIME" "FAIL2BAN_MAXRETRY"
-        "PROJECT_ROOT" "INSTALL_ROOT"
+        "PROJECT_ROOT" "INSTALL_ROOT" "SMTP_HOST" "SMTP_PORT" "SMTP_USER" "SMTP_PASSWORD" "SMTP_FROM"
+        "NOTIFICATION_EMAIL" "ADMIN_EMAIL"
     )
 
     for var in "${common_vars[@]}"; do
@@ -4899,6 +4900,140 @@ create_docker_system_account() {
     return 0
 }
 
+# Create DNS zone files for CoreDNS
+create_dns_zone_files() {
+    log_info "Creating DNS zone files for CoreDNS..."
+
+    local dns_dir="/data/local-dns"
+
+    # Ensure DNS directory exists with correct ownership
+    if ! standard_create_directory "$dns_dir" "755" "dockerapp" "dockerapp"; then
+        log_error "Failed to create DNS directory: $dns_dir"
+        return 1
+    fi
+
+    # Create db.danger zone file
+    if [[ ! -f "$dns_dir/db.danger" ]]; then
+        log_info "Creating db.danger zone file..."
+        cat > "$dns_dir/db.danger" << 'EOF'
+$ORIGIN danger.
+$TTL 300
+
+@       IN      SOA     ns1.danger. admin.danger. (
+                        2024091501      ; Serial
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        300             ; Minimum TTL
+                        )
+
+@       IN      NS      ns1.danger.
+ns1     IN      A       172.20.0.3
+
+; Service records (will be updated by dns-registrar)
+traefik IN      A       172.20.0.3
+EOF
+        chown dockerapp:dockerapp "$dns_dir/db.danger"
+        chmod 644 "$dns_dir/db.danger"
+        enhanced_status_indicator "success" "Created db.danger zone file"
+    else
+        enhanced_status_indicator "info" "db.danger zone file already exists"
+    fi
+
+    # Create db.danger.diy zone file
+    if [[ ! -f "$dns_dir/db.danger.diy" ]]; then
+        log_info "Creating db.danger.diy zone file..."
+        cat > "$dns_dir/db.danger.diy" << 'EOF'
+$ORIGIN danger.diy.
+$TTL 300
+
+@       IN      SOA     ns1.danger.diy. admin.danger.diy. (
+                        2024091501      ; Serial
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        300             ; Minimum TTL
+                        )
+
+@       IN      NS      ns1.danger.diy.
+ns1     IN      A       172.20.0.3
+
+; Service records (will be updated by dns-registrar)
+traefik IN      A       172.20.0.3
+EOF
+        chown dockerapp:dockerapp "$dns_dir/db.danger.diy"
+        chmod 644 "$dns_dir/db.danger.diy"
+        enhanced_status_indicator "success" "Created db.danger.diy zone file"
+    else
+        enhanced_status_indicator "info" "db.danger.diy zone file already exists"
+    fi
+
+    log_success "DNS zone files created successfully"
+    return 0
+}
+
+# Fix specific service permissions that need special handling
+fix_service_permissions() {
+    log_info "Fixing service-specific permissions..."
+
+    # Fix Step-CA permissions - needs secure key files
+    if [[ -d "/data/step-ca" ]]; then
+        log_info "Fixing Step-CA permissions..."
+        chown -R dockerapp:dockerapp "/data/step-ca"
+
+        # Set secure permissions for key files
+        find "/data/step-ca" -name "*_key" -exec chmod 600 {} \; 2>/dev/null || true
+        find "/data/step-ca" -name "*.key" -exec chmod 600 {} \; 2>/dev/null || true
+        find "/data/step-ca" -name "password" -exec chmod 600 {} \; 2>/dev/null || true
+
+        # Set readable permissions for certificates
+        find "/data/step-ca" -name "*.crt" -exec chmod 644 {} \; 2>/dev/null || true
+        find "/data/step-ca" -name "*.json" -exec chmod 644 {} \; 2>/dev/null || true
+
+        # Ensure directories are accessible
+        find "/data/step-ca" -type d -exec chmod 755 {} \;
+
+        enhanced_status_indicator "success" "Fixed Step-CA permissions"
+    fi
+
+    # Fix MongoDB permissions - needs full write access
+    local mongo_dirs=(
+        "/data/komodo-mongo/db"
+        "/data/komodo-mongo/config"
+        "/data/docmost/postgres"
+        "/data/onedev/postgres"
+    )
+
+    for dir in "${mongo_dirs[@]}"; do
+        if [[ -d "$dir" ]]; then
+            log_info "Fixing MongoDB permissions for: $dir"
+            chown -R dockerapp:dockerapp "$dir"
+            chmod -R 755 "$dir"
+
+            # Ensure all files are writable by the user
+            find "$dir" -type f -exec chmod 644 {} \; 2>/dev/null || true
+            find "$dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
+
+            enhanced_status_indicator "success" "Fixed MongoDB permissions for: $dir"
+        fi
+    done
+
+    # Fix DNS permissions
+    if [[ -d "/data/local-dns" ]]; then
+        log_info "Fixing DNS permissions..."
+        chown -R dockerapp:dockerapp "/data/local-dns"
+        chmod -R 755 "/data/local-dns"
+
+        # Ensure DNS zone files are readable
+        find "/data/local-dns" -name "db.*" -exec chmod 644 {} \; 2>/dev/null || true
+
+        enhanced_status_indicator "success" "Fixed DNS permissions"
+    fi
+
+    log_success "Service-specific permissions fixed"
+    return 0
+}
+
 # Configure rootless Docker using standardized patterns
 configure_rootless_docker() {
     enhanced_section "Docker Installation" "Installing and configuring Docker with rootless support" "🐳"
@@ -5049,34 +5184,43 @@ setup_docker_services() {
     )
 
     # Create data directories on the dedicated /data partition
+    # Use dockerapp:dockerapp (1337:1337) ownership for Docker service directories
     local data_directories=(
-        "/data/traefik:755:root:root"
-        "/data/komodo:755:root:root"
-        "/data/komodo-mongo/db:755:root:root"
-        "/data/komodo-mongo/config:755:root:root"
-        "/data/jellyfin/config:755:root:root"
-        "/data/jellyfin/cache:755:root:root"
-        "/data/komga/config:755:root:root"
-        "/data/kiwix:755:root:root"
+        "/data/traefik:755:dockerapp:dockerapp"
+        "/data/komodo:755:dockerapp:dockerapp"
+        "/data/komodo/backups:755:dockerapp:dockerapp"
+        "/data/komodo/syncs:755:dockerapp:dockerapp"
+        "/data/komodo/periphery:755:dockerapp:dockerapp"
+        "/data/komodo-mongo:755:dockerapp:dockerapp"
+        "/data/komodo-mongo/db:755:dockerapp:dockerapp"
+        "/data/komodo-mongo/config:755:dockerapp:dockerapp"
+        "/data/jellyfin:755:dockerapp:dockerapp"
+        "/data/jellyfin/config:755:dockerapp:dockerapp"
+        "/data/jellyfin/cache:755:dockerapp:dockerapp"
+        "/data/komga:755:dockerapp:dockerapp"
+        "/data/komga/config:755:dockerapp:dockerapp"
+        "/data/kiwix:755:dockerapp:dockerapp"
         "/data/logs:755:root:root"
         "/data/backups:755:root:root"
         "/data/raspap:755:root:root"
-        "/data/step-ca:755:root:root"
-        "/data/cdn:755:root:root"
-        "/data/cdn-assets:755:root:root"
-        "/data/offline-sync:755:root:root"
-        "/data/sync:755:root:root"
-        "/data/romm/config:755:root:root"
-        "/data/romm/assets:755:root:root"
-        "/data/romm/resources:755:root:root"
-        "/data/docmost:755:root:root"
-        "/data/docmost/postgres:755:root:root"
-        "/data/docmost/redis:755:root:root"
-        "/data/onedev:755:root:root"
-        "/data/onedev/postgres:755:root:root"
-        "/data/adguard/work:755:root:root"
-        "/data/adguard/conf:755:root:root"
-        "/data/local-dns:755:root:root"
+        "/data/step-ca:755:dockerapp:dockerapp"
+        "/data/cdn:755:dockerapp:dockerapp"
+        "/data/cdn-assets:755:dockerapp:dockerapp"
+        "/data/offline-sync:755:dockerapp:dockerapp"
+        "/data/sync:755:dockerapp:dockerapp"
+        "/data/romm:755:dockerapp:dockerapp"
+        "/data/romm/config:755:dockerapp:dockerapp"
+        "/data/romm/assets:755:dockerapp:dockerapp"
+        "/data/romm/resources:755:dockerapp:dockerapp"
+        "/data/docmost:755:dockerapp:dockerapp"
+        "/data/docmost/postgres:755:dockerapp:dockerapp"
+        "/data/docmost/redis:755:dockerapp:dockerapp"
+        "/data/onedev:755:dockerapp:dockerapp"
+        "/data/onedev/postgres:755:dockerapp:dockerapp"
+        "/data/adguard:755:dockerapp:dockerapp"
+        "/data/adguard/work:755:dockerapp:dockerapp"
+        "/data/adguard/conf:755:dockerapp:dockerapp"
+        "/data/local-dns:755:dockerapp:dockerapp"
     )
 
     # Create content directories on the dedicated /content partition
@@ -5179,6 +5323,18 @@ setup_docker_services() {
     fi
 
     enhanced_status_indicator "success" "Directory structure created with NVMe integration"
+
+    # Create DNS zone files for CoreDNS
+    if ! create_dns_zone_files; then
+        log_error "Failed to create DNS zone files"
+        return 1
+    fi
+
+    # Fix service-specific permissions after directory creation
+    if ! fix_service_permissions; then
+        log_error "Failed to fix service permissions"
+        return 1
+    fi
 
     # Copy Docker configurations if they exist using standardized file operations
     if [[ -d "${PROJECT_ROOT}/docker" ]]; then
@@ -6001,14 +6157,22 @@ create_nvme_partitions() {
 
     # Create subdirectories for organization using standardized directory creation
     # These match the service-specific directories that Docker containers expect
-    local data_subdirs=(
-        "/data/traefik" "/data/komodo" "/data/komodo-mongo/db" "/data/komodo-mongo/config" "/data/jellyfin/config" "/data/jellyfin/cache"
-        "/data/komga/config" "/data/kiwix" "/data/logs" "/data/backups" "/data/raspap"
+    # Use dockerapp:dockerapp ownership for Docker service directories
+    local data_subdirs_dockerapp=(
+        "/data/traefik" "/data/komodo" "/data/komodo/backups" "/data/komodo/syncs" "/data/komodo/periphery"
+        "/data/komodo-mongo" "/data/komodo-mongo/db" "/data/komodo-mongo/config"
+        "/data/jellyfin" "/data/jellyfin/config" "/data/jellyfin/cache"
+        "/data/komga" "/data/komga/config" "/data/kiwix"
         "/data/step-ca" "/data/cdn" "/data/cdn-assets" "/data/offline-sync" "/data/sync"
-        "/data/romm/config" "/data/romm/assets" "/data/romm/resources"
+        "/data/romm" "/data/romm/config" "/data/romm/assets" "/data/romm/resources"
         "/data/docmost" "/data/docmost/postgres" "/data/docmost/redis"
         "/data/onedev" "/data/onedev/postgres"
-        "/data/adguard/work" "/data/adguard/conf" "/data/local-dns"
+        "/data/adguard" "/data/adguard/work" "/data/adguard/conf" "/data/local-dns"
+    )
+
+    # Directories that should remain root-owned
+    local data_subdirs_root=(
+        "/data/logs" "/data/backups" "/data/raspap"
         "/data/config" "/data/cache"
     )
 
@@ -6019,8 +6183,16 @@ create_nvme_partitions() {
         "/content/downloads" "/content/sync"
     )
 
-    log_info "Creating data subdirectories on /data partition..."
-    for subdir in "${data_subdirs[@]}"; do
+    log_info "Creating Docker service data subdirectories with dockerapp ownership..."
+    for subdir in "${data_subdirs_dockerapp[@]}"; do
+        if ! standard_create_directory "$subdir" "755" "1337" "1337"; then
+            log_error "Failed to create directory: $subdir"
+            return 1
+        fi
+    done
+
+    log_info "Creating system data subdirectories with root ownership..."
+    for subdir in "${data_subdirs_root[@]}"; do
         if ! standard_create_directory "$subdir" "755" "root" "root"; then
             log_error "Failed to create directory: $subdir"
             return 1
