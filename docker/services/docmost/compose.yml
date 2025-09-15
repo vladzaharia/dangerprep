@@ -21,9 +21,20 @@ services:
       - DATABASE_URL=${DATABASE_URL}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.docmost.rule=Host(`docs.danger`)"
-      - "traefik.http.routers.docmost.entrypoints=websecure"
-      - "traefik.http.routers.docmost.tls.certresolver=step-ca"
+
+      # Docmost - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.docmost-internal.rule=Host(`docs.danger`)"
+      - "traefik.http.routers.docmost-internal.entrypoints=websecure"
+      - "traefik.http.routers.docmost-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.docmost-internal.service=docmost"
+
+      # Docmost - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.docmost-external.rule=Host(`docs.danger.diy`)"
+      - "traefik.http.routers.docmost-external.entrypoints=websecure"
+      - "traefik.http.routers.docmost-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.docmost-external.service=docmost"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.docmost.loadbalancer.server.port=3000"
 
       # DNS registration

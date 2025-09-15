@@ -10,9 +10,20 @@ services:
     user: "1337:1337"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.kiwix.rule=Host(`kiwix.danger`)"
-      - "traefik.http.routers.kiwix.entrypoints=websecure"
-      - "traefik.http.routers.kiwix.tls.certresolver=step-ca"
+
+      # Kiwix - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.kiwix-internal.rule=Host(`kiwix.danger`)"
+      - "traefik.http.routers.kiwix-internal.entrypoints=websecure"
+      - "traefik.http.routers.kiwix-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.kiwix-internal.service=kiwix"
+
+      # Kiwix - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.kiwix-external.rule=Host(`kiwix.danger.diy`)"
+      - "traefik.http.routers.kiwix-external.entrypoints=websecure"
+      - "traefik.http.routers.kiwix-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.kiwix-external.service=kiwix"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.kiwix.loadbalancer.server.port=80"
 
       # DNS registration

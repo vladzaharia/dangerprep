@@ -15,10 +15,19 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # CDN service
-      - "traefik.http.routers.cdn.rule=Host(`cdn.danger`)"
-      - "traefik.http.routers.cdn.entrypoints=websecure"
-      - "traefik.http.routers.cdn.tls.certresolver=step-ca"
+      # CDN service - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.cdn-internal.rule=Host(`cdn.danger`)"
+      - "traefik.http.routers.cdn-internal.entrypoints=websecure"
+      - "traefik.http.routers.cdn-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.cdn-internal.service=cdn"
+
+      # CDN service - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.cdn-external.rule=Host(`cdn.danger.diy`)"
+      - "traefik.http.routers.cdn-external.entrypoints=websecure"
+      - "traefik.http.routers.cdn-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.cdn-external.service=cdn"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.cdn.loadbalancer.server.port=8080"
 
       # DNS registration

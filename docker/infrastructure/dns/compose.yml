@@ -12,14 +12,23 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Web interface
-      - "traefik.http.routers.adguardhome.rule=Host(`dns.danger`)"
-      - "traefik.http.routers.adguardhome.entrypoints=websecure"
-      - "traefik.http.routers.adguardhome.tls.certresolver=step-ca"
+      # Web interface - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.adguardhome-internal.rule=Host(`dns.danger`)"
+      - "traefik.http.routers.adguardhome-internal.entrypoints=websecure"
+      - "traefik.http.routers.adguardhome-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.adguardhome-internal.service=adguardhome"
+
+      # Web interface - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.adguardhome-external.rule=Host(`dns.danger.diy`)"
+      - "traefik.http.routers.adguardhome-external.entrypoints=websecure"
+      - "traefik.http.routers.adguardhome-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.adguardhome-external.service=adguardhome"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.adguardhome.loadbalancer.server.port=80"
 
       # DNS registration
-      - "dns.register=adguard.danger"
+      - "dns.register=dns.danger"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

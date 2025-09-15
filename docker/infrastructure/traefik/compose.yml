@@ -19,12 +19,19 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Dashboard
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.danger`)"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.tls.certresolver=step-ca"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.middlewares=auth"
+      # Dashboard - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.dashboard-internal.rule=Host(`traefik.danger`)"
+      - "traefik.http.routers.dashboard-internal.entrypoints=websecure"
+      - "traefik.http.routers.dashboard-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.dashboard-internal.service=api@internal"
+      - "traefik.http.routers.dashboard-internal.middlewares=auth"
+
+      # Dashboard - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.dashboard-external.rule=Host(`traefik.danger.diy`)"
+      - "traefik.http.routers.dashboard-external.entrypoints=websecure"
+      - "traefik.http.routers.dashboard-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.dashboard-external.service=api@internal"
+      - "traefik.http.routers.dashboard-external.middlewares=auth"
 
       # Basic auth middleware for dashboard
       - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH_USERS}"

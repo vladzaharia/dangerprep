@@ -12,9 +12,20 @@ services:
     user: "1337:1337"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.komga.rule=Host(`komga.danger`)"
-      - "traefik.http.routers.komga.entrypoints=websecure"
-      - "traefik.http.routers.komga.tls.certresolver=step-ca"
+
+      # Komga - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.komga-internal.rule=Host(`komga.danger`)"
+      - "traefik.http.routers.komga-internal.entrypoints=websecure"
+      - "traefik.http.routers.komga-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.komga-internal.service=komga"
+
+      # Komga - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.komga-external.rule=Host(`komga.danger.diy`)"
+      - "traefik.http.routers.komga-external.entrypoints=websecure"
+      - "traefik.http.routers.komga-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.komga-external.service=komga"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.komga.loadbalancer.server.port=8080"
 
       # DNS registration

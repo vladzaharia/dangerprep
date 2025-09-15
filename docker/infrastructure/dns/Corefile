@@ -1,9 +1,16 @@
 # CoreDNS configuration for local domain resolution
 # This file is managed by the dns-registrar service
 
-# Local domain resolution
+# Local domain resolution - Internal (.danger)
 danger {
     file /etc/coredns/db.danger
+    log
+    errors
+}
+
+# Local domain resolution - External (.danger.diy)
+danger.diy {
+    file /etc/coredns/db.danger.diy
     log
     errors
 }

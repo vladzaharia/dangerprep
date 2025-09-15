@@ -10,9 +10,20 @@ services:
     user: "1337:1337"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host(`portainer.danger`)"
-      - "traefik.http.routers.portainer.entrypoints=websecure"
-      - "traefik.http.routers.portainer.tls.certresolver=step-ca"
+
+      # Portainer - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.portainer-internal.rule=Host(`portainer.danger`)"
+      - "traefik.http.routers.portainer-internal.entrypoints=websecure"
+      - "traefik.http.routers.portainer-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.portainer-internal.service=portainer"
+
+      # Portainer - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.portainer-external.rule=Host(`portainer.danger.diy`)"
+      - "traefik.http.routers.portainer-external.entrypoints=websecure"
+      - "traefik.http.routers.portainer-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.portainer-external.service=portainer"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
       # DNS registration

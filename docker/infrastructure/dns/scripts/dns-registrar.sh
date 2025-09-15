@@ -7,8 +7,10 @@ set -e
 
 # Configuration
 DOMAIN_NAME="${DOMAIN_NAME:-danger}"
+EXTERNAL_DOMAIN_NAME="${EXTERNAL_DOMAIN_NAME:-danger.diy}"
 DNS_CONFIG_DIR="/dns-config"
-DNS_DB_FILE="$DNS_CONFIG_DIR/db.$DOMAIN_NAME"
+DNS_DB_FILE="${DNS_CONFIG_DIR}/db.${DOMAIN_NAME}"
+EXTERNAL_DNS_DB_FILE="${DNS_CONFIG_DIR}/db.${EXTERNAL_DOMAIN_NAME}"
 UPDATE_INTERVAL="${DNS_UPDATE_INTERVAL:-30}"
 TRAEFIK_IP="172.20.0.3"  # Traefik container IP in dns network
 
@@ -43,15 +45,16 @@ get_dns_registrations() {
     done
 }
 
-# Generate DNS zone file
-generate_dns_zone() {
+# Generate DNS zone file for a specific domain
+generate_dns_zone_for_domain() {
     local zone_file="$1"
-    local temp_file="$zone_file.tmp"
-    
+    local domain_name="$2"
+    local temp_file="${zone_file}.tmp"
+
     # DNS zone header
     cat > "$temp_file" << EOF
 \$TTL 300
-@       IN      SOA     ns1.$DOMAIN_NAME. admin.$DOMAIN_NAME. (
+@       IN      SOA     ns1.${domain_name}. admin.${domain_name}. (
                         $(date +%Y%m%d%H)  ; Serial
                         3600               ; Refresh
                         1800               ; Retry
@@ -59,27 +62,42 @@ generate_dns_zone() {
                         300 )              ; Minimum TTL
 
 ; Name servers
-@       IN      NS      ns1.$DOMAIN_NAME.
+@       IN      NS      ns1.${domain_name}.
 ns1     IN      A       172.20.0.4
 
 ; Default records
-@       IN      A       $TRAEFIK_IP
-*       IN      A       $TRAEFIK_IP
+@       IN      A       ${TRAEFIK_IP}
+*       IN      A       ${TRAEFIK_IP}
 
 EOF
 
     # Add container-specific records
     get_dns_registrations | while read -r domain ip; do
         if [ -n "$domain" ] && [ -n "$ip" ]; then
-            # Remove domain suffix if present
-            hostname=$(echo "$domain" | sed "s/\.$DOMAIN_NAME$//")
-            echo "$hostname    IN      A       $ip" >> "$temp_file"
-            log "Registered: $hostname.$DOMAIN_NAME -> $ip"
+            # Remove .danger suffix if present to get base hostname
+            hostname=$(echo "$domain" | sed "s/\.${DOMAIN_NAME}$//")
+
+            # For .danger domain, use hostname as-is
+            if [ "$domain_name" = "$DOMAIN_NAME" ]; then
+                echo "${hostname}    IN      A       ${ip}" >> "$temp_file"
+                log "Registered: ${hostname}.${domain_name} -> ${ip}"
+            # For .danger.diy domain, use same hostname
+            elif [ "$domain_name" = "$EXTERNAL_DOMAIN_NAME" ]; then
+                echo "${hostname}    IN      A       ${ip}" >> "$temp_file"
+                log "Registered: ${hostname}.${domain_name} -> ${ip}"
+            fi
         fi
     done
-    
+
     # Atomic update
     mv "$temp_file" "$zone_file"
+}
+
+# Generate both DNS zone files
+generate_dns_zones() {
+    log "Generating DNS zones for both domains..."
+    generate_dns_zone_for_domain "$DNS_DB_FILE" "$DOMAIN_NAME"
+    generate_dns_zone_for_domain "$EXTERNAL_DNS_DB_FILE" "$EXTERNAL_DOMAIN_NAME"
 }
 
 # Reload CoreDNS configuration
@@ -95,18 +113,19 @@ reload_coredns() {
 # Main loop
 main() {
     log "DNS Registrar starting..."
-    log "Domain: $DOMAIN_NAME"
+    log "Internal domain: ${DOMAIN_NAME}"
+    log "External domain: ${EXTERNAL_DOMAIN_NAME}"
     log "Update interval: ${UPDATE_INTERVAL}s"
-    
+
     while true; do
         log "Updating DNS registrations..."
-        
-        # Generate new zone file
-        generate_dns_zone "$DNS_DB_FILE"
-        
+
+        # Generate new zone files for both domains
+        generate_dns_zones
+
         # Reload CoreDNS
         reload_coredns
-        
+
         log "DNS update complete"
         sleep "$UPDATE_INTERVAL"
     done

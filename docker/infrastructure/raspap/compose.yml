@@ -20,9 +20,20 @@ services:
     labels:
       # Traefik Configuration
       - "traefik.enable=true"
-      - "traefik.http.routers.raspap.rule=Host(`router.danger`)"
-      - "traefik.http.routers.raspap.entrypoints=websecure"
-      - "traefik.http.routers.raspap.tls.certresolver=step-ca"
+
+      # RaspAP - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.raspap-internal.rule=Host(`router.danger`)"
+      - "traefik.http.routers.raspap-internal.entrypoints=websecure"
+      - "traefik.http.routers.raspap-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.raspap-internal.service=raspap"
+
+      # RaspAP - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.raspap-external.rule=Host(`router.danger.diy`)"
+      - "traefik.http.routers.raspap-external.entrypoints=websecure"
+      - "traefik.http.routers.raspap-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.raspap-external.service=raspap"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.raspap.loadbalancer.server.port=8080"
 
       # DNS Registration

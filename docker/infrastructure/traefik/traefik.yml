@@ -29,6 +29,17 @@ certificatesResolvers:
         entryPoint: web
       # Trust the step-ca root certificate
 
+  letsencrypt-cloudflare:
+    acme:
+      email: ${CF_API_EMAIL}
+      storage: /data/letsencrypt-acme.json
+      caServer: https://acme-v02.api.letsencrypt.org/directory
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+
 log:
   level: INFO
 

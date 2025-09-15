@@ -28,9 +28,20 @@ services:
       - "3022:3022"  # SSH port needs to be exposed for Git operations
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.onedev.rule=Host(`dev.danger`)"
-      - "traefik.http.routers.onedev.entrypoints=websecure"
-      - "traefik.http.routers.onedev.tls.certresolver=step-ca"
+
+      # OneDev - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.onedev-internal.rule=Host(`dev.danger`)"
+      - "traefik.http.routers.onedev-internal.entrypoints=websecure"
+      - "traefik.http.routers.onedev-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.onedev-internal.service=onedev"
+
+      # OneDev - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.onedev-external.rule=Host(`dev.danger.diy`)"
+      - "traefik.http.routers.onedev-external.entrypoints=websecure"
+      - "traefik.http.routers.onedev-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.onedev-external.service=onedev"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.onedev.loadbalancer.server.port=6610"
 
       # DNS registration

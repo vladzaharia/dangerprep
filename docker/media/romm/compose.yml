@@ -22,9 +22,20 @@ services:
       - REDIS_PASSWORD_FILE=/run/secrets/redis_password
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.romm.rule=Host(`romm.danger`)"
-      - "traefik.http.routers.romm.entrypoints=websecure"
-      - "traefik.http.routers.romm.tls.certresolver=step-ca"
+
+      # RomM - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.romm-internal.rule=Host(`romm.danger`)"
+      - "traefik.http.routers.romm-internal.entrypoints=websecure"
+      - "traefik.http.routers.romm-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.romm-internal.service=romm"
+
+      # RomM - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.romm-external.rule=Host(`romm.danger.diy`)"
+      - "traefik.http.routers.romm-external.entrypoints=websecure"
+      - "traefik.http.routers.romm-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.romm-external.service=romm"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.romm.loadbalancer.server.port=8080"
 
       # DNS registration

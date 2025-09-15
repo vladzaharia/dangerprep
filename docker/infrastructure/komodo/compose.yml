@@ -53,9 +53,20 @@ services:
       - "komodo.skip="
       
       - "traefik.enable=true"
-      - "traefik.http.routers.komodo.rule=Host(`docker.danger`)"
-      - "traefik.http.routers.komodo.entrypoints=websecure"
-      - "traefik.http.routers.komodo.tls.certresolver=step-ca"
+
+      # Komodo - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.komodo-internal.rule=Host(`docker.danger`)"
+      - "traefik.http.routers.komodo-internal.entrypoints=websecure"
+      - "traefik.http.routers.komodo-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.komodo-internal.service=komodo"
+
+      # Komodo - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.komodo-external.rule=Host(`docker.danger.diy`)"
+      - "traefik.http.routers.komodo-external.entrypoints=websecure"
+      - "traefik.http.routers.komodo-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.komodo-external.service=komodo"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.komodo.loadbalancer.server.port=9120"
 
       # DNS registration

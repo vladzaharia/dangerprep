@@ -20,9 +20,20 @@ services:
       - /dev/dri:/dev/dri  # Hardware transcoding for RK3588S
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.danger`)"
-      - "traefik.http.routers.jellyfin.entrypoints=websecure"
-      - "traefik.http.routers.jellyfin.tls.certresolver=step-ca"
+
+      # Jellyfin - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.jellyfin-internal.rule=Host(`jellyfin.danger`)"
+      - "traefik.http.routers.jellyfin-internal.entrypoints=websecure"
+      - "traefik.http.routers.jellyfin-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.jellyfin-internal.service=jellyfin"
+
+      # Jellyfin - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.jellyfin-external.rule=Host(`jellyfin.danger.diy`)"
+      - "traefik.http.routers.jellyfin-external.entrypoints=websecure"
+      - "traefik.http.routers.jellyfin-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.jellyfin-external.service=jellyfin"
+
+      # Service definition (shared by both routers)
       - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
 
       # DNS registration
