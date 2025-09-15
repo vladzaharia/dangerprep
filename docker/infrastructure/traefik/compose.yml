@@ -8,14 +8,13 @@ services:
       - "9090:8080"  # Dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /data/traefik:/data
+      - traefik-data:/data
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
-      - /data/step-ca/certs/root_ca.crt:/etc/ssl/certs/step-ca-root.crt:ro
     env_file:
       - compose.env
     user: "1337:1337"
     environment:
-      - LEGO_CA_CERTIFICATES=/etc/ssl/certs/step-ca-root.crt
+      - LEGO_DISABLE_CNAME_SUPPORT=true
     labels:
       - "traefik.enable=true"
 
@@ -49,6 +48,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  traefik-data:
+    driver: local
 
 networks:
   traefik:

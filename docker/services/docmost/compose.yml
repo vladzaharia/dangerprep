@@ -6,7 +6,7 @@ services:
       - postgres
       - redis
     volumes:
-      - /data/docmost:/app/data/storage
+      - docmost-storage:/app/data/storage
       # Mount secrets as files for enhanced security
       - ${INSTALL_ROOT}/secrets/docmost/app_secret:/run/secrets/app_secret:ro
       - ${INSTALL_ROOT}/secrets/docmost/db_password:/run/secrets/db_password:ro
@@ -56,7 +56,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     volumes:
-      - /data/docmost/postgres:/var/lib/postgresql/data
+      - docmost-postgres:/var/lib/postgresql/data
     env_file:
       - compose.env
     user: "1337:1337"
@@ -80,7 +80,7 @@ services:
     image: redis:7.2-alpine
     restart: unless-stopped
     volumes:
-      - /data/docmost/redis:/data
+      - docmost-redis:/data
     env_file:
       - compose.env
     user: "1337:1337"
@@ -95,6 +95,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  docmost-storage:
+    driver: local
+  docmost-postgres:
+    driver: local
+  docmost-redis:
+    driver: local
 
 networks:
   traefik:

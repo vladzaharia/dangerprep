@@ -4,8 +4,8 @@ services:
     restart: unless-stopped
     command: --quiet --wiredTigerCacheSizeGB 0.25
     volumes:
-      - /data/komodo-mongo/db:/data/db
-      - /data/komodo-mongo/config:/data/configdb
+      - komodo-mongo-db:/data/db
+      - komodo-mongo-config:/data/configdb
     env_file:
       - compose.env
     user: "1337:1337"
@@ -39,8 +39,8 @@ services:
     depends_on:
       - mongo
     volumes:
-      - /data/komodo/backups:/backups
-      - /data/komodo/syncs:/syncs
+      - komodo-backups:/backups
+      - komodo-syncs:/syncs
     env_file:
       - compose.env
     user: "1337:1337"
@@ -96,7 +96,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /proc:/proc
-      - /data/komodo/periphery:/etc/komodo
+      - komodo-periphery:/etc/komodo
     env_file:
       - compose.env
     user: "1337:1337"
@@ -122,6 +122,18 @@ services:
           memory: 1G
         reservations:
           memory: 256M
+
+volumes:
+  komodo-mongo-db:
+    driver: local
+  komodo-mongo-config:
+    driver: local
+  komodo-backups:
+    driver: local
+  komodo-syncs:
+    driver: local
+  komodo-periphery:
+    driver: local
 
 networks:
   traefik:

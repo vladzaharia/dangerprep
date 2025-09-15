@@ -6,8 +6,8 @@ services:
       - "7359:7359/udp"  # Auto-discovery
       - "1900:1900/udp"  # DLNA
     volumes:
-      - /data/jellyfin/config:/config
-      - /data/jellyfin/cache:/cache
+      - jellyfin-config:/config
+      - jellyfin-cache:/cache
       - /content/movies:/media/movies:ro
       - /content/tv:/media/tv:ro
       - /content/webtv:/media/webtv:ro
@@ -55,6 +55,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+volumes:
+  jellyfin-config:
+    driver: local
+  jellyfin-cache:
+    driver: local
 
 networks:
   traefik:

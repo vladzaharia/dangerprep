@@ -3,7 +3,7 @@ services:
     image: gotson/komga:latest
     restart: unless-stopped
     volumes:
-      - /data/komga/config:/config
+      - komga-config:/config
       - /content/books:/books:ro
       - /content/comics:/comics:ro
       - /content/magazines:/magazines:ro
@@ -47,6 +47,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+volumes:
+  komga-config:
+    driver: local
 
 networks:
   traefik:

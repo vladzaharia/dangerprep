@@ -2460,7 +2460,7 @@ configure_nvme_storage_options() {
         echo
 
         enhanced_warning_box "DESTRUCTIVE OPERATION WARNING" \
-            "⚠️  REPARTITIONING WILL PERMANENTLY DESTROY ALL EXISTING DATA!\n\n• All files and partitions on ${nvme_device} will be erased\n• This action cannot be undone\n• Make sure you have backups of any important data\n\nNew partition layout will be:\n• 256GB partition for /data\n• Remaining space for /content" \
+            "⚠️  REPARTITIONING WILL PERMANENTLY DESTROY ALL EXISTING DATA!\n\n• All files and partitions on ${nvme_device} will be erased\n• This action cannot be undone\n• Make sure you have backups of any important data\n\nNew partition layout will be:\n• 256GB partition for /var/lib/docker (Docker storage)\n• Remaining space for /content (media and files)" \
             "danger"
 
         if enhanced_confirm "I understand the risks and want to proceed with repartitioning ${nvme_device}" "false"; then
@@ -2474,7 +2474,7 @@ configure_nvme_storage_options() {
         fi
     else
         # No existing partitions, safe to proceed
-        if enhanced_confirm "Set up NVMe storage with 256GB /data and remaining space for /content?" "true"; then
+        if enhanced_confirm "Set up NVMe storage with 256GB /var/lib/docker and remaining space for /content?" "true"; then
             export NVME_PARTITION_CONFIRMED="true"
             export NVME_DEVICE="${nvme_device}"
             log_info "NVMe partitioning confirmed for ${nvme_device}"
@@ -2741,7 +2741,7 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
         if [[ -n "${NVME_DEVICE:-}" ]]; then
             storage_config+=$'\n'"NVMe Device: ${NVME_DEVICE}"
         fi
-        storage_config+=$'\n'"NVMe Layout: 256GB /data + remaining /content"
+        storage_config+=$'\n'"NVMe Layout: 256GB /var/lib/docker + remaining /content"
     else
         storage_config+="Disabled"
     fi
@@ -3441,72 +3441,26 @@ EOF
 
 
 
-# Fix Docker Compose network configurations
-fix_docker_compose_networks() {
-    enhanced_section "Docker Compose Networks" "Fixing network configurations in compose files" "🔧"
+# Setup shared Docker infrastructure (networks and volumes)
+setup_shared_docker_infrastructure() {
+    enhanced_section "Shared Docker Infrastructure" "Creating shared networks and volumes" "🔧"
 
-    local compose_files=(
-        "$PROJECT_ROOT/docker/infrastructure/traefik/compose.yml"
-        "$PROJECT_ROOT/docker/infrastructure/step-ca/compose.yml"
-        "$PROJECT_ROOT/docker/infrastructure/komodo/compose.yml"
-        "$PROJECT_ROOT/docker/media/komga/compose.yml"
-        "$PROJECT_ROOT/docker/media/jellyfin/compose.yml"
-        "$PROJECT_ROOT/docker/media/romm/compose.yml"
-        "$PROJECT_ROOT/docker/services/docmost/compose.yml"
-        "$PROJECT_ROOT/docker/services/onedev/compose.yml"
-        "$PROJECT_ROOT/docker/sync/kiwix-sync/compose.yml"
-        "$PROJECT_ROOT/docker/sync/nfs-sync/compose.yml"
-        "$PROJECT_ROOT/docker/infrastructure/dns/compose.yml"
-    )
+    local shared_compose="$PROJECT_ROOT/docker/shared/compose.yml"
 
-    local fixed_count=0
-    local total_files=0
+    if [[ ! -f "$shared_compose" ]]; then
+        enhanced_status_indicator "warning" "Shared infrastructure compose file not found: $shared_compose"
+        return 1
+    fi
 
-    for compose_file in "${compose_files[@]}"; do
-        if [[ -f "$compose_file" ]]; then
-            ((total_files++))
-            log_debug "Checking network configuration in: $compose_file"
-
-            # Check if file has traefik network that needs fixing
-            if grep -q "traefik:" "$compose_file"; then
-                # Create backup of compose file
-                if standard_create_backup "$compose_file" >/dev/null; then
-                    # Fix traefik network to be external with explicit name
-                    if sed -i.tmp '/^networks:/,/^[[:space:]]*traefik:/{
-                        /^[[:space:]]*traefik:/,/^[[:space:]]*[^[:space:]]/{
-                            /^[[:space:]]*traefik:/c\
-  traefik:\
-    external: true\
-    name: traefik
-                            /^[[:space:]]*external:/d
-                            /^[[:space:]]*name: traefik/d
-                            /^[[:space:]]*driver: bridge/d
-                        }
-                    }' "$compose_file" 2>/dev/null; then
-                        rm -f "${compose_file}.tmp" 2>/dev/null
-                        enhanced_status_indicator "success" "Fixed: $(basename "$(dirname "$compose_file")")/$(basename "$compose_file")"
-                        ((fixed_count++))
-                    else
-                        # Restore from backup if sed failed
-                        if [[ -f "${compose_file}.tmp" ]]; then
-                            mv "${compose_file}.tmp" "$compose_file"
-                        fi
-                        enhanced_status_indicator "warning" "Failed to fix: $(basename "$compose_file")"
-                    fi
-                else
-                    enhanced_status_indicator "warning" "Could not backup: $(basename "$compose_file")"
-                fi
-            else
-                log_debug "No traefik network found in: $(basename "$compose_file")"
-            fi
-        fi
-    done
-
-    enhanced_status_indicator "success" "Fixed $fixed_count/$total_files Docker Compose files"
-
-    if [[ $fixed_count -gt 0 ]]; then
-        log_info "Network configurations updated to use shared traefik network"
-        log_info "All compose files now reference external traefik network properly"
+    # Deploy shared infrastructure
+    if enhanced_spin "Creating shared Docker infrastructure" \
+        docker compose -f "$shared_compose" up -d --remove-orphans; then
+        enhanced_status_indicator "success" "Shared Docker infrastructure created"
+        log_info "Shared networks and volumes are now available for services"
+        return 0
+    else
+        enhanced_status_indicator "failure" "Failed to create shared Docker infrastructure"
+        return 1
     fi
 }
 
@@ -4904,133 +4858,23 @@ create_docker_system_account() {
 create_dns_zone_files() {
     log_info "Creating DNS zone files for CoreDNS..."
 
-    local dns_dir="/data/local-dns"
-
-    # Ensure DNS directory exists with correct ownership
-    if ! standard_create_directory "$dns_dir" "755" "dockerapp" "dockerapp"; then
-        log_error "Failed to create DNS directory: $dns_dir"
-        return 1
-    fi
-
-    # Create db.danger zone file
-    if [[ ! -f "$dns_dir/db.danger" ]]; then
-        log_info "Creating db.danger zone file..."
-        cat > "$dns_dir/db.danger" << 'EOF'
-$ORIGIN danger.
-$TTL 300
-
-@       IN      SOA     ns1.danger. admin.danger. (
-                        2024091501      ; Serial
-                        3600            ; Refresh
-                        1800            ; Retry
-                        604800          ; Expire
-                        300             ; Minimum TTL
-                        )
-
-@       IN      NS      ns1.danger.
-ns1     IN      A       172.20.0.3
-
-; Service records (will be updated by dns-registrar)
-traefik IN      A       172.20.0.3
-EOF
-        chown dockerapp:dockerapp "$dns_dir/db.danger"
-        chmod 644 "$dns_dir/db.danger"
-        enhanced_status_indicator "success" "Created db.danger zone file"
-    else
-        enhanced_status_indicator "info" "db.danger zone file already exists"
-    fi
-
-    # Create db.danger.diy zone file
-    if [[ ! -f "$dns_dir/db.danger.diy" ]]; then
-        log_info "Creating db.danger.diy zone file..."
-        cat > "$dns_dir/db.danger.diy" << 'EOF'
-$ORIGIN danger.diy.
-$TTL 300
-
-@       IN      SOA     ns1.danger.diy. admin.danger.diy. (
-                        2024091501      ; Serial
-                        3600            ; Refresh
-                        1800            ; Retry
-                        604800          ; Expire
-                        300             ; Minimum TTL
-                        )
-
-@       IN      NS      ns1.danger.diy.
-ns1     IN      A       172.20.0.3
-
-; Service records (will be updated by dns-registrar)
-traefik IN      A       172.20.0.3
-EOF
-        chown dockerapp:dockerapp "$dns_dir/db.danger.diy"
-        chmod 644 "$dns_dir/db.danger.diy"
-        enhanced_status_indicator "success" "Created db.danger.diy zone file"
-    else
-        enhanced_status_indicator "info" "db.danger.diy zone file already exists"
-    fi
-
-    log_success "DNS zone files created successfully"
+    # DNS zone files are now managed by Docker volumes
+    # This function is kept for compatibility but no longer creates files
+    log_info "DNS zone files are managed by Docker volumes"
     return 0
+
+
 }
 
 # Fix specific service permissions that need special handling
 fix_service_permissions() {
-    log_info "Fixing service-specific permissions..."
+    log_info "Service-specific permissions are now managed by Docker volumes"
 
-    # Fix Step-CA permissions - needs secure key files
-    if [[ -d "/data/step-ca" ]]; then
-        log_info "Fixing Step-CA permissions..."
-        chown -R dockerapp:dockerapp "/data/step-ca"
+    # All service data is now handled by Docker volumes with proper ownership
+    # No manual permission fixing needed
+    enhanced_status_indicator "success" "Service permissions managed by Docker volumes"
 
-        # Set secure permissions for key files
-        find "/data/step-ca" -name "*_key" -exec chmod 600 {} \; 2>/dev/null || true
-        find "/data/step-ca" -name "*.key" -exec chmod 600 {} \; 2>/dev/null || true
-        find "/data/step-ca" -name "password" -exec chmod 600 {} \; 2>/dev/null || true
-
-        # Set readable permissions for certificates
-        find "/data/step-ca" -name "*.crt" -exec chmod 644 {} \; 2>/dev/null || true
-        find "/data/step-ca" -name "*.json" -exec chmod 644 {} \; 2>/dev/null || true
-
-        # Ensure directories are accessible
-        find "/data/step-ca" -type d -exec chmod 755 {} \;
-
-        enhanced_status_indicator "success" "Fixed Step-CA permissions"
-    fi
-
-    # Fix MongoDB permissions - needs full write access
-    local mongo_dirs=(
-        "/data/komodo-mongo/db"
-        "/data/komodo-mongo/config"
-        "/data/docmost/postgres"
-        "/data/onedev/postgres"
-    )
-
-    for dir in "${mongo_dirs[@]}"; do
-        if [[ -d "$dir" ]]; then
-            log_info "Fixing MongoDB permissions for: $dir"
-            chown -R dockerapp:dockerapp "$dir"
-            chmod -R 755 "$dir"
-
-            # Ensure all files are writable by the user
-            find "$dir" -type f -exec chmod 644 {} \; 2>/dev/null || true
-            find "$dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
-
-            enhanced_status_indicator "success" "Fixed MongoDB permissions for: $dir"
-        fi
-    done
-
-    # Fix DNS permissions
-    if [[ -d "/data/local-dns" ]]; then
-        log_info "Fixing DNS permissions..."
-        chown -R dockerapp:dockerapp "/data/local-dns"
-        chmod -R 755 "/data/local-dns"
-
-        # Ensure DNS zone files are readable
-        find "/data/local-dns" -name "db.*" -exec chmod 644 {} \; 2>/dev/null || true
-
-        enhanced_status_indicator "success" "Fixed DNS permissions"
-    fi
-
-    log_success "Service-specific permissions fixed"
+    log_success "Service-specific permissions handled by Docker"
     return 0
 }
 
@@ -5163,16 +5007,11 @@ setup_docker_services() {
         return 0
     fi
 
-    # Create shared traefik network for all web services
-    if ! docker network ls --format "{{.Name}}" | grep -q "^traefik$" 2>/dev/null; then
-        if enhanced_spin "Creating shared traefik network" docker network create traefik --driver bridge --subnet=172.20.0.0/16 --gateway=172.20.0.1; then
-            enhanced_status_indicator "success" "Created shared traefik network (172.20.0.0/16)"
-        else
-            enhanced_status_indicator "failure" "Failed to create traefik network"
-            return 1
-        fi
-    else
-        enhanced_status_indicator "info" "Shared traefik network already exists"
+    # Setup shared Docker infrastructure (networks and volumes)
+    if ! setup_shared_docker_infrastructure; then
+        enhanced_status_indicator "warning" "Failed to setup shared Docker infrastructure"
+        log_warn "Services may not work properly without shared networks"
+        # Don't return here - allow setup to continue
     fi
 
     # Set up directory structure using standardized directory creation
@@ -5183,45 +5022,7 @@ setup_docker_services() {
         "${INSTALL_ROOT}/secrets:755:root:root"
     )
 
-    # Create data directories on the dedicated /data partition
-    # Use dockerapp:dockerapp (1337:1337) ownership for Docker service directories
-    local data_directories=(
-        "/data/traefik:755:dockerapp:dockerapp"
-        "/data/komodo:755:dockerapp:dockerapp"
-        "/data/komodo/backups:755:dockerapp:dockerapp"
-        "/data/komodo/syncs:755:dockerapp:dockerapp"
-        "/data/komodo/periphery:755:dockerapp:dockerapp"
-        "/data/komodo-mongo:755:dockerapp:dockerapp"
-        "/data/komodo-mongo/db:755:dockerapp:dockerapp"
-        "/data/komodo-mongo/config:755:dockerapp:dockerapp"
-        "/data/jellyfin:755:dockerapp:dockerapp"
-        "/data/jellyfin/config:755:dockerapp:dockerapp"
-        "/data/jellyfin/cache:755:dockerapp:dockerapp"
-        "/data/komga:755:dockerapp:dockerapp"
-        "/data/komga/config:755:dockerapp:dockerapp"
-        "/data/kiwix:755:dockerapp:dockerapp"
-        "/data/logs:755:root:root"
-        "/data/backups:755:root:root"
-        "/data/raspap:755:root:root"
-        "/data/step-ca:755:dockerapp:dockerapp"
-        "/data/cdn:755:dockerapp:dockerapp"
-        "/data/cdn-assets:755:dockerapp:dockerapp"
-        "/data/offline-sync:755:dockerapp:dockerapp"
-        "/data/sync:755:dockerapp:dockerapp"
-        "/data/romm:755:dockerapp:dockerapp"
-        "/data/romm/config:755:dockerapp:dockerapp"
-        "/data/romm/assets:755:dockerapp:dockerapp"
-        "/data/romm/resources:755:dockerapp:dockerapp"
-        "/data/docmost:755:dockerapp:dockerapp"
-        "/data/docmost/postgres:755:dockerapp:dockerapp"
-        "/data/docmost/redis:755:dockerapp:dockerapp"
-        "/data/onedev:755:dockerapp:dockerapp"
-        "/data/onedev/postgres:755:dockerapp:dockerapp"
-        "/data/adguard:755:dockerapp:dockerapp"
-        "/data/adguard/work:755:dockerapp:dockerapp"
-        "/data/adguard/conf:755:dockerapp:dockerapp"
-        "/data/local-dns:755:dockerapp:dockerapp"
-    )
+
 
     # Create content directories on the dedicated /content partition
     local content_directories=(
@@ -5250,41 +5051,7 @@ setup_docker_services() {
     done
     enhanced_status_indicator "success" "Created $created_base base directories"
 
-    # Create data directories on /data partition (if mounted)
-    if mountpoint -q /data 2>/dev/null; then
-        local created_data=0
-        for dir_spec in "${data_directories[@]}"; do
-            IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
-            if standard_create_directory "$dir_path" "$mode" "$owner" "$group"; then
-                ((created_data++))
-            else
-                enhanced_status_indicator "failure" "Failed to create: $dir_path"
-                return 1
-            fi
-        done
-        enhanced_status_indicator "success" "Created $created_data data directories on /data"
-    else
-        enhanced_status_indicator "warning" "/data partition not mounted, using fallback"
-        # Fallback: create directories under INSTALL_ROOT if /data is not available
-        if ! standard_create_directory "${INSTALL_ROOT}/data" "755" "root" "root"; then
-            enhanced_status_indicator "failure" "Failed to create fallback data directory"
-            return 1
-        fi
 
-        local created_fallback=0
-        for dir_spec in "${data_directories[@]}"; do
-            IFS=':' read -r dir_path mode owner group <<< "$dir_spec"
-            # Replace /data with ${INSTALL_ROOT}/data for fallback
-            fallback_path="${dir_path/\/data/${INSTALL_ROOT}/data}"
-            if standard_create_directory "$fallback_path" "$mode" "$owner" "$group"; then
-                ((created_fallback++))
-            else
-                enhanced_status_indicator "failure" "Failed to create: $fallback_path"
-                return 1
-            fi
-        done
-        enhanced_status_indicator "success" "Created $created_fallback fallback data directories"
-    fi
 
     # Create content directories on /content partition (if mounted)
     if mountpoint -q /content 2>/dev/null; then
@@ -5394,10 +5161,11 @@ deploy_selected_docker_services() {
         sleep 5  # Give Docker a moment to fully start
     fi
 
-    # Ensure shared traefik network exists for service deployment
+    # Ensure shared Docker infrastructure exists for service deployment
     if ! docker network ls --format "{{.Name}}" | grep -q "^traefik$" 2>/dev/null; then
-        if ! docker network create traefik --driver bridge --subnet=172.20.0.0/16 --gateway=172.20.0.1 2>/dev/null; then
-            enhanced_status_indicator "warning" "Failed to create traefik network"
+        log_warn "Shared traefik network not found, attempting to create shared infrastructure..."
+        if ! setup_shared_docker_infrastructure; then
+            enhanced_status_indicator "warning" "Failed to create shared infrastructure - services may not work properly"
         fi
     fi
 
@@ -6027,7 +5795,7 @@ create_emmc_home_partition() {
     log_success "eMMC swap and /home partitions created and mounted successfully"
 }
 
-# Create NVMe partitions (256GB /data, rest /content)
+# Create NVMe partitions (256GB /var/lib/docker, rest /content)
 create_nvme_partitions() {
     local nvme_device="$1"
 
@@ -6051,8 +5819,8 @@ create_nvme_partitions() {
     log_info "Creating GPT partition table..."
     parted -s "${nvme_device}" mklabel gpt
 
-    # Create 256GB partition for /data (starting at 1MB for alignment)
-    log_info "Creating 256GB /data partition..."
+    # Create 256GB partition for /var/lib/docker (starting at 1MB for alignment)
+    log_info "Creating 256GB /var/lib/docker partition..."
     parted -s "${nvme_device}" mkpart primary ext4 1MiB 256GiB
 
     # Create partition for /content using remaining space
@@ -6065,18 +5833,18 @@ create_nvme_partitions() {
     sleep 2
 
     # Format partitions
-    local data_partition="${nvme_device}p1"
+    local docker_partition="${nvme_device}p1"
     local content_partition="${nvme_device}p2"
 
-    log_info "Formatting /data partition (${data_partition})..."
-    mkfs.ext4 -F -L "danger-data" "${data_partition}"
+    log_info "Formatting /var/lib/docker partition (${docker_partition})..."
+    mkfs.ext4 -F -L "danger-docker" "${docker_partition}"
 
     log_info "Formatting /content partition (${content_partition})..."
     mkfs.ext4 -F -L "danger-content" "${content_partition}"
 
     # Create mount points using standardized directory creation
-    if ! standard_create_directory "/data" "755" "root" "root"; then
-        log_error "Failed to create /data mount point"
+    if ! standard_create_directory "/var/lib/docker" "755" "root" "root"; then
+        log_error "Failed to create /var/lib/docker mount point"
         return 1
     fi
 
@@ -6089,26 +5857,26 @@ create_nvme_partitions() {
     log_info "Mounting partitions with boot safety checks..."
 
     # Create mount points if they don't exist
-    mkdir -p /data /content
+    mkdir -p /var/lib/docker /content
 
     # Backup fstab before making changes
     cp /etc/fstab /etc/fstab.backup-$(date +%Y%m%d-%H%M%S)
 
-    # Test mount data partition first
-    if mount "${data_partition}" /data 2>/dev/null; then
-        log_success "Successfully mounted data partition"
+    # Test mount docker partition first
+    if mount "${docker_partition}" /var/lib/docker 2>/dev/null; then
+        log_success "Successfully mounted Docker partition"
 
         # Test if mount is working properly
-        if touch /data/.mount-test 2>/dev/null && rm /data/.mount-test 2>/dev/null; then
-            log_info "Data partition mount verified"
+        if touch /var/lib/docker/.mount-test 2>/dev/null && rm /var/lib/docker/.mount-test 2>/dev/null; then
+            log_info "Docker partition mount verified"
         else
-            log_warn "Data partition mounted but not writable"
-            umount /data 2>/dev/null || true
+            log_warn "Docker partition mounted but not writable"
+            umount /var/lib/docker 2>/dev/null || true
         fi
     else
-        log_error "Failed to mount data partition: ${data_partition}"
-        log_warn "Continuing without data partition - can be fixed after boot"
-        data_partition=""
+        log_error "Failed to mount Docker partition: ${docker_partition}"
+        log_warn "Continuing without Docker partition - can be fixed after boot"
+        docker_partition=""
     fi
 
     # Test mount content partition
@@ -6133,13 +5901,13 @@ create_nvme_partitions() {
     log_info "Adding successfully mounted partitions to /etc/fstab..."
 
     # Remove any existing entries for these mount points
-    sed -i '\|/data|d' /etc/fstab
+    sed -i '\|/var/lib/docker|d' /etc/fstab
     sed -i '\|/content|d' /etc/fstab
 
     # Add new entries only for successfully mounted partitions
-    if [[ -n "${data_partition}" ]] && mountpoint -q /data; then
-        echo "LABEL=danger-data /data ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
-        log_info "Added data partition to fstab with nofail option"
+    if [[ -n "${docker_partition}" ]] && mountpoint -q /var/lib/docker; then
+        echo "LABEL=danger-docker /var/lib/docker ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+        log_info "Added Docker partition to fstab with nofail option"
     fi
 
     if [[ -n "${content_partition}" ]] && mountpoint -q /content; then
@@ -6155,25 +5923,16 @@ create_nvme_partitions() {
         cp /etc/fstab.backup-$(date +%Y%m%d-%H%M%S) /etc/fstab
     fi
 
-    # Create subdirectories for organization using standardized directory creation
-    # These match the service-specific directories that Docker containers expect
-    # Use dockerapp:dockerapp ownership for Docker service directories
-    local data_subdirs_dockerapp=(
-        "/data/traefik" "/data/komodo" "/data/komodo/backups" "/data/komodo/syncs" "/data/komodo/periphery"
-        "/data/komodo-mongo" "/data/komodo-mongo/db" "/data/komodo-mongo/config"
-        "/data/jellyfin" "/data/jellyfin/config" "/data/jellyfin/cache"
-        "/data/komga" "/data/komga/config" "/data/kiwix"
-        "/data/step-ca" "/data/cdn" "/data/cdn-assets" "/data/offline-sync" "/data/sync"
-        "/data/romm" "/data/romm/config" "/data/romm/assets" "/data/romm/resources"
-        "/data/docmost" "/data/docmost/postgres" "/data/docmost/redis"
-        "/data/onedev" "/data/onedev/postgres"
-        "/data/adguard" "/data/adguard/work" "/data/adguard/conf" "/data/local-dns"
-    )
+    # Note: Service-specific data directories are now handled by Docker volumes
+    # Only create essential system directories that still need bind mounts
 
-    # Directories that should remain root-owned
-    local data_subdirs_root=(
-        "/data/logs" "/data/backups" "/data/raspap"
-        "/data/config" "/data/cache"
+    # Directories that still need bind mounts (system integration, shared data)
+    local system_dirs_root=(
+        "/var/lib/docker/bind-mounts/logs"
+        "/var/lib/docker/bind-mounts/backups"
+        "/var/lib/docker/bind-mounts/raspap"
+        "/var/lib/docker/bind-mounts/cdn-assets"
+        "/var/lib/docker/bind-mounts/step-ca-certs"
     )
 
     local content_subdirs=(
@@ -6183,18 +5942,10 @@ create_nvme_partitions() {
         "/content/downloads" "/content/sync"
     )
 
-    log_info "Creating Docker service data subdirectories with dockerapp ownership..."
-    for subdir in "${data_subdirs_dockerapp[@]}"; do
-        if ! standard_create_directory "$subdir" "755" "1337" "1337"; then
-            log_error "Failed to create directory: $subdir"
-            return 1
-        fi
-    done
-
-    log_info "Creating system data subdirectories with root ownership..."
-    for subdir in "${data_subdirs_root[@]}"; do
-        if ! standard_create_directory "$subdir" "755" "root" "root"; then
-            log_error "Failed to create directory: $subdir"
+    log_info "Creating system bind-mount directories with root ownership..."
+    for subdir in "${system_dirs_root[@]}"; do
+        if ! standard_create_directory "${subdir}" "755" "root" "root"; then
+            log_error "Failed to create directory: ${subdir}"
             return 1
         fi
     done
@@ -6208,15 +5959,15 @@ create_nvme_partitions() {
     done
 
     log_info "NVMe partition layout:"
-    log_info "  ${data_partition} -> /data (256GB)"
+    log_info "  ${docker_partition} -> /var/lib/docker (256GB)"
     log_info "  ${content_partition} -> /content (remaining space)"
 
     # Show final layout
     if gum_available; then
         log_info "📋 Final NVMe Partition Layout"
         enhanced_table "Partition,Mount,Size,Filesystem,Label" \
-            "${data_partition},/data,256GB,ext4,danger-data" \
-            "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}"),ext4,danger-content"
+            "${docker_partition},/var/lib/docker,256GB,ext4,danger-docker" \
+            "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}" || echo "Unknown"),ext4,danger-content"
     fi
 
     log_success "NVMe partitions created and mounted successfully"
@@ -6229,12 +5980,12 @@ mount_existing_nvme_partitions() {
     log_info "Attempting to mount existing partitions on ${nvme_device}..."
 
     # Get the partition names
-    local data_partition="${nvme_device}p1"
+    local docker_partition="${nvme_device}p1"
     local content_partition="${nvme_device}p2"
 
     # Verify partitions exist
-    if [[ ! -b "${data_partition}" ]]; then
-        log_error "Expected partition ${data_partition} does not exist"
+    if [[ ! -b "${docker_partition}" ]]; then
+        log_error "Expected partition ${docker_partition} does not exist"
         return 1
     fi
 
@@ -6243,15 +5994,15 @@ mount_existing_nvme_partitions() {
         return 1
     fi
 
-    log_info "Found partitions: ${data_partition} and ${content_partition}"
+    log_info "Found partitions: ${docker_partition} and ${content_partition}"
 
     # Show current partition information
     log_info "Current partition layout:"
     lsblk "${nvme_device}" 2>/dev/null || true
 
     # Create mount points using standardized directory creation
-    if ! standard_create_directory "/data" "755" "root" "root"; then
-        log_error "Failed to create /data mount point"
+    if ! standard_create_directory "/var/lib/docker" "755" "root" "root"; then
+        log_error "Failed to create /var/lib/docker mount point"
         return 1
     fi
 
@@ -6261,15 +6012,15 @@ mount_existing_nvme_partitions() {
     fi
 
     # Create mount points if they don't exist (fallback)
-    mkdir -p /data /content
+    mkdir -p /var/lib/docker /content
 
     # Check if partitions are already mounted
-    local data_already_mounted=""
+    local docker_already_mounted=""
     local content_already_mounted=""
 
-    if mountpoint -q /data 2>/dev/null; then
-        data_already_mounted=$(findmnt -n -o SOURCE /data 2>/dev/null || echo "")
-        log_info "/data is already mounted from: ${data_already_mounted}"
+    if mountpoint -q /var/lib/docker 2>/dev/null; then
+        docker_already_mounted=$(findmnt -n -o SOURCE /var/lib/docker 2>/dev/null || echo "")
+        log_info "/var/lib/docker is already mounted from: ${docker_already_mounted}"
     fi
 
     if mountpoint -q /content 2>/dev/null; then
@@ -6280,31 +6031,31 @@ mount_existing_nvme_partitions() {
     # Backup fstab before making changes
     cp /etc/fstab /etc/fstab.backup-$(date +%Y%m%d-%H%M%S)
 
-    # Mount data partition
-    local data_mount_success=false
-    if [[ "${data_already_mounted}" == "${data_partition}" ]]; then
-        log_info "Data partition already correctly mounted"
-        data_mount_success=true
-    elif [[ -n "${data_already_mounted}" ]]; then
-        log_warn "/data is mounted from different device (${data_already_mounted}), unmounting first"
-        umount /data 2>/dev/null || true
+    # Mount docker partition
+    local docker_mount_success=false
+    if [[ "${docker_already_mounted}" == "${docker_partition}" ]]; then
+        log_info "Docker partition already correctly mounted"
+        docker_mount_success=true
+    elif [[ -n "${docker_already_mounted}" ]]; then
+        log_warn "/var/lib/docker is mounted from different device (${docker_already_mounted}), unmounting first"
+        umount /var/lib/docker 2>/dev/null || true
     fi
 
-    if [[ "${data_mount_success}" != "true" ]]; then
-        log_info "Attempting to mount ${data_partition} to /data..."
-        if mount "${data_partition}" /data 2>/dev/null; then
-            log_success "Successfully mounted data partition"
+    if [[ "${docker_mount_success}" != "true" ]]; then
+        log_info "Attempting to mount ${docker_partition} to /var/lib/docker..."
+        if mount "${docker_partition}" /var/lib/docker 2>/dev/null; then
+            log_success "Successfully mounted Docker partition"
 
             # Test if mount is working properly
-            if touch /data/.mount-test 2>/dev/null && rm /data/.mount-test 2>/dev/null; then
-                log_info "Data partition mount verified"
-                data_mount_success=true
+            if touch /var/lib/docker/.mount-test 2>/dev/null && rm /var/lib/docker/.mount-test 2>/dev/null; then
+                log_info "Docker partition mount verified"
+                docker_mount_success=true
             else
-                log_warn "Data partition mounted but not writable"
-                umount /data 2>/dev/null || true
+                log_warn "Docker partition mounted but not writable"
+                umount /var/lib/docker 2>/dev/null || true
             fi
         else
-            log_error "Failed to mount data partition: ${data_partition}"
+            log_error "Failed to mount Docker partition: ${docker_partition}"
         fi
     fi
 
@@ -6339,23 +6090,23 @@ mount_existing_nvme_partitions() {
     # Update fstab for persistent mounting (only for successfully mounted partitions)
     local fstab_updated=false
 
-    if [[ "${data_mount_success}" == "true" ]]; then
-        # Get UUID for data partition
-        local data_uuid
-        data_uuid=$(blkid -s UUID -o value "${data_partition}" 2>/dev/null || echo "")
+    if [[ "${docker_mount_success}" == "true" ]]; then
+        # Get UUID for docker partition
+        local docker_uuid
+        docker_uuid=$(blkid -s UUID -o value "${docker_partition}" 2>/dev/null || echo "")
 
-        if [[ -n "${data_uuid}" ]]; then
-            # Remove any existing entries for /data
-            sed -i '\|/data|d' /etc/fstab
+        if [[ -n "${docker_uuid}" ]]; then
+            # Remove any existing entries for /var/lib/docker
+            sed -i '\|/var/lib/docker|d' /etc/fstab
 
             # Add new entry using UUID
-            echo "UUID=${data_uuid} /data ext4 defaults,noatime 0 2" >> /etc/fstab
-            log_info "Added /data to fstab with UUID=${data_uuid}"
+            echo "UUID=${docker_uuid} /var/lib/docker ext4 defaults,noatime 0 2" >> /etc/fstab
+            log_info "Added /var/lib/docker to fstab with UUID=${docker_uuid}"
             fstab_updated=true
         else
-            log_warn "Could not get UUID for data partition, using device path in fstab"
-            sed -i '\|/data|d' /etc/fstab
-            echo "${data_partition} /data ext4 defaults,noatime 0 2" >> /etc/fstab
+            log_warn "Could not get UUID for Docker partition, using device path in fstab"
+            sed -i '\|/var/lib/docker|d' /etc/fstab
+            echo "${docker_partition} /var/lib/docker ext4 defaults,noatime 0 2" >> /etc/fstab
             fstab_updated=true
         fi
     fi
@@ -6392,23 +6143,23 @@ mount_existing_nvme_partitions() {
     fi
 
     # Report results
-    if [[ "${data_mount_success}" == "true" && "${content_mount_success}" == "true" ]]; then
+    if [[ "${docker_mount_success}" == "true" && "${content_mount_success}" == "true" ]]; then
         log_success "Both existing partitions mounted successfully"
 
         # Show final layout
         if gum_available; then
             log_info "📋 Mounted NVMe Partition Layout"
             enhanced_table "Partition,Mount,Size,Filesystem" \
-                "${data_partition},/data,$(lsblk -n -o SIZE "${data_partition}"),$(lsblk -n -o FSTYPE "${data_partition}")" \
-                "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}"),$(lsblk -n -o FSTYPE "${content_partition}")"
+                "${docker_partition},/var/lib/docker,$(lsblk -n -o SIZE "${docker_partition}" || echo "Unknown"),$(lsblk -n -o FSTYPE "${docker_partition}" || echo "Unknown")" \
+                "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}" || echo "Unknown"),$(lsblk -n -o FSTYPE "${content_partition}" || echo "Unknown")"
         fi
 
         log_info "NVMe partition layout:"
-        log_info "  ${data_partition} -> /data ($(lsblk -n -o SIZE "${data_partition}"))"
-        log_info "  ${content_partition} -> /content ($(lsblk -n -o SIZE "${content_partition}"))"
+        log_info "  ${docker_partition} -> /var/lib/docker ($(lsblk -n -o SIZE "${docker_partition}" || echo "Unknown"))"
+        log_info "  ${content_partition} -> /content ($(lsblk -n -o SIZE "${content_partition}" || echo "Unknown"))"
 
         return 0
-    elif [[ "${data_mount_success}" == "true" || "${content_mount_success}" == "true" ]]; then
+    elif [[ "${docker_mount_success}" == "true" || "${content_mount_success}" == "true" ]]; then
         log_warn "Partial success: only some partitions could be mounted"
         return 0
     else

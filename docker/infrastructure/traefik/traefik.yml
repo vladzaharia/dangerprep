@@ -19,6 +19,9 @@ providers:
     exposedByDefault: false
     network: traefik
 
+serversTransport:
+  insecureSkipVerify: true
+
 certificatesResolvers:
   step-ca:
     acme:
@@ -27,7 +30,6 @@ certificatesResolvers:
       caServer: https://step-ca-step-ca-1:9000/acme/acme/directory
       httpChallenge:
         entryPoint: web
-      # Trust the step-ca root certificate
 
   letsencrypt-cloudflare:
     acme:

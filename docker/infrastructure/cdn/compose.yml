@@ -5,7 +5,7 @@ services:
       dockerfile: docker/infrastructure/cdn/Dockerfile
     restart: unless-stopped
     volumes:
-      - /data/cdn:/app/data
+      - cdn-data:/app/data
       - ./assets:/app/assets:ro
     env_file:
       - compose.env
@@ -52,6 +52,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  cdn-data:
+    driver: local
 
 networks:
   traefik:

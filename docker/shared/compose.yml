@@ -1,0 +1,33 @@
+# =============================================================================
+# SHARED DOCKER INFRASTRUCTURE
+# =============================================================================
+# This compose file creates shared networks and volumes used across multiple
+# services in the DangerPrep infrastructure.
+#
+# Networks:
+# - traefik: Shared network for all web services routed through Traefik
+#
+# Usage:
+# docker compose -f docker/shared/compose.yml up -d
+# =============================================================================
+
+networks:
+  # Shared Traefik network for all web services
+  # Used by all services that need to be accessible through the reverse proxy
+  traefik:
+    name: traefik
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+    labels:
+      - "dangerprep.network=shared"
+      - "dangerprep.description=Shared network for Traefik reverse proxy"
+
+# Currently no shared volumes are needed, but this section is ready for future use
+# volumes:
+#   shared-data:
+#     driver: local
+#     labels:
+#       - "dangerprep.volume=shared"

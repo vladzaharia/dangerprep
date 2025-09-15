@@ -5,7 +5,7 @@ services:
       dockerfile: docker/sync/nfs-sync/Dockerfile
     restart: unless-stopped
     volumes:
-      - /data/sync:/app/data
+      - nfs-sync-data:/app/data
       - /content:/content
       - ${INSTALL_ROOT}/nfs:/nfs:ro
       - ./config.yaml:/app/data/config.yaml:ro
@@ -23,6 +23,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+volumes:
+  nfs-sync-data:
+    driver: local
 
 networks:
   traefik:

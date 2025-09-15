@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     privileged: true  # Required for USB device access and mounting
     volumes:
-      - /data/offline-sync:/app/data
+      - offline-sync-data:/app/data
       - /content:/content
       - ./config.yaml:/app/data/config.yaml:ro
       - /dev:/dev  # Device access for USB detection
@@ -29,6 +29,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+volumes:
+  offline-sync-data:
+    driver: local
 
 networks:
   traefik:

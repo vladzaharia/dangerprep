@@ -3,9 +3,9 @@ services:
     image: rommapp/romm:latest
     restart: unless-stopped
     volumes:
-      - /data/romm/config:/romm/config
-      - /data/romm/assets:/romm/assets
-      - /data/romm/resources:/romm/resources
+      - romm-config:/romm/config
+      - romm-assets:/romm/assets
+      - romm-resources:/romm/resources
       - /content/games/roms:/romm/library:ro
       - ${INSTALL_ROOT}/nfs/games:/nfs/games:ro
       # Mount secrets as files for enhanced security
@@ -57,6 +57,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+volumes:
+  romm-config:
+    driver: local
+  romm-assets:
+    driver: local
+  romm-resources:
+    driver: local
 
 networks:
   traefik:

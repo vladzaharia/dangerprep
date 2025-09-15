@@ -5,7 +5,7 @@ services:
     depends_on:
       - postgres
     volumes:
-      - /data/onedev:/opt/onedev
+      - onedev-data:/opt/onedev
       - /var/run/docker.sock:/var/run/docker.sock
       # Mount secrets as files for enhanced security
       - ${INSTALL_ROOT}/secrets/onedev/db_password:/run/secrets/db_password:ro
@@ -63,7 +63,7 @@ services:
     image: postgres:15.4
     restart: unless-stopped
     volumes:
-      - /data/onedev/postgres:/var/lib/postgresql/data
+      - onedev-postgres:/var/lib/postgresql/data
     env_file:
       - compose.env
     user: "1337:1337"
@@ -82,6 +82,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+volumes:
+  onedev-data:
+    driver: local
+  onedev-postgres:
+    driver: local
 
 networks:
   traefik:

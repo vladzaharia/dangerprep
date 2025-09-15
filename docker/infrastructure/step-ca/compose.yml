@@ -5,7 +5,8 @@ services:
     ports:
       - "9000:9000"
     volumes:
-      - /data/step-ca:/home/step
+      - step-ca-data:/home/step
+      - step-ca-certs:/home/step/certs
     env_file:
       - compose.env
     user: "1337:1337"
@@ -53,8 +54,9 @@ services:
       dockerfile: docker/infrastructure/step-ca/Dockerfile
     restart: unless-stopped
     volumes:
-      - /data/step-ca:/ca-data:ro
-      - /data/cdn-assets:/cdn-assets
+      - step-ca-data:/ca-data:ro
+      - step-ca-certs:/ca-data/certs:ro
+      - cdn-assets:/cdn-assets
     env_file:
       - compose.env
     environment:
@@ -95,6 +97,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  step-ca-data:
+    driver: local
+  step-ca-certs:
+    driver: local
+    name: step-ca-certs
+  cdn-assets:
+    driver: local
 
 networks:
   traefik:
