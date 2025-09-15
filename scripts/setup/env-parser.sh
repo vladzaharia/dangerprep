@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Source required utilities
 ENV_PARSER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_PARSER_PROJECT_ROOT="$(dirname "$(dirname "$(dirname "${ENV_PARSER_SCRIPT_DIR}")")")"
+ENV_PARSER_PROJECT_ROOT="$(dirname "$(dirname "${ENV_PARSER_SCRIPT_DIR}")")"
 
 # Source gum utilities (includes logging functions)
 if [[ -f "$ENV_PARSER_SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
