@@ -39,7 +39,7 @@ services:
       - "traefik.http.services.romm.loadbalancer.server.port=8080"
 
       # DNS registration
-      - "dns.register=romm.danger"
+      - "dns.register=romm"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

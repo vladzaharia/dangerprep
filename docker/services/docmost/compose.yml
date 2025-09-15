@@ -38,7 +38,7 @@ services:
       - "traefik.http.services.docmost.loadbalancer.server.port=3000"
 
       # DNS registration
-      - "dns.register=docs.danger"
+      - "dns.register=docs"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

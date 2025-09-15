@@ -3447,7 +3447,6 @@ fix_docker_compose_networks() {
         "$PROJECT_ROOT/docker/infrastructure/traefik/compose.yml"
         "$PROJECT_ROOT/docker/infrastructure/step-ca/compose.yml"
         "$PROJECT_ROOT/docker/infrastructure/komodo/compose.yml"
-        "$PROJECT_ROOT/docker/infrastructure/portainer/compose.yml"
         "$PROJECT_ROOT/docker/media/komga/compose.yml"
         "$PROJECT_ROOT/docker/media/jellyfin/compose.yml"
         "$PROJECT_ROOT/docker/media/romm/compose.yml"
@@ -5074,7 +5073,6 @@ setup_docker_services() {
         "/data/docmost/redis:755:root:root"
         "/data/onedev:755:root:root"
         "/data/onedev/postgres:755:root:root"
-        "/data/portainer:755:root:root"
         "/data/adguard/work:755:root:root"
         "/data/adguard/conf:755:root:root"
         "/data/local-dns:755:root:root"
@@ -5287,7 +5285,7 @@ deploy_docker_service() {
     # Determine service directory structure
     local service_dir
     case "${service_name}" in
-        "traefik"|"komodo"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn")
+        "traefik"|"komodo"|"raspap"|"step-ca"|"watchtower"|"dns"|"cdn")
             service_dir="${PROJECT_ROOT}/docker/infrastructure/${service_name}"
             ;;
         "jellyfin"|"komga"|"romm")
@@ -5724,10 +5722,54 @@ create_emmc_home_partition() {
         return 1
     fi
 
+    log_debug "Detected partition end: '${partition_end}'"
+
     # Create 32GB partition for /home using parted
+    # The issue was using the end position as a size instead of an absolute position
+    # Let's use a percentage-based approach which is more reliable
     log_info "Adding 32GB /home partition starting after ${partition_end}..."
-    if ! parted -s "${emmc_device}" mkpart primary ext4 "${partition_end}" $((32 * 1024))MiB; then
+
+    # Get the total disk size to calculate percentages
+    local disk_size_bytes
+    disk_size_bytes=$(lsblk -b -d -n -o SIZE "${emmc_device}" 2>/dev/null || echo "0")
+    local disk_size_gb=$((disk_size_bytes / 1024 / 1024 / 1024))
+
+    if [[ ${disk_size_gb} -lt 64 ]]; then
+        log_error "Disk too small for 32GB partition (${disk_size_gb}GB total)"
+        return 1
+    fi
+
+    # Calculate the end position as start + 32GB
+    # Parse the start position and add 32GB to it
+    local start_pos_gb end_pos_gb
+    if [[ "$partition_end" =~ ^([0-9.]+)GB$ ]]; then
+        start_pos_gb="${BASH_REMATCH[1]}"
+        end_pos_gb=$(echo "$start_pos_gb + 32" | bc -l)
+        end_position="${end_pos_gb}GB"
+    elif [[ "$partition_end" =~ ^([0-9.]+)GiB$ ]]; then
+        start_pos_gb="${BASH_REMATCH[1]}"
+        end_pos_gb=$(echo "$start_pos_gb + 32" | bc -l)
+        end_position="${end_pos_gb}GiB"
+    elif [[ "$partition_end" =~ ^([0-9.]+)MB$ ]]; then
+        local start_pos_mb="${BASH_REMATCH[1]}"
+        local end_pos_mb=$(echo "$start_pos_mb + 32768" | bc -l)
+        end_position="${end_pos_mb}MB"
+    elif [[ "$partition_end" =~ ^([0-9.]+)MiB$ ]]; then
+        local start_pos_mib="${BASH_REMATCH[1]}"
+        local end_pos_mib=$(echo "$start_pos_mib + 32768" | bc -l)
+        end_position="${end_pos_mib}MiB"
+    else
+        log_error "Unsupported partition end format: ${partition_end}"
+        log_error "Expected format: [number]GB, [number]GiB, [number]MB, or [number]MiB"
+        return 1
+    fi
+
+    log_info "Creating partition from ${partition_end} to ${end_position}"
+    log_debug "Partition creation command: parted -s ${emmc_device} mkpart primary ext4 '${partition_end}' '${end_position}'"
+
+    if ! parted -s "${emmc_device}" mkpart primary ext4 "${partition_end}" "${end_position}"; then
         log_error "Failed to create /home partition"
+        log_error "Command failed: parted -s ${emmc_device} mkpart primary ext4 '${partition_end}' '${end_position}'"
         return 1
     fi
 
@@ -5960,7 +6002,7 @@ create_nvme_partitions() {
         "/data/step-ca" "/data/cdn" "/data/cdn-assets" "/data/offline-sync" "/data/sync"
         "/data/romm/config" "/data/romm/assets" "/data/romm/resources"
         "/data/docmost" "/data/docmost/postgres" "/data/docmost/redis"
-        "/data/onedev" "/data/onedev/postgres" "/data/portainer"
+        "/data/onedev" "/data/onedev/postgres"
         "/data/adguard/work" "/data/adguard/conf" "/data/local-dns"
         "/data/config" "/data/cache"
     )

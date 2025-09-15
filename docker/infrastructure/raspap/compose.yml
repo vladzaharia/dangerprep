@@ -37,7 +37,7 @@ services:
       - "traefik.http.services.raspap.loadbalancer.server.port=8080"
 
       # DNS Registration
-      - "dns.register=router.danger"
+      - "dns.register=router"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

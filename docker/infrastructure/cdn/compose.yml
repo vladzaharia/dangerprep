@@ -31,7 +31,7 @@ services:
       - "traefik.http.services.cdn.loadbalancer.server.port=8080"
 
       # DNS registration
-      - "dns.register=cdn.danger"
+      - "dns.register=cdn"
 
       # App registration for discovery
       - "app.register=true"

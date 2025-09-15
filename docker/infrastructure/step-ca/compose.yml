@@ -33,7 +33,7 @@ services:
       - "traefik.http.services.step-ca.loadbalancer.server.scheme=https"
 
       # DNS registration
-      - "dns.register=ca.danger"
+      - "dns.register=ca"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

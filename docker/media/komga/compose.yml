@@ -29,7 +29,7 @@ services:
       - "traefik.http.services.komga.loadbalancer.server.port=8080"
 
       # DNS registration
-      - "dns.register=komga.danger"
+      - "dns.register=komga"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

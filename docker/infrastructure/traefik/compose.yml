@@ -37,7 +37,7 @@ services:
       - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH_USERS}"
 
       # DNS registration
-      - "dns.register=traefik.danger"
+      - "dns.register=traefik"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

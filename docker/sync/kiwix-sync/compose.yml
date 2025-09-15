@@ -27,7 +27,7 @@ services:
       - "traefik.http.services.kiwix.loadbalancer.server.port=80"
 
       # DNS registration
-      - "dns.register=kiwix.danger"
+      - "dns.register=kiwix"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

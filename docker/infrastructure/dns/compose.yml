@@ -28,7 +28,7 @@ services:
       - "traefik.http.services.adguardhome.loadbalancer.server.port=80"
 
       # DNS registration
-      - "dns.register=dns.danger"
+      - "dns.register=dns"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
@@ -59,7 +59,7 @@ services:
     labels:
       - "traefik.enable=false"
       # DNS registration for internal resolution
-      - "dns.register=dns.danger"
+      - "dns.register=coredns"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

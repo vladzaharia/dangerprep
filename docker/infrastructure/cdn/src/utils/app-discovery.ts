@@ -247,14 +247,6 @@ export class AppDiscoveryService {
         status: 'healthy'
       },
       {
-        name: 'Container Manager',
-        description: 'Portainer Docker Management',
-        icon: 'docker',
-        url: 'https://portainer.danger',
-        category: 'Infrastructure',
-        status: 'healthy'
-      },
-      {
         name: 'Documentation',
         description: 'Docmost Knowledge Base',
         icon: 'file-text',

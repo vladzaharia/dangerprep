@@ -74,18 +74,19 @@ EOF
     # Add container-specific records
     get_dns_registrations | while read -r domain ip; do
         if [ -n "$domain" ] && [ -n "$ip" ]; then
-            # Remove .danger suffix if present to get base hostname
-            hostname=$(echo "$domain" | sed "s/\.${DOMAIN_NAME}$//")
-
-            # For .danger domain, use hostname as-is
-            if [ "$domain_name" = "$DOMAIN_NAME" ]; then
-                echo "${hostname}    IN      A       ${ip}" >> "$temp_file"
-                log "Registered: ${hostname}.${domain_name} -> ${ip}"
-            # For .danger.diy domain, use same hostname
-            elif [ "$domain_name" = "$EXTERNAL_DOMAIN_NAME" ]; then
-                echo "${hostname}    IN      A       ${ip}" >> "$temp_file"
-                log "Registered: ${hostname}.${domain_name} -> ${ip}"
+            # Extract subdomain from dns.register label
+            # Handle both full domain (subdomain.danger) and subdomain-only formats
+            if echo "$domain" | grep -q "\."; then
+                # Full domain format - extract subdomain
+                hostname=$(echo "$domain" | sed "s/\.${DOMAIN_NAME}$//" | sed "s/\.${EXTERNAL_DOMAIN_NAME}$//")
+            else
+                # Subdomain-only format - use as-is
+                hostname="$domain"
             fi
+
+            # Create DNS record for this domain
+            echo "${hostname}    IN      A       ${ip}" >> "$temp_file"
+            log "Registered: ${hostname}.${domain_name} -> ${ip}"
         fi
     done
 

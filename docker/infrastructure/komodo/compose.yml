@@ -70,7 +70,7 @@ services:
       - "traefik.http.services.komodo.loadbalancer.server.port=9120"
 
       # DNS registration
-      - "dns.register=docker.danger"
+      - "dns.register=docker"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

@@ -45,7 +45,7 @@ services:
       - "traefik.http.services.onedev.loadbalancer.server.port=6610"
 
       # DNS registration
-      - "dns.register=dev.danger"
+      - "dns.register=dev"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
