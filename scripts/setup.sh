@@ -1695,7 +1695,7 @@ Automatic update packages"
     # Set default Docker services selection (core services for non-interactive mode)
     if [[ -z "${SELECTED_DOCKER_SERVICES:-}" ]]; then
         SELECTED_DOCKER_SERVICES="traefik:Traefik (Reverse Proxy)
-arcane:Arcane (Dashboard)
+komodo:Komodo (Docker Management)
 jellyfin:Jellyfin (Media Server)
 komga:Komga (Comic/Book Server)"
     fi
@@ -2135,7 +2135,7 @@ collect_docker_services_configuration() {
     local docker_services=(
         # Infrastructure services
         "traefik:Traefik (Reverse Proxy)"
-        "arcane:Arcane (Dashboard)"
+        "komodo:Komodo (Docker Management)"
         "watchtower:Watchtower (Automatic Updates)"
         "step-ca:Step-CA (Certificate Authority)"
         "raspap:RaspAP (Network Management)"
@@ -4129,7 +4129,9 @@ setup_docker_services() {
     # Create data directories on the dedicated /data partition
     local data_directories=(
         "/data/traefik:755:root:root"
-        "/data/arcane:755:root:root"
+        "/data/komodo:755:root:root"
+        "/data/komodo-mongo/db:755:root:root"
+        "/data/komodo-mongo/config:755:root:root"
         "/data/jellyfin/config:755:root:root"
         "/data/jellyfin/cache:755:root:root"
         "/data/komga/config:755:root:root"
@@ -4363,7 +4365,7 @@ deploy_docker_service() {
     # Determine service directory structure
     local service_dir
     case "${service_name}" in
-        "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn")
+        "traefik"|"komodo"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn")
             service_dir="${PROJECT_ROOT}/docker/infrastructure/${service_name}"
             ;;
         "jellyfin"|"komga"|"romm")
@@ -4786,7 +4788,7 @@ create_nvme_partitions() {
     # Create subdirectories for organization using standardized directory creation
     # These match the service-specific directories that Docker containers expect
     local data_subdirs=(
-        "/data/traefik" "/data/arcane" "/data/jellyfin/config" "/data/jellyfin/cache"
+        "/data/traefik" "/data/komodo" "/data/komodo-mongo/db" "/data/komodo-mongo/config" "/data/jellyfin/config" "/data/jellyfin/cache"
         "/data/komga/config" "/data/kiwix" "/data/logs" "/data/backups" "/data/raspap"
         "/data/step-ca" "/data/cdn" "/data/cdn-assets" "/data/offline-sync" "/data/sync"
         "/data/romm/config" "/data/romm/assets" "/data/romm/resources"
@@ -4844,7 +4846,7 @@ enumerate_docker_services() {
         "watchtower:Automatic container updates"
         "step-ca:Internal certificate authority"
         "raspap:Network management interface"
-        "arcane:System monitoring dashboard"
+        "komodo:Docker management platform"
         "cdn:Local content delivery network"
         "dns:DNS server (CoreDNS)"
     )

@@ -54,7 +54,7 @@ cd /dangerprep && sudo scripts/setup.sh
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| Portal | https://portal.danger | System management |
+| Docker | https://docker.danger | Docker management |
 | Jellyfin | https://jellyfin.danger | Media streaming |
 | Komga | https://komga.danger | eBook management |
 | RomM | https://romm.danger | Game ROM management |

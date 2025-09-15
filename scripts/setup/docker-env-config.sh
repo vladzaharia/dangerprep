@@ -162,7 +162,7 @@ find_service_env_file() {
     # Determine service directory structure
     local service_dir
     case "${service_name}" in
-        "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn")
+        "traefik"|"komodo"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn")
             service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/infrastructure/${service_name}"
             ;;
         "jellyfin"|"komga"|"romm")

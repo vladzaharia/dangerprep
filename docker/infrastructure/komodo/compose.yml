@@ -1,0 +1,119 @@
+services:
+  mongo:
+    image: mongo:6.0
+    restart: unless-stopped
+    command: --quiet --wiredTigerCacheSizeGB 0.25
+    volumes:
+      - /data/komodo-mongo/db:/data/db
+      - /data/komodo-mongo/config:/data/configdb
+    env_file:
+      - compose.env
+    user: "1337:1337"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${KOMODO_DB_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${KOMODO_DB_PASSWORD}
+    labels:
+      # Prevent Komodo from stopping with StopAllContainers
+      - "komodo.skip="
+      
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - komodo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  core:
+    image: ghcr.io/moghtech/komodo-core:latest
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    volumes:
+      - /data/komodo/backups:/backups
+      - /data/komodo/syncs:/syncs
+    env_file:
+      - compose.env
+    user: "1337:1337"
+    environment:
+      - KOMODO_DATABASE_ADDRESS=mongo:27017
+      - KOMODO_DATABASE_USERNAME=${KOMODO_DB_USERNAME}
+      - KOMODO_DATABASE_PASSWORD=${KOMODO_DB_PASSWORD}
+    labels:
+      # Prevent Komodo from stopping with StopAllContainers
+      - "komodo.skip="
+      
+      - "traefik.enable=true"
+      - "traefik.http.routers.komodo.rule=Host(`docker.danger`)"
+      - "traefik.http.routers.komodo.entrypoints=websecure"
+      - "traefik.http.routers.komodo.tls.certresolver=step-ca"
+      - "traefik.http.services.komodo.loadbalancer.server.port=9120"
+
+      # DNS registration
+      - "dns.register=docker.danger"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+      - komodo
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9120/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  periphery:
+    image: ghcr.io/moghtech/komodo-periphery:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc:/proc
+      - /data/komodo/periphery:/etc/komodo
+    env_file:
+      - compose.env
+    user: "1337:1337"
+    environment:
+      - PERIPHERY_ROOT_DIRECTORY=/etc/komodo
+    labels:
+      # Prevent Komodo from stopping with StopAllContainers
+      - "komodo.skip="
+      
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - komodo
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8120/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+networks:
+  traefik:
+    external: true
+  komodo:
+    driver: bridge
