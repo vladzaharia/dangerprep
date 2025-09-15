@@ -2513,16 +2513,68 @@ configure_emmc_home_partition_options() {
 
     log_info "eMMC device size: ${device_size_gb}GB"
 
-    # Check for unpartitioned space
-    local total_partitioned_size=0
-    while IFS= read -r size; do
-        if [[ -n "$size" && "$size" != "0" ]]; then
-            total_partitioned_size=$((total_partitioned_size + size))
-        fi
-    done < <(lsblk -b -n -o SIZE "${emmc_device}" 2>/dev/null | tail -n +2)
+    # Check for unpartitioned space using proper Linux tools
+    local unpartitioned_gb=0
 
-    local unpartitioned_size=$((device_size - total_partitioned_size))
-    local unpartitioned_gb=$((unpartitioned_size / 1024 / 1024 / 1024))
+    # Method 1: Try sfdisk -F (shows free space regions)
+    if command -v sfdisk >/dev/null 2>&1; then
+        log_debug "Using sfdisk to detect unpartitioned space"
+        local sfdisk_output
+        sfdisk_output=$(sfdisk -F "${emmc_device}" 2>/dev/null || true)
+
+        if [[ -n "$sfdisk_output" ]]; then
+            # Parse sfdisk output to get free space in sectors, then convert to GB
+            # sfdisk -F output format: "Unpartitioned space /dev/device: start end sectors size"
+            local free_sectors
+            free_sectors=$(echo "$sfdisk_output" | grep "Unpartitioned space" | awk '{print $(NF-1)}' | head -1)
+
+            if [[ -n "$free_sectors" && "$free_sectors" =~ ^[0-9]+$ ]]; then
+                # Convert sectors to GB (assuming 512 byte sectors)
+                unpartitioned_gb=$(( free_sectors * 512 / 1024 / 1024 / 1024 ))
+                log_debug "sfdisk detected ${unpartitioned_gb}GB unpartitioned space (${free_sectors} sectors)"
+            fi
+        fi
+    fi
+
+    # Method 2: Try parted print free (if sfdisk didn't work)
+    if [[ ${unpartitioned_gb} -eq 0 ]] && command -v parted >/dev/null 2>&1; then
+        log_debug "Using parted to detect unpartitioned space"
+        local parted_output
+        parted_output=$(parted -s "${emmc_device}" print free 2>/dev/null | grep "Free Space" | tail -1 || true)
+
+        if [[ -n "$parted_output" ]]; then
+            # Parse parted output to get free space size
+            # Format: "Number  Start   End     Size    Type     File system  Flags"
+            local free_size
+            free_size=$(echo "$parted_output" | awk '{print $4}' | sed 's/[^0-9.]//g')
+
+            if [[ -n "$free_size" ]]; then
+                # Convert to GB (parted usually shows in GB already)
+                unpartitioned_gb=$(echo "$free_size" | cut -d. -f1)
+                # Ensure we have a valid number
+                if [[ ! "$unpartitioned_gb" =~ ^[0-9]+$ ]]; then
+                    unpartitioned_gb=0
+                fi
+                log_debug "parted detected ${unpartitioned_gb}GB unpartitioned space"
+            fi
+        fi
+    fi
+
+    # Method 3: Fallback - check if device has more than 64GB and assume some free space
+    if [[ ${unpartitioned_gb} -eq 0 && ${device_size_gb} -gt 64 ]]; then
+        log_debug "Fallback method: estimating unpartitioned space"
+        # Conservative estimate: assume 32GB is used by system, rest might be available
+        local estimated_used=32
+        local estimated_free=$((device_size_gb - estimated_used))
+
+        # Only suggest /home partition if we estimate at least 40GB free
+        if [[ ${estimated_free} -ge 40 ]]; then
+            unpartitioned_gb=${estimated_free}
+            log_debug "Estimated ${unpartitioned_gb}GB potentially available space"
+        else
+            log_debug "Device appears to be mostly used (estimated ${estimated_free}GB free)"
+        fi
+    fi
 
     if [[ ${unpartitioned_gb} -lt 32 ]]; then
         log_warn "Insufficient unpartitioned space on eMMC (${unpartitioned_gb}GB available, 32GB required)"
