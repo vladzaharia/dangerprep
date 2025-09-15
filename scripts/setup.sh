@@ -1083,6 +1083,118 @@ retry_with_backoff() {
     done
 }
 
+# Robust Docker GPG key installation function
+install_docker_gpg_key() {
+    log_debug "Starting Docker GPG key installation"
+
+    # Check prerequisites
+    if ! command -v curl >/dev/null 2>&1; then
+        log_error "curl is required for Docker GPG key installation"
+        return 1
+    fi
+
+    if ! command -v gpg >/dev/null 2>&1; then
+        log_error "gpg is required for Docker GPG key installation"
+        return 1
+    fi
+
+    # Ensure keyrings directory exists with proper permissions
+    if ! mkdir -p /usr/share/keyrings; then
+        log_error "Failed to create keyrings directory"
+        return 1
+    fi
+
+    # Remove existing key if present to avoid conflicts
+    rm -f /usr/share/keyrings/docker-archive-keyring.gpg
+
+    # Download and install Docker GPG key with retry logic and detailed error handling
+    log_debug "Downloading Docker GPG key from https://download.docker.com/linux/ubuntu/gpg"
+
+    if retry_with_backoff 3 5 30 bash -c "
+        set -euo pipefail
+        curl -fsSL --connect-timeout 30 --max-time 120 https://download.docker.com/linux/ubuntu/gpg | \
+        gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg 2>/dev/null
+    "; then
+        # Verify the key was installed correctly
+        if [[ -f /usr/share/keyrings/docker-archive-keyring.gpg ]] && [[ -s /usr/share/keyrings/docker-archive-keyring.gpg ]]; then
+            # Set proper permissions
+            chmod 644 /usr/share/keyrings/docker-archive-keyring.gpg
+            log_debug "Docker GPG key installed successfully"
+            return 0
+        else
+            log_error "Docker GPG key file is missing or empty after installation"
+            return 1
+        fi
+    else
+        log_error "Failed to download or install Docker GPG key after retries"
+
+        # Try alternative method using apt-key (deprecated but may work as fallback)
+        log_debug "Attempting fallback method using apt-key"
+        if retry_with_backoff 2 3 15 bash -c "
+            curl -fsSL --connect-timeout 30 --max-time 120 https://download.docker.com/linux/ubuntu/gpg | \
+            apt-key add - 2>/dev/null
+        "; then
+            log_debug "Docker GPG key added using fallback apt-key method"
+            return 0
+        else
+            log_error "All Docker GPG key installation methods failed"
+            return 1
+        fi
+    fi
+}
+
+# Robust Tailscale GPG key installation function
+install_tailscale_gpg_key() {
+    log_debug "Starting Tailscale GPG key installation"
+
+    # Check prerequisites
+    if ! command -v curl >/dev/null 2>&1; then
+        log_error "curl is required for Tailscale GPG key installation"
+        return 1
+    fi
+
+    # Ensure keyrings directory exists with proper permissions
+    if ! mkdir -p /usr/share/keyrings; then
+        log_error "Failed to create keyrings directory"
+        return 1
+    fi
+
+    # Remove existing key if present to avoid conflicts
+    rm -f /usr/share/keyrings/tailscale-archive-keyring.gpg
+
+    # Get Ubuntu codename for the GPG key URL
+    local ubuntu_codename
+    ubuntu_codename=$(lsb_release -cs)
+    if [[ -z "$ubuntu_codename" ]]; then
+        log_error "Failed to determine Ubuntu codename"
+        return 1
+    fi
+
+    # Download and install Tailscale GPG key with retry logic
+    log_debug "Downloading Tailscale GPG key for Ubuntu $ubuntu_codename"
+
+    if retry_with_backoff 3 5 30 bash -c "
+        set -euo pipefail
+        curl -fsSL --connect-timeout 30 --max-time 120 \
+        'https://pkgs.tailscale.com/stable/ubuntu/$ubuntu_codename.noarmor.gpg' \
+        -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+    "; then
+        # Verify the key was installed correctly
+        if [[ -f /usr/share/keyrings/tailscale-archive-keyring.gpg ]] && [[ -s /usr/share/keyrings/tailscale-archive-keyring.gpg ]]; then
+            # Set proper permissions
+            chmod 644 /usr/share/keyrings/tailscale-archive-keyring.gpg
+            log_debug "Tailscale GPG key installed successfully"
+            return 0
+        else
+            log_error "Tailscale GPG key file is missing or empty after installation"
+            return 1
+        fi
+    else
+        log_error "Failed to download Tailscale GPG key after retries"
+        return 1
+    fi
+}
+
 # Enhanced input validation functions
 validate_ip_address() {
     local ip="$1"
@@ -2934,9 +3046,8 @@ setup_package_repositories() {
     if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]] && echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Docker packages"; then
         log_info "Setting up Docker repository for package installation..."
 
-        # Add Docker's official GPG key with error handling
-        if enhanced_spin "Adding Docker GPG key" \
-            bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg"; then
+        # Add Docker's official GPG key with robust error handling
+        if install_docker_gpg_key; then
             enhanced_status_indicator "success" "Docker GPG key added"
         else
             enhanced_status_indicator "failure" "Failed to add Docker GPG key"
@@ -2958,9 +3069,8 @@ setup_package_repositories() {
     if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]] && echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Network packages"; then
         log_info "Setting up Tailscale repository for package installation..."
 
-        # Add Tailscale's official GPG key
-        if enhanced_spin "Adding Tailscale GPG key" \
-            bash -c "curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).noarmor.gpg | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null"; then
+        # Add Tailscale's official GPG key with robust error handling
+        if install_tailscale_gpg_key; then
             enhanced_status_indicator "success" "Tailscale GPG key added"
         else
             enhanced_status_indicator "failure" "Failed to add Tailscale GPG key"
@@ -4164,9 +4274,8 @@ configure_rootless_docker() {
     elif ! command -v docker >/dev/null 2>&1; then
         log_info "Installing Docker from official repository..."
 
-        # Add Docker's official GPG key with error handling
-        if enhanced_spin "Adding Docker GPG key" \
-            bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg"; then
+        # Add Docker's official GPG key with robust error handling
+        if install_docker_gpg_key; then
             enhanced_status_indicator "success" "Docker GPG key added"
         else
             enhanced_status_indicator "failure" "Failed to add Docker GPG key"
@@ -7054,8 +7163,7 @@ setup_tailscale() {
         enhanced_status_indicator "warning" "Tailscale not found, attempting manual installation"
 
         # Fallback installation if not installed via consolidated packages
-        if enhanced_spin "Adding Tailscale repository" \
-            bash -c "curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).noarmor.gpg | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null"; then
+        if install_tailscale_gpg_key; then
             enhanced_status_indicator "success" "Tailscale GPG key added"
         else
             enhanced_status_indicator "failure" "Failed to add Tailscale GPG key"
