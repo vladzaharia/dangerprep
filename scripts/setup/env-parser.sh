@@ -46,22 +46,24 @@ parse_directive_parameters() {
     for param in "${params[@]}"; do
         # Trim whitespace
         param="$(echo "$param" | xargs)"
-        
+
         case "$param" in
             "OPTIONAL")
                 IS_OPTIONAL="true"
                 ;;
             "email"|"pw"|"password")
-                PARAM_TYPE="$param"
+                # Only set type if not already set (preserve first type parameter)
+                [[ -z "$PARAM_TYPE" ]] && PARAM_TYPE="$param"
                 ;;
             "b64"|"base64"|"hex"|"bcrypt")
-                PARAM_TYPE="$param"
+                # Only set type if not already set (preserve first type parameter)
+                [[ -z "$PARAM_TYPE" ]] && PARAM_TYPE="$param"
                 ;;
             [0-9]*)
                 PARAM_SIZE="$param"
                 ;;
             *)
-                # Unknown parameter, treat as type
+                # Unknown parameter, treat as type only if no type is set
                 [[ -z "$PARAM_TYPE" ]] && PARAM_TYPE="$param"
                 ;;
         esac

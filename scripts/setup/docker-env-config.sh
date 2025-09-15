@@ -42,10 +42,9 @@ log_debug "Loaded environment parser modules"
 # PROMPT[type,OPTIONAL]: User input with optional type validation
 #   - type: email (email validation), pw/password (hidden input), or omit for text input
 #   - OPTIONAL: field can be skipped
-# GENERATE[type,size,OPTIONAL]: Auto-generate secure value
+# GENERATE[type,size]: Auto-generate secure value
 #   - type: b64/base64, hex, bcrypt, pw/password, or omit for default generation
 #   - size: length of generated value (default: 24)
-#   - OPTIONAL: field can be skipped
 
 # Main function to collect Docker environment configuration
 collect_docker_environment_configuration() {

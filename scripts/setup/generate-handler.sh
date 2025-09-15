@@ -154,23 +154,8 @@ handle_generate_directive() {
         size=24
     fi
     
-    # For optional fields, check if we should generate them
-    if [[ "$is_optional" == "true" ]]; then
-        # In non-interactive mode with defaults, always generate optional secure values
-        if [[ "${DOCKER_ENV_USE_DEFAULTS:-false}" == "true" ]]; then
-            log_debug "Auto-generating optional secure value for $var_name (non-interactive mode)"
-        else
-            # Interactive mode - ask user
-            local configure_msg="Generate secure value for $var_name?"
-            [[ -n "$description" ]] && configure_msg="Generate $var_name ($description)?"
-
-            if ! enhanced_confirm "$configure_msg" "true"; then
-                log_debug "User chose to skip optional variable $var_name"
-                echo ""
-                return 0
-            fi
-        fi
-    fi
+    # GENERATE directives always generate values - they are not optional
+    # The purpose of GENERATE is to automatically create secure values
     
     # Always generate for GENERATE directives (values in examples are just examples)
     log_debug "Generating new secure value for $var_name"
@@ -214,7 +199,12 @@ validate_generate_parameters() {
     local param_type="$1"
     local param_size="$2"
     local is_optional="$3"
-    
+
+    # GENERATE directives don't support OPTIONAL - they always generate
+    if [[ "$is_optional" == "true" ]]; then
+        log_warn "GENERATE directives don't support OPTIONAL - values are always generated"
+    fi
+
     # Validate size parameter
     if [[ -n "$param_size" ]]; then
         if ! [[ "$param_size" =~ ^[0-9]+$ ]] || [[ "$param_size" -lt 1 ]] || [[ "$param_size" -gt 256 ]]; then
@@ -222,7 +212,7 @@ validate_generate_parameters() {
             return 1
         fi
     fi
-    
+
     # Validate known types
     case "$param_type" in
         ""|"b64"|"base64"|"hex"|"bcrypt"|"pw"|"password")
