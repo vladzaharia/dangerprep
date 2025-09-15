@@ -154,15 +154,21 @@ handle_generate_directive() {
         size=24
     fi
     
-    # For optional fields, ask if user wants to generate them
+    # For optional fields, check if we should generate them
     if [[ "$is_optional" == "true" ]]; then
-        local configure_msg="Generate secure value for $var_name?"
-        [[ -n "$description" ]] && configure_msg="Generate $var_name ($description)?"
+        # In non-interactive mode with defaults, always generate optional secure values
+        if [[ "${DOCKER_ENV_USE_DEFAULTS:-false}" == "true" ]]; then
+            log_debug "Auto-generating optional secure value for $var_name (non-interactive mode)"
+        else
+            # Interactive mode - ask user
+            local configure_msg="Generate secure value for $var_name?"
+            [[ -n "$description" ]] && configure_msg="Generate $var_name ($description)?"
 
-        if ! enhanced_confirm "$configure_msg" "true"; then
-            log_debug "User chose to skip optional variable $var_name"
-            echo ""
-            return 0
+            if ! enhanced_confirm "$configure_msg" "true"; then
+                log_debug "User chose to skip optional variable $var_name"
+                echo ""
+                return 0
+            fi
         fi
     fi
     

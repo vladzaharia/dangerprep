@@ -136,9 +136,44 @@ handle_prompt_directive() {
     local param_type="$3"
     local is_optional="$4"
     local description="$5"
-    
+
     log_debug "Handling PROMPT for $var_name (type: '$param_type', optional: $is_optional)"
-    
+
+    # Check if we should use default values (non-interactive mode)
+    if [[ "${DOCKER_ENV_USE_DEFAULTS:-false}" == "true" ]]; then
+        log_debug "Using default values for PROMPT directive (non-interactive mode)"
+
+        # Use current value if it exists and is not empty
+        if [[ -n "$current_value" ]]; then
+            log_debug "Using existing value for $var_name: $current_value"
+            echo "$current_value"
+            return 0
+        fi
+
+        # Generate reasonable defaults based on variable name and type
+        local default_value
+        default_value=$(generate_default_value "$var_name" "$param_type" "$description")
+
+        if [[ -n "$default_value" ]]; then
+            log_debug "Generated default value for $var_name: $default_value"
+            echo "$default_value"
+            return 0
+        fi
+
+        # For optional fields in non-interactive mode, return empty
+        if [[ "$is_optional" == "true" ]]; then
+            log_debug "Skipping optional variable $var_name in non-interactive mode"
+            echo ""
+            return 0
+        fi
+
+        # For required fields, use a generic default
+        log_warn "No default available for required variable $var_name, using placeholder"
+        echo "changeme"
+        return 0
+    fi
+
+    # Interactive mode - proceed with normal prompting
     # For optional fields, ask if user wants to configure them
     if [[ "$is_optional" == "true" ]]; then
         local configure_msg="Configure $var_name?"
@@ -150,7 +185,7 @@ handle_prompt_directive() {
             return 0
         fi
     fi
-    
+
     # Handle different prompt types
     case "$param_type" in
         "email")
@@ -162,6 +197,83 @@ handle_prompt_directive() {
         ""|*)
             # Default text input for unknown or empty types
             prompt_text "$description" "$current_value" "$is_optional"
+            ;;
+    esac
+}
+
+# =============================================================================
+# DEFAULT VALUE GENERATION
+# =============================================================================
+
+# Generate reasonable default values for common variable patterns
+generate_default_value() {
+    local var_name="$1"
+    local param_type="$2"
+    local description="$3"
+
+    # Convert variable name to lowercase for pattern matching
+    local var_lower="${var_name,,}"
+
+    # Generate defaults based on variable name patterns
+    case "$var_lower" in
+        *email*)
+            echo "admin@localhost"
+            ;;
+        *user*|*username*)
+            echo "admin"
+            ;;
+        *password*|*pass*|*secret*)
+            # Generate a random password
+            if command -v openssl >/dev/null 2>&1; then
+                openssl rand -base64 16 | tr -d "=+/" | cut -c1-16
+            else
+                echo "changeme$(date +%s | tail -c 4)"
+            fi
+            ;;
+        *port*)
+            # Common default ports based on service context
+            case "$var_lower" in
+                *web*|*http*) echo "8080" ;;
+                *admin*) echo "9090" ;;
+                *api*) echo "3000" ;;
+                *) echo "8000" ;;
+            esac
+            ;;
+        *host*|*hostname*)
+            echo "localhost"
+            ;;
+        *domain*)
+            echo "localhost.local"
+            ;;
+        *url*)
+            echo "http://localhost"
+            ;;
+        *path*|*dir*)
+            echo "/data"
+            ;;
+        *key*|*token*)
+            # Generate a random key/token
+            if command -v openssl >/dev/null 2>&1; then
+                openssl rand -hex 32
+            else
+                echo "changeme$(date +%s)"
+            fi
+            ;;
+        *timeout*)
+            echo "30"
+            ;;
+        *size*|*limit*)
+            echo "100"
+            ;;
+        *enable*|*enabled*)
+            echo "true"
+            ;;
+        *disable*|*disabled*)
+            echo "false"
+            ;;
+        *)
+            # No specific default available
+            echo ""
             ;;
     esac
 }
@@ -233,6 +345,7 @@ confirm_value_change() {
 export -f prompt_email
 export -f prompt_password
 export -f prompt_text
+export -f generate_default_value
 export -f handle_prompt_directive
 export -f validate_prompt_parameters
 export -f needs_prompt_update

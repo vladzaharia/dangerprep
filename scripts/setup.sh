@@ -1489,6 +1489,7 @@ DRY_RUN=false
 VERBOSE=false
 SKIP_UPDATES=false
 FORCE_INSTALL=false
+FORCE_INTERACTIVE=false
 
 show_help() {
     # Create styled help display with sections
@@ -1502,6 +1503,7 @@ Complete system setup for emergency router and content hub"
 -s, --skip-updates      Skip system package updates
 -f, --force             Force installation even if already installed
 --non-interactive       Run in non-interactive mode with default values
+--force-interactive     Force interactive mode even when piped
 --batch                 Alias for --non-interactive
 -h, --help              Show this help message
 --version               Show version information"
@@ -1564,6 +1566,11 @@ parse_arguments() {
             --non-interactive|--batch)
                 export NON_INTERACTIVE=true
                 log_info "Non-interactive mode enabled"
+                shift
+                ;;
+            --force-interactive)
+                export FORCE_INTERACTIVE=true
+                log_info "Force interactive mode enabled"
                 shift
                 ;;
             -h|--help)
@@ -1655,9 +1662,24 @@ set_default_configuration_values() {
         IMPORT_GITHUB_KEYS="no"
     fi
 
-    # Set default storage configuration
+    # Set default storage configuration with auto-detection
     if [[ -z "${NVME_PARTITION_CONFIRMED:-}" ]]; then
-        NVME_PARTITION_CONFIRMED="false"
+        # Auto-detect NVMe devices and enable partitioning if found
+        local nvme_devices=()
+        while IFS= read -r device; do
+            if [[ -n "$device" ]]; then
+                nvme_devices+=("$device")
+            fi
+        done < <(lsblk -d -n -o NAME 2>/dev/null | grep '^nvme' || true)
+
+        if [[ ${#nvme_devices[@]} -gt 0 ]]; then
+            log_info "Auto-detected NVMe devices: ${nvme_devices[*]}"
+            log_info "Enabling NVMe partitioning for non-interactive mode"
+            NVME_PARTITION_CONFIRMED="true"
+            NVME_DEVICE="/dev/${nvme_devices[0]}"
+        else
+            NVME_PARTITION_CONFIRMED="false"
+        fi
     fi
 
     # Set default package selection (all categories for non-interactive mode)
@@ -1689,6 +1711,16 @@ Development packages (kernel headers, build tools)"
             FRIENDLYELEC_ENABLE_FEATURES="Hardware acceleration
 GPIO/PWM access"
         fi
+    fi
+
+    # Process Docker environment configuration with defaults for non-interactive mode
+    log_info "Processing Docker environment configuration with default values..."
+    if command -v collect_docker_environment_configuration >/dev/null 2>&1; then
+        # Set flag to indicate we're using defaults
+        export DOCKER_ENV_USE_DEFAULTS="true"
+        collect_docker_environment_configuration || log_warn "Docker environment configuration failed, services may need manual setup"
+    else
+        log_warn "Docker environment configuration function not available"
     fi
 
     # Export all variables for use in templates and other functions
@@ -1851,18 +1883,54 @@ get_last_completed_phase() {
 
 # Interactive configuration collection
 collect_configuration() {
-    # Check if we're in a non-interactive environment or mode
-    if [[ "${NON_INTERACTIVE:-false}" == "true" ]] || [[ "${DRY_RUN:-false}" == "true" ]] || [[ ! -t 0 ]] || [[ ! -t 1 ]] || [[ "${TERM:-}" == "dumb" ]]; then
+    # Check for explicit non-interactive mode (unless force-interactive is set)
+    if [[ "${FORCE_INTERACTIVE:-false}" != "true" ]] && ([[ "${NON_INTERACTIVE:-false}" == "true" ]] || [[ "${DRY_RUN:-false}" == "true" ]]); then
         log_info "Using default configuration values (non-interactive mode)"
         set_default_configuration_values
         return 0
     fi
 
-    # Additional check for SSH or remote sessions where interaction might not work well
-    if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]] || [[ "${TERM:-}" == "screen"* ]]; then
-        log_warn "Remote session detected, using defaults (use --non-interactive to suppress)"
+    # Check for truly non-interactive environments (both stdin AND stdout not terminals)
+    # This prevents false positives from piped execution where stdout is still a terminal
+    if [[ "${FORCE_INTERACTIVE:-false}" != "true" ]] && ([[ ! -t 0 && ! -t 1 ]] || [[ "${TERM:-}" == "dumb" ]]); then
+        log_info "Using default configuration values (non-interactive environment detected)"
         set_default_configuration_values
         return 0
+    fi
+
+    # Special handling for piped execution (stdin not terminal but stdout is)
+    if [[ ! -t 0 && -t 1 ]]; then
+        if [[ "${FORCE_INTERACTIVE:-false}" == "true" ]]; then
+            log_info "Force interactive mode enabled - attempting to connect to controlling terminal"
+        else
+            log_warn "Piped execution detected (stdin not a terminal)"
+            log_warn "This may be from running: curl ... | sudo bash"
+        fi
+
+        # Try to reconnect to the controlling terminal for input
+        if [[ -c /dev/tty ]]; then
+            log_info "Attempting to use controlling terminal for interactive input"
+            # Redirect stdin to the controlling terminal for interactive functions
+            exec 0</dev/tty
+            log_success "Successfully connected to controlling terminal"
+        else
+            if [[ "${FORCE_INTERACTIVE:-false}" == "true" ]]; then
+                log_error "Force interactive mode requested but no controlling terminal available"
+                log_error "Try running the script directly instead of piping it"
+                exit 1
+            else
+                log_warn "No controlling terminal available, using default configuration"
+                set_default_configuration_values
+                return 0
+            fi
+        fi
+    fi
+
+    # Additional check for SSH or remote sessions where interaction might not work well
+    if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]] || [[ "${TERM:-}" == "screen"* ]]; then
+        log_warn "Remote session detected"
+        log_info "Interactive configuration is still possible in remote sessions"
+        log_info "Use --non-interactive flag to suppress this message and use defaults"
     fi
 
     # Check for saved configuration from previous run

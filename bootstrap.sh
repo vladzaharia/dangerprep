@@ -23,6 +23,7 @@ INSTALL_DIR="${INSTALL_DIR:-/dangerprep}"
 FORCE_CLONE=false
 FORCE_UPDATE=false
 DRY_RUN=false
+NON_INTERACTIVE=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -60,10 +61,11 @@ Usage:
   $0 [OPTIONS]
 
 Options:
-  --clone     Force git clone instead of release download
-  --update    Force update of existing installation
-  --dry-run   Show what would be done without executing
-  --help      Show this help message
+  --clone              Force git clone instead of release download
+  --update             Force update of existing installation
+  --dry-run            Show what would be done without executing
+  --non-interactive    Skip interactive configuration (use defaults)
+  --help               Show this help message
 
 Examples:
   # Download and run directly (recommended):
@@ -77,6 +79,9 @@ Examples:
 
   # Force update existing installation:
   curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --update
+
+  # Skip interactive configuration (use defaults):
+  curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --non-interactive
 
   # Dry run (show what would be done):
   curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | bash -s -- --dry-run
@@ -98,6 +103,10 @@ parse_args() {
                 ;;
             --dry-run)
                 DRY_RUN=true
+                shift
+                ;;
+            --non-interactive)
+                NON_INTERACTIVE=true
                 shift
                 ;;
             --help)
@@ -376,7 +385,13 @@ run_setup() {
         log_info "[DRY RUN] Would change to directory: $INSTALL_DIR"
         log_info "[DRY RUN] Would set permissions: chmod -R 755 $INSTALL_DIR"
         log_info "[DRY RUN] Would run: bash lib/gum/download.sh"
-        log_info "[DRY RUN] Would run: bash scripts/setup.sh"
+        local setup_args=""
+        if [[ "$NON_INTERACTIVE" == "true" ]]; then
+            setup_args="--non-interactive"
+        else
+            setup_args="--force-interactive"
+        fi
+        log_info "[DRY RUN] Would run: bash scripts/setup.sh $setup_args"
         log_success "[DRY RUN] Setup process would complete here"
         return
     fi
@@ -390,9 +405,20 @@ run_setup() {
     log_info "Downloading gum..."
     bash lib/gum/download.sh
 
-    # Run the main setup script
+    # Run the main setup script with appropriate flags
     log_info "Running main setup script..."
-    bash scripts/setup.sh
+    local setup_args=()
+
+    # Bootstrap is designed for interactive configuration by default
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        log_info "Using non-interactive mode (defaults only)"
+        setup_args+=("--non-interactive")
+    else
+        log_info "Using interactive mode for configuration (bootstrap default)"
+        setup_args+=("--force-interactive")
+    fi
+
+    bash scripts/setup.sh "${setup_args[@]}"
 
     log_success "DangerPrep setup completed successfully!"
 }

@@ -15,7 +15,7 @@ Emergency router and content hub system built as a TypeScript monorepo with Dock
 
 ```bash
 # Download and run bootstrap script
-curl -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
+wget -4 -qO- https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
 
 # Or manual installation
 git clone https://github.com/vladzaharia/dangerprep.git /dangerprep
