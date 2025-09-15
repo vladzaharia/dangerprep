@@ -118,6 +118,28 @@ parse_variable_line() {
     return 1
 }
 
+# Parse a commented out variable assignment line
+# Returns: 0 if commented variable found, 1 if not a commented variable
+# Usage: parse_commented_variable_line "line" && var_name="$PARSE_VAR_NAME" var_value="$PARSE_VAR_VALUE"
+parse_commented_variable_line() {
+    local line="$1"
+
+    # Clear global variables
+    PARSE_VAR_NAME=""
+    PARSE_VAR_VALUE=""
+
+    # Match commented out variable: # VAR_NAME=value (with optional whitespace)
+    if [[ "$line" =~ ^[[:space:]]*#[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+        PARSE_VAR_NAME="${BASH_REMATCH[1]}"
+        PARSE_VAR_VALUE="${BASH_REMATCH[2]}"
+
+        log_debug "Found commented variable: $PARSE_VAR_NAME = '$PARSE_VAR_VALUE' (ignored)"
+        return 0
+    fi
+
+    return 1
+}
+
 # =============================================================================
 # ENVIRONMENT FILE PARSING
 # =============================================================================
@@ -168,6 +190,19 @@ parse_environment_file() {
                     "$pending_directive" "$pending_description" "$pending_params"; then
                     log_warn "Failed to process $var_name at line $line_number"
                 fi
+
+                # Clear pending directive
+                pending_directive=""
+                pending_description=""
+                pending_params=""
+            fi
+        elif parse_commented_variable_line "$line"; then
+            # Found a commented out variable assignment
+            local var_name="$PARSE_VAR_NAME"
+
+            if [[ -n "$pending_directive" ]]; then
+                # Skip processing for commented out variables and clear pending directive
+                log_debug "Skipping directive for commented variable: $var_name (directive: $pending_directive)"
 
                 # Clear pending directive
                 pending_directive=""
@@ -258,6 +293,7 @@ backup_env_file() {
 export -f parse_directive_parameters
 export -f parse_directive_line
 export -f parse_variable_line
+export -f parse_commented_variable_line
 export -f parse_environment_file
 export -f validate_email
 export -f validate_required
