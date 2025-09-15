@@ -2105,6 +2105,7 @@ collect_package_configuration() {
         "Monitoring packages (sensors, collectd, etc.)"
         "Backup packages (borgbackup, restic)"
         "Automatic update packages"
+        "Docker packages (docker-ce, docker-ce-cli, containerd.io, etc.)"
     )
 
     log_info "Select which package categories to install:"
@@ -2909,6 +2910,46 @@ backup_original_configs() {
     enhanced_status_indicator "success" "Backed up $backed_up configurations to ${BACKUP_DIR}"
 }
 
+# Setup Docker repository if Docker packages are selected
+setup_docker_repository() {
+    # Check if Docker packages are selected
+    if [[ -z "$SELECTED_PACKAGE_CATEGORIES" ]] || ! echo "$SELECTED_PACKAGE_CATEGORIES" | grep -q "Docker packages"; then
+        log_debug "Docker packages not selected, skipping repository setup"
+        return 0
+    fi
+
+    log_info "Setting up Docker repository for package installation..."
+
+    # Add Docker's official GPG key with error handling
+    if enhanced_spin "Adding Docker GPG key" \
+        bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg"; then
+        enhanced_status_indicator "success" "Docker GPG key added"
+    else
+        enhanced_status_indicator "failure" "Failed to add Docker GPG key"
+        return 1
+    fi
+
+    # Add Docker repository with standardized file operations
+    local docker_repo="deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    if standard_create_env_file "/etc/apt/sources.list.d/docker.list" "$docker_repo" "644"; then
+        enhanced_status_indicator "success" "Docker repository added"
+    else
+        enhanced_status_indicator "failure" "Failed to add Docker repository"
+        return 1
+    fi
+
+    # Update package index after adding Docker repository
+    if enhanced_spin "Updating package index with Docker repository" \
+        bash -c "apt update"; then
+        enhanced_status_indicator "success" "Package index updated with Docker repository"
+    else
+        enhanced_status_indicator "failure" "Failed to update package index"
+        return 1
+    fi
+
+    log_success "Docker repository setup completed"
+}
+
 # Update system packages
 update_system_packages() {
     enhanced_section "System Updates" "Updating system packages" "📦"
@@ -2939,6 +2980,11 @@ update_system_packages() {
         enhanced_status_indicator "failure" "Failed to upgrade packages"
         return 1
     fi
+
+    # Setup Docker repository if Docker packages are selected
+    setup_docker_repository
+
+    log_success "System packages updated successfully"
 }
 
 # Install essential packages using standardized pattern and upfront configuration
@@ -2973,17 +3019,45 @@ install_essential_packages() {
                 *"Automatic update packages"*)
                     package_categories+=("Updates:unattended-upgrades")
                     ;;
+                *"Docker packages"*)
+                    package_categories+=("Docker:docker-ce,docker-ce-cli,containerd.io,docker-buildx-plugin,docker-compose-plugin")
+                    ;;
             esac
         done <<< "$SELECTED_PACKAGE_CATEGORIES"
     fi
 
-    # Use standardized package installation function
-    install_packages_with_selection "Essential Packages" "Installing packages based on your configuration" "${package_categories[@]}"
+    # Add FriendlyElec packages to consolidated installation if configured
+    if [[ "$IS_FRIENDLYELEC" == true ]] && [[ -n "$FRIENDLYELEC_INSTALL_PACKAGES" ]]; then
+        while IFS= read -r category; do
+            case "$category" in
+                *"Hardware acceleration packages"*)
+                    if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
+                        package_categories+=("Hardware:mesa-utils,glmark2-es2,v4l-utils,gstreamer1.0-tools,gstreamer1.0-plugins-bad,gstreamer1.0-rockchip1")
+                    fi
+                    ;;
+                *"Development packages"*)
+                    package_categories+=("Development:build-essential,linux-headers-generic")
+                    ;;
+                *"Media packages"*)
+                    package_categories+=("Media:ffmpeg,libavcodec-extra")
+                    ;;
+                *"GPIO/PWM packages"*)
+                    package_categories+=("GPIO:python3-rpi.gpio,python3-gpiozero,wiringpi")
+                    ;;
+            esac
+        done <<< "$FRIENDLYELEC_INSTALL_PACKAGES"
+    fi
+
+    # Use standardized package installation function for consolidated installation
+    install_packages_with_selection "All Selected Packages" "Installing all selected packages (regular, Docker, and hardware packages)" "${package_categories[@]}"
     local install_result=$?
 
-    # Install FriendlyElec-specific packages if configured
+    # Mark that consolidated package installation was performed
+    export CONSOLIDATED_PACKAGES_INSTALLED="true"
+
+    # Install FriendlyElec kernel headers if applicable (not available via apt)
     if [[ "$IS_FRIENDLYELEC" == true ]] && [[ -n "$FRIENDLYELEC_INSTALL_PACKAGES" ]]; then
-        install_friendlyelec_packages
+        install_friendlyelec_kernel_headers
     fi
 
     # Install Tailscale if Network packages were selected
@@ -3005,6 +3079,15 @@ install_essential_packages() {
 
 # Install FriendlyElec-specific packages using standardized pattern and upfront configuration
 install_friendlyelec_packages() {
+    # Check if packages were already installed in consolidated installation
+    if [[ "${CONSOLIDATED_PACKAGES_INSTALLED:-false}" == "true" ]]; then
+        enhanced_status_indicator "info" "FriendlyElec packages already installed in consolidated package installation"
+        # Still run kernel headers and hardware configuration
+        install_friendlyelec_kernel_headers
+        configure_friendlyelec_hardware
+        return 0
+    fi
+
     enhanced_section "FriendlyElec Packages" "Installing hardware-specific packages" "🔧"
 
     # Build package categories based on upfront configuration
@@ -4025,8 +4108,10 @@ configure_rootless_docker() {
     # Create Docker system account for containers
     create_docker_system_account
 
-    # Install Docker using official repository (secure method)
-    if ! command -v docker >/dev/null 2>&1; then
+    # Check if Docker packages were already installed in consolidated installation
+    if [[ "${CONSOLIDATED_PACKAGES_INSTALLED:-false}" == "true" ]] && echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Docker packages"; then
+        enhanced_status_indicator "info" "Docker packages already installed in consolidated package installation"
+    elif ! command -v docker >/dev/null 2>&1; then
         log_info "Installing Docker from official repository..."
 
         # Add Docker's official GPG key with error handling

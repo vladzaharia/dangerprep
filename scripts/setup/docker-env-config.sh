@@ -4,7 +4,7 @@
 
 # Source required utilities
 DOCKER_ENV_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOCKER_ENV_PROJECT_ROOT="$(dirname "$(dirname "${DOCKER_ENV_SCRIPT_DIR}")")"
+DOCKER_ENV_PROJECT_ROOT="$(dirname "$(dirname "$(dirname "${DOCKER_ENV_SCRIPT_DIR}")")")"
 
 # Source gum utilities for consistent user interaction
 if [[ -f "$DOCKER_ENV_SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
@@ -162,7 +162,7 @@ find_service_env_file() {
     # Determine service directory structure
     local service_dir
     case "${service_name}" in
-        "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn")
+        "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn"|"komodo")
             service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/infrastructure/${service_name}"
             ;;
         "jellyfin"|"komga"|"romm")
