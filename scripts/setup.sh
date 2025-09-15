@@ -5386,9 +5386,14 @@ load_and_export_env_file() {
                 var_value="${BASH_REMATCH[1]}"
             fi
 
-            # Export the variable
-            export "$var_name=$var_value"
-            log_debug "Exported $var_name from $(basename "$env_file")"
+            # Check if variable is readonly before attempting to export
+            if declare -p "$var_name" 2>/dev/null | grep -q "declare -r"; then
+                log_debug "Skipping readonly variable $var_name from $(basename "$env_file")"
+            else
+                # Export the variable
+                export "$var_name=$var_value"
+                log_debug "Exported $var_name from $(basename "$env_file")"
+            fi
         fi
     done < "$env_file"
 
