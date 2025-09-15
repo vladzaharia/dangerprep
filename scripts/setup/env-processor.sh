@@ -423,7 +423,7 @@ process_template_substitutions() {
     local common_vars=(
         "TZ" "SSH_PORT" "WIFI_SSID" "WIFI_PASSWORD" "WIFI_INTERFACE" "WAN_INTERFACE"
         "LAN_IP" "LAN_NETWORK" "DHCP_START" "DHCP_END" "FAIL2BAN_BANTIME" "FAIL2BAN_MAXRETRY"
-        "PROJECT_ROOT" "INSTALL_ROOT"
+        "PROJECT_ROOT" "INSTALL_ROOT" "SMTP_HOST" "SMTP_PORT" "SMTP_USER" "SMTP_PASSWORD" "SMTP_FROM"
     )
 
     local substitutions_made=0

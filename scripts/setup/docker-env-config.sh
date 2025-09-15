@@ -360,12 +360,90 @@ collect_global_environment_variables() {
         log_debug "Using existing timezone: $TZ"
     fi
 
+    # Configure SMTP settings if not already configured
+    collect_smtp_configuration
+
     # Set installation root if not already configured
     if [[ -z "${INSTALL_ROOT:-}" ]]; then
         export INSTALL_ROOT="${DOCKER_ENV_PROJECT_ROOT}"
         log_debug "Set installation root: $INSTALL_ROOT"
     fi
 
-    log_debug "Global environment variables configured: TZ=${TZ}, INSTALL_ROOT=${INSTALL_ROOT}"
+    log_debug "Global environment variables configured: TZ=${TZ}, INSTALL_ROOT=${INSTALL_ROOT}, SMTP_HOST=${SMTP_HOST:-'not set'}"
+}
+
+# Collect SMTP configuration for services that need email functionality
+collect_smtp_configuration() {
+    # Check if we're in interactive mode and if SMTP is not already configured
+    if [[ "${NON_INTERACTIVE:-false}" != "true" ]] && [[ -z "${SMTP_HOST:-}" ]]; then
+        log_info "Some services support email notifications. Configure SMTP settings?"
+
+        local configure_smtp=false
+        if command -v enhanced_confirm >/dev/null 2>&1; then
+            if enhanced_confirm "Configure SMTP for email notifications?" "false"; then
+                configure_smtp=true
+            fi
+        else
+            read -p "Configure SMTP for email notifications? (y/N): " configure_smtp_input
+            configure_smtp_input="${configure_smtp_input,,}"
+            if [[ "$configure_smtp_input" =~ ^(y|yes)$ ]]; then
+                configure_smtp=true
+            fi
+        fi
+
+        if [[ "$configure_smtp" == "true" ]]; then
+            # SMTP Host
+            local smtp_host
+            if command -v enhanced_input >/dev/null 2>&1; then
+                smtp_host=$(enhanced_input "SMTP Host" "smtp.gmail.com" "Enter your SMTP server address")
+            else
+                read -p "SMTP Host (e.g., smtp.gmail.com): " smtp_host
+            fi
+            export SMTP_HOST="${smtp_host:-smtp.gmail.com}"
+
+            # SMTP Port
+            local smtp_port
+            if command -v enhanced_input >/dev/null 2>&1; then
+                smtp_port=$(enhanced_input "SMTP Port" "587" "Enter SMTP port (587 for TLS, 465 for SSL)")
+            else
+                read -p "SMTP Port (587 for TLS, 465 for SSL): " smtp_port
+            fi
+            export SMTP_PORT="${smtp_port:-587}"
+
+            # SMTP Username
+            local smtp_user
+            if command -v enhanced_input >/dev/null 2>&1; then
+                smtp_user=$(enhanced_input "SMTP Username" "" "Enter your email address for SMTP authentication")
+            else
+                read -p "SMTP Username (your email address): " smtp_user
+            fi
+            export SMTP_USER="$smtp_user"
+
+            # SMTP Password
+            local smtp_password
+            if command -v enhanced_password >/dev/null 2>&1; then
+                smtp_password=$(enhanced_password "SMTP Password" "Enter your SMTP password or app password")
+            else
+                read -s -p "SMTP Password (app password recommended): " smtp_password
+                echo
+            fi
+            export SMTP_PASSWORD="$smtp_password"
+
+            # SMTP From Address
+            local smtp_from
+            if command -v enhanced_input >/dev/null 2>&1; then
+                smtp_from=$(enhanced_input "SMTP From Address" "${smtp_user}" "Enter the 'from' email address for notifications")
+            else
+                read -p "SMTP From Address (${smtp_user}): " smtp_from
+            fi
+            export SMTP_FROM="${smtp_from:-$smtp_user}"
+
+            log_info "SMTP configuration completed: ${SMTP_HOST}:${SMTP_PORT}"
+        else
+            log_debug "SMTP configuration skipped"
+        fi
+    else
+        log_debug "Using existing SMTP configuration or non-interactive mode"
+    fi
 }
 

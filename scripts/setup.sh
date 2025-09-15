@@ -1679,6 +1679,7 @@ set_default_configuration_values() {
             NVME_DEVICE="/dev/${nvme_devices[0]}"
         else
             NVME_PARTITION_CONFIRMED="false"
+            NVME_DEVICE=""
         fi
     fi
 
@@ -1769,16 +1770,16 @@ IMPORT_GITHUB_KEYS="$IMPORT_GITHUB_KEYS"
 GITHUB_USERNAME="$GITHUB_USERNAME"
 
 # Package Selection
-SELECTED_PACKAGE_CATEGORIES="$SELECTED_PACKAGE_CATEGORIES"
-SELECTED_DOCKER_SERVICES="$SELECTED_DOCKER_SERVICES"
+SELECTED_PACKAGE_CATEGORIES="${SELECTED_PACKAGE_CATEGORIES:-}"
+SELECTED_DOCKER_SERVICES="${SELECTED_DOCKER_SERVICES:-}"
 
 # FriendlyElec Configuration
 FRIENDLYELEC_INSTALL_PACKAGES="$FRIENDLYELEC_INSTALL_PACKAGES"
 FRIENDLYELEC_ENABLE_FEATURES="$FRIENDLYELEC_ENABLE_FEATURES"
 
 # Storage Configuration
-NVME_PARTITION_CONFIRMED="$NVME_PARTITION_CONFIRMED"
-NVME_DEVICE="$NVME_DEVICE"
+NVME_PARTITION_CONFIRMED="${NVME_PARTITION_CONFIRMED:-false}"
+NVME_DEVICE="${NVME_DEVICE:-}"
 
 # System Detection
 IS_FRIENDLYELEC="$IS_FRIENDLYELEC"
@@ -2089,7 +2090,7 @@ collect_configuration() {
 collect_package_configuration() {
     # Check if package categories are already configured
     if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
-        log_debug "Package categories already configured: $SELECTED_PACKAGE_CATEGORIES"
+        log_debug "Package categories already configured: ${SELECTED_PACKAGE_CATEGORIES:-}"
         return 0
     fi
 
@@ -2111,9 +2112,9 @@ collect_package_configuration() {
     log_info "Select which package categories to install:"
     SELECTED_PACKAGE_CATEGORIES=$(enhanced_multi_choose "Package Categories" "${package_categories[@]}")
 
-    if [[ -n "$SELECTED_PACKAGE_CATEGORIES" ]]; then
+    if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
         local category_count
-        category_count=$(echo "$SELECTED_PACKAGE_CATEGORIES" | wc -l)
+        category_count=$(echo "${SELECTED_PACKAGE_CATEGORIES:-}" | wc -l)
         enhanced_status_indicator "success" "Selected $category_count package categories"
     else
         enhanced_status_indicator "info" "No optional packages selected (core packages will still be installed)"
@@ -2225,6 +2226,7 @@ collect_storage_configuration() {
     if [[ ${#nvme_devices[@]} -eq 0 ]]; then
         log_info "No NVMe devices detected, skipping storage configuration"
         export NVME_PARTITION_CONFIRMED="false"
+        export NVME_DEVICE=""
         return 0
     fi
 
@@ -2268,6 +2270,7 @@ collect_storage_configuration() {
             log_info "NVMe partitioning confirmed for ${nvme_device}"
         else
             export NVME_PARTITION_CONFIRMED="false"
+            export NVME_DEVICE=""
             log_info "NVMe partitioning declined - will skip storage setup"
         fi
     else
@@ -2278,6 +2281,7 @@ collect_storage_configuration() {
             log_info "NVMe partitioning confirmed for ${nvme_device}"
         else
             export NVME_PARTITION_CONFIRMED="false"
+            export NVME_DEVICE=""
             log_info "NVMe partitioning declined - will skip storage setup"
         fi
     fi
@@ -2383,9 +2387,9 @@ Fail2ban Max Retry: ${FAIL2BAN_MAXRETRY}"
 
     # Package configuration
     local package_config="Selected Categories: "
-    if [[ -n "$SELECTED_PACKAGE_CATEGORIES" ]]; then
+    if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
         local category_count
-        category_count=$(echo "$SELECTED_PACKAGE_CATEGORIES" | wc -l)
+        category_count=$(echo "${SELECTED_PACKAGE_CATEGORIES:-}" | wc -l)
         package_config+="$category_count categories"
     else
         package_config+="Core packages only"
@@ -2912,7 +2916,7 @@ backup_original_configs() {
 # Setup Docker repository if Docker packages are selected
 setup_docker_repository() {
     # Check if Docker packages are selected
-    if [[ -z "$SELECTED_PACKAGE_CATEGORIES" ]] || ! echo "$SELECTED_PACKAGE_CATEGORIES" | grep -q "Docker packages"; then
+    if [[ -z "${SELECTED_PACKAGE_CATEGORIES:-}" ]] || ! echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Docker packages"; then
         log_debug "Docker packages not selected, skipping repository setup"
         return 0
     fi
@@ -2997,7 +3001,7 @@ install_essential_packages() {
     local package_categories=("Core:$core_packages")
 
     # Add optional categories based on user selection
-    if [[ -n "$SELECTED_PACKAGE_CATEGORIES" ]]; then
+    if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
         while IFS= read -r category; do
             case "$category" in
                 *"Convenience packages"*)
@@ -3022,7 +3026,7 @@ install_essential_packages() {
                     package_categories+=("Docker:docker-ce,docker-ce-cli,containerd.io,docker-buildx-plugin,docker-compose-plugin")
                     ;;
             esac
-        done <<< "$SELECTED_PACKAGE_CATEGORIES"
+        done <<< "${SELECTED_PACKAGE_CATEGORIES:-}"
     fi
 
     # Add FriendlyElec packages to consolidated installation if configured
@@ -3060,7 +3064,7 @@ install_essential_packages() {
     fi
 
     # Install Tailscale if Network packages were selected
-    if [[ -n "$SELECTED_PACKAGE_CATEGORIES" ]] && echo "$SELECTED_PACKAGE_CATEGORIES" | grep -q "Network packages"; then
+    if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]] && echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Network packages"; then
         enhanced_status_indicator "info" "Installing Tailscale (Network package)"
         setup_tailscale
     fi
