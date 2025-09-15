@@ -1917,6 +1917,7 @@ GPIO/PWM access"
     export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
+    export EMMC_HOME_PARTITION_CONFIRMED EMMC_DEVICE
 
     log_debug "Configuration values set and exported"
 }
@@ -1965,6 +1966,8 @@ FRIENDLYELEC_ENABLE_FEATURES="$FRIENDLYELEC_ENABLE_FEATURES"
 # Storage Configuration
 NVME_PARTITION_CONFIRMED="${NVME_PARTITION_CONFIRMED:-false}"
 NVME_DEVICE="${NVME_DEVICE:-}"
+EMMC_HOME_PARTITION_CONFIRMED="${EMMC_HOME_PARTITION_CONFIRMED:-false}"
+EMMC_DEVICE="${EMMC_DEVICE:-}"
 
 # System Detection
 IS_FRIENDLYELEC="$IS_FRIENDLYELEC"
@@ -2261,6 +2264,7 @@ collect_configuration() {
     export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
+    export EMMC_HOME_PARTITION_CONFIRMED EMMC_DEVICE
 
     # Save configuration for resumable installations
     save_configuration
@@ -2400,6 +2404,15 @@ collect_storage_configuration() {
     log_info "💾 Storage Configuration"
     echo
 
+    # Configure NVMe storage (existing functionality)
+    configure_nvme_storage_options
+
+    # Configure eMMC /home partition (new functionality)
+    configure_emmc_home_partition_options
+}
+
+# Configure NVMe storage options (existing functionality)
+configure_nvme_storage_options() {
     # Check if NVMe devices exist
     local nvme_devices=()
     while IFS= read -r device; do
@@ -2409,7 +2422,7 @@ collect_storage_configuration() {
     done < <(lsblk -d -n -o NAME 2>/dev/null | grep '^nvme' || true)
 
     if [[ ${#nvme_devices[@]} -eq 0 ]]; then
-        log_info "No NVMe devices detected, skipping storage configuration"
+        log_info "No NVMe devices detected, skipping NVMe storage configuration"
         export NVME_PARTITION_CONFIRMED="false"
         export NVME_DEVICE=""
         return 0
@@ -2469,6 +2482,70 @@ collect_storage_configuration() {
             export NVME_DEVICE=""
             log_info "NVMe partitioning declined - will skip storage setup"
         fi
+    fi
+}
+
+# Configure eMMC /home partition options (new functionality)
+configure_emmc_home_partition_options() {
+    # Check for eMMC devices
+    local emmc_devices=()
+    while IFS= read -r device; do
+        if [[ -n "$device" ]]; then
+            emmc_devices+=("$device")
+        fi
+    done < <(lsblk -d -n -o NAME 2>/dev/null | grep '^mmcblk' || true)
+
+    if [[ ${#emmc_devices[@]} -eq 0 ]]; then
+        log_info "No eMMC devices detected, skipping /home partition configuration"
+        export EMMC_HOME_PARTITION_CONFIRMED="false"
+        export EMMC_DEVICE=""
+        return 0
+    fi
+
+    # Use the first eMMC device (typically mmcblk0 for main eMMC)
+    local emmc_device="/dev/${emmc_devices[0]}"
+    log_info "Found eMMC device: ${emmc_device}"
+
+    # Get device information
+    local device_size
+    device_size=$(lsblk -b -d -n -o SIZE "${emmc_device}" 2>/dev/null || echo "0")
+    local device_size_gb=$((device_size / 1024 / 1024 / 1024))
+
+    log_info "eMMC device size: ${device_size_gb}GB"
+
+    # Check for unpartitioned space
+    local total_partitioned_size=0
+    while IFS= read -r size; do
+        if [[ -n "$size" && "$size" != "0" ]]; then
+            total_partitioned_size=$((total_partitioned_size + size))
+        fi
+    done < <(lsblk -b -n -o SIZE "${emmc_device}" 2>/dev/null | tail -n +2)
+
+    local unpartitioned_size=$((device_size - total_partitioned_size))
+    local unpartitioned_gb=$((unpartitioned_size / 1024 / 1024 / 1024))
+
+    if [[ ${unpartitioned_gb} -lt 32 ]]; then
+        log_warn "Insufficient unpartitioned space on eMMC (${unpartitioned_gb}GB available, 32GB required)"
+        log_info "Cannot create dedicated /home partition - /home will remain on root filesystem"
+        export EMMC_HOME_PARTITION_CONFIRMED="false"
+        export EMMC_DEVICE=""
+        return 0
+    fi
+
+    log_info "Available unpartitioned space: ${unpartitioned_gb}GB"
+
+    enhanced_info_box "eMMC /home Partition Setup" \
+        "📁 Create dedicated /home partition on eMMC\n\n• 32GB partition for user home directories\n• Remaining ${unpartitioned_gb}GB can expand root filesystem\n• Safe operation - no data loss on existing partitions\n• /home contents will be migrated to new partition" \
+        "info"
+
+    if enhanced_confirm "Create 32GB /home partition on eMMC?" "true"; then
+        export EMMC_HOME_PARTITION_CONFIRMED="true"
+        export EMMC_DEVICE="${emmc_device}"
+        log_info "eMMC /home partition creation confirmed for ${emmc_device}"
+    else
+        export EMMC_HOME_PARTITION_CONFIRMED="false"
+        export EMMC_DEVICE=""
+        log_info "/home partition creation declined - /home will remain on root filesystem"
     fi
 }
 
@@ -2608,9 +2685,20 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
     if [[ "${NVME_PARTITION_CONFIRMED:-false}" == "true" ]]; then
         storage_config+="Enabled"
         if [[ -n "${NVME_DEVICE:-}" ]]; then
-            storage_config+=$'\n'"Device: ${NVME_DEVICE}"
+            storage_config+=$'\n'"NVMe Device: ${NVME_DEVICE}"
         fi
-        storage_config+=$'\n'"Layout: 256GB /data + remaining /content"
+        storage_config+=$'\n'"NVMe Layout: 256GB /data + remaining /content"
+    else
+        storage_config+="Disabled"
+    fi
+
+    storage_config+=$'\n\n'"eMMC /home Partition: "
+    if [[ "${EMMC_HOME_PARTITION_CONFIRMED:-false}" == "true" ]]; then
+        storage_config+="Enabled"
+        if [[ -n "${EMMC_DEVICE:-}" ]]; then
+            storage_config+=$'\n'"eMMC Device: ${EMMC_DEVICE}"
+        fi
+        storage_config+=$'\n'"eMMC Layout: 32GB dedicated /home partition"
     else
         storage_config+="Disabled"
     fi
@@ -5525,6 +5613,165 @@ detect_and_configure_nvme_storage() {
     log_success "NVMe storage configuration completed"
 }
 
+# Detect and configure eMMC /home partition
+detect_and_configure_emmc_home_partition() {
+    # Allow users to skip eMMC /home configuration entirely
+    if [[ "${SKIP_EMMC_HOME_CONFIG:-false}" == "true" ]]; then
+        log_info "Skipping eMMC /home configuration (SKIP_EMMC_HOME_CONFIG=true)"
+        return 0
+    fi
+
+    log_info "Detecting eMMC storage for /home partition..."
+
+    # Check if eMMC /home partitioning was confirmed during configuration
+    if [[ "${EMMC_HOME_PARTITION_CONFIRMED:-false}" != "true" ]]; then
+        log_info "eMMC /home partitioning was not confirmed during configuration, skipping"
+        return 0
+    fi
+
+    if [[ -z "${EMMC_DEVICE:-}" ]]; then
+        log_error "eMMC device not specified despite confirmation"
+        return 1
+    fi
+
+    log_info "Setting up eMMC /home partition on ${EMMC_DEVICE}..."
+
+    # Create eMMC /home partition
+    create_emmc_home_partition "${EMMC_DEVICE}"
+
+    log_success "eMMC /home partition configuration completed"
+}
+
+# Create eMMC /home partition (32GB) in unpartitioned space
+create_emmc_home_partition() {
+    local emmc_device="$1"
+
+    log_info "Creating 32GB /home partition on ${emmc_device}..."
+
+    # Get the last partition number to determine where to add the new partition
+    local last_partition_num
+    last_partition_num=$(lsblk -n -o NAME "${emmc_device}" | grep -E "${emmc_device##*/}p[0-9]+$" | sed 's/.*p//' | sort -n | tail -1)
+
+    if [[ -z "$last_partition_num" ]]; then
+        log_error "Could not determine last partition number on ${emmc_device}"
+        return 1
+    fi
+
+    local new_partition_num=$((last_partition_num + 1))
+    local home_partition="${emmc_device}p${new_partition_num}"
+
+    log_info "Creating partition ${new_partition_num} for /home..."
+
+    # Get the end of the last partition to start the new partition there
+    local last_partition="${emmc_device}p${last_partition_num}"
+    local partition_end
+    partition_end=$(parted -s "${emmc_device}" print | grep "^ ${last_partition_num}" | awk '{print $3}')
+
+    if [[ -z "$partition_end" ]]; then
+        log_error "Could not determine end of last partition"
+        return 1
+    fi
+
+    # Create 32GB partition for /home using parted
+    log_info "Adding 32GB /home partition starting after ${partition_end}..."
+    if ! parted -s "${emmc_device}" mkpart primary ext4 "${partition_end}" $((32 * 1024))MiB; then
+        log_error "Failed to create /home partition"
+        return 1
+    fi
+
+    # Wait for kernel to recognize new partition
+    sleep 2
+    partprobe "${emmc_device}"
+    sleep 2
+
+    # Verify the partition was created
+    if [[ ! -b "${home_partition}" ]]; then
+        log_error "New /home partition ${home_partition} was not created"
+        return 1
+    fi
+
+    # Format the new partition
+    log_info "Formatting /home partition (${home_partition})..."
+    if ! mkfs.ext4 -F -L "danger-home" "${home_partition}"; then
+        log_error "Failed to format /home partition"
+        return 1
+    fi
+
+    # Create temporary mount point for migration
+    local temp_home_mount="/mnt/new-home"
+    if ! mkdir -p "${temp_home_mount}"; then
+        log_error "Failed to create temporary mount point"
+        return 1
+    fi
+
+    # Mount the new partition
+    log_info "Mounting new /home partition..."
+    if ! mount "${home_partition}" "${temp_home_mount}"; then
+        log_error "Failed to mount new /home partition"
+        return 1
+    fi
+
+    # Migrate existing /home contents
+    log_info "Migrating existing /home contents to new partition..."
+    if [[ -d "/home" ]] && [[ "$(ls -A /home 2>/dev/null)" ]]; then
+        if ! rsync -av /home/ "${temp_home_mount}/"; then
+            log_error "Failed to migrate /home contents"
+            umount "${temp_home_mount}" 2>/dev/null || true
+            return 1
+        fi
+        log_info "Successfully migrated /home contents"
+    else
+        log_info "No existing /home contents to migrate"
+    fi
+
+    # Unmount temporary mount
+    umount "${temp_home_mount}"
+    rmdir "${temp_home_mount}"
+
+    # Backup fstab before making changes
+    cp /etc/fstab "/etc/fstab.backup-$(date +%Y%m%d-%H%M%S)"
+
+    # Add new /home partition to fstab
+    log_info "Adding /home partition to fstab..."
+
+    # Remove any existing /home entries
+    sed -i '\|/home|d' /etc/fstab
+
+    # Add new entry using LABEL
+    echo "LABEL=danger-home /home ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+
+    # Verify fstab syntax
+    if ! mount -a --fake 2>/dev/null; then
+        log_error "fstab syntax error after adding /home partition"
+        return 1
+    fi
+
+    # Mount the new /home partition
+    log_info "Mounting new /home partition..."
+    if ! mount /home; then
+        log_error "Failed to mount new /home partition"
+        return 1
+    fi
+
+    # Verify mount is working
+    if ! touch /home/.mount-test 2>/dev/null || ! rm /home/.mount-test 2>/dev/null; then
+        log_warn "/home partition mounted but not writable"
+        return 1
+    fi
+
+    log_info "eMMC /home partition layout:"
+    log_info "  ${home_partition} -> /home (32GB)"
+
+    # Show final layout
+    if command -v gum >/dev/null 2>&1; then
+        log_info "📋 eMMC /home Partition Layout"
+        enhanced_table "Partition,Mount,Size,Filesystem,Label" \
+            "${home_partition},/home,32GB,ext4,danger-home"
+    fi
+
+    log_success "eMMC /home partition created and mounted successfully"
+}
+
 # Create NVMe partitions (256GB /data, rest /content)
 create_nvme_partitions() {
     local nvme_device="$1"
@@ -6739,61 +6986,27 @@ configure_user_accounts() {
         break
     done
 
-    # SSH key configuration options
+    # SSH key configuration - use values already collected during initial configuration
     echo
     log_info "🔑 SSH Key Configuration"
 
-    local ssh_options=()
-    local has_pi_keys=false
+    # Use the SSH key configuration that was already collected during the initial configuration phase
+    # This prevents duplicate prompting and ensures consistency
+    local import_github_keys="${IMPORT_GITHUB_KEYS:-no}"
+    local github_username="${GITHUB_USERNAME:-}"
 
-    # Check if pi user has SSH keys
-    if [[ -d "/home/pi/.ssh" && -f "/home/pi/.ssh/authorized_keys" ]]; then
-        has_pi_keys=true
-        ssh_options+=("Transfer existing SSH keys from pi user")
-    fi
-
-    # Always offer GitHub import option
-    ssh_options+=("Import SSH keys from GitHub account")
-    ssh_options+=("Skip SSH key setup (configure manually later)")
-
-    local ssh_choice
-    if [[ ${#ssh_options[@]} -gt 1 ]]; then
-        ssh_choice=$(enhanced_choose "SSH Key Setup" "${ssh_options[@]}")
+    # Determine transfer_ssh_keys based on existing configuration
+    if [[ "${import_github_keys}" == "yes" ]]; then
+        transfer_ssh_keys="no"
+        log_info "Using GitHub SSH key import configuration from initial setup"
+        log_info "GitHub username: ${github_username}"
+    elif [[ "${TRANSFER_SSH_KEYS:-no}" == "yes" ]]; then
+        transfer_ssh_keys="yes"
+        log_info "Using SSH key transfer configuration from initial setup"
     else
-        # Only one option available
-        ssh_choice="${ssh_options[0]}"
+        transfer_ssh_keys="no"
+        log_info "SSH key setup will be skipped (manual configuration required)"
     fi
-
-    # Set variables based on choice
-    local import_github_keys="no"
-    local github_username=""
-
-    case "$ssh_choice" in
-        *"Transfer existing SSH keys"*)
-            transfer_ssh_keys="yes"
-            import_github_keys="no"
-            github_username=""
-            ;;
-        *"Import SSH keys from GitHub"*)
-            transfer_ssh_keys="no"
-            import_github_keys="yes"
-            # Get GitHub username
-            github_username=$(enhanced_input "GitHub Username" "" "Enter your GitHub username to import SSH keys")
-            while [[ -z "$github_username" ]]; do
-                log_warn "GitHub username cannot be empty"
-                github_username=$(enhanced_input "GitHub Username" "" "Enter your GitHub username to import SSH keys")
-            done
-            ;;
-        *)
-            transfer_ssh_keys="no"
-            import_github_keys="no"
-            github_username=""
-            ;;
-    esac
-
-    # Set global variables for use in create_new_user
-    IMPORT_GITHUB_KEYS="$import_github_keys"
-    GITHUB_USERNAME="$github_username"
 
     # Show configuration summary
     enhanced_section "User Configuration Summary" "Review new user account settings" "📋"
@@ -6801,9 +7014,9 @@ configure_user_accounts() {
     log_info "Full Name: ${new_fullname:-'(not specified)'}"
 
     # Show SSH key configuration
-    if [[ "$import_github_keys" == "yes" ]]; then
-        log_info "SSH Keys: Import from GitHub (@$github_username)"
-    elif [[ "$transfer_ssh_keys" == "yes" ]]; then
+    if [[ "${import_github_keys}" == "yes" ]]; then
+        log_info "SSH Keys: Import from GitHub (@${github_username})"
+    elif [[ "${transfer_ssh_keys}" == "yes" ]]; then
         log_info "SSH Keys: Transfer from pi user"
     else
         log_info "SSH Keys: Manual setup required"
@@ -8170,7 +8383,8 @@ main() {
         "update_system_packages:Updating system packages"
         "install_essential_packages:Installing essential packages"
         "setup_automatic_updates:Setting up automatic updates"
-        "detect_and_configure_nvme_storage:Detecting and configuring NVMe storage"
+        "        "detect_and_configure_nvme_storage:Detecting and configuring NVMe storage"
+        "detect_and_configure_emmc_home_partition:Detecting and configuring eMMC /home partition""
         "load_motd_config:Loading MOTD configuration"
         "configure_kernel_hardening:Configuring kernel hardening"
         "setup_file_integrity_monitoring:Setting up file integrity monitoring"
