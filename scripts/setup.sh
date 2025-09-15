@@ -3072,30 +3072,466 @@ pre_flight_checks() {
     enhanced_status_indicator "success" "All pre-flight checks passed"
 }
 
-# Backup original configurations
+# Backup original configurations - COMPREHENSIVE VERSION
 backup_original_configs() {
     enhanced_section "Configuration Backup" "Backing up original system configurations" "💾"
 
-    local configs_to_backup=(
+    # Files to backup (will backup if they exist)
+    local files_to_backup=(
+        # Core system configuration
         "/etc/ssh/sshd_config"
         "/etc/sysctl.conf"
         "/etc/fail2ban/jail.conf"
         "/etc/aide/aide.conf"
         "/etc/sensors3.conf"
-        "/etc/netplan"
+        "/etc/fstab"
+        "/etc/lightdm/lightdm.conf"
+        "/etc/systemd/logind.conf"
+        "/boot/config.txt"
+
+        # User-related files
+        "/var/spool/cron/crontabs/pi"
+
+        # SSH banner if it exists
+        "/etc/ssh/ssh_banner"
+
+        # Fail2ban local config if it exists
+        "/etc/fail2ban/jail.local"
     )
 
+    # Directories to backup (will backup entire directory if it exists)
+    local dirs_to_backup=(
+        "/etc/netplan"
+        "/etc/environment.d"
+        "/etc/gstreamer-1.0"
+        "/etc/systemd/system/getty@tty1.service.d"
+        "/home/pi"
+        "/etc/dangerprep"  # In case it already exists
+    )
+
+    # Directories to backup selectively (backup existing files only)
+    local selective_dirs_to_backup=(
+        "/etc/udev/rules.d"
+        "/etc/sysctl.d"
+        "/etc/profile.d"
+        "/etc/sensors.d"
+        "/etc/polkit-1/localauthority/50-local.d"
+        "/etc/apt/sources.list.d"
+        "/usr/share/keyrings"
+        "/etc/systemd/system"  # For any existing DangerPrep services
+        "/etc/cron.d"  # For any existing DangerPrep cron jobs
+        "/etc/logrotate.d"  # For any existing DangerPrep logrotate configs
+    )
+
+    # Docker environment files to backup
+    local docker_env_files=()
+    if [[ -d "$PROJECT_ROOT/docker" ]]; then
+        while IFS= read -r -d '' env_file; do
+            docker_env_files+=("$env_file")
+        done < <(find "$PROJECT_ROOT/docker" -name "compose.env" -type f -print0 2>/dev/null)
+    fi
+
     local backed_up=0
-    for config in "${configs_to_backup[@]}"; do
-        if [[ -e "$config" ]]; then
-            if cp -r "$config" "$BACKUP_DIR/" 2>/dev/null; then
+    local total_items=0
+
+    # Count total items for progress tracking
+    for config in "${files_to_backup[@]}"; do
+        [[ -f "$config" ]] && ((total_items++))
+    done
+    for config in "${dirs_to_backup[@]}"; do
+        [[ -d "$config" ]] && ((total_items++))
+    done
+    for dir in "${selective_dirs_to_backup[@]}"; do
+        [[ -d "$dir" ]] && total_items=$((total_items + $(find "$dir" -maxdepth 1 -type f 2>/dev/null | wc -l)))
+    done
+    total_items=$((total_items + ${#docker_env_files[@]}))
+
+    log_info "Found $total_items configuration items to backup"
+
+    # Backup individual files
+    for config in "${files_to_backup[@]}"; do
+        if [[ -f "$config" ]]; then
+            if standard_create_backup "$config" >/dev/null; then
                 enhanced_status_indicator "success" "Backed up: $(basename "$config")"
                 ((backed_up++))
+            else
+                enhanced_status_indicator "warning" "Failed to backup: $(basename "$config")"
             fi
         fi
     done
 
-    enhanced_status_indicator "success" "Backed up $backed_up configurations to ${BACKUP_DIR}"
+    # Backup entire directories
+    for config in "${dirs_to_backup[@]}"; do
+        if [[ -d "$config" ]]; then
+            if standard_create_backup "$config" >/dev/null; then
+                enhanced_status_indicator "success" "Backed up directory: $(basename "$config")"
+                ((backed_up++))
+            else
+                enhanced_status_indicator "warning" "Failed to backup directory: $(basename "$config")"
+            fi
+        fi
+    done
+
+    # Backup selective directories (only existing files)
+    for dir in "${selective_dirs_to_backup[@]}"; do
+        if [[ -d "$dir" ]]; then
+            local files_found=0
+            local files_backed_up=0
+
+            # Find existing files in the directory (only DangerPrep-related or important system files)
+            while IFS= read -r -d '' file; do
+                local filename=$(basename "$file")
+                # Only backup files that might be modified by DangerPrep or are important system files
+                if [[ "$filename" =~ (dangerprep|docker|tailscale|rk3588|nanopi|mali|gpio|pwm|nvme|usb) ]] ||
+                   [[ "$dir" == "/etc/systemd/system" && "$filename" =~ \.(service|timer|socket)$ ]] ||
+                   [[ "$dir" == "/usr/share/keyrings" && "$filename" =~ \.(gpg|asc)$ ]]; then
+                    ((files_found++))
+                    if standard_create_backup "$file" >/dev/null; then
+                        ((files_backed_up++))
+                        ((backed_up++))
+                    fi
+                fi
+            done < <(find "$dir" -maxdepth 1 -type f -print0 2>/dev/null)
+
+            if [[ $files_found -gt 0 ]]; then
+                enhanced_status_indicator "success" "Backed up $files_backed_up/$files_found relevant files from $(basename "$dir")"
+            fi
+        fi
+    done
+
+    # Backup Docker environment files
+    for env_file in "${docker_env_files[@]}"; do
+        if standard_create_backup "$env_file" >/dev/null; then
+            enhanced_status_indicator "success" "Backed up Docker env: $(basename "$(dirname "$env_file")")/$(basename "$env_file")"
+            ((backed_up++))
+        else
+            enhanced_status_indicator "warning" "Failed to backup Docker env: $env_file"
+        fi
+    done
+
+    enhanced_status_indicator "success" "Backed up $backed_up/$total_items configurations to ${BACKUP_DIR}"
+
+    # Create backup manifest and restoration script
+    create_backup_manifest "$backed_up" "$total_items"
+    create_emergency_restoration_script
+
+    # Verify backup directory
+    if [[ -d "$BACKUP_DIR" ]]; then
+        local backup_size
+        backup_size=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo "unknown")
+        log_info "Backup directory size: $backup_size"
+        log_info "Backup location: $BACKUP_DIR"
+        log_info "Backup manifest: ${BACKUP_DIR}/backup-manifest.txt"
+        log_info "Emergency restore script: ${BACKUP_DIR}/restore-all-configs.sh"
+    else
+        log_error "Backup directory was not created: $BACKUP_DIR"
+        return 1
+    fi
+}
+
+# Create a detailed backup manifest
+create_backup_manifest() {
+    local backed_up="$1"
+    local total_items="$2"
+    local manifest_file="${BACKUP_DIR}/backup-manifest.txt"
+
+    cat > "$manifest_file" << EOF
+DangerPrep Configuration Backup Manifest
+========================================
+Backup Date: $(date)
+Backup Location: ${BACKUP_DIR}
+Script Version: ${SCRIPT_VERSION}
+System: $(uname -a)
+User: $(whoami)
+Original User: ${ORIGINAL_USER:-unknown}
+
+Summary:
+--------
+Total items found: $total_items
+Successfully backed up: $backed_up
+Failed backups: $((total_items - backed_up))
+
+Backup Contents:
+---------------
+EOF
+
+    # List all files in the backup directory with their original paths
+    if [[ -d "$BACKUP_DIR" ]]; then
+        find "$BACKUP_DIR" -type f -name "*.backup-*" | sort | while read -r backup_file; do
+            local filename=$(basename "$backup_file")
+            local original_name="${filename%.backup-*}"
+            echo "✓ $original_name -> $(basename "$backup_file")" >> "$manifest_file"
+        done
+
+        # List directories
+        find "$BACKUP_DIR" -type d -mindepth 1 | sort | while read -r backup_dir; do
+            local dirname=$(basename "$backup_dir")
+            if [[ "$dirname" =~ \.backup-[0-9]{8}-[0-9]{6}$ ]]; then
+                local original_name="${dirname%.backup-*}"
+                echo "✓ $original_name/ -> $(basename "$backup_dir")/" >> "$manifest_file"
+            fi
+        done
+    fi
+
+    cat >> "$manifest_file" << EOF
+
+Restoration Instructions:
+------------------------
+To restore a specific file:
+  sudo cp "${BACKUP_DIR}/filename.backup-YYYYMMDD-HHMMSS" /original/path/filename
+
+To restore a directory:
+  sudo cp -r "${BACKUP_DIR}/dirname.backup-YYYYMMDD-HHMMSS" /original/path/dirname
+
+Emergency restoration script:
+  ${BACKUP_DIR}/restore-all-configs.sh
+
+Notes:
+------
+- All backups include timestamp in filename
+- Original file permissions and ownership are preserved in backups
+- This manifest was created automatically by DangerPrep setup script
+- Keep this backup safe - it contains your original system configuration
+EOF
+
+    log_debug "Created backup manifest: $manifest_file"
+}
+
+
+
+# Fix Docker Compose network configurations
+fix_docker_compose_networks() {
+    enhanced_section "Docker Compose Networks" "Fixing network configurations in compose files" "🔧"
+
+    local compose_files=(
+        "$PROJECT_ROOT/docker/infrastructure/traefik/compose.yml"
+        "$PROJECT_ROOT/docker/infrastructure/step-ca/compose.yml"
+        "$PROJECT_ROOT/docker/infrastructure/komodo/compose.yml"
+        "$PROJECT_ROOT/docker/infrastructure/portainer/compose.yml"
+        "$PROJECT_ROOT/docker/media/komga/compose.yml"
+        "$PROJECT_ROOT/docker/media/jellyfin/compose.yml"
+        "$PROJECT_ROOT/docker/media/romm/compose.yml"
+        "$PROJECT_ROOT/docker/services/docmost/compose.yml"
+        "$PROJECT_ROOT/docker/services/onedev/compose.yml"
+        "$PROJECT_ROOT/docker/sync/kiwix-sync/compose.yml"
+        "$PROJECT_ROOT/docker/sync/nfs-sync/compose.yml"
+        "$PROJECT_ROOT/docker/infrastructure/dns/compose.yml"
+    )
+
+    local fixed_count=0
+    local total_files=0
+
+    for compose_file in "${compose_files[@]}"; do
+        if [[ -f "$compose_file" ]]; then
+            ((total_files++))
+            log_debug "Checking network configuration in: $compose_file"
+
+            # Check if file has traefik network that needs fixing
+            if grep -q "traefik:" "$compose_file"; then
+                # Create backup of compose file
+                if standard_create_backup "$compose_file" >/dev/null; then
+                    # Fix traefik network to be external with explicit name
+                    if sed -i.tmp '/^networks:/,/^[[:space:]]*traefik:/{
+                        /^[[:space:]]*traefik:/,/^[[:space:]]*[^[:space:]]/{
+                            /^[[:space:]]*traefik:/c\
+  traefik:\
+    external: true\
+    name: traefik
+                            /^[[:space:]]*external:/d
+                            /^[[:space:]]*name: traefik/d
+                            /^[[:space:]]*driver: bridge/d
+                        }
+                    }' "$compose_file" 2>/dev/null; then
+                        rm -f "${compose_file}.tmp" 2>/dev/null
+                        enhanced_status_indicator "success" "Fixed: $(basename "$(dirname "$compose_file")")/$(basename "$compose_file")"
+                        ((fixed_count++))
+                    else
+                        # Restore from backup if sed failed
+                        if [[ -f "${compose_file}.tmp" ]]; then
+                            mv "${compose_file}.tmp" "$compose_file"
+                        fi
+                        enhanced_status_indicator "warning" "Failed to fix: $(basename "$compose_file")"
+                    fi
+                else
+                    enhanced_status_indicator "warning" "Could not backup: $(basename "$compose_file")"
+                fi
+            else
+                log_debug "No traefik network found in: $(basename "$compose_file")"
+            fi
+        fi
+    done
+
+    enhanced_status_indicator "success" "Fixed $fixed_count/$total_files Docker Compose files"
+
+    if [[ $fixed_count -gt 0 ]]; then
+        log_info "Network configurations updated to use shared traefik network"
+        log_info "All compose files now reference external traefik network properly"
+    fi
+}
+
+# Create emergency restoration script
+create_emergency_restoration_script() {
+    local restore_script="${BACKUP_DIR}/restore-all-configs.sh"
+
+    cat > "$restore_script" << 'EOF'
+#!/bin/bash
+# DangerPrep Emergency Configuration Restoration Script
+# This script restores all backed up configurations to their original locations
+#
+# WARNING: This will overwrite current configurations with backed up versions
+# Only run this if you need to completely revert DangerPrep changes
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_DIR="$SCRIPT_DIR"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $*"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $*"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $*"
+}
+
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+    log_error "This script must be run as root (use sudo)"
+    exit 1
+fi
+
+echo "DangerPrep Emergency Configuration Restoration"
+echo "=============================================="
+echo "Backup Directory: $BACKUP_DIR"
+echo "Restoration Date: $(date)"
+echo ""
+
+# Confirm with user
+read -p "Are you sure you want to restore ALL configurations? This will overwrite current settings. (yes/no): " confirm
+if [[ "$confirm" != "yes" ]]; then
+    log_info "Restoration cancelled by user"
+    exit 0
+fi
+
+echo ""
+log_info "Starting configuration restoration..."
+
+restored=0
+failed=0
+
+# Restore individual files
+while IFS= read -r -d '' backup_file; do
+    if [[ "$(basename "$backup_file")" =~ ^(.+)\.backup-[0-9]{8}-[0-9]{6}$ ]]; then
+        original_name="${BASH_REMATCH[1]}"
+
+        # Determine original path based on backup file location and name
+        if [[ "$original_name" =~ ^(sshd_config|ssh_banner)$ ]]; then
+            original_path="/etc/ssh/$original_name"
+        elif [[ "$original_name" =~ ^(sysctl\.conf|fstab|logind\.conf)$ ]]; then
+            original_path="/etc/$original_name"
+        elif [[ "$original_name" =~ ^(jail\.conf|jail\.local)$ ]]; then
+            original_path="/etc/fail2ban/$original_name"
+        elif [[ "$original_name" =~ ^(aide\.conf)$ ]]; then
+            original_path="/etc/aide/$original_name"
+        elif [[ "$original_name" =~ ^(sensors3\.conf)$ ]]; then
+            original_path="/etc/$original_name"
+        elif [[ "$original_name" =~ ^(lightdm\.conf)$ ]]; then
+            original_path="/etc/lightdm/$original_name"
+        elif [[ "$original_name" =~ ^(config\.txt)$ ]]; then
+            original_path="/boot/$original_name"
+        elif [[ "$original_name" =~ ^(pi)$ ]]; then
+            original_path="/var/spool/cron/crontabs/$original_name"
+        else
+            log_warn "Unknown file type, skipping: $original_name"
+            continue
+        fi
+
+        log_info "Restoring: $original_path"
+        if cp "$backup_file" "$original_path" 2>/dev/null; then
+            # Restore original permissions (basic attempt)
+            chmod 644 "$original_path" 2>/dev/null || true
+            if [[ "$original_path" =~ /boot/ ]]; then
+                chown root:root "$original_path" 2>/dev/null || true
+            elif [[ "$original_path" =~ /var/spool/cron/ ]]; then
+                chown root:crontab "$original_path" 2>/dev/null || true
+                chmod 600 "$original_path" 2>/dev/null || true
+            else
+                chown root:root "$original_path" 2>/dev/null || true
+            fi
+            ((restored++))
+        else
+            log_error "Failed to restore: $original_path"
+            ((failed++))
+        fi
+    fi
+done < <(find "$BACKUP_DIR" -name "*.backup-*" -type f -print0 2>/dev/null)
+
+# Restore directories
+while IFS= read -r -d '' backup_dir; do
+    if [[ "$(basename "$backup_dir")" =~ ^(.+)\.backup-[0-9]{8}-[0-9]{6}$ ]]; then
+        original_name="${BASH_REMATCH[1]}"
+
+        # Determine original path
+        case "$original_name" in
+            "netplan"|"environment.d"|"gstreamer-1.0"|"dangerprep")
+                original_path="/etc/$original_name"
+                ;;
+            "getty@tty1.service.d")
+                original_path="/etc/systemd/system/$original_name"
+                ;;
+            "pi")
+                original_path="/home/$original_name"
+                ;;
+            *)
+                log_warn "Unknown directory type, skipping: $original_name"
+                continue
+                ;;
+        esac
+
+        log_info "Restoring directory: $original_path"
+        if [[ -d "$original_path" ]]; then
+            rm -rf "$original_path" 2>/dev/null || true
+        fi
+
+        if cp -r "$backup_dir" "$original_path" 2>/dev/null; then
+            chown -R root:root "$original_path" 2>/dev/null || true
+            if [[ "$original_path" == "/home/pi" ]]; then
+                chown -R pi:pi "$original_path" 2>/dev/null || true
+            fi
+            ((restored++))
+        else
+            log_error "Failed to restore directory: $original_path"
+            ((failed++))
+        fi
+    fi
+done < <(find "$BACKUP_DIR" -name "*.backup-*" -type d -print0 2>/dev/null)
+
+echo ""
+log_info "Restoration complete!"
+log_info "Restored: $restored items"
+if [[ $failed -gt 0 ]]; then
+    log_warn "Failed: $failed items"
+fi
+
+echo ""
+log_warn "IMPORTANT: You may need to:"
+log_warn "1. Restart services: sudo systemctl daemon-reload"
+log_warn "2. Reboot the system for all changes to take effect"
+log_warn "3. Check service status: sudo systemctl status ssh"
+EOF
+
+    chmod +x "$restore_script"
+    log_debug "Created emergency restoration script: $restore_script"
 }
 
 # Setup all necessary package repositories based on selected packages
@@ -4452,16 +4888,16 @@ setup_docker_services() {
         return 0
     fi
 
-    # Create Docker networks with error handling
-    if ! docker network ls --format "{{.Name}}" | grep -q "^traefik$"; then
-        if enhanced_spin "Creating Docker network: traefik" bash -c "docker network create traefik"; then
-            enhanced_status_indicator "success" "Created Docker network: traefik"
+    # Create shared traefik network for all web services
+    if ! docker network ls --format "{{.Name}}" | grep -q "^traefik$" 2>/dev/null; then
+        if enhanced_spin "Creating shared traefik network" docker network create traefik --driver bridge --subnet=172.20.0.0/16 --gateway=172.20.0.1; then
+            enhanced_status_indicator "success" "Created shared traefik network (172.20.0.0/16)"
         else
-            enhanced_status_indicator "failure" "Failed to create Docker network: traefik"
+            enhanced_status_indicator "failure" "Failed to create traefik network"
             return 1
         fi
     else
-        enhanced_status_indicator "info" "Docker network 'traefik' already exists"
+        enhanced_status_indicator "info" "Shared traefik network already exists"
     fi
 
     # Set up directory structure using standardized directory creation
@@ -4663,10 +5099,10 @@ deploy_selected_docker_services() {
         sleep 5  # Give Docker a moment to fully start
     fi
 
-    # Create Traefik network if it doesn't exist (required by most services)
-    if ! docker network ls | grep -q "traefik"; then
-        if ! enhanced_spin "Creating Traefik network" docker network create traefik; then
-            enhanced_status_indicator "warning" "Failed to create Traefik network"
+    # Ensure shared traefik network exists for service deployment
+    if ! docker network ls --format "{{.Name}}" | grep -q "^traefik$" 2>/dev/null; then
+        if ! docker network create traefik --driver bridge --subnet=172.20.0.0/16 --gateway=172.20.0.1 2>/dev/null; then
+            enhanced_status_indicator "warning" "Failed to create traefik network"
         fi
     fi
 
@@ -4775,6 +5211,7 @@ deploy_docker_service() {
         "traefik")
             # Traefik should be started first and given time to initialize
             log_info "Starting Traefik (reverse proxy)..."
+
             if docker compose -f "${compose_file}" up -d; then
                 sleep 5  # Give Traefik time to initialize
                 return 0

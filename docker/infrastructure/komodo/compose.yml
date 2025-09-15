@@ -115,5 +115,6 @@ services:
 networks:
   traefik:
     external: true
+    name: traefik
   komodo:
     driver: bridge

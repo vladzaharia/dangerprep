@@ -45,4 +45,5 @@ services:
 
 networks:
   traefik:
-    driver: bridge
+    external: true
+    name: traefik

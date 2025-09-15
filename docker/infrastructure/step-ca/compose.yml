@@ -90,5 +90,7 @@ services:
 networks:
   traefik:
     external: true
+    name: traefik
   step-ca:
     driver: bridge
+    name: step-ca

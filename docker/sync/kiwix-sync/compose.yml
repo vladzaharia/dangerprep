@@ -58,5 +58,6 @@ services:
 networks:
   traefik:
     external: true
+    name: traefik
   kiwix:
     driver: bridge
