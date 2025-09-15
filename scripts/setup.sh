@@ -2982,16 +2982,10 @@ setup_package_repositories() {
     # Note: Most other packages (borgbackup, restic, etc.) are available in Ubuntu universe repository
     # which should already be enabled
 
-    # Update package index if any repositories were added
+    # Note: apt update will be called by update_system_packages() after this function returns
+    # This ensures repositories are set up before the main package index update
     if [[ "$repositories_added" == "true" ]]; then
-        if enhanced_spin "Updating package index with new repositories" \
-            bash -c "apt update"; then
-            enhanced_status_indicator "success" "Package index updated with new repositories"
-        else
-            enhanced_status_indicator "failure" "Failed to update package index"
-            return 1
-        fi
-        log_success "Package repositories setup completed"
+        log_success "Package repositories setup completed - repositories will be refreshed with main apt update"
     else
         log_info "No additional repositories needed for selected packages"
     fi
@@ -3021,7 +3015,10 @@ update_system_packages() {
 
     export DEBIAN_FRONTEND=noninteractive
 
-    # Update package lists with retry logic
+    # Setup all necessary package repositories based on selected packages BEFORE apt update
+    setup_package_repositories
+
+    # Update package lists with retry logic (now includes new repositories)
     if retry_with_backoff 3 5 30 apt update; then
         enhanced_status_indicator "success" "Package lists updated"
     else
@@ -3036,9 +3033,6 @@ update_system_packages() {
         enhanced_status_indicator "failure" "Failed to upgrade packages"
         return 1
     fi
-
-    # Setup all necessary package repositories based on selected packages
-    setup_package_repositories
 
     log_success "System packages updated successfully"
 }
@@ -4188,16 +4182,8 @@ configure_rootless_docker() {
             return 1
         fi
 
-        # Update package index and install Docker packages
-        if enhanced_spin "Updating package index" \
-            bash -c "apt update"; then
-            enhanced_status_indicator "success" "Package index updated"
-        else
-            enhanced_status_indicator "failure" "Failed to update package index"
-            return 1
-        fi
-
         # Install Docker packages using standardized pattern
+        # Note: Package index was already updated in update_system_packages()
         local docker_packages="docker-ce,docker-ce-cli,containerd.io,docker-buildx-plugin,docker-compose-plugin"
         install_packages_with_selection "Docker" "Installing Docker packages" "Docker:$docker_packages"
         local install_result=$?
@@ -7084,9 +7070,9 @@ setup_tailscale() {
             return 1
         fi
 
-        # Update and install Tailscale
+        # Install Tailscale (package index was already updated in update_system_packages)
         if enhanced_spin "Installing Tailscale" \
-            bash -c "apt update && env DEBIAN_FRONTEND=noninteractive apt install -y tailscale"; then
+            bash -c "env DEBIAN_FRONTEND=noninteractive apt install -y tailscale"; then
             enhanced_status_indicator "success" "Tailscale installed"
         else
             enhanced_status_indicator "failure" "Failed to install Tailscale"
