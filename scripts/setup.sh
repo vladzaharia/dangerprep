@@ -886,16 +886,49 @@ import_github_ssh_keys() {
     local temp_keys_file
     temp_keys_file=$(mktemp)
 
-    # Use curl with better error handling and timeout
-    if ! curl -s -f --max-time 30 --retry 3 --retry-delay 2 \
-        -H "Accept: application/vnd.github.v3+json" \
-        -H "User-Agent: DangerPrep-Setup/1.0" \
-        "$github_keys_url" > "$temp_keys_file" 2>/tmp/curl_error.log; then
+    # Use wget or curl with better error handling and timeout
+    local download_success=false
+    local http_code="000"
 
+    # Try wget first, then curl as fallback
+    if command -v wget >/dev/null 2>&1; then
+        if wget -4 -q --timeout=30 --tries=3 --retry-connrefused \
+            --header="Accept: application/vnd.github.v3+json" \
+            --header="User-Agent: DangerPrep-Setup/1.0" \
+            -O "$temp_keys_file" "$github_keys_url" 2>/tmp/wget_error.log; then
+            download_success=true
+        else
+            # Get HTTP status code with wget
+            http_code=$(wget -4 -q --timeout=10 --tries=1 --spider --server-response "$github_keys_url" 2>&1 | grep "HTTP/" | tail -1 | awk '{print $2}' || echo "000")
+        fi
+    elif command -v curl >/dev/null 2>&1; then
+        if curl -s -f --max-time 30 --retry 3 --retry-delay 2 \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "User-Agent: DangerPrep-Setup/1.0" \
+            "$github_keys_url" > "$temp_keys_file" 2>/tmp/curl_error.log; then
+            download_success=true
+        else
+            # Get HTTP status code with curl
+            http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$github_keys_url" 2>/dev/null || echo "000")
+        fi
+    else
+        log_error "Neither wget nor curl is available for downloading SSH keys"
+        rm -f "$temp_keys_file"
+        return 1
+    fi
+
+    if [[ "$download_success" != "true" ]]; then
         log_error "Failed to fetch SSH keys from GitHub for user: $github_username"
 
-        # Show curl error details if available
-        if [[ -f /tmp/curl_error.log ]]; then
+        # Show error details if available
+        if [[ -f /tmp/wget_error.log ]]; then
+            local wget_error
+            wget_error=$(cat /tmp/wget_error.log 2>/dev/null)
+            if [[ -n "$wget_error" ]]; then
+                log_error "Wget error: $wget_error"
+            fi
+            rm -f /tmp/wget_error.log
+        elif [[ -f /tmp/curl_error.log ]]; then
             local curl_error
             curl_error=$(cat /tmp/curl_error.log 2>/dev/null)
             if [[ -n "$curl_error" ]]; then
@@ -903,10 +936,6 @@ import_github_ssh_keys() {
             fi
             rm -f /tmp/curl_error.log
         fi
-
-        # Check if it's a network issue or user not found
-        local http_code
-        http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$github_keys_url" 2>/dev/null || echo "000")
 
         case "$http_code" in
             "404")
@@ -1087,9 +1116,9 @@ retry_with_backoff() {
 install_docker_gpg_key() {
     log_debug "Starting Docker GPG key installation"
 
-    # Check prerequisites
-    if ! command -v curl >/dev/null 2>&1; then
-        log_error "curl is required for Docker GPG key installation"
+    # Check prerequisites - prefer wget over curl for better compatibility
+    if ! command -v wget >/dev/null 2>&1 && ! command -v curl >/dev/null 2>&1; then
+        log_error "wget or curl is required for Docker GPG key installation"
         return 1
     fi
 
@@ -1110,10 +1139,17 @@ install_docker_gpg_key() {
     # Download and install Docker GPG key with retry logic and detailed error handling
     log_debug "Downloading Docker GPG key from https://download.docker.com/linux/ubuntu/gpg"
 
+    # Prefer wget over curl for better compatibility
+    local download_cmd
+    if command -v wget >/dev/null 2>&1; then
+        download_cmd="wget -4 -q --timeout=30 --tries=1 -O - https://download.docker.com/linux/ubuntu/gpg"
+    else
+        download_cmd="curl -fsSL --connect-timeout 30 --max-time 120 https://download.docker.com/linux/ubuntu/gpg"
+    fi
+
     if retry_with_backoff 3 5 30 bash -c "
         set -euo pipefail
-        curl -fsSL --connect-timeout 30 --max-time 120 https://download.docker.com/linux/ubuntu/gpg | \
-        gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg 2>/dev/null
+        $download_cmd | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg 2>/dev/null
     "; then
         # Verify the key was installed correctly
         if [[ -f /usr/share/keyrings/docker-archive-keyring.gpg ]] && [[ -s /usr/share/keyrings/docker-archive-keyring.gpg ]]; then
@@ -1131,8 +1167,7 @@ install_docker_gpg_key() {
         # Try alternative method using apt-key (deprecated but may work as fallback)
         log_debug "Attempting fallback method using apt-key"
         if retry_with_backoff 2 3 15 bash -c "
-            curl -fsSL --connect-timeout 30 --max-time 120 https://download.docker.com/linux/ubuntu/gpg | \
-            apt-key add - 2>/dev/null
+            $download_cmd | apt-key add - 2>/dev/null
         "; then
             log_debug "Docker GPG key added using fallback apt-key method"
             return 0
@@ -1147,9 +1182,9 @@ install_docker_gpg_key() {
 install_tailscale_gpg_key() {
     log_debug "Starting Tailscale GPG key installation"
 
-    # Check prerequisites
-    if ! command -v curl >/dev/null 2>&1; then
-        log_error "curl is required for Tailscale GPG key installation"
+    # Check prerequisites - prefer wget over curl for better compatibility
+    if ! command -v wget >/dev/null 2>&1 && ! command -v curl >/dev/null 2>&1; then
+        log_error "wget or curl is required for Tailscale GPG key installation"
         return 1
     fi
 
@@ -1173,11 +1208,17 @@ install_tailscale_gpg_key() {
     # Download and install Tailscale GPG key with retry logic
     log_debug "Downloading Tailscale GPG key for Ubuntu $ubuntu_codename"
 
+    # Prefer wget over curl for better compatibility
+    local download_cmd
+    if command -v wget >/dev/null 2>&1; then
+        download_cmd="wget -4 -q --timeout=30 --tries=1 -O /usr/share/keyrings/tailscale-archive-keyring.gpg 'https://pkgs.tailscale.com/stable/ubuntu/${ubuntu_codename}.noarmor.gpg'"
+    else
+        download_cmd="curl -fsSL --connect-timeout 30 --max-time 120 'https://pkgs.tailscale.com/stable/ubuntu/${ubuntu_codename}.noarmor.gpg' -o /usr/share/keyrings/tailscale-archive-keyring.gpg"
+    fi
+
     if retry_with_backoff 3 5 30 bash -c "
         set -euo pipefail
-        curl -fsSL --connect-timeout 30 --max-time 120 \
-        'https://pkgs.tailscale.com/stable/ubuntu/$ubuntu_codename.noarmor.gpg' \
-        -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+        $download_cmd
     "; then
         # Verify the key was installed correctly
         if [[ -f /usr/share/keyrings/tailscale-archive-keyring.gpg ]] && [[ -s /usr/share/keyrings/tailscale-archive-keyring.gpg ]]; then
@@ -1542,11 +1583,21 @@ install_fastfetch_package() {
     temp_dir=$(mktemp -d)
     local deb_file="${temp_dir}/fastfetch-linux-${arch}.deb"
 
-    # Get latest release URL
+    # Get latest release URL using wget or curl
     local download_url
-    download_url=$(curl -s https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest | \
-                   grep "browser_download_url.*linux-${arch}.deb" | \
-                   cut -d '"' -f 4)
+    if command -v wget >/dev/null 2>&1; then
+        download_url=$(wget -4 -q -O - https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest | \
+                       grep "browser_download_url.*linux-${arch}.deb" | \
+                       cut -d '"' -f 4)
+    elif command -v curl >/dev/null 2>&1; then
+        download_url=$(curl -s https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest | \
+                       grep "browser_download_url.*linux-${arch}.deb" | \
+                       cut -d '"' -f 4)
+    else
+        log_warn "Neither wget nor curl available for fastfetch download"
+        rm -rf "$temp_dir"
+        return 1
+    fi
 
     if [[ -z "$download_url" ]]; then
         log_warn "Could not find fastfetch download URL for architecture: ${arch}"
@@ -1557,9 +1608,20 @@ install_fastfetch_package() {
 
     log_debug "Found fastfetch download URL: $download_url"
 
-    # Download and install
+    # Download and install using wget or curl
     log_debug "Downloading fastfetch from: $download_url"
-    if curl -L -o "$deb_file" "$download_url"; then
+    local download_success=false
+    if command -v wget >/dev/null 2>&1; then
+        if wget -4 -q --timeout=60 --tries=3 -O "$deb_file" "$download_url"; then
+            download_success=true
+        fi
+    elif command -v curl >/dev/null 2>&1; then
+        if curl -L -o "$deb_file" "$download_url"; then
+            download_success=true
+        fi
+    fi
+
+    if [[ "$download_success" == "true" ]]; then
         log_debug "Download successful, installing package"
         if dpkg -i "$deb_file" 2>/dev/null; then
             log_debug "Fastfetch installed from GitHub release"
