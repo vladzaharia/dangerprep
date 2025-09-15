@@ -4374,6 +4374,29 @@ configure_rootless_docker() {
     log_success "Docker configuration completed"
 }
 
+# Simple Docker startup
+start_docker_service() {
+    log_info "Starting Docker service..."
+
+    if systemctl start docker 2>/dev/null; then
+        # Wait for Docker daemon to be ready
+        local max_wait=30
+        local wait_count=0
+        while ! docker info >/dev/null 2>&1 && [[ $wait_count -lt $max_wait ]]; do
+            sleep 2
+            ((wait_count++))
+        done
+
+        if docker info >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+
+
 # Setup Docker services using standardized patterns
 setup_docker_services() {
     enhanced_section "Docker Services Setup" "Configuring Docker services and infrastructure" "🐳"
@@ -4388,7 +4411,7 @@ setup_docker_services() {
         return 0
     fi
 
-    # Enable and start Docker using standardized service management
+    # Enable and start Docker with enhanced diagnostics
     # BOOT FIX: Don't fail setup if Docker has issues - it can be fixed later
     if standard_service_operation "docker" "enable"; then
         enhanced_status_indicator "success" "Docker service enabled"
@@ -4397,7 +4420,8 @@ setup_docker_services() {
         log_warn "Docker service enable failed, but continuing setup"
     fi
 
-    if standard_service_operation "docker" "start"; then
+    # Start Docker service
+    if start_docker_service; then
         enhanced_status_indicator "success" "Docker service started"
     else
         enhanced_status_indicator "warning" "Failed to start Docker service - can be fixed after boot"
