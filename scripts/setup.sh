@@ -2924,44 +2924,86 @@ backup_original_configs() {
     enhanced_status_indicator "success" "Backed up $backed_up configurations to ${BACKUP_DIR}"
 }
 
-# Setup Docker repository if Docker packages are selected
+# Setup all necessary package repositories based on selected packages
+setup_package_repositories() {
+    enhanced_section "Package Repositories" "Setting up additional package repositories" "📦"
+
+    local repositories_added=false
+
+    # Setup Docker repository if Docker packages are selected
+    if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]] && echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Docker packages"; then
+        log_info "Setting up Docker repository for package installation..."
+
+        # Add Docker's official GPG key with error handling
+        if enhanced_spin "Adding Docker GPG key" \
+            bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg"; then
+            enhanced_status_indicator "success" "Docker GPG key added"
+        else
+            enhanced_status_indicator "failure" "Failed to add Docker GPG key"
+            return 1
+        fi
+
+        # Add Docker repository with standardized file operations
+        local docker_repo="deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+        if standard_create_env_file "/etc/apt/sources.list.d/docker.list" "$docker_repo" "644"; then
+            enhanced_status_indicator "success" "Docker repository added"
+            repositories_added=true
+        else
+            enhanced_status_indicator "failure" "Failed to add Docker repository"
+            return 1
+        fi
+    fi
+
+    # Setup Tailscale repository if Network packages are selected
+    if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]] && echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Network packages"; then
+        log_info "Setting up Tailscale repository for package installation..."
+
+        # Add Tailscale's official GPG key
+        if enhanced_spin "Adding Tailscale GPG key" \
+            bash -c "curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).noarmor.gpg | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null"; then
+            enhanced_status_indicator "success" "Tailscale GPG key added"
+        else
+            enhanced_status_indicator "failure" "Failed to add Tailscale GPG key"
+            return 1
+        fi
+
+        # Add Tailscale repository
+        local tailscale_repo="deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu $(lsb_release -cs) main"
+        if standard_create_env_file "/etc/apt/sources.list.d/tailscale.list" "$tailscale_repo" "644"; then
+            enhanced_status_indicator "success" "Tailscale repository added"
+            repositories_added=true
+        else
+            enhanced_status_indicator "failure" "Failed to add Tailscale repository"
+            return 1
+        fi
+    fi
+
+    # Add other repositories as needed for specific packages
+    # Note: Most other packages (borgbackup, restic, etc.) are available in Ubuntu universe repository
+    # which should already be enabled
+
+    # Update package index if any repositories were added
+    if [[ "$repositories_added" == "true" ]]; then
+        if enhanced_spin "Updating package index with new repositories" \
+            bash -c "apt update"; then
+            enhanced_status_indicator "success" "Package index updated with new repositories"
+        else
+            enhanced_status_indicator "failure" "Failed to update package index"
+            return 1
+        fi
+        log_success "Package repositories setup completed"
+    else
+        log_info "No additional repositories needed for selected packages"
+    fi
+}
+
+# Legacy function for backward compatibility
 setup_docker_repository() {
-    # Check if Docker packages are selected
-    if [[ -z "${SELECTED_PACKAGE_CATEGORIES:-}" ]] || ! echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Docker packages"; then
-        log_debug "Docker packages not selected, skipping repository setup"
-        return 0
+    # This function is now handled by setup_package_repositories
+    # Keep for any existing calls, but redirect to the new function
+    if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]] && echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Docker packages"; then
+        setup_package_repositories
     fi
-
-    log_info "Setting up Docker repository for package installation..."
-
-    # Add Docker's official GPG key with error handling
-    if enhanced_spin "Adding Docker GPG key" \
-        bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg"; then
-        enhanced_status_indicator "success" "Docker GPG key added"
-    else
-        enhanced_status_indicator "failure" "Failed to add Docker GPG key"
-        return 1
-    fi
-
-    # Add Docker repository with standardized file operations
-    local docker_repo="deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-    if standard_create_env_file "/etc/apt/sources.list.d/docker.list" "$docker_repo" "644"; then
-        enhanced_status_indicator "success" "Docker repository added"
-    else
-        enhanced_status_indicator "failure" "Failed to add Docker repository"
-        return 1
-    fi
-
-    # Update package index after adding Docker repository
-    if enhanced_spin "Updating package index with Docker repository" \
-        bash -c "apt update"; then
-        enhanced_status_indicator "success" "Package index updated with Docker repository"
-    else
-        enhanced_status_indicator "failure" "Failed to update package index"
-        return 1
-    fi
-
-    log_success "Docker repository setup completed"
 }
 
 # Update system packages
@@ -2995,8 +3037,8 @@ update_system_packages() {
         return 1
     fi
 
-    # Setup Docker repository if Docker packages are selected
-    setup_docker_repository
+    # Setup all necessary package repositories based on selected packages
+    setup_package_repositories
 
     log_success "System packages updated successfully"
 }
@@ -3019,7 +3061,7 @@ install_essential_packages() {
                     package_categories+=("Convenience:vim,nano,htop,tree,zip,jq,rsync,screen,tmux,fastfetch")
                     ;;
                 *"Network packages"*)
-                    package_categories+=("Network:netplan.io,iproute2,wondershaper,iperf3")
+                    package_categories+=("Network:netplan.io,iproute2,wondershaper,iperf3,tailscale")
                     ;;
                 *"Security packages"*)
                     package_categories+=("Security:fail2ban,aide,rkhunter,chkrootkit,clamav,clamav-daemon,lynis,suricata,apparmor,apparmor-utils,libpam-pwquality,libpam-tmpdir,acct")
@@ -3074,10 +3116,10 @@ install_essential_packages() {
         install_friendlyelec_kernel_headers
     fi
 
-    # Install Tailscale if Network packages were selected
+    # Configure Tailscale service if Network packages were selected (package already installed in consolidated installation)
     if [[ -n "${SELECTED_PACKAGE_CATEGORIES:-}" ]] && echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Network packages"; then
-        enhanced_status_indicator "info" "Installing Tailscale (Network package)"
-        setup_tailscale
+        enhanced_status_indicator "info" "Tailscale package installed in consolidated installation"
+        # Service configuration will be handled in the setup_tailscale phase
     fi
 
     # Clean up package cache
@@ -4203,6 +4245,30 @@ setup_docker_services() {
     else
         enhanced_status_indicator "warning" "Failed to start Docker service - can be fixed after boot"
         log_warn "Docker service start failed, but continuing setup"
+    fi
+
+    # Check if Docker command is available before proceeding
+    if ! command -v docker >/dev/null 2>&1; then
+        enhanced_status_indicator "warning" "Docker command not found - skipping Docker network setup"
+        log_warn "Docker may not be properly installed or not in PATH"
+        log_info "Docker services can be configured later after Docker is properly installed"
+        return 0
+    fi
+
+    # Wait for Docker daemon to be ready
+    local max_wait=30
+    local wait_count=0
+    while ! docker info >/dev/null 2>&1 && [[ $wait_count -lt $max_wait ]]; do
+        log_debug "Waiting for Docker daemon to be ready... ($((wait_count + 1))/$max_wait)"
+        sleep 2
+        ((wait_count++))
+    done
+
+    if ! docker info >/dev/null 2>&1; then
+        enhanced_status_indicator "warning" "Docker daemon not responding - skipping Docker network setup"
+        log_warn "Docker daemon may not be running properly"
+        log_info "Docker services can be configured later after Docker daemon is started"
+        return 0
     fi
 
     # Create Docker networks with error handling
@@ -6987,24 +7053,59 @@ generate_sync_configs() {
 
 # Setup Tailscale
 setup_tailscale() {
-    log_info "Setting up Tailscale..."
-
-    # Check if Tailscale is already installed
-    if command -v tailscale >/dev/null 2>&1; then
-        log_info "Tailscale already installed"
-    else
-        # Add Tailscale repository
-        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | tee /etc/apt/sources.list.d/tailscale.list
-
-        # Update and install Tailscale
-        apt update
-        env DEBIAN_FRONTEND=noninteractive apt install -y tailscale
+    # Skip if Network packages were not selected
+    if [[ -z "${SELECTED_PACKAGE_CATEGORIES:-}" ]] || ! echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Network packages"; then
+        log_info "Network packages not selected, skipping Tailscale setup"
+        return 0
     fi
 
-    # Enable Tailscale service
-    systemctl enable tailscaled
-    systemctl start tailscaled
+    enhanced_section "Tailscale Setup" "Configuring Tailscale VPN service" "🔗"
+
+    # Check if Tailscale is already installed (should be from consolidated installation)
+    if command -v tailscale >/dev/null 2>&1; then
+        enhanced_status_indicator "success" "Tailscale already installed"
+    else
+        enhanced_status_indicator "warning" "Tailscale not found, attempting manual installation"
+
+        # Fallback installation if not installed via consolidated packages
+        if enhanced_spin "Adding Tailscale repository" \
+            bash -c "curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).noarmor.gpg | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null"; then
+            enhanced_status_indicator "success" "Tailscale GPG key added"
+        else
+            enhanced_status_indicator "failure" "Failed to add Tailscale GPG key"
+            return 1
+        fi
+
+        local tailscale_repo="deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu $(lsb_release -cs) main"
+        if standard_create_env_file "/etc/apt/sources.list.d/tailscale.list" "$tailscale_repo" "644"; then
+            enhanced_status_indicator "success" "Tailscale repository added"
+        else
+            enhanced_status_indicator "failure" "Failed to add Tailscale repository"
+            return 1
+        fi
+
+        # Update and install Tailscale
+        if enhanced_spin "Installing Tailscale" \
+            bash -c "apt update && env DEBIAN_FRONTEND=noninteractive apt install -y tailscale"; then
+            enhanced_status_indicator "success" "Tailscale installed"
+        else
+            enhanced_status_indicator "failure" "Failed to install Tailscale"
+            return 1
+        fi
+    fi
+
+    # Enable and start Tailscale service
+    if standard_service_operation "tailscaled" "enable"; then
+        enhanced_status_indicator "success" "Tailscale service enabled"
+    else
+        enhanced_status_indicator "warning" "Failed to enable Tailscale service"
+    fi
+
+    if standard_service_operation "tailscaled" "start"; then
+        enhanced_status_indicator "success" "Tailscale service started"
+    else
+        enhanced_status_indicator "warning" "Failed to start Tailscale service"
+    fi
 
     # Note: Tailscale firewall rules should be configured in RaspAP
     # RaspAP manages iptables, so Tailscale rules need to be added through RaspAP interface
