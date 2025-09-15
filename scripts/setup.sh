@@ -1416,8 +1416,9 @@ install_fastfetch_package() {
     local arch
     case "$(uname -m)" in
         x86_64|amd64)   arch="amd64" ;;
-        aarch64|arm64)  arch="arm64" ;;
-        armv7l)         arch="armhf" ;;
+        aarch64|arm64)  arch="aarch64" ;;
+        armv7l)         arch="armv7l" ;;
+        armv6l)         arch="armv6l" ;;
         *)
             log_warn "Unsupported architecture for fastfetch: $(uname -m)"
             return 1
@@ -1437,18 +1438,28 @@ install_fastfetch_package() {
 
     if [[ -z "$download_url" ]]; then
         log_warn "Could not find fastfetch download URL for architecture: ${arch}"
+        log_debug "Searched for pattern: browser_download_url.*linux-${arch}.deb"
         rm -rf "$temp_dir"
         return 1
     fi
 
+    log_debug "Found fastfetch download URL: $download_url"
+
     # Download and install
-    if curl -L -o "$deb_file" "$download_url" && \
-       dpkg -i "$deb_file" 2>/dev/null; then
-        log_debug "Fastfetch installed from GitHub release"
-        rm -rf "$temp_dir"
-        return 0
+    log_debug "Downloading fastfetch from: $download_url"
+    if curl -L -o "$deb_file" "$download_url"; then
+        log_debug "Download successful, installing package"
+        if dpkg -i "$deb_file" 2>/dev/null; then
+            log_debug "Fastfetch installed from GitHub release"
+            rm -rf "$temp_dir"
+            return 0
+        else
+            log_warn "Failed to install fastfetch .deb package"
+            rm -rf "$temp_dir"
+            return 1
+        fi
     else
-        log_warn "Failed to install fastfetch from GitHub release"
+        log_warn "Failed to download fastfetch from GitHub release"
         rm -rf "$temp_dir"
         return 1
     fi
