@@ -4,7 +4,7 @@
 
 # Source required utilities
 DOCKER_ENV_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOCKER_ENV_PROJECT_ROOT="$(dirname "$(dirname "$(dirname "${DOCKER_ENV_SCRIPT_DIR}")")")"
+DOCKER_ENV_PROJECT_ROOT="$(dirname "$(dirname "${DOCKER_ENV_SCRIPT_DIR}")")"
 
 # Source gum utilities for consistent user interaction
 if [[ -f "$DOCKER_ENV_SCRIPT_DIR/../shared/gum-utils.sh" ]]; then
