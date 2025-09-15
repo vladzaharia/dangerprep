@@ -4861,6 +4861,12 @@ detect_network_interfaces() {
 
 # Detect and configure NVMe storage
 detect_and_configure_nvme_storage() {
+    # Allow users to skip NVMe configuration entirely
+    if [[ "${SKIP_NVME_CONFIG:-false}" == "true" ]]; then
+        log_info "Skipping NVMe configuration (SKIP_NVME_CONFIG=true)"
+        return 0
+    fi
+
     log_info "Detecting NVMe storage devices..."
 
     # Find NVMe devices
@@ -4930,7 +4936,7 @@ detect_and_configure_nvme_storage() {
             fi
         done < <(lsblk -n -o NAME,SIZE,FSTYPE,MOUNTPOINT "${nvme_device}" | grep -v "^${nvme_devices[0]} ")
 
-        # Unmount each partition with multiple attempts
+        # Unmount each partition with multiple attempts and better process handling
         for partition_info in "${mounted_partitions[@]}"; do
             local partition_name="${partition_info%%:*}"
             local mountpoint="${partition_info##*:}"
@@ -4938,44 +4944,116 @@ detect_and_configure_nvme_storage() {
 
             log_info "Unmounting ${partition_path} from ${mountpoint}..."
 
-            # Kill any processes using the mountpoint
+            # Stop any systemd services that might be using the mountpoint
+            if command -v systemctl >/dev/null 2>&1; then
+                # Stop Docker services that might be using the mount
+                systemctl stop docker 2>/dev/null || true
+                # Stop any mount-related services
+                systemctl stop "$(systemd-escape --path "${mountpoint}").mount" 2>/dev/null || true
+                sleep 2
+            fi
+
+            # Kill any processes using the mountpoint with more aggressive approach
             if command -v fuser >/dev/null 2>&1; then
-                fuser -km "${mountpoint}" 2>/dev/null || true
+                # First try to identify what's using the mount
+                log_debug "Processes using ${mountpoint}:"
+                fuser -v "${mountpoint}" 2>/dev/null || true
+
+                # Kill processes using the mountpoint (SIGTERM first, then SIGKILL)
+                fuser -m "${mountpoint}" -TERM 2>/dev/null || true
+                sleep 3
+                fuser -m "${mountpoint}" -KILL 2>/dev/null || true
+                sleep 2
+            fi
+
+            # Also try lsof if available
+            if command -v lsof >/dev/null 2>&1; then
+                log_debug "Files open in ${mountpoint}:"
+                lsof +D "${mountpoint}" 2>/dev/null || true
+                # Kill processes with open files in the mountpoint
+                lsof +D "${mountpoint}" 2>/dev/null | awk 'NR>1 {print $2}' | xargs -r kill -TERM 2>/dev/null || true
+                sleep 2
+                lsof +D "${mountpoint}" 2>/dev/null | awk 'NR>1 {print $2}' | xargs -r kill -KILL 2>/dev/null || true
                 sleep 1
             fi
 
-            # Try multiple unmount methods
+            # Try multiple unmount methods with retries
             local unmount_success=false
+            local max_attempts=3
 
-            # Method 1: Normal unmount
-            if umount "${mountpoint}" 2>/dev/null; then
-                unmount_success=true
-                log_info "Successfully unmounted ${mountpoint}"
-            # Method 2: Force unmount
-            elif umount -f "${mountpoint}" 2>/dev/null; then
-                unmount_success=true
-                log_info "Force unmounted ${mountpoint}"
-            # Method 3: Lazy unmount
-            elif umount -l "${mountpoint}" 2>/dev/null; then
-                unmount_success=true
-                log_warn "Lazy unmounted ${mountpoint} (will complete when no longer busy)"
-            fi
+            for attempt in $(seq 1 $max_attempts); do
+                log_debug "Unmount attempt $attempt/$max_attempts for ${mountpoint}"
+
+                # Method 1: Normal unmount
+                if umount "${mountpoint}" 2>/dev/null; then
+                    unmount_success=true
+                    log_info "Successfully unmounted ${mountpoint} (attempt $attempt)"
+                    break
+                # Method 2: Force unmount
+                elif umount -f "${mountpoint}" 2>/dev/null; then
+                    unmount_success=true
+                    log_info "Force unmounted ${mountpoint} (attempt $attempt)"
+                    break
+                # Method 3: Lazy unmount (only on last attempt)
+                elif [[ $attempt -eq $max_attempts ]] && umount -l "${mountpoint}" 2>/dev/null; then
+                    unmount_success=true
+                    log_warn "Lazy unmounted ${mountpoint} (will complete when no longer busy)"
+                    break
+                fi
+
+                # Wait before next attempt
+                if [[ $attempt -lt $max_attempts ]]; then
+                    sleep 2
+                fi
+            done
 
             if ! $unmount_success; then
-                log_warn "Failed to unmount ${mountpoint}, continuing anyway"
+                log_warn "Failed to unmount ${mountpoint} after $max_attempts attempts"
+                log_warn "This may require manual intervention or a system reboot"
             fi
         done
 
+        # Restart Docker if we stopped it
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl start docker 2>/dev/null || true
+        fi
+
         # Wait for lazy unmounts to complete and sync
         sync
-        sleep 3
+        sleep 5
 
-        # Final check - if any partitions are still mounted, this is a problem
-        local still_mounted
-        still_mounted=$(lsblk -n -o MOUNTPOINT "${nvme_device}" | grep -v "^$" | wc -l)
-        if [[ $still_mounted -gt 0 ]]; then
-            log_error "Some partitions are still mounted. Manual intervention may be required."
+        # Final check - if any partitions are still mounted, provide recovery options
+        local still_mounted_partitions=()
+        while IFS= read -r line; do
+            if [[ -n "$line" && "$line" != "" ]]; then
+                still_mounted_partitions+=("$line")
+            fi
+        done < <(lsblk -n -o NAME,MOUNTPOINT "${nvme_device}" | grep -v "^${nvme_devices[0]} " | awk '$2 != "" {print $1 ":" $2}')
+
+        if [[ ${#still_mounted_partitions[@]} -gt 0 ]]; then
+            log_error "Some partitions are still mounted after unmount attempts:"
             lsblk "${nvme_device}"
+
+            log_info "Still mounted partitions:"
+            for partition in "${still_mounted_partitions[@]}"; do
+                log_info "  - ${partition}"
+            done
+
+            log_warn "Recovery options:"
+            log_warn "1. Reboot the system and run the setup script again"
+            log_warn "2. Manually unmount the partitions and run the script again"
+            log_warn "3. Skip NVMe partitioning by setting NVME_PARTITION_CONFIRMED=false"
+            log_warn "4. Skip NVMe configuration entirely by setting SKIP_NVME_CONFIG=true"
+
+            # Offer to continue without repartitioning if the existing partitions look correct
+            if [[ ${#still_mounted_partitions[@]} -eq 2 ]]; then
+                log_info "Found exactly 2 mounted partitions - attempting to use existing layout..."
+                if mount_existing_nvme_partitions "${nvme_device}"; then
+                    log_success "Successfully configured existing NVMe partitions"
+                    return 0
+                fi
+            fi
+
             return 1
         fi
     fi
