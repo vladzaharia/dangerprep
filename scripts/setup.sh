@@ -2132,29 +2132,28 @@ collect_docker_services_configuration() {
     log_info "🐳 Docker Services Configuration"
     echo
 
-    # Define available Docker services
-    local docker_services=(
-        # Infrastructure services
-        "traefik:Traefik (Reverse Proxy)"
-        "komodo:Komodo (Docker Management)"
-        "watchtower:Watchtower (Automatic Updates)"
-        "step-ca:Step-CA (Certificate Authority)"
-        "raspap:RaspAP (Network Management)"
-        "cdn:CDN (Content Delivery Network)"
-        "dns:AdGuard Home (DNS Filtering)"
-        "portainer:Portainer (Container Management)"
-        # Media services
-        "jellyfin:Jellyfin (Media Server)"
-        "komga:Komga (Comic/Book Server)"
-        "romm:ROMM (ROM Management)"
-        # Application services
-        "docmost:Docmost (Documentation)"
-        "onedev:OneDev (Git Server & CI/CD)"
-        # Sync services
-        "kiwix-sync:Kiwix (Offline Wikipedia)"
-        "nfs-sync:NFS Sync (Network File Sync)"
-        "offline-sync:Offline Sync (Content Sync)"
-    )
+    # Discover available Docker services dynamically
+    log_info "Discovering available Docker services..."
+    local docker_services
+    if command -v discover_docker_services >/dev/null 2>&1; then
+        # Use dynamic discovery if available
+        readarray -t docker_services < <(discover_docker_services)
+        if [[ ${#docker_services[@]} -eq 0 ]]; then
+            log_warn "No Docker services discovered, falling back to basic list"
+            docker_services=(
+                "traefik:traefik (traefik)"
+                "komodo:komodo (mongo, core, periphery)"
+            )
+        else
+            log_info "Discovered ${#docker_services[@]} Docker services"
+        fi
+    else
+        log_warn "Dynamic service discovery not available, using fallback list"
+        docker_services=(
+            "traefik:traefik (traefik)"
+            "komodo:komodo (mongo, core, periphery)"
+        )
+    fi
 
     log_info "Select which Docker services to install:"
     SELECTED_DOCKER_SERVICES=$(enhanced_multi_choose "Docker Services" "${docker_services[@]}")

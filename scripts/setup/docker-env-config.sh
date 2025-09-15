@@ -155,37 +155,129 @@ process_selected_services_environments() {
     fi
 }
 
+# Discover all available Docker services by scanning directory structure
+discover_docker_services() {
+    local docker_root="${DOCKER_ENV_PROJECT_ROOT}/docker"
+    local -a discovered_services=()
+
+    if [[ ! -d "$docker_root" ]]; then
+        log_error "Docker directory not found: $docker_root"
+        return 1
+    fi
+
+    # Scan each category directory
+    for category_dir in "$docker_root"/*; do
+        if [[ ! -d "$category_dir" ]]; then
+            continue
+        fi
+
+        local category_name
+        category_name=$(basename "$category_dir")
+
+        # Skip non-service directories
+        if [[ "$category_name" == "shared" || "$category_name" == "templates" ]]; then
+            continue
+        fi
+
+        # Scan services in this category
+        for service_dir in "$category_dir"/*; do
+            if [[ ! -d "$service_dir" ]]; then
+                continue
+            fi
+
+            local service_name
+            service_name=$(basename "$service_dir")
+
+            # Check if this is a valid service (has compose.yml and compose.env.example)
+            if [[ -f "$service_dir/compose.yml" && -f "$service_dir/compose.env.example" ]]; then
+                # Extract service names from compose.yml
+                local compose_services
+                compose_services=$(extract_compose_services "$service_dir/compose.yml")
+
+                if [[ -n "$compose_services" ]]; then
+                    discovered_services+=("${service_name}:${service_name} (${compose_services})")
+                    log_debug "Discovered service: ${service_name} with services: ${compose_services}"
+                fi
+            fi
+        done
+    done
+
+    # Output discovered services
+    printf '%s\n' "${discovered_services[@]}"
+}
+
+# Extract service names from a Docker Compose file
+extract_compose_services() {
+    local compose_file="$1"
+
+    if [[ ! -f "$compose_file" ]]; then
+        return 1
+    fi
+
+    # Use awk to extract service names from the services: section
+    local services
+    services=$(awk '
+        /^services:/ { in_services = 1; next }
+        /^[a-zA-Z]/ && in_services == 1 { in_services = 0 }
+        in_services == 1 && /^  [a-zA-Z0-9_-]+:/ {
+            gsub(/^  /, "")
+            gsub(/:.*$/, "")
+            print $0
+        }
+    ' "$compose_file" | tr '\n' ',' | sed 's/,$//')
+
+    echo "$services"
+}
+
+# Find service directory dynamically
+find_service_directory() {
+    local service_name="$1"
+    local docker_root="${DOCKER_ENV_PROJECT_ROOT}/docker"
+
+    # Search through all category directories
+    for category_dir in "$docker_root"/*; do
+        if [[ ! -d "$category_dir" ]]; then
+            continue
+        fi
+
+        local potential_service_dir="$category_dir/$service_name"
+        if [[ -d "$potential_service_dir" && -f "$potential_service_dir/compose.yml" ]]; then
+            echo "$potential_service_dir"
+            return 0
+        fi
+    done
+
+    # Handle alternative service names
+    case "$service_name" in
+        "adguardhome"|"adguard")
+            if [[ -d "$docker_root/infrastructure/dns" ]]; then
+                echo "$docker_root/infrastructure/dns"
+                return 0
+            fi
+            ;;
+        "kiwix")
+            if [[ -d "$docker_root/sync/kiwix-sync" ]]; then
+                echo "$docker_root/sync/kiwix-sync"
+                return 0
+            fi
+            ;;
+    esac
+
+    return 1
+}
+
 # Find environment file for a service
 find_service_env_file() {
     local service_name="$1"
 
-    # Determine service directory structure
+    # Find the service directory dynamically
     local service_dir
-    case "${service_name}" in
-        "traefik"|"arcane"|"raspap"|"step-ca"|"portainer"|"watchtower"|"dns"|"cdn"|"komodo")
-            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/infrastructure/${service_name}"
-            ;;
-        "jellyfin"|"komga"|"romm")
-            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/media/${service_name}"
-            ;;
-        "docmost"|"onedev")
-            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/services/${service_name}"
-            ;;
-        "kiwix-sync"|"nfs-sync"|"offline-sync")
-            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/sync/${service_name}"
-            ;;
-        # Handle alternative service names
-        "adguardhome"|"adguard")
-            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/infrastructure/dns"
-            ;;
-        "kiwix")
-            service_dir="${DOCKER_ENV_PROJECT_ROOT}/docker/sync/kiwix-sync"
-            ;;
-        *)
-            log_debug "Unknown service directory structure for: ${service_name}"
-            return 1
-            ;;
-    esac
+    service_dir=$(find_service_directory "$service_name")
+
+    if [[ -z "$service_dir" ]]; then
+        log_debug "Service directory not found for: ${service_name}"
+        return 1
+    fi
 
     local env_example="${service_dir}/compose.env.example"
     if [[ -f "$env_example" ]]; then
