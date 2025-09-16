@@ -721,6 +721,13 @@ create_disk_image() {
         exit 1
     fi
 
+    # Create essential directories that were excluded from the tar backup
+    # These are required by the sd-fuse build-rootfs-img.sh script
+    log_info "Creating essential system directories..."
+    mkdir -p "$rootfs_dir"/{dev,proc,sys,run,tmp,var/tmp}
+    chmod 755 "$rootfs_dir"/{dev,proc,sys,run}
+    chmod 1777 "$rootfs_dir"/{tmp,var/tmp}
+
     # Build new rootfs.img - ensure we're in the correct directory and copy result
     log_info "Building rootfs.img from extracted system..."
     if ! (cd "$SD_FUSE_DIR" && sudo ./build-rootfs-img.sh "$rootfs_dir" "$(basename "$IMAGE_DIRNAME")"); then
