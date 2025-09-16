@@ -4929,6 +4929,48 @@ configure_rootless_docker() {
     log_success "Docker configuration completed"
 }
 
+# Clean and initialize Docker data directory
+clean_docker_data_directory() {
+    log_info "Cleaning Docker data directory to prevent corruption issues..."
+
+    # Stop Docker services
+    if enhanced_spin "Stopping Docker services" \
+        bash -c "systemctl stop docker.socket docker 2>/dev/null || true"; then
+        enhanced_status_indicator "success" "Docker services stopped"
+    else
+        enhanced_status_indicator "warning" "Some Docker services may still be running"
+    fi
+
+    # Clean Docker data directory if it exists and has issues
+    if [[ -d "/var/lib/docker" ]]; then
+        # Check if directory looks corrupted (missing expected subdirectories)
+        local expected_dirs=("containers" "images" "networks" "volumes")
+        local missing_dirs=0
+
+        for dir in "${expected_dirs[@]}"; do
+            if [[ ! -d "/var/lib/docker/$dir" ]]; then
+                ((missing_dirs++))
+            fi
+        done
+
+        # If most expected directories are missing, clean the data directory
+        if [[ $missing_dirs -ge 3 ]]; then
+            log_warn "Docker data directory appears corrupted (missing $missing_dirs/4 expected directories)"
+            if enhanced_spin "Cleaning corrupted Docker data directory" \
+                bash -c "rm -rf /var/lib/docker/* 2>/dev/null || true"; then
+                enhanced_status_indicator "success" "Docker data directory cleaned"
+                log_info "Docker will reinitialize on next start"
+            else
+                enhanced_status_indicator "warning" "Failed to clean Docker data directory"
+            fi
+        else
+            enhanced_status_indicator "info" "Docker data directory appears healthy"
+        fi
+    else
+        enhanced_status_indicator "info" "Docker data directory will be created on first start"
+    fi
+}
+
 # Simple Docker startup
 start_docker_service() {
     log_info "Starting Docker service..."
@@ -4965,6 +5007,9 @@ setup_docker_services() {
         log_info "Docker can be configured later when more space is available"
         return 0
     fi
+
+    # Clean Docker data directory to prevent corruption issues
+    clean_docker_data_directory
 
     # Enable and start Docker with enhanced diagnostics
     # BOOT FIX: Don't fail setup if Docker has issues - it can be fixed later
