@@ -924,8 +924,9 @@ create_raw_backup() {
         return 0
     fi
 
-    log_info "Creating raw backup: $backup_filename (${emmc_size_gb}GB)"
+    log_info "Creating sparse raw backup: $backup_filename (${emmc_size_gb}GB logical size)"
     log_info "Note: Filesystems will be temporarily frozen for consistency"
+    log_info "Note: Using sparse allocation - actual file size will be much smaller"
 
     # Freeze filesystems for consistency
     freeze_filesystems
@@ -935,15 +936,18 @@ create_raw_backup() {
 
     # Use dd with conv=sparse to create a sparse image file
     # Note: conv=sparse skips writing blocks of all zeros, creating a sparse file
+    # iflag=fullblock ensures we read full blocks even from devices
     local backup_success=false
     if command -v pv >/dev/null 2>&1; then
-        # Use pv for progress indication - need to use dd directly to maintain sparseness
-        if pv -s "$emmc_size_bytes" "$DETECTED_EMMC" | dd of="$backup_path" conv=sparse bs=1M iflag=fullblock; then
+        # Use pv for progress indication - pipe through dd to maintain sparseness
+        log_info "Using pv for progress indication during sparse backup creation"
+        if pv -s "$emmc_size_bytes" "$DETECTED_EMMC" | dd of="$backup_path" conv=sparse bs=1M iflag=fullblock oflag=sync; then
             backup_success=true
         fi
     else
         # Fallback to dd without progress indication but with sparse support
-        if dd if="$DETECTED_EMMC" of="$backup_path" conv=sparse bs=1M iflag=fullblock status=progress; then
+        log_info "Using dd with built-in progress for sparse backup creation"
+        if dd if="$DETECTED_EMMC" of="$backup_path" conv=sparse bs=1M iflag=fullblock oflag=sync status=progress; then
             backup_success=true
         fi
     fi
@@ -963,12 +967,24 @@ create_raw_backup() {
     # Sync to ensure data is written
     sync
 
-    # Get actual backup file size (should be much smaller due to sparse allocation)
-    local backup_size_bytes
+    # Get actual backup file size and verify sparse allocation
+    local backup_size_bytes backup_disk_usage_bytes
     backup_size_bytes=$(stat -c%s "$backup_path" 2>/dev/null || echo "0")
-    local backup_size_gb=$((backup_size_bytes / 1024 / 1024 / 1024))
+    backup_disk_usage_bytes=$(du -b "$backup_path" 2>/dev/null | cut -f1 || echo "0")
 
-    log_info "Raw backup created: ${backup_size_gb}GB (sparse)"
+    local backup_size_gb=$((backup_size_bytes / 1024 / 1024 / 1024))
+    local backup_disk_usage_gb=$((backup_disk_usage_bytes / 1024 / 1024 / 1024))
+
+    # Calculate compression ratio (how much space is saved by sparse allocation)
+    local compression_ratio=0
+    if [[ $backup_size_bytes -gt 0 ]]; then
+        compression_ratio=$(( (backup_size_bytes - backup_disk_usage_bytes) * 100 / backup_size_bytes ))
+    fi
+
+    log_info "Raw backup created successfully:"
+    log_info "  Logical size: ${backup_size_gb}GB"
+    log_info "  Actual disk usage: ${backup_disk_usage_gb}GB"
+    log_info "  Space saved by sparse allocation: ${compression_ratio}%"
 }
 
 # Copy image to EFlasher SD card

@@ -11,10 +11,6 @@ services:
       - compose.env
     # Note: Step-CA runs as its own internal user, not 1337:1337
     # Forcing UID 1337 causes permission issues with secrets directory
-    environment:
-      # Override specific settings for DangerPrep
-      - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
-      - DOCKER_STEPCA_INIT_ACME=true
     labels:
       - "traefik.enable=true"
       
@@ -49,54 +45,54 @@ services:
       retries: 3
       start_period: 30s
 
-  ca-download:
-    build:
-      context: ../../..
-      dockerfile: docker/infrastructure/step-ca/Dockerfile
-    restart: unless-stopped
-    volumes:
-      - step-ca-data:/ca-data:ro
-      - step-ca-certs:/ca-data/certs:ro
-      - cdn-assets:/cdn-assets
-    env_file:
-      - compose.env
-    environment:
-      # Override specific settings for ca-download service
-      - CA_NAME=${DOCKER_STEPCA_INIT_NAME:-DangerPrep Internal CA}
-      - CA_URL=https://step-ca-step-ca-1:9000
-    labels:
-      - "traefik.enable=true"
+  # ca-download:
+  #   build:
+  #     context: ../../..
+  #     dockerfile: docker/infrastructure/step-ca/Dockerfile
+  #   restart: unless-stopped
+  #   volumes:
+  #     - step-ca-data:/ca-data:ro
+  #     - step-ca-certs:/ca-data/certs:ro
+  #     - cdn-assets:/cdn-assets
+  #   env_file:
+  #     - compose.env
+  #   environment:
+  #     # Override specific settings for ca-download service
+  #     - CA_NAME=${DOCKER_STEPCA_INIT_NAME:-DangerPrep Internal CA}
+  #     - CA_URL=https://step-ca-step-ca-1:9000
+  #   labels:
+  #     - "traefik.enable=true"
 
-      # HTTP-only download service (no HTTPS required for initial setup)
-      - "traefik.http.routers.ca-download.rule=Host(`root.danger`)"
-      - "traefik.http.routers.ca-download.entrypoints=web"
-      - "traefik.http.services.ca-download.loadbalancer.server.port=8080"
+  #     # HTTP-only download service (no HTTPS required for initial setup)
+  #     - "traefik.http.routers.ca-download.rule=Host(`root.danger`)"
+  #     - "traefik.http.routers.ca-download.entrypoints=web"
+  #     - "traefik.http.services.ca-download.loadbalancer.server.port=8080"
 
-      # DNS registration
-      - "dns.register=root.danger"
+  #     # DNS registration
+  #     - "dns.register=root.danger"
 
-      # App registration for discovery
-      - "app.register=true"
-      - "app.name=Certificate Authority"
-      - "app.description=SSL Certificate Management"
-      - "app.icon=shield-check"
-      - "app.category=Security"
-      - "app.url=https://root.danger"
-      - "app.version=1.0.0"
+  #     # App registration for discovery
+  #     - "app.register=true"
+  #     - "app.name=Certificate Authority"
+  #     - "app.description=SSL Certificate Management"
+  #     - "app.icon=shield-check"
+  #     - "app.category=Security"
+  #     - "app.url=https://root.danger"
+  #     - "app.version=1.0.0"
 
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
-    networks:
-      - traefik
-      - step-ca
-    depends_on:
-      - step-ca
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+  #     # Watchtower
+  #     - "com.centurylinklabs.watchtower.enable=true"
+  #   networks:
+  #     - traefik
+  #     - step-ca
+  #   depends_on:
+  #     - step-ca
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 10s
 
 volumes:
   step-ca-data:

@@ -53,9 +53,11 @@ RUN apk add --no-cache \
 # Copy Docker CLI from official Docker image
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 
-# Create non-root user with consistent UID/GID
+# Create non-root user with consistent UID/GID and add to docker group
 RUN addgroup -g 1001 -S appuser && \
-    adduser -S appuser -u 1001 -G appuser
+    adduser -S appuser -u 1001 -G appuser && \
+    addgroup -g 999 -S docker && \
+    adduser appuser docker
 
 # Copy built application from installer
 COPY --from=installer /app/docker/infrastructure/cdn/dist ./dist

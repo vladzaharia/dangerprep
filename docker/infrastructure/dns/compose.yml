@@ -6,6 +6,7 @@ services:
     volumes:
       - adguard-work:/opt/adguardhome/work
       - adguard-conf:/opt/adguardhome/conf
+      - ./adguard-config.yaml:/opt/adguardhome/conf/AdGuardHome.yaml:ro
     env_file:
       - compose.env
     labels:

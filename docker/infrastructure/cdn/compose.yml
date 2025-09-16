@@ -1,62 +1,71 @@
 services:
-  cdn:
-    build:
-      context: ../../..
-      dockerfile: docker/infrastructure/cdn/Dockerfile
-    restart: unless-stopped
-    volumes:
-      - cdn-data:/app/data
-      - ./assets:/app/assets:ro
-      # Docker socket for app discovery
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    env_file:
-      - compose.env
-    ports:
-      - 8080:8080
-    labels:
-      - "traefik.enable=true"
-
-      # CDN service - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.cdn-internal.rule=Host(`cdn.danger`)"
-      - "traefik.http.routers.cdn-internal.entrypoints=websecure"
-      - "traefik.http.routers.cdn-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.cdn-internal.service=cdn"
-
-      # CDN service - External (.danger.diy domain with Let's Encrypt)
-      - "traefik.http.routers.cdn-external.rule=Host(`cdn.danger.diy`)"
-      - "traefik.http.routers.cdn-external.entrypoints=websecure"
-      - "traefik.http.routers.cdn-external.tls.certresolver=letsencrypt-cloudflare"
-      - "traefik.http.routers.cdn-external.service=cdn"
-
-      # Service definition (shared by both routers)
-      - "traefik.http.services.cdn.loadbalancer.server.port=8080"
-
-      # DNS registration
-      - "dns.register=cdn"
-
-      # App registration for discovery
-      - "app.register=true"
-      - "app.name=CDN Manager"
-      - "app.description=Content Delivery Network Management"
-      - "app.icon=rocket"
-      - "app.category=Infrastructure"
-      - "app.url=https://cdn.danger"
-      - "app.version=1.0.0"
-
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
+  cdn-init:
+    image: alpine:latest
+    command: /bin/true
+    restart: "no"
     networks:
       - traefik
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+    labels:
+      - "dangerprep.service=infrastructure"
+      - "dangerprep.description=CDN initialization service"
+  # cdn:
+  #   build:
+  #     context: ../../..
+  #     dockerfile: docker/infrastructure/cdn/Dockerfile
+  #   restart: unless-stopped
+  #   volumes:
+  #     - cdn-data:/app/data
+  #     - ./assets:/app/assets:ro
+  #     # Docker socket for app discovery
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   env_file:
+  #     - compose.env
+  #   ports:
+  #     - 8080:8080
+  #   labels:
+  #     - "traefik.enable=true"
 
-volumes:
-  cdn-data:
-    driver: local
+  #     # CDN service - Internal (.danger domain with step-ca)
+  #     - "traefik.http.routers.cdn-internal.rule=Host(`cdn.danger`)"
+  #     - "traefik.http.routers.cdn-internal.entrypoints=websecure"
+  #     - "traefik.http.routers.cdn-internal.tls.certresolver=step-ca"
+  #     - "traefik.http.routers.cdn-internal.service=cdn"
+
+  #     # CDN service - External (.danger.diy domain with Let's Encrypt)
+  #     - "traefik.http.routers.cdn-external.rule=Host(`cdn.danger.diy`)"
+  #     - "traefik.http.routers.cdn-external.entrypoints=websecure"
+  #     - "traefik.http.routers.cdn-external.tls.certresolver=letsencrypt-cloudflare"
+  #     - "traefik.http.routers.cdn-external.service=cdn"
+
+  #     # Service definition (shared by both routers)
+  #     - "traefik.http.services.cdn.loadbalancer.server.port=8080"
+
+  #     # DNS registration
+  #     - "dns.register=cdn"
+
+  #     # App registration for discovery
+  #     - "app.register=true"
+  #     - "app.name=CDN Manager"
+  #     - "app.description=Content Delivery Network Management"
+  #     - "app.icon=rocket"
+  #     - "app.category=Infrastructure"
+  #     - "app.url=https://cdn.danger"
+  #     - "app.version=1.0.0"
+
+  #     # Watchtower
+  #     - "com.centurylinklabs.watchtower.enable=true"
+  #   networks:
+  #     - traefik
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 10s
+
+# volumes:
+#   cdn-data:
+#     driver: local
 
 networks:
   traefik:

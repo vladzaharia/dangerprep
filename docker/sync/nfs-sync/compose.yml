@@ -1,31 +1,40 @@
 services:
-  sync:
-    build:
-      context: ../../..
-      dockerfile: docker/sync/nfs-sync/Dockerfile
-    restart: unless-stopped
-    volumes:
-      - nfs-sync-data:/app/data
-      - /content:/content
-      - ${INSTALL_ROOT}/nfs:/nfs:ro
-      - ./config.yaml:/app/data/config.yaml:ro
-    env_file:
-      - compose.env
-    labels:
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
+  sync-init:
+    image: alpine:latest
+    command: /bin/true
+    restart: "no"
     networks:
       - traefik
-    healthcheck:
-      test: ["CMD", "node", "dist/engine.js", "health", "--simple"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+    labels:
+      - "dangerprep.service=sync"
+      - "dangerprep.description=Sync initialization service"
+#   sync:
+#     build:
+#       context: ../../..
+#       dockerfile: docker/sync/nfs-sync/Dockerfile
+#     restart: unless-stopped
+#     volumes:
+#       - nfs-sync-data:/app/data
+#       - /content:/content
+#       - ${INSTALL_ROOT}/nfs:/nfs:ro
+#       - ./config.yaml:/app/data/config.yaml:ro
+#     env_file:
+#       - compose.env
+#     labels:
+#       # Watchtower
+#       - "com.centurylinklabs.watchtower.enable=true"
+#     networks:
+#       - traefik
+#     healthcheck:
+#       test: ["CMD", "node", "dist/engine.js", "health", "--simple"]
+#       interval: 30s
+#       timeout: 10s
+#       retries: 3
+#       start_period: 30s
 
-volumes:
-  nfs-sync-data:
-    driver: local
+# volumes:
+#   nfs-sync-data:
+#     driver: local
 
 networks:
   traefik:

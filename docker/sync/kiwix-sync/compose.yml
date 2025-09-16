@@ -41,28 +41,28 @@ services:
       timeout: 10s
       retries: 3
 
-  manager:
-    build:
-      context: ../../..
-      dockerfile: docker/sync/kiwix-sync/Dockerfile
-    restart: unless-stopped
-    volumes:
-      - /content/kiwix:/data/kiwix
-      - kiwix-manager-data:/app/data
-      - ./config.yaml:/app/data/config.yaml:ro
-    env_file:
-      - compose.env
-    labels:
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
-    networks:
-      - kiwix
-    healthcheck:
-      test: ["CMD", "node", "dist/manager.js", "health", "--simple"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+  # manager:
+  #   build:
+  #     context: ../../..
+  #     dockerfile: docker/sync/kiwix-sync/Dockerfile
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /content/kiwix:/data/kiwix
+  #     - kiwix-manager-data:/app/data
+  #     - ./config.yaml:/app/data/config.yaml:ro
+  #   env_file:
+  #     - compose.env
+  #   labels:
+  #     # Watchtower
+  #     - "com.centurylinklabs.watchtower.enable=true"
+  #   networks:
+  #     - kiwix
+  #   healthcheck:
+  #     test: ["CMD", "node", "dist/manager.js", "health", "--simple"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
 
 volumes:
   kiwix-manager-data:

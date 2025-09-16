@@ -17,7 +17,8 @@ providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
-    network: traefik
+    # Removed network constraint to support host-networked containers like RaspAP
+    # network: traefik
 
 serversTransport:
   insecureSkipVerify: true
