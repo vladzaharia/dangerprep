@@ -2503,9 +2503,33 @@ configure_emmc_home_partition_options() {
         return 0
     fi
 
-    # Use the first eMMC device (typically mmcblk0 for main eMMC)
-    local emmc_device="/dev/${emmc_devices[0]}"
-    log_info "Found eMMC device: ${emmc_device}"
+    # Find the most appropriate eMMC device (prefer smaller boot eMMC over large storage)
+    local emmc_device=""
+    local smallest_size=999999999999  # Very large number
+
+    for device in "${emmc_devices[@]}"; do
+        local device_path="/dev/${device}"
+        local device_size
+        device_size=$(lsblk -b -d -n -o SIZE "${device_path}" 2>/dev/null || echo "0")
+        local device_size_gb=$((device_size / 1024 / 1024 / 1024))
+
+        log_debug "Found eMMC device ${device_path}: ${device_size_gb}GB"
+
+        # Prefer devices between 16GB and 64GB (typical boot eMMC range)
+        # Skip very large devices (likely storage eMMC/SD cards)
+        if [[ ${device_size_gb} -ge 16 && ${device_size_gb} -le 64 && ${device_size} -lt ${smallest_size} ]]; then
+            emmc_device="${device_path}"
+            smallest_size=${device_size}
+        fi
+    done
+
+    # If no suitable device found, fall back to first device but warn user
+    if [[ -z "${emmc_device}" ]]; then
+        emmc_device="/dev/${emmc_devices[0]}"
+        log_warn "No suitable boot eMMC found (16-64GB range), using first device: ${emmc_device}"
+    else
+        log_info "Selected boot eMMC device: ${emmc_device}"
+    fi
 
     # Get device information
     local device_size
@@ -2513,6 +2537,15 @@ configure_emmc_home_partition_options() {
     local device_size_gb=$((device_size / 1024 / 1024 / 1024))
 
     log_info "eMMC device size: ${device_size_gb}GB"
+
+    # Validate device size is reasonable for /home partition creation
+    if [[ ${device_size_gb} -lt 64 ]]; then
+        log_warn "eMMC device is only ${device_size_gb}GB - insufficient for 32GB /home + 16GB swap (48GB required)"
+        log_info "Skipping /home partition creation on small eMMC device"
+        export EMMC_HOME_PARTITION_CONFIRMED="false"
+        export EMMC_DEVICE=""
+        return 0
+    fi
 
     # Check for unpartitioned space using proper Linux tools
     local unpartitioned_gb=0
@@ -2561,20 +2594,10 @@ configure_emmc_home_partition_options() {
         fi
     fi
 
-    # Method 3: Fallback - check if device has more than 64GB and assume some free space
-    if [[ ${unpartitioned_gb} -eq 0 && ${device_size_gb} -gt 64 ]]; then
-        log_debug "Fallback method: estimating unpartitioned space"
-        # Conservative estimate: assume 32GB is used by system, rest might be available
-        local estimated_used=32
-        local estimated_free=$((device_size_gb - estimated_used))
-
-        # Only suggest /home partition if we estimate at least 40GB free
-        if [[ ${estimated_free} -ge 40 ]]; then
-            unpartitioned_gb=${estimated_free}
-            log_debug "Estimated ${unpartitioned_gb}GB potentially available space"
-        else
-            log_debug "Device appears to be mostly used (estimated ${estimated_free}GB free)"
-        fi
+    # Method 3: Final verification - double-check with blockdev if both methods failed
+    if [[ ${unpartitioned_gb} -eq 0 ]]; then
+        log_debug "Both sfdisk and parted report no unpartitioned space"
+        log_debug "Device appears to be fully partitioned - would need to resize existing partitions"
     fi
 
     if [[ ${unpartitioned_gb} -lt 48 ]]; then
@@ -5672,7 +5695,10 @@ detect_and_configure_emmc_home_partition() {
     log_info "Setting up eMMC /home and swap partitions on ${EMMC_DEVICE}..."
 
     # Create eMMC /home and swap partitions
-    create_emmc_home_partition "${EMMC_DEVICE}"
+    if ! create_emmc_home_partition "${EMMC_DEVICE}"; then
+        log_error "Failed to create eMMC /home and swap partitions"
+        return 1
+    fi
 
     log_success "eMMC /home and swap partition configuration completed"
 }
@@ -5799,20 +5825,10 @@ get_available_sectors() {
 
         echo "${largest_free_sectors}"
     else
-        # Fallback: estimate based on device size and existing partitions
-        local device_sectors
-        device_sectors=$(blockdev --getsz "${emmc_device}" 2>/dev/null || echo "0")
-
-        # Conservative estimate: assume 50GB used, rest available
-        local estimated_used_sectors=$((50 * 1024 * 1024 * 1024 / 512))
-        local estimated_free_sectors=$((device_sectors - estimated_used_sectors))
-
-        # Ensure we don't return negative values
-        if [[ ${estimated_free_sectors} -lt 0 ]]; then
-            estimated_free_sectors=0
-        fi
-
-        echo "${estimated_free_sectors}"
+        # Fallback: if sfdisk failed, assume no free space available
+        # This is safer than making incorrect estimates
+        log_debug "sfdisk failed to detect free space - assuming device is fully partitioned"
+        echo "0"
     fi
 }
 

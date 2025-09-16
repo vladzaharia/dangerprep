@@ -1,16 +1,14 @@
 services:
   mongo:
-    image: bitnami/mongodb:6.0
+    image: mongo:6.0
     restart: unless-stopped
     volumes:
-      - komodo-mongo-db:/bitnami/mongodb
+      - komodo-mongo-db:/data/db
     env_file:
       - compose.env
-    user: "1337:1337"
     environment:
-      - MONGODB_ROOT_USER=${KOMODO_DB_USERNAME}
-      - MONGODB_ROOT_PASSWORD=${KOMODO_DB_PASSWORD}
-      - MONGODB_EXTRA_FLAGS=--quiet --wiredTigerCacheSizeGB=0.25
+      - MONGO_INITDB_ROOT_USERNAME=${KOMODO_DB_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${KOMODO_DB_PASSWORD}
     labels:
       # Prevent Komodo from stopping with StopAllContainers
       - "komodo.skip="
@@ -20,7 +18,7 @@ services:
     networks:
       - komodo
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 30s
       timeout: 10s
       retries: 3
