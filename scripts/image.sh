@@ -695,7 +695,9 @@ create_disk_image() {
 
     # Step 3: Extract backup and create new rootfs.img
     log_info "Step 3: Creating custom rootfs.img..."
-    local rootfs_dir="${IMAGE_DIRNAME}/rootfs"
+    # Use /tmp for extraction to avoid filesystem compatibility issues (exFAT/FAT32 don't support symlinks)
+    local temp_rootfs_dir="/tmp/dangerprep-rootfs-$$"
+    local rootfs_dir="${temp_rootfs_dir}"
 
     # Verify SD_FUSE_DIR exists
     if [[ ! -d "$SD_FUSE_DIR" ]]; then
@@ -706,13 +708,15 @@ create_disk_image() {
         exit 1
     fi
 
-    # Create rootfs directory and extract backup
+    # Create rootfs directory in /tmp and extract backup
     mkdir -p "$rootfs_dir"
-    log_info "Extracting system backup to rootfs directory..."
+    log_info "Extracting system backup to temporary rootfs directory..."
+    log_info "Note: Using /tmp to avoid filesystem compatibility issues with symlinks"
     if ! (cd "$SD_FUSE_DIR" && ./tools/extract-rootfs-tar.sh "$backup_file" "$rootfs_dir"); then
         log_error "Failed to extract rootfs backup"
         log_error "Check that the backup file is valid: $backup_file"
         rm -rf "$IMAGE_DIRNAME" 2>/dev/null || true
+        rm -rf "$temp_rootfs_dir" 2>/dev/null || true
         rm -f "$backup_file" 2>/dev/null || true
         exit 1
     fi
@@ -722,6 +726,7 @@ create_disk_image() {
     if ! (cd "$SD_FUSE_DIR" && sudo ./build-rootfs-img.sh "$rootfs_dir" "$(basename "$IMAGE_DIRNAME")"); then
         log_error "Failed to build rootfs.img"
         rm -rf "$IMAGE_DIRNAME" 2>/dev/null || true
+        rm -rf "$temp_rootfs_dir" 2>/dev/null || true
         rm -f "$backup_file" 2>/dev/null || true
         exit 1
     fi
@@ -734,6 +739,7 @@ create_disk_image() {
     else
         log_error "Generated rootfs.img not found at expected location: $generated_rootfs"
         rm -rf "$IMAGE_DIRNAME" 2>/dev/null || true
+        rm -rf "$temp_rootfs_dir" 2>/dev/null || true
         rm -f "$backup_file" 2>/dev/null || true
         exit 1
     fi
@@ -743,7 +749,7 @@ create_disk_image() {
     create_dangerprep_info_conf
 
     # Step 5: Clean up
-    rm -rf "$rootfs_dir" 2>/dev/null || true
+    rm -rf "$temp_rootfs_dir" 2>/dev/null || true
     rm -f "$backup_file" 2>/dev/null || true
 
     enhanced_status_indicator "success" "DangerPrep EFlasher image created successfully"
