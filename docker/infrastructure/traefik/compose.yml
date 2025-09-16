@@ -12,7 +12,6 @@ services:
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
     env_file:
       - compose.env
-    user: "1337:1337"
     environment:
       - LEGO_DISABLE_CNAME_SUPPORT=true
     labels:

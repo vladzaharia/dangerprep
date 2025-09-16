@@ -15,7 +15,6 @@ services:
       - /content/audiobooks:/media/audiobooks:ro
     env_file:
       - compose.env
-    user: "1337:1337"
     devices:
       - /dev/dri:/dev/dri  # Hardware transcoding for RK3588S
     labels:

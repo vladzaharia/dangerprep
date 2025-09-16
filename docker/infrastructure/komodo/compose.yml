@@ -40,7 +40,6 @@ services:
       - komodo-syncs:/syncs
     env_file:
       - compose.env
-    user: "1337:1337"
     environment:
       - KOMODO_DATABASE_ADDRESS=mongo:27017
       - KOMODO_DATABASE_USERNAME=${KOMODO_DB_USERNAME}
@@ -96,7 +95,6 @@ services:
       - komodo-periphery:/etc/komodo
     env_file:
       - compose.env
-    user: "1337:1337"
     environment:
       - PERIPHERY_ROOT_DIRECTORY=/etc/komodo
     labels:

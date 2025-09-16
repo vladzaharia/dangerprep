@@ -6,12 +6,8 @@ services:
     volumes:
       - adguard-work:/opt/adguardhome/work
       - adguard-conf:/opt/adguardhome/conf
-      - ./adguard-config.yaml:/opt/adguardhome/conf/AdGuardHome.yaml
     env_file:
       - compose.env
-    user: "1337:1337"
-    cap_add:
-      - NET_BIND_SERVICE
     labels:
       - "traefik.enable=true"
 
@@ -59,7 +55,6 @@ services:
     command: ["-conf", "/etc/coredns/Corefile"]
     env_file:
       - compose.env
-    user: "1337:1337"
     labels:
       - "traefik.enable=false"
       # DNS registration for internal resolution
@@ -89,7 +84,6 @@ services:
       - ./scripts:/scripts:ro
     env_file:
       - compose.env
-    user: "1337:1337"
     command: ["/scripts/dns-registrar.sh"]
     labels:
       - "traefik.enable=false"

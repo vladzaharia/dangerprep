@@ -11,7 +11,6 @@ services:
       - ${INSTALL_ROOT}/secrets/onedev/db_password:/run/secrets/db_password:ro
     env_file:
       - compose.env
-    user: "1337:1337"
     environment:
       # Database configuration
       - hibernate_dialect=io.onedev.server.persistence.PostgreSQLDialect
@@ -66,7 +65,6 @@ services:
       - onedev-postgres:/var/lib/postgresql/data
     env_file:
       - compose.env
-    user: "1337:1337"
     environment:
       - POSTGRES_DB=onedev
       - POSTGRES_USER=onedev
