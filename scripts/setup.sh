@@ -3753,6 +3753,63 @@ install_friendlyelec_packages() {
     enhanced_status_indicator "success" "FriendlyElec packages installation completed"
 }
 
+# Package installation checkpoint - allows user to pause and create image
+checkpoint_after_packages() {
+    enhanced_section "Package Installation Checkpoint" "All packages have been installed successfully" "🎯"
+
+    log_success "Package installation phase completed!"
+    log_info ""
+    log_info "At this point, all essential packages have been installed and configured."
+    log_info "This is an ideal time to create a system image if desired."
+    log_info ""
+    log_info "Available options:"
+    log_info "  • Continue with setup (recommended for first-time installation)"
+    log_info "  • Exit setup (you can resume later with the same command)"
+    log_info ""
+
+    # In non-interactive mode, always continue
+    if [[ "${NON_INTERACTIVE:-false}" == "true" ]]; then
+        log_info "Non-interactive mode: continuing with setup automatically"
+        return 0
+    fi
+
+    # Interactive checkpoint options
+    local checkpoint_choice
+    checkpoint_choice=$(gum choose \
+        "Continue with setup" \
+        "Exit setup (resume later)" \
+        --header "What would you like to do?" \
+        --height 8)
+
+    case "$checkpoint_choice" in
+        "Continue with setup")
+            log_info "Continuing with DangerPrep setup..."
+            return 0
+            ;;
+        "Exit setup (resume later)")
+            enhanced_section "Setup Paused" "You can resume setup later" "⏸️"
+            log_info ""
+            log_info "Setup has been paused after package installation."
+            log_info ""
+            log_info "To resume setup later, run the same command:"
+            log_info "  sudo ./scripts/setup.sh"
+            log_info ""
+            log_info "The setup will automatically detect where you left off"
+            log_info "and continue from this checkpoint."
+            log_info ""
+            log_info "If you want to create a system image before resuming:"
+            log_info "  sudo ./scripts/image.sh --copy-to-sd"
+            log_info ""
+            log_success "Setup paused successfully. You can safely close this terminal."
+            exit 0
+            ;;
+        *)
+            log_error "Invalid choice. Continuing with setup..."
+            return 0
+            ;;
+    esac
+}
+
 # Install FriendlyElec kernel headers
 install_friendlyelec_kernel_headers() {
     local current_kernel
@@ -8193,6 +8250,7 @@ main() {
         "detect_and_configure_nvme_storage:Detecting and configuring NVMe storage"
         "update_system_packages:Updating system packages"
         "install_essential_packages:Installing essential packages"
+        "checkpoint_after_packages:Package installation checkpoint"
         "setup_automatic_updates:Setting up automatic updates"
         "load_motd_config:Loading MOTD configuration"
         "configure_kernel_hardening:Configuring kernel hardening"

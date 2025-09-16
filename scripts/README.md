@@ -12,12 +12,18 @@ Setup and cleanup scripts for the DangerPrep system.
 - Safely removes DangerPrep configuration
 - Restores original system state
 
+**`image.sh`** - System image creation script
+- Creates sparse disk images from running Ubuntu system
+- Compatible with FriendlyElec's EFlasher tool
+- Generates "golden images" for rapid deployment
+
 ## Directory Structure
 
 ```
 scripts/
 ├── setup.sh                 # Main system setup script
 ├── cleanup.sh               # Main system cleanup script
+├── image.sh                 # System image creation script
 ├── setup/                   # Setup helper scripts and configurations
 ├── shared/                  # Shared utility functions
 └── README.md               # This documentation
@@ -26,10 +32,18 @@ scripts/
 ## Usage
 
 **System Management:**
+
 ```bash
 ./scripts/setup.sh           # Install/deploy DangerPrep system
 ./scripts/cleanup.sh         # Remove DangerPrep system completely
+./scripts/image.sh           # Create system image for deployment
 ./scripts/setup.sh --help    # Show help and options
+```
+
+**Image Creation:**
+
+```bash
+sudo ./scripts/image.sh                    # Create image with auto-detection
 ```
 
 ## Components
