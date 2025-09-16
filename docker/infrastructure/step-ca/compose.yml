@@ -9,7 +9,8 @@ services:
       - step-ca-certs:/home/step/certs
     env_file:
       - compose.env
-    user: "1337:1337"
+    # Note: Step-CA runs as its own internal user, not 1337:1337
+    # Forcing UID 1337 causes permission issues with secrets directory
     environment:
       # Override specific settings for DangerPrep
       - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true

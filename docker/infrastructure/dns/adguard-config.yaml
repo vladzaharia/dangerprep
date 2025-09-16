@@ -1,0 +1,18 @@
+# Minimal AdGuard Home configuration to bypass first-launch detection bug
+# See: https://github.com/AdguardTeam/AdGuardHome/issues/4714
+#
+# This config allows AdGuard Home to start as non-root user (1337:1337)
+# The actual configuration will be done through the web interface
+
+bind_host: 0.0.0.0
+bind_port: 3000
+users: []
+
+# DNS configuration
+dns:
+  bind_hosts:
+    - 0.0.0.0
+  port: 53
+  
+# Basic settings to prevent errors
+schema_version: 27

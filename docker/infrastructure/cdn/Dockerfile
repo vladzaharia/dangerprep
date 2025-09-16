@@ -38,6 +38,9 @@ RUN yarn install --immutable
 COPY --from=builder /app/out/full/ .
 RUN turbo run build --filter=@dangerprep/cdn
 
+# Get Docker CLI from official image
+FROM docker:cli AS docker
+
 FROM base AS runner
 WORKDIR /app
 
@@ -46,6 +49,9 @@ RUN apk add --no-cache \
     curl \
     wget \
     bash
+
+# Copy Docker CLI from official Docker image
+COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 
 # Create non-root user with consistent UID/GID
 RUN addgroup -g 1001 -S appuser && \

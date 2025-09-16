@@ -4839,6 +4839,21 @@ create_docker_system_account() {
         enhanced_status_indicator "info" "dockerapp user already exists"
     fi
 
+    # Add dockerapp user to docker group for Docker socket access
+    if getent group "docker" >/dev/null 2>&1; then
+        if enhanced_spin "Adding dockerapp user to docker group" \
+            bash -c "usermod -a -G docker dockerapp"; then
+            enhanced_status_indicator "success" "Added dockerapp user to docker group"
+            log_info "dockerapp user now has Docker socket access"
+        else
+            enhanced_status_indicator "failure" "Failed to add dockerapp user to docker group"
+            return 1
+        fi
+    else
+        enhanced_status_indicator "warning" "Docker group not found - Docker may not be installed yet"
+        log_warn "dockerapp user will need to be added to docker group after Docker installation"
+    fi
+
     # Verify the account was created correctly
     local user_info
     user_info=$(getent passwd dockerapp 2>/dev/null || echo "")
@@ -4925,6 +4940,23 @@ configure_rootless_docker() {
         enhanced_status_indicator "info" "Docker already installed"
     fi
 
+    # Ensure dockerapp user is added to docker group after Docker installation
+    if id dockerapp >/dev/null 2>&1 && getent group "docker" >/dev/null 2>&1; then
+        if ! groups dockerapp | grep -q docker; then
+            if enhanced_spin "Adding dockerapp user to docker group (post-installation)" \
+                bash -c "usermod -a -G docker dockerapp"; then
+                enhanced_status_indicator "success" "dockerapp user added to docker group"
+                log_info "dockerapp user now has Docker socket access"
+            else
+                enhanced_status_indicator "failure" "Failed to add dockerapp user to docker group"
+                log_warn "Containers running as 1337:1337 may have Docker socket permission issues"
+            fi
+        else
+            enhanced_status_indicator "info" "dockerapp user already in docker group"
+        fi
+    else
+        log_warn "dockerapp user or docker group not found - skipping group assignment"
+    fi
 
     log_success "Docker configuration completed"
 }
