@@ -4923,6 +4923,9 @@ configure_rootless_docker() {
     # Create Docker system account for containers
     create_docker_system_account
 
+    # Fix ownership of existing content directories for dockerapp user
+    fix_content_directory_ownership
+
     # Check if Docker packages were already installed in consolidated installation
     if [[ "${CONSOLIDATED_PACKAGES_INSTALLED:-false}" == "true" ]] && echo "${SELECTED_PACKAGE_CATEGORIES:-}" | grep -q "Docker packages"; then
         enhanced_status_indicator "info" "Docker packages already installed in consolidated package installation"
@@ -4982,6 +4985,55 @@ configure_rootless_docker() {
     fi
 
     log_success "Docker configuration completed"
+}
+
+# Fix ownership of content directories for dockerapp user
+fix_content_directory_ownership() {
+    log_info "Fixing ownership of content directories for dockerapp user..."
+
+    # Check if dockerapp user exists
+    if ! id dockerapp >/dev/null 2>&1; then
+        log_warn "dockerapp user not found, skipping content ownership fix"
+        return 0
+    fi
+
+    # List of content directories to fix
+    local content_paths=(
+        "/content"
+        "/content/movies"
+        "/content/tv"
+        "/content/webtv"
+        "/content/music"
+        "/content/audiobooks"
+        "/content/books"
+        "/content/comics"
+        "/content/magazines"
+        "/content/games"
+        "/content/games/roms"
+        "/content/kiwix"
+        "/content/media"
+        "/content/documents"
+        "/content/downloads"
+        "/content/sync"
+    )
+
+    local fixed_count=0
+    for content_path in "${content_paths[@]}"; do
+        if [[ -d "$content_path" ]]; then
+            if chown -R dockerapp:dockerapp "$content_path" 2>/dev/null; then
+                log_debug "Fixed ownership for: $content_path"
+                ((fixed_count++))
+            else
+                log_warn "Failed to fix ownership for: $content_path"
+            fi
+        fi
+    done
+
+    if [[ $fixed_count -gt 0 ]]; then
+        log_success "Fixed ownership for $fixed_count content directories"
+    else
+        log_info "No content directories found to fix"
+    fi
 }
 
 # Clean and initialize Docker data directory
@@ -5125,17 +5177,18 @@ setup_docker_services() {
 
 
     # Create content directories on the dedicated /content partition
+    # Use dockerapp user (1337:1337) for content directories so containers can access them
     local content_directories=(
-        "/content/movies:755:root:root"
-        "/content/tv:755:root:root"
-        "/content/webtv:755:root:root"
-        "/content/music:755:root:root"
-        "/content/audiobooks:755:root:root"
-        "/content/books:755:root:root"
-        "/content/comics:755:root:root"
-        "/content/magazines:755:root:root"
-        "/content/games/roms:755:root:root"
-        "/content/kiwix:755:root:root"
+        "/content/movies:755:dockerapp:dockerapp"
+        "/content/tv:755:dockerapp:dockerapp"
+        "/content/webtv:755:dockerapp:dockerapp"
+        "/content/music:755:dockerapp:dockerapp"
+        "/content/audiobooks:755:dockerapp:dockerapp"
+        "/content/books:755:dockerapp:dockerapp"
+        "/content/comics:755:dockerapp:dockerapp"
+        "/content/magazines:755:dockerapp:dockerapp"
+        "/content/games/roms:755:dockerapp:dockerapp"
+        "/content/kiwix:755:dockerapp:dockerapp"
     )
 
     # Create base directories under INSTALL_ROOT
@@ -6201,9 +6254,9 @@ create_nvme_partitions() {
         fi
     done
 
-    log_info "Creating content subdirectories on /content partition..."
+    log_info "Creating content subdirectories on /content partition with dockerapp ownership..."
     for subdir in "${content_subdirs[@]}"; do
-        if ! standard_create_directory "$subdir" "755" "root" "root"; then
+        if ! standard_create_directory "$subdir" "755" "dockerapp" "dockerapp"; then
             log_error "Failed to create directory: $subdir"
             return 1
         fi
