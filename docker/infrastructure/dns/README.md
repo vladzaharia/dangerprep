@@ -29,7 +29,7 @@ docker compose up -d
 
 # 3. Setup AdGuard
 # Access http://your-server-ip:3000, follow setup wizard
-# Set upstream DNS to 172.20.0.4:53
+# Set upstream DNS to 172.21.0.4:53
 ```
 
 ## Service Registration
@@ -44,7 +44,7 @@ Creates DNS record: `myservice.yourdomain.com → service-ip`
 ## Network Architecture
 
 ```
-Client Request → AdGuard Home (172.20.0.2:53) → CoreDNS (172.20.0.4:53) → DNS Zone File → DNS Registrar
+Client Request → AdGuard Home (172.21.0.2:53) → CoreDNS (172.21.0.4:53) → DNS Zone File → DNS Registrar
 ```
 
 ## Troubleshooting

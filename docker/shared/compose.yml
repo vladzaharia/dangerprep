@@ -5,11 +5,26 @@
 # services in the DangerPrep infrastructure.
 #
 # Networks:
-# - traefik: Shared network for all web services routed through Traefik
+# - traefik: Shared network for all web services routed through Traefik (172.20.0.0/16)
+# - dns: Shared network for DNS infrastructure with static IP allocation (172.21.0.0/16)
 #
 # Usage:
 # docker compose -f docker/shared/compose.yml up -d
 # =============================================================================
+
+services:
+  # Temporary service to ensure networks are created
+  # This service exits immediately after creating the shared infrastructure
+  network-init:
+    image: alpine:latest
+    command: /bin/true
+    restart: "no"
+    networks:
+      - traefik
+      - dns
+    labels:
+      - "dangerprep.service=infrastructure"
+      - "dangerprep.description=Network initialization service"
 
 networks:
   # Shared Traefik network for all web services
@@ -24,6 +39,19 @@ networks:
     labels:
       - "dangerprep.network=shared"
       - "dangerprep.description=Shared network for Traefik reverse proxy"
+
+  # Shared DNS network for DNS infrastructure services
+  # Used by DNS services that need static IP allocation for reliable DNS resolution
+  dns:
+    name: dns
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
+    labels:
+      - "dangerprep.network=shared"
+      - "dangerprep.description=Shared network for DNS infrastructure with static IPs"
 
 # Currently no shared volumes are needed, but this section is ready for future use
 # volumes:

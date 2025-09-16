@@ -64,12 +64,12 @@ https://dns.nextdns.io/3ca9ab
 ### With RaspAP Integration
 - RaspAP dnsmasq listens on: `host:53` (primary DNS for clients)
 - CoreDNS listens on: `host:5353` (for .danger domain resolution)
-- AdGuard Home listens on: `172.20.0.2:53` (DNS network, for ad-blocking)
-- DNS chain: `RaspAP (host:53) -> CoreDNS (host:5353) -> AdGuard (172.20.0.2:53) -> NextDNS`
+- AdGuard Home listens on: `172.21.0.2:53` (DNS network, for ad-blocking)
+- DNS chain: `RaspAP (host:53) -> CoreDNS (host:5353) -> AdGuard (172.21.0.2:53) -> NextDNS`
 
 ### Legacy Configuration (without RaspAP)
-- AdGuard Home listens on: `172.20.0.2:53` (DNS network)
-- CoreDNS forwards to: `172.20.0.2:53`
+- AdGuard Home listens on: `172.21.0.2:53` (DNS network)
+- CoreDNS forwards to: `172.21.0.2:53`
 - Clients should use: CoreDNS at port 53 (advertised by system DHCP)
 
 ## Testing

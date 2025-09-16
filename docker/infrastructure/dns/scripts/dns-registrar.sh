@@ -12,7 +12,7 @@ DNS_CONFIG_DIR="/dns-config"
 DNS_DB_FILE="${DNS_CONFIG_DIR}/db.${DOMAIN_NAME}"
 EXTERNAL_DNS_DB_FILE="${DNS_CONFIG_DIR}/db.${EXTERNAL_DOMAIN_NAME}"
 UPDATE_INTERVAL="${DNS_UPDATE_INTERVAL:-30}"
-TRAEFIK_IP="172.20.0.3"  # Traefik container IP in dns network
+TRAEFIK_IP="172.21.0.3"  # Traefik container IP in dns network
 
 # Install required packages
 apk add --no-cache docker-cli jq curl
@@ -63,7 +63,7 @@ generate_dns_zone_for_domain() {
 
 ; Name servers
 @       IN      NS      ns1.${domain_name}.
-ns1     IN      A       172.20.0.4
+ns1     IN      A       172.21.0.4
 
 ; Default records
 @       IN      A       ${TRAEFIK_IP}

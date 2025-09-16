@@ -5617,69 +5617,240 @@ detect_and_configure_emmc_home_partition() {
     log_success "eMMC /home and swap partition configuration completed"
 }
 
-# Create eMMC /home (32GB) and swap (16GB) partitions in unpartitioned space
+# Create eMMC /home (32GB) and swap (16GB) partitions using modern approach
 create_emmc_home_partition() {
     local emmc_device="$1"
 
-    log_info "Creating 32GB /home partition on ${emmc_device}..."
+    log_info "Analyzing current eMMC partition layout on ${emmc_device}..."
 
-    # Get the last partition number to determine where to add the new partition
+    # First, analyze the current partition table and layout
+    analyze_emmc_partition_layout "${emmc_device}"
+    local analysis_result=$?
+
+    if [[ ${analysis_result} -ne 0 ]]; then
+        log_error "Failed to analyze current partition layout"
+        return 1
+    fi
+
+    # Get device size in sectors for precise calculations
+    local device_size_sectors
+    device_size_sectors=$(blockdev --getsz "${emmc_device}" 2>/dev/null || echo "0")
+    local device_size_bytes
+    device_size_bytes=$(blockdev --getsize64 "${emmc_device}" 2>/dev/null || echo "0")
+    local device_size_gb=$((device_size_bytes / 1024 / 1024 / 1024))
+
+    log_info "eMMC device: ${device_size_gb}GB (${device_size_sectors} sectors)"
+
+    if [[ ${device_size_gb} -lt 80 ]]; then
+        log_error "Device too small for partitioning (${device_size_gb}GB total, need at least 80GB)"
+        return 1
+    fi
+
+    # Calculate partition sizes in sectors (more precise than GB)
+    # 32GB = 67,108,864 sectors, 16GB = 33,554,432 sectors (assuming 512-byte sectors)
+    local home_size_sectors=67108864  # 32GB
+    local swap_size_sectors=33554432  # 16GB
+    local total_new_sectors=$((home_size_sectors + swap_size_sectors))
+
+    # Check if we have enough free space
+    local available_sectors
+    available_sectors=$(get_available_sectors "${emmc_device}")
+
+    if [[ ${available_sectors} -lt ${total_new_sectors} ]]; then
+        log_error "Insufficient space: need ${total_new_sectors} sectors, have ${available_sectors} sectors"
+        return 1
+    fi
+
+    log_info "Creating partitions using sector-aligned boundaries..."
+
+    # Use sfdisk for modern, reliable partition creation
+    create_emmc_partitions_with_sfdisk "${emmc_device}" "${swap_size_sectors}" "${home_size_sectors}"
+    local create_result=$?
+
+    if [[ ${create_result} -ne 0 ]]; then
+        log_error "Failed to create new partitions"
+        return 1
+    fi
+
+    # Format and setup the new partitions
+    setup_new_emmc_partitions "${emmc_device}"
+    local setup_result=$?
+
+    if [[ ${setup_result} -ne 0 ]]; then
+        log_error "Failed to setup new partitions"
+        return 1
+    fi
+
+    log_success "eMMC partitioning completed successfully"
+    return 0
+}
+
+# Analyze current eMMC partition layout
+analyze_emmc_partition_layout() {
+    local emmc_device="$1"
+
+    log_info "Analyzing partition table on ${emmc_device}..."
+
+    # Check if device exists and is accessible
+    if [[ ! -b "${emmc_device}" ]]; then
+        log_error "Device ${emmc_device} is not accessible"
+        return 1
+    fi
+
+    # Get partition table type
+    local table_type
+    table_type=$(sfdisk -l "${emmc_device}" 2>/dev/null | grep "Disklabel type:" | awk '{print $3}' || echo "unknown")
+    log_info "Partition table type: ${table_type}"
+
+    # Show current layout
+    log_info "Current partition layout:"
+    sfdisk -l "${emmc_device}" 2>/dev/null || parted -s "${emmc_device}" print 2>/dev/null || {
+        log_error "Cannot read partition table"
+        return 1
+    }
+
+    # Check for overlayfs or other special filesystem setups
+    if findmnt -n -o FSTYPE / 2>/dev/null | grep -q "overlay"; then
+        log_info "Detected overlayfs root filesystem - system likely uses single partition with overlay"
+    fi
+
+    return 0
+}
+
+# Get available sectors for new partitions
+get_available_sectors() {
+    local emmc_device="$1"
+
+    # Use sfdisk to get free space information
+    local free_space_info
+    free_space_info=$(sfdisk -F "${emmc_device}" 2>/dev/null)
+
+    if [[ -n "${free_space_info}" ]]; then
+        # Parse sfdisk free space output
+        local largest_free_sectors=0
+        while IFS= read -r line; do
+            if [[ "${line}" =~ Unpartitioned\ space.*:.*[[:space:]]([0-9]+)[[:space:]]*sectors ]]; then
+                local sectors="${BASH_REMATCH[1]}"
+                if [[ ${sectors} -gt ${largest_free_sectors} ]]; then
+                    largest_free_sectors=${sectors}
+                fi
+            fi
+        done <<< "${free_space_info}"
+
+        echo "${largest_free_sectors}"
+    else
+        # Fallback: estimate based on device size and existing partitions
+        local device_sectors
+        device_sectors=$(blockdev --getsz "${emmc_device}" 2>/dev/null || echo "0")
+
+        # Conservative estimate: assume 50GB used, rest available
+        local estimated_used_sectors=$((50 * 1024 * 1024 * 1024 / 512))
+        local estimated_free_sectors=$((device_sectors - estimated_used_sectors))
+
+        # Ensure we don't return negative values
+        if [[ ${estimated_free_sectors} -lt 0 ]]; then
+            estimated_free_sectors=0
+        fi
+
+        echo "${estimated_free_sectors}"
+    fi
+}
+
+# Create partitions using sfdisk (modern approach)
+create_emmc_partitions_with_sfdisk() {
+    local emmc_device="$1"
+    local swap_size_sectors="$2"
+    local home_size_sectors="$3"
+
+    log_info "Creating partitions using sfdisk..."
+
+    # Get the next available partition numbers
+    local next_partition_num
+    next_partition_num=$(get_next_partition_number "${emmc_device}")
+
+    if [[ -z "${next_partition_num}" ]]; then
+        log_error "Cannot determine next partition number"
+        return 1
+    fi
+
+    local swap_partition_num=${next_partition_num}
+    local home_partition_num=$((next_partition_num + 1))
+
+    log_info "Creating swap partition ${swap_partition_num} (${swap_size_sectors} sectors)"
+    log_info "Creating home partition ${home_partition_num} (${home_size_sectors} sectors)"
+
+    # Create sfdisk input for new partitions
+    # Format: start,size,type,bootable
+    local sfdisk_input=""
+
+    # Add swap partition (type 82 = Linux swap)
+    sfdisk_input+=",${swap_size_sectors},82\n"
+
+    # Add home partition (type 83 = Linux filesystem)
+    sfdisk_input+=",${home_size_sectors},83\n"
+
+    # Apply the partition changes
+    log_info "Applying partition table changes..."
+    if echo -e "${sfdisk_input}" | sfdisk "${emmc_device}" --append --no-reread 2>/dev/null; then
+        log_info "Partition table updated successfully"
+    else
+        log_error "Failed to update partition table with sfdisk"
+        return 1
+    fi
+
+    # Force kernel to re-read partition table
+    partprobe "${emmc_device}" 2>/dev/null || true
+    sleep 2
+
+    # Verify partitions were created
+    local swap_partition="${emmc_device}p${swap_partition_num}"
+    local home_partition="${emmc_device}p${home_partition_num}"
+
+    if [[ ! -b "${swap_partition}" ]]; then
+        log_error "Swap partition ${swap_partition} was not created"
+        return 1
+    fi
+
+    if [[ ! -b "${home_partition}" ]]; then
+        log_error "Home partition ${home_partition} was not created"
+        return 1
+    fi
+
+    log_info "Partitions created successfully:"
+    log_info "  Swap: ${swap_partition}"
+    log_info "  Home: ${home_partition}"
+
+    return 0
+}
+
+# Get next available partition number
+get_next_partition_number() {
+    local emmc_device="$1"
+
+    # Get the highest existing partition number
     local last_partition_num
     last_partition_num=$(lsblk -n -o NAME "${emmc_device}" | grep -E "${emmc_device##*/}p[0-9]+$" | sed 's/.*p//' | sort -n | tail -1)
 
-    if [[ -z "$last_partition_num" ]]; then
-        log_error "Could not determine last partition number on ${emmc_device}"
-        return 1
+    if [[ -z "${last_partition_num}" ]]; then
+        # No existing partitions, start with 1
+        echo "1"
+    else
+        # Return next available number
+        echo $((last_partition_num + 1))
     fi
+}
 
-    local new_partition_num=$((last_partition_num + 1))
-    local home_partition="${emmc_device}p${new_partition_num}"
+# Setup and format new eMMC partitions
+setup_new_emmc_partitions() {
+    local emmc_device="$1"
 
-    log_info "Creating partition ${new_partition_num} for /home..."
+    log_info "Setting up new eMMC partitions..."
 
-    # Strategy: Create partitions at the END of the disk in this order:
-    # 1. 16GB swap partition
-    # 2. 32GB /home partition
-    # 3. Later expand main partition to use remaining space
-
-    # Get total disk size
-    local disk_size_bytes
-    disk_size_bytes=$(lsblk -b -d -n -o SIZE "${emmc_device}" 2>/dev/null || echo "0")
-    local disk_size_gb=$((disk_size_bytes / 1024 / 1024 / 1024))
-
-    if [[ ${disk_size_gb} -lt 80 ]]; then
-        log_error "Disk too small for 32GB /home + 16GB swap (${disk_size_gb}GB total, need at least 80GB)"
-        return 1
-    fi
-
-    # Calculate positions from the end:
-    # /home: last 32GB (disk_size-32 to disk_size)
-    # swap: 16GB before /home (disk_size-48 to disk_size-32)
-    local home_start_gb=$((disk_size_gb - 32))
-    local home_end_gb=${disk_size_gb}
-    local swap_start_gb=$((disk_size_gb - 48))
-    local swap_end_gb=$((disk_size_gb - 32))
-
-    # Create swap partition first (so it gets a lower partition number)
-    local swap_partition_num=$((last_partition_num + 1))
-    local home_partition_num=$((last_partition_num + 2))
-
-    log_info "Creating 16GB swap partition (${swap_start_gb}GB to ${swap_end_gb}GB)..."
-    if ! parted -s "${emmc_device}" mkpart primary linux-swap "${swap_start_gb}GB" "${swap_end_gb}GB"; then
-        log_error "Failed to create swap partition"
-        return 1
-    fi
-
-    log_info "Creating 32GB /home partition (${home_start_gb}GB to ${home_end_gb}GB)..."
-    if ! parted -s "${emmc_device}" mkpart primary ext4 "${home_start_gb}GB" "${home_end_gb}GB"; then
-        log_error "Failed to create /home partition"
-        return 1
-    fi
-
-    # Wait for kernel to recognize new partitions
-    sleep 2
-    partprobe "${emmc_device}"
-    sleep 2
+    # Get partition numbers
+    local next_partition_num
+    next_partition_num=$(get_next_partition_number "${emmc_device}")
+    local swap_partition_num=$((next_partition_num - 2))  # We created swap first
+    local home_partition_num=$((next_partition_num - 1))  # Then home
 
     # Define partition device paths
     local swap_partition="${emmc_device}p${swap_partition_num}"
@@ -5726,7 +5897,9 @@ create_emmc_home_partition() {
 
     # Migrate existing /home contents
     log_info "Migrating existing /home contents to new partition..."
-    if [[ -d "/home" ]] && [[ "$(ls -A /home 2>/dev/null)" ]]; then
+    local home_contents
+    home_contents=$(ls -A /home 2>/dev/null || true)
+    if [[ -d "/home" ]] && [[ -n "${home_contents}" ]]; then
         if ! rsync -av /home/ "${temp_home_mount}/"; then
             log_error "Failed to migrate /home contents"
             umount "${temp_home_mount}" 2>/dev/null || true
@@ -5742,7 +5915,8 @@ create_emmc_home_partition() {
     rmdir "${temp_home_mount}"
 
     # Backup fstab before making changes
-    cp /etc/fstab "/etc/fstab.backup-$(date +%Y%m%d-%H%M%S)"
+    local fstab_backup="/etc/fstab.backup-$(date +%Y%m%d-%H%M%S)"
+    cp /etc/fstab "${fstab_backup}"
 
     # Add new partitions to fstab
     log_info "Adding swap and /home partitions to fstab..."
@@ -5793,6 +5967,7 @@ create_emmc_home_partition() {
     fi
 
     log_success "eMMC swap and /home partitions created and mounted successfully"
+    return 0
 }
 
 # Create NVMe partitions (256GB /var/lib/docker, rest /content)
