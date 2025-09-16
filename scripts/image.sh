@@ -931,18 +931,19 @@ create_raw_backup() {
     freeze_filesystems
 
     # Create sparse raw backup using dd with progress indication
-    enhanced_status_indicator "info" "Creating raw disk backup (filesystems frozen)..."
+    enhanced_status_indicator "info" "Creating sparse raw disk backup (filesystems frozen)..."
 
     # Use dd with conv=sparse to create a sparse image file
+    # Note: conv=sparse skips writing blocks of all zeros, creating a sparse file
     local backup_success=false
     if command -v pv >/dev/null 2>&1; then
-        # Use pv for progress indication if available
-        if dd if="$DETECTED_EMMC" conv=sparse bs=1M | pv -s "$emmc_size_bytes" > "$backup_path"; then
+        # Use pv for progress indication - need to use dd directly to maintain sparseness
+        if pv -s "$emmc_size_bytes" "$DETECTED_EMMC" | dd of="$backup_path" conv=sparse bs=1M iflag=fullblock; then
             backup_success=true
         fi
     else
-        # Fallback to dd without progress indication
-        if dd if="$DETECTED_EMMC" of="$backup_path" conv=sparse bs=1M status=progress; then
+        # Fallback to dd without progress indication but with sparse support
+        if dd if="$DETECTED_EMMC" of="$backup_path" conv=sparse bs=1M iflag=fullblock status=progress; then
             backup_success=true
         fi
     fi
