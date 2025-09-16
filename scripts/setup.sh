@@ -5160,27 +5160,10 @@ setup_docker_services() {
         enhanced_status_indicator "info" "No Docker configurations to copy"
     fi
 
-    # Setup secrets for Docker services
-    setup_docker_secrets
-
     # Deploy all selected Docker services
     deploy_selected_docker_services
 
     log_success "Docker services configuration completed"
-}
-
-# Setup Docker secrets
-setup_docker_secrets() {
-    # Run the secret setup script
-    if [[ -f "$PROJECT_ROOT/scripts/security/setup-secrets.sh" ]]; then
-        if enhanced_spin "Generating Docker secrets" "$PROJECT_ROOT/scripts/security/setup-secrets.sh"; then
-            enhanced_status_indicator "success" "Docker secrets configured"
-        else
-            enhanced_status_indicator "warning" "Secret generation failed"
-        fi
-    else
-        enhanced_status_indicator "warning" "Secret setup script not found, manual configuration needed"
-    fi
 }
 
 # Deploy all selected Docker services
