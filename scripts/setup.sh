@@ -8637,11 +8637,11 @@ main() {
     # Main installation phases with progress tracking
     local -a installation_phases=(
         "backup_original_configs:Backing up original configurations"
+        "detect_and_configure_nvme_storage:Detecting and configuring NVMe storage"
+        "detect_and_configure_emmc_home_partition:Detecting and configuring eMMC /home partition"
         "update_system_packages:Updating system packages"
         "install_essential_packages:Installing essential packages"
         "setup_automatic_updates:Setting up automatic updates"
-        "detect_and_configure_nvme_storage:Detecting and configuring NVMe storage"
-        "detect_and_configure_emmc_home_partition:Detecting and configuring eMMC /home partition"
         "load_motd_config:Loading MOTD configuration"
         "configure_kernel_hardening:Configuring kernel hardening"
         "setup_file_integrity_monitoring:Setting up file integrity monitoring"
