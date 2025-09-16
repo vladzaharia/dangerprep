@@ -48,7 +48,6 @@ readonly IMAGE_PREFIX="nanopi-m6-dangerprep"
 OUTPUT_DIR=""
 SKIP_CLEANUP=false
 COMPRESS_IMAGE=false
-COPY_TO_SD=false
 DRY_RUN=false
 DETECTED_EMMC=""
 DETECTED_OUTPUT=""
@@ -82,7 +81,6 @@ OPTIONS:
     --output-dir DIR    Specify output directory (default: auto-detect)
     --skip-cleanup      Skip system cleanup before imaging
     --compress          Compress the output image with gzip
-    --copy-to-sd        Copy image to EFlasher SD card after creation
     --dry-run          Show what would be done without executing
     --help             Show this help message
 
@@ -92,9 +90,6 @@ EXAMPLES:
 
     # Create compressed image to specific directory
     sudo ./scripts/image.sh --output-dir /mnt/usb --compress
-
-    # Create image and copy to EFlasher SD card
-    sudo ./scripts/image.sh --copy-to-sd
 
     # Dry run to see what would be done
     sudo ./scripts/image.sh --dry-run
@@ -123,10 +118,7 @@ parse_args() {
                 COMPRESS_IMAGE=true
                 shift
                 ;;
-            --copy-to-sd)
-                COPY_TO_SD=true
-                shift
-                ;;
+
             --dry-run)
                 DRY_RUN=true
                 shift
@@ -573,37 +565,36 @@ create_disk_image() {
     log_info "Image directory: $IMAGE_DIRNAME"
 }
 
-# Validate created image
+# Validate created image directory
 validate_image() {
-    enhanced_section "Image Validation" "Validating created image" "✅"
+    enhanced_section "Image Validation" "Validating created EFlasher image" "✅"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        log_info "[DRY RUN] Would validate created image"
+        log_info "[DRY RUN] Would validate created image directory"
         return 0
     fi
 
-    if [[ ! -f "$IMAGE_FILENAME" ]]; then
-        log_error "Image file not found: $IMAGE_FILENAME"
+    if [[ ! -d "$IMAGE_DIRNAME" ]]; then
+        log_error "Image directory not found: $IMAGE_DIRNAME"
         exit 1
     fi
 
-    # Check file size
-    local image_size
-    image_size=$(stat -c%s "$IMAGE_FILENAME")
-    local image_size_gb=$((image_size / 1024 / 1024 / 1024))
+    # Check for required files
+    local required_files=("rootfs.img" "boot.img" "kernel.img" "info.conf" "parameter.txt")
+    for file in "${required_files[@]}"; do
+        if [[ ! -f "$IMAGE_DIRNAME/$file" ]]; then
+            log_error "Missing required file: $file"
+            exit 1
+        fi
+    done
 
-    enhanced_status_indicator "info" "Image size: ${image_size_gb}GB"
+    # Check rootfs.img size
+    local rootfs_size
+    rootfs_size=$(stat -c%s "$IMAGE_DIRNAME/rootfs.img" 2>/dev/null || echo "0")
+    local rootfs_size_gb=$((rootfs_size / 1024 / 1024 / 1024))
 
-    # Create checksum
-    enhanced_status_indicator "info" "Generating checksum..."
-    local checksum_file="${IMAGE_FILENAME}.sha256"
-    if ! sha256sum "$IMAGE_FILENAME" > "$checksum_file"; then
-        log_warn "Failed to create checksum file"
-    else
-        enhanced_status_indicator "success" "Checksum saved: $(basename "$checksum_file")"
-    fi
-
-    enhanced_status_indicator "success" "Image validation completed"
+    enhanced_status_indicator "info" "Rootfs size: ${rootfs_size_gb}GB"
+    enhanced_status_indicator "success" "EFlasher image validation completed"
 }
 
 # Detect EFlasher SD card
@@ -617,6 +608,12 @@ detect_eflasher_sd() {
     if [[ -d "/media/pi/FriendlyARM" ]]; then
         log_info "Found EFlasher SD card at known location: /media/pi/FriendlyARM"
         sd_candidates+=("/media/pi/FriendlyARM")
+    fi
+
+    # Also check for the mount point the user is using
+    if [[ -d "/mnt/eflasher-64gb" ]]; then
+        log_info "Found EFlasher SD card at: /mnt/eflasher-64gb"
+        sd_candidates+=("/mnt/eflasher-64gb")
     fi
 
     # Also check other potential mount points
@@ -674,7 +671,9 @@ detect_eflasher_sd() {
 
 # Copy image to EFlasher SD card
 copy_to_eflasher_sd() {
-    if [[ "$COPY_TO_SD" != "true" ]]; then
+    # Check if EFlasher SD card is available
+    if [[ -z "$EFLASHER_SD_PATH" || ! -d "$EFLASHER_SD_PATH" ]]; then
+        log_info "No EFlasher SD card available - skipping copy"
         return 0
     fi
 
@@ -692,90 +691,84 @@ copy_to_eflasher_sd() {
         return 1
     fi
 
-    # Check if image file exists
-    if [[ ! -f "$IMAGE_FILENAME" ]]; then
-        log_error "Image file not found: $IMAGE_FILENAME"
+    # Check if image directory exists
+    if [[ ! -d "$IMAGE_DIRNAME" ]]; then
+        log_error "Image directory not found: $IMAGE_DIRNAME"
         return 1
     fi
 
-    # Get image size and check space
-    local image_size_bytes
-    image_size_bytes=$(stat -c%s "$IMAGE_FILENAME")
-    local image_size_gb=$((image_size_bytes / 1024 / 1024 / 1024 + 1))  # Round up
+    # Get directory size and check space
+    local dir_size_bytes
+    dir_size_bytes=$(du -sb "$IMAGE_DIRNAME" | cut -f1)
+    local dir_size_gb=$((dir_size_bytes / 1024 / 1024 / 1024 + 1))  # Round up
 
     local available_bytes
-    available_bytes=$(df -B1 "$sd_mountpoint" | tail -1 | awk '{print $4}')
+    available_bytes=$(df -B1 "$EFLASHER_SD_PATH" | tail -1 | awk '{print $4}')
     local available_gb=$((available_bytes / 1024 / 1024 / 1024))
 
-    if [[ $available_bytes -lt $image_size_bytes ]]; then
-        log_error "Insufficient space on SD card"
-        log_info "Required: ${image_size_gb}GB, Available: ${available_gb}GB"
+    if [[ $available_bytes -lt $dir_size_bytes ]]; then
+        log_error "Insufficient space on EFlasher SD card"
+        log_error "Required: ${dir_size_gb}GB, Available: ${available_gb}GB"
         return 1
     fi
 
-    # Copy the image file
-    local dest_filename
-    dest_filename="$sd_mountpoint/$(basename "$IMAGE_FILENAME")"
+    # Copy the image directory
+    local dest_dirname
+    dest_dirname="$EFLASHER_SD_PATH/$(basename "$IMAGE_DIRNAME")"
 
-    enhanced_status_indicator "info" "Copying image to SD card..."
-    if ! pv "$IMAGE_FILENAME" > "$dest_filename"; then
-        log_error "Failed to copy image to SD card"
-        rm -f "$dest_filename" 2>/dev/null || true
+    enhanced_status_indicator "info" "Copying image directory to SD card..."
+    if ! cp -r "$IMAGE_DIRNAME" "$EFLASHER_SD_PATH/"; then
+        log_error "Failed to copy image directory to SD card"
+        rm -rf "$dest_dirname" 2>/dev/null || true
         return 1
-    fi
-
-    # Copy checksum file if it exists
-    if [[ -f "${IMAGE_FILENAME}.sha256" ]]; then
-        cp "${IMAGE_FILENAME}.sha256" "${dest_filename}.sha256" 2>/dev/null || true
     fi
 
     # Sync to ensure data is written
     sync
 
-    enhanced_status_indicator "success" "Image copied to SD card: $(basename "$dest_filename")"
-    log_info "SD card location: $sd_mountpoint"
+    enhanced_status_indicator "success" "Image directory copied to EFlasher SD card"
+    log_info "Destination: $dest_dirname"
+    log_info "The image will appear as '$(basename "$IMAGE_DIRNAME")' in EFlasher"
 
-    # Show EFlasher configuration suggestion
+    # Show EFlasher usage information
     log_info ""
-    log_info "To enable automatic restore, create/edit eflasher.conf on the SD card:"
-    log_info "  [General]"
-    log_info "  autoStart=/mnt/sdcard/$(basename "$dest_filename")"
-    log_info "  autoExit=true"
+    log_info "Your DangerPrep image is now ready for use with EFlasher!"
+    log_info "It will appear in the EFlasher interface as a selectable OS option."
 }
 
 # Show completion information
 show_completion_info() {
     enhanced_section "Completion" "Image creation successful" "🎉"
 
-    log_success "Sparse disk image created successfully!"
+    log_success "DangerPrep EFlasher image created successfully!"
     log_info ""
     log_info "Image Details:"
-    log_info "  File: $IMAGE_FILENAME"
-    if [[ -f "${IMAGE_FILENAME}.sha256" ]]; then
-        log_info "  Checksum: ${IMAGE_FILENAME}.sha256"
+    log_info "  Directory: $IMAGE_DIRNAME"
+    log_info "  Name: $(basename "$IMAGE_DIRNAME")"
+    if [[ -f "$IMAGE_DIRNAME/rootfs.img" ]]; then
+        local rootfs_size
+        rootfs_size=$(stat -c%s "$IMAGE_DIRNAME/rootfs.img" 2>/dev/null || echo "0")
+        local rootfs_size_gb=$((rootfs_size / 1024 / 1024 / 1024))
+        log_info "  Rootfs Size: ${rootfs_size_gb}GB"
     fi
     log_info ""
-    if [[ "$COPY_TO_SD" == "true" ]]; then
+    if [[ -n "$EFLASHER_SD_PATH" && -d "$EFLASHER_SD_PATH" ]]; then
         log_info "EFlasher Usage (SD card already prepared):"
         log_info "  1. Insert the EFlasher SD card into target device"
         log_info "  2. Boot the device (hold BOOT button if required)"
-        log_info "  3. Select 'Restore eMMC Flash from backup file'"
-        log_info "  4. Choose your DangerPrep image from the list"
+        log_info "  3. Select 'Ubuntu 24.04 DangerPrep' from the EFlasher interface"
+        log_info "  4. Follow the installation prompts"
     else
         log_info "EFlasher Usage:"
-        log_info "  1. Copy the .raw file to an EFlasher SD card"
-        log_info "  2. Use EFlasher's 'Restore eMMC Flash from backup file' option"
-        log_info "  3. Select your .raw file to flash to new devices"
+        log_info "  1. Copy the image directory to your EFlasher SD card"
+        log_info "  2. Insert the SD card into target device"
+        log_info "  3. Boot the device (hold BOOT button if required)"
+        log_info "  4. Select 'Ubuntu 24.04 DangerPrep' from the EFlasher interface"
     fi
-    log_info ""
-    log_info "For automatic restoration, create eflasher.conf with:"
-    log_info "  [General]"
-    log_info "  autoStart=$(basename "$IMAGE_FILENAME")"
     log_info ""
 
-    if [[ "$COMPRESS_IMAGE" == "true" ]]; then
-        log_info "Note: Compressed images may need to be decompressed before use with EFlasher"
-    fi
+    log_info "The DangerPrep image will appear as a selectable OS in EFlasher"
+    log_info "and contains all your current system customizations."
 }
 
 # =============================================================================
@@ -837,8 +830,8 @@ get_user_confirmation() {
     log_info "  Compress Image: ${compress_status}"
 
     local copy_sd_status="No"
-    if [[ "${COPY_TO_SD}" == "true" ]]; then
-        copy_sd_status="Yes"
+    if [[ -n "$EFLASHER_SD_PATH" && -d "$EFLASHER_SD_PATH" ]]; then
+        copy_sd_status="Yes (SD card detected)"
     fi
     log_info "  Copy to SD Card: ${copy_sd_status}"
     log_info ""
@@ -857,11 +850,16 @@ cleanup_on_error() {
     if [[ $exit_code -ne 0 ]]; then
         log_error "Image creation failed with exit code $exit_code"
 
-        # Clean up partial image file
-        if [[ -n "$IMAGE_FILENAME" && -f "$IMAGE_FILENAME" ]]; then
-            log_info "Cleaning up partial image file..."
-            rm -f "$IMAGE_FILENAME" 2>/dev/null || true
-            rm -f "${IMAGE_FILENAME}.sha256" 2>/dev/null || true
+        # Clean up partial image directory
+        if [[ -n "$IMAGE_DIRNAME" && -d "$IMAGE_DIRNAME" ]]; then
+            log_info "Cleaning up partial image directory..."
+            rm -rf "$IMAGE_DIRNAME" 2>/dev/null || true
+        fi
+
+        # Clean up sd-fuse directory
+        if [[ -n "$SD_FUSE_DIR" && -d "$SD_FUSE_DIR" ]]; then
+            log_info "Cleaning up sd-fuse tools..."
+            rm -rf "$SD_FUSE_DIR" 2>/dev/null || true
         fi
 
         # Restart services if they were stopped
@@ -896,6 +894,9 @@ main() {
 
     # Create disk image
     create_disk_image
+
+    # Validate image
+    validate_image
 
     # Copy to SD card if requested
     copy_to_eflasher_sd
