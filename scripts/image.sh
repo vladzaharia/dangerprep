@@ -52,7 +52,10 @@ COPY_TO_SD=false
 DRY_RUN=false
 DETECTED_EMMC=""
 DETECTED_OUTPUT=""
-IMAGE_FILENAME=""
+IMAGE_DIRNAME=""
+EFLASHER_SD_PATH=""
+TEMPLATE_IMAGE_DIR=""
+SD_FUSE_DIR=""
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -155,6 +158,11 @@ check_dependencies() {
     local missing_deps=()
     local deps=("dd" "pv" "lsblk" "df" "sync" "gzip")
 
+    # Check for exfat utilities (exfatprogs provides mkfs.exfat, fsck.exfat, etc.)
+    if ! command -v "mkfs.exfat" >/dev/null 2>&1; then
+        missing_deps+=("exfatprogs")
+    fi
+
     for dep in "${deps[@]}"; do
         if ! command -v "${dep}" >/dev/null 2>&1; then
             missing_deps+=("${dep}")
@@ -163,7 +171,30 @@ check_dependencies() {
     
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         log_error "Missing required dependencies: ${missing_deps[*]}"
-        log_info "Install missing packages: sudo apt update && sudo apt install -y pv gzip"
+        log_info ""
+        log_info "These packages are required for image creation:"
+        for dep in "${missing_deps[@]}"; do
+            case "$dep" in
+                "pv")
+                    log_info "  • pv: Provides progress indication during image creation"
+                    ;;
+                "gzip")
+                    log_info "  • gzip: Required for image compression (--compress option)"
+                    ;;
+                "exfatprogs")
+                    log_info "  • exfatprogs: Required for exFAT filesystem support on SD cards"
+                    ;;
+                *)
+                    log_info "  • $dep: Required system utility"
+                    ;;
+            esac
+        done
+        log_info ""
+        log_info "Install missing packages:"
+        log_info "  sudo apt update && sudo apt install -y ${missing_deps[*]}"
+        log_info ""
+        log_info "Note: These packages are automatically installed if you run DangerPrep setup"
+        log_info "with 'Convenience packages' selected."
         exit 1
     fi
 }
@@ -274,18 +305,15 @@ detect_output_location() {
     exit 1
 }
 
-# Generate image filename
-generate_image_filename() {
+# Generate EFlasher directory name
+generate_eflasher_dirname() {
     local timestamp
     timestamp=$(date +%Y%m%d-%H%M%S)
-    local base_filename="${IMAGE_PREFIX}-${timestamp}.raw"
 
-    if [[ "$COMPRESS_IMAGE" == "true" ]]; then
-        base_filename="${base_filename}.gz"
-    fi
+    # Create EFlasher-compatible directory name
+    EFLASHER_DIRNAME="${DETECTED_OUTPUT}/ubuntu-noble-desktop-arm64-dangerprep-${timestamp}"
 
-    IMAGE_FILENAME="${DETECTED_OUTPUT}/${base_filename}"
-    log_info "Image will be saved as: $IMAGE_FILENAME"
+    log_info "EFlasher image directory will be: $EFLASHER_DIRNAME"
 }
 
 # Perform comprehensive system cleanup
@@ -350,55 +378,199 @@ perform_system_cleanup() {
     enhanced_status_indicator "success" "System cleanup completed"
 }
 
-# Create sparse disk image
-create_disk_image() {
-    enhanced_section "Image Creation" "Creating sparse disk image" "💾"
+# Find EFlasher SD card and template image
+find_eflasher_template() {
+    enhanced_section "Template Detection" "Finding EFlasher template image" "🔍"
 
-    local device_size_bytes
-    device_size_bytes=$(lsblk -dn -b -o SIZE "$DETECTED_EMMC")
-    local device_size_gb=$((device_size_bytes / 1024 / 1024 / 1024))
+    # First, try to detect EFlasher SD card
+    local sd_mountpoint
+    sd_mountpoint=$(detect_eflasher_sd)
 
-    log_info "Source device: $DETECTED_EMMC (${device_size_gb}GB)"
-    log_info "Output file: $IMAGE_FILENAME"
-
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log_info "[DRY RUN] Would create sparse image of $DETECTED_EMMC"
-        log_info "[DRY RUN] Output: $IMAGE_FILENAME"
-        return 0
-    fi
-
-    # Check available space
-    local available_bytes
-    available_bytes=$(df -B1 "$DETECTED_OUTPUT" | tail -1 | awk '{print $4}')
-    local required_bytes=$((device_size_bytes / 2))  # Estimate for sparse image
-
-    if [[ $available_bytes -lt $required_bytes ]]; then
-        log_error "Insufficient disk space for image creation"
-        log_info "Available: $((available_bytes / 1024 / 1024 / 1024))GB"
-        log_info "Required (estimated): $((required_bytes / 1024 / 1024 / 1024))GB"
+    if [[ -z "$sd_mountpoint" ]]; then
+        log_error "EFlasher SD card not found"
+        log_info "Please insert the EFlasher SD card and try again"
         exit 1
     fi
 
-    # Create the sparse image
-    enhanced_status_indicator "info" "Creating sparse disk image..."
+    EFLASHER_SD_PATH="$sd_mountpoint"
+    log_info "Found EFlasher SD card at: $EFLASHER_SD_PATH"
 
-    if [[ "$COMPRESS_IMAGE" == "true" ]]; then
-        # Create compressed sparse image
-        if ! pv "$DETECTED_EMMC" | gzip > "$IMAGE_FILENAME"; then
-            log_error "Failed to create compressed image"
-            rm -f "$IMAGE_FILENAME" 2>/dev/null || true
-            exit 1
+    # Look for Ubuntu template images
+    local template_candidates=()
+
+    # Check for various Ubuntu image directories
+    for pattern in "ubuntu-noble-desktop-arm64" "ubuntu-jammy-desktop-arm64" "ubuntu-*-desktop-arm64"; do
+        if [[ -d "$EFLASHER_SD_PATH/$pattern" ]]; then
+            template_candidates+=("$EFLASHER_SD_PATH/$pattern")
         fi
-    else
-        # Create uncompressed sparse image
-        if ! pv "$DETECTED_EMMC" | dd of="$IMAGE_FILENAME" bs=1M conv=sparse; then
-            log_error "Failed to create image"
-            rm -f "$IMAGE_FILENAME" 2>/dev/null || true
-            exit 1
-        fi
+    done
+
+    if [[ ${#template_candidates[@]} -eq 0 ]]; then
+        log_error "No Ubuntu template images found on EFlasher SD card"
+        log_info "Expected to find directories like 'ubuntu-noble-desktop-arm64'"
+        exit 1
     fi
 
-    enhanced_status_indicator "success" "Image creation completed"
+    # Use the first (most recent) template found
+    TEMPLATE_IMAGE_DIR="${template_candidates[0]}"
+    log_info "Using template: $(basename "$TEMPLATE_IMAGE_DIR")"
+
+    # Verify template has required files
+    local required_files=("boot.img" "kernel.img" "parameter.txt" "info.conf")
+    for file in "${required_files[@]}"; do
+        if [[ ! -f "$TEMPLATE_IMAGE_DIR/$file" ]]; then
+            log_error "Template missing required file: $file"
+            exit 1
+        fi
+    done
+
+    enhanced_status_indicator "success" "Template image found and validated"
+}
+
+# Setup sd-fuse tools
+setup_sd_fuse() {
+    enhanced_section "SD-Fuse Setup" "Preparing image creation tools" "🛠️"
+
+    SD_FUSE_DIR="/tmp/sd-fuse_rk3588"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would setup sd-fuse tools in $SD_FUSE_DIR"
+        return 0
+    fi
+
+    # Clean up any existing directory
+    if [[ -d "$SD_FUSE_DIR" ]]; then
+        rm -rf "$SD_FUSE_DIR"
+    fi
+
+    # Clone sd-fuse repository
+    log_info "Downloading sd-fuse tools..."
+    if ! git clone https://github.com/friendlyarm/sd-fuse_rk3588 -b kernel-6.1.y --depth 1 "$SD_FUSE_DIR"; then
+        log_error "Failed to download sd-fuse tools"
+        exit 1
+    fi
+
+    # Make scripts executable
+    chmod +x "$SD_FUSE_DIR"/*.sh
+    chmod +x "$SD_FUSE_DIR/tools"/*.sh
+
+    enhanced_status_indicator "success" "SD-fuse tools ready"
+}
+
+# Create system backup using tar
+create_system_backup() {
+    local backup_file="$1"
+
+    log_info "Creating system backup (this may take 5-15 minutes)..."
+
+    # Create backup excluding unnecessary files
+    if tar --warning=no-file-changed -czpf "$backup_file" \
+        --exclude="$backup_file" \
+        --exclude=/var/lib/docker/runtimes \
+        --exclude=/etc/firstuse \
+        --exclude=/etc/friendlyelec-release \
+        --exclude=/usr/local/first_boot_flag \
+        --exclude=/tmp/* \
+        --exclude=/var/tmp/* \
+        --exclude=/var/log/* \
+        --exclude=/var/cache/* \
+        --exclude=/proc \
+        --exclude=/sys \
+        --exclude=/dev \
+        --exclude=/run \
+        --exclude=/mnt \
+        --exclude=/media \
+        --one-file-system /; then
+
+        log_info "System backup created: $(basename "$backup_file")"
+        return 0
+    else
+        log_error "Failed to create system backup"
+        return 1
+    fi
+}
+
+# Create DangerPrep info.conf
+create_dangerprep_info_conf() {
+    local info_file="$IMAGE_DIRNAME/info.conf"
+    local timestamp
+    timestamp=$(date +%Y%m%d)
+
+    cat > "$info_file" << EOF
+title=Ubuntu 24.04 DangerPrep
+require-board=rk3588
+version=$timestamp
+icon=ubuntu.png
+EOF
+
+    log_info "Created DangerPrep info.conf"
+}
+
+# Create EFlasher-compatible image using sd-fuse tools
+create_disk_image() {
+    enhanced_section "Image Creation" "Creating DangerPrep EFlasher image" "💾"
+
+    # Generate image directory name
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S)
+    IMAGE_DIRNAME="${DETECTED_OUTPUT}/ubuntu-noble-desktop-arm64-dangerprep-${timestamp}"
+
+    log_info "Creating DangerPrep EFlasher image: $(basename "$IMAGE_DIRNAME")"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would create EFlasher image directory: $IMAGE_DIRNAME"
+        log_info "[DRY RUN] Would backup current system and create rootfs.img"
+        return 0
+    fi
+
+    # Step 1: Create system backup
+    log_info "Step 1: Creating system backup..."
+    local backup_file="/tmp/dangerprep-rootfs.tar.gz"
+
+    if ! create_system_backup "$backup_file"; then
+        log_error "Failed to create system backup"
+        exit 1
+    fi
+
+    # Step 2: Create working directory based on template
+    log_info "Step 2: Creating image directory from template..."
+    if ! cp -r "$TEMPLATE_IMAGE_DIR" "$IMAGE_DIRNAME"; then
+        log_error "Failed to copy template directory"
+        rm -f "$backup_file" 2>/dev/null || true
+        exit 1
+    fi
+
+    # Step 3: Extract backup and create new rootfs.img
+    log_info "Step 3: Creating custom rootfs.img..."
+    local rootfs_dir="${IMAGE_DIRNAME}/rootfs"
+
+    # Create rootfs directory and extract backup
+    mkdir -p "$rootfs_dir"
+    if ! (cd "$SD_FUSE_DIR" && ./tools/extract-rootfs-tar.sh "$backup_file" "$rootfs_dir"); then
+        log_error "Failed to extract rootfs backup"
+        rm -rf "$IMAGE_DIRNAME" 2>/dev/null || true
+        rm -f "$backup_file" 2>/dev/null || true
+        exit 1
+    fi
+
+    # Build new rootfs.img
+    if ! (cd "$SD_FUSE_DIR" && sudo ./build-rootfs-img.sh "$rootfs_dir" "$(basename "$IMAGE_DIRNAME")"); then
+        log_error "Failed to build rootfs.img"
+        rm -rf "$IMAGE_DIRNAME" 2>/dev/null || true
+        rm -f "$backup_file" 2>/dev/null || true
+        exit 1
+    fi
+
+    # Step 4: Update info.conf
+    log_info "Step 4: Updating image configuration..."
+    create_dangerprep_info_conf
+
+    # Step 5: Clean up
+    rm -rf "$rootfs_dir" 2>/dev/null || true
+    rm -f "$backup_file" 2>/dev/null || true
+
+    enhanced_status_indicator "success" "DangerPrep EFlasher image created successfully"
+    log_info "Image directory: $IMAGE_DIRNAME"
 }
 
 # Validate created image
@@ -460,8 +632,8 @@ detect_eflasher_sd() {
             continue
         fi
 
-        # Look for FAT32 filesystems that might be EFlasher cards
-        if [[ "$fstype" == "vfat" || "$fstype" == "fat32" ]]; then
+        # Look for FAT32/exFAT filesystems that might be EFlasher cards
+        if [[ "$fstype" == "vfat" || "$fstype" == "fat32" || "$fstype" == "exfat" ]]; then
             # Check for EFlasher-specific indicators
             if [[ "$label" =~ (FRIENDLYARM|EFLASHER) ]] ||
                [[ "$mountpoint" =~ /media/.*/FriendlyARM ]] ||
@@ -628,8 +800,11 @@ perform_preflight_checks() {
     # Detect output location
     detect_output_location
 
-    # Generate image filename
-    generate_image_filename
+    # Find EFlasher template
+    find_eflasher_template
+
+    # Setup sd-fuse tools
+    setup_sd_fuse
 
     enhanced_status_indicator "success" "Pre-flight checks completed"
 }
@@ -646,7 +821,8 @@ get_user_confirmation() {
     log_info "Operation Summary:"
     log_info "  Source Device: ${DETECTED_EMMC}"
     log_info "  Output Location: ${DETECTED_OUTPUT}"
-    log_info "  Image Filename: $(basename "${IMAGE_FILENAME}")"
+    log_info "  Template Image: $(basename "${TEMPLATE_IMAGE_DIR}")"
+    log_info "  EFlasher SD Card: ${EFLASHER_SD_PATH}"
 
     local cleanup_status="Yes"
     if [[ "${SKIP_CLEANUP}" == "true" ]]; then
@@ -667,7 +843,7 @@ get_user_confirmation() {
     log_info "  Copy to SD Card: ${copy_sd_status}"
     log_info ""
 
-    if ! gum confirm "Proceed with image creation?"; then
+    if ! enhanced_confirm "Proceed with image creation?" "true"; then
         log_info "Operation cancelled by user"
         exit 0
     fi
@@ -720,9 +896,6 @@ main() {
 
     # Create disk image
     create_disk_image
-
-    # Validate image
-    validate_image
 
     # Copy to SD card if requested
     copy_to_eflasher_sd

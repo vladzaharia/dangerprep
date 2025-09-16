@@ -1871,7 +1871,7 @@ set_default_configuration_values() {
 
     # Set default package selection (all categories for non-interactive mode)
     if [[ -z "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
-        SELECTED_PACKAGE_CATEGORIES="Convenience packages (vim, nano, htop, etc.)
+        SELECTED_PACKAGE_CATEGORIES="Convenience packages (vim, nano, htop, pv, gzip, exfatprogs, etc.)
 Network packages (netplan, tc, iperf3, tailscale, etc.)
 Security packages (fail2ban, aide, clamav, etc.)
 Monitoring packages (sensors, collectd, etc.)
@@ -2286,7 +2286,7 @@ collect_package_configuration() {
 
     # Define package categories (same as in install_essential_packages)
     local package_categories=(
-        "Convenience packages (vim, nano, htop, etc.)"
+        "Convenience packages (vim, nano, htop, pv, gzip, exfatprogs, etc.)"
         "Network packages (netplan, tc, iperf3, tailscale, etc.)"
         "Security packages (fail2ban, aide, clamav, etc.)"
         "Monitoring packages (sensors, collectd, etc.)"
@@ -3624,7 +3624,7 @@ install_essential_packages() {
         while IFS= read -r category; do
             case "$category" in
                 *"Convenience packages"*)
-                    package_categories+=("Convenience:vim,nano,htop,tree,zip,jq,rsync,screen,tmux,fastfetch")
+                    package_categories+=("Convenience:vim,nano,htop,tree,zip,jq,rsync,screen,tmux,fastfetch,pv,gzip,exfatprogs")
                     ;;
                 *"Network packages"*)
                     package_categories+=("Network:netplan.io,iproute2,wondershaper,iperf3,tailscale")
