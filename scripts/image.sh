@@ -730,7 +730,8 @@ create_disk_image() {
 
     # Build new rootfs.img - ensure we're in the correct directory and copy result
     log_info "Building rootfs.img from extracted system..."
-    if ! (cd "$SD_FUSE_DIR" && sudo ./build-rootfs-img.sh "$rootfs_dir" "$(basename "$IMAGE_DIRNAME")"); then
+    local output_dirname="dangerprep-build-$$"
+    if ! (cd "$SD_FUSE_DIR" && sudo ./build-rootfs-img.sh "$rootfs_dir" "$output_dirname"); then
         log_error "Failed to build rootfs.img"
         rm -rf "$IMAGE_DIRNAME" 2>/dev/null || true
         rm -rf "$temp_rootfs_dir" 2>/dev/null || true
@@ -739,15 +740,19 @@ create_disk_image() {
     fi
 
     # Copy the generated rootfs.img to our image directory
-    local generated_rootfs="${SD_FUSE_DIR}/$(basename "$IMAGE_DIRNAME")/rootfs.img"
+    local generated_rootfs="${SD_FUSE_DIR}/${output_dirname}/rootfs.img"
     if [[ -f "$generated_rootfs" ]]; then
         cp "$generated_rootfs" "$IMAGE_DIRNAME/rootfs.img"
         log_info "Rootfs.img copied to image directory"
+        # Clean up the temporary build directory
+        rm -rf "${SD_FUSE_DIR}/${output_dirname}" 2>/dev/null || true
     else
         log_error "Generated rootfs.img not found at expected location: $generated_rootfs"
         rm -rf "$IMAGE_DIRNAME" 2>/dev/null || true
         rm -rf "$temp_rootfs_dir" 2>/dev/null || true
         rm -f "$backup_file" 2>/dev/null || true
+        # Clean up the temporary build directory
+        rm -rf "${SD_FUSE_DIR}/${output_dirname}" 2>/dev/null || true
         exit 1
     fi
 
@@ -876,14 +881,19 @@ create_raw_backup() {
         return 0
     fi
 
-    # Check if EFlasher SD card is available for backup storage
-    if [[ -z "$EFLASHER_SD_PATH" || ! -d "$EFLASHER_SD_PATH" ]]; then
-        log_info "No EFlasher SD card available - skipping raw backup"
-        return 0
+    # Determine backup storage location
+    local backups_dir
+    if [[ -n "$EFLASHER_SD_PATH" && -d "$EFLASHER_SD_PATH" ]]; then
+        # Use EFlasher SD card if available
+        backups_dir="$EFLASHER_SD_PATH/backups"
+        log_info "Using EFlasher SD card for raw backup storage"
+    else
+        # Use detected output location
+        backups_dir="$DETECTED_OUTPUT/backups"
+        log_info "Using output location for raw backup storage: $DETECTED_OUTPUT"
     fi
 
-    # Create backups directory on SD card if it doesn't exist
-    local backups_dir="$EFLASHER_SD_PATH/backups"
+    # Create backups directory if it doesn't exist
     if [[ ! -d "$backups_dir" ]]; then
         mkdir -p "$backups_dir" || {
             log_error "Failed to create backups directory: $backups_dir"
@@ -902,13 +912,13 @@ create_raw_backup() {
     emmc_size_bytes=$(lsblk -dn -b -o SIZE "$DETECTED_EMMC" | tr -d ' ')
     local emmc_size_gb=$((emmc_size_bytes / 1024 / 1024 / 1024))
 
-    # Check available space on SD card
+    # Check available space on backup storage location
     local available_bytes
-    available_bytes=$(df -B1 "$EFLASHER_SD_PATH" | tail -1 | awk '{print $4}')
+    available_bytes=$(df -B1 "$backups_dir" | tail -1 | awk '{print $4}')
     local available_gb=$((available_bytes / 1024 / 1024 / 1024))
 
     if [[ $available_bytes -lt $emmc_size_bytes ]]; then
-        log_warn "Insufficient space for raw backup on EFlasher SD card"
+        log_warn "Insufficient space for raw backup on storage device"
         log_warn "Required: ${emmc_size_gb}GB, Available: ${available_gb}GB"
         log_info "Skipping raw backup creation"
         return 0
@@ -1051,8 +1061,12 @@ show_completion_info() {
     fi
 
     # Show raw backup information if created
-    if [[ "$CREATE_RAW_BACKUP" == "true" && -n "$EFLASHER_SD_PATH" && -d "$EFLASHER_SD_PATH/backups" ]]; then
-        log_info "Raw backup ready in backups folder for EFlasher restoration"
+    if [[ "$CREATE_RAW_BACKUP" == "true" ]]; then
+        if [[ -n "$EFLASHER_SD_PATH" && -d "$EFLASHER_SD_PATH/backups" ]]; then
+            log_info "Raw backup ready in backups folder on EFlasher SD card"
+        elif [[ -d "$DETECTED_OUTPUT/backups" ]]; then
+            log_info "Raw backup ready in backups folder at: $DETECTED_OUTPUT/backups"
+        fi
     fi
 }
 
@@ -1078,13 +1092,30 @@ perform_preflight_checks() {
     # Detect output location
     detect_output_location
 
+    # Try to detect EFlasher SD card (optional for raw backups)
+    local sd_mountpoint
+    sd_mountpoint=$(detect_eflasher_sd) || true
+    if [[ -n "$sd_mountpoint" ]]; then
+        EFLASHER_SD_PATH="$sd_mountpoint"
+        log_info "Found EFlasher SD card at: $EFLASHER_SD_PATH"
+    else
+        log_info "No EFlasher SD card detected (raw backups will use output location)"
+    fi
+
+    enhanced_status_indicator "success" "Pre-flight checks completed"
+}
+
+# Setup EFlasher-specific requirements
+setup_eflasher_requirements() {
+    enhanced_section "EFlasher Setup" "Preparing EFlasher image requirements" "🔧"
+
     # Find EFlasher template
     find_eflasher_template
 
     # Setup sd-fuse tools
     setup_sd_fuse
 
-    enhanced_status_indicator "success" "Pre-flight checks completed"
+    enhanced_status_indicator "success" "EFlasher requirements ready"
 }
 
 # Get user confirmation and backup options
@@ -1120,13 +1151,13 @@ get_user_confirmation() {
     local gum_cmd
     gum_cmd=$(get_gum_cmd)
 
-    # Always available: EFlasher image creation
-    backup_options+=("EFlasher Image Directory")
-
-    # Add raw backup option if SD card is available
+    # EFlasher image creation (only if SD card is available)
     if [[ -n "$EFLASHER_SD_PATH" && -d "$EFLASHER_SD_PATH" ]]; then
-        backup_options+=("Raw Disk Backup (.raw file)")
+        backup_options+=("EFlasher Image Directory")
     fi
+
+    # Raw backup option (always available)
+    backup_options+=("Raw Disk Backup (.raw file)")
 
     # Future options can be added here:
     # backup_options+=("Compressed Archive (.tar.gz)")
@@ -1240,8 +1271,9 @@ main() {
     # Perform system cleanup
     perform_system_cleanup
 
-    # Create EFlasher image if selected
+    # Setup EFlasher requirements and create image if selected
     if [[ "$CREATE_EFLASHER_IMAGE" == "true" ]]; then
+        setup_eflasher_requirements
         create_disk_image
         validate_image
         copy_to_eflasher_sd
