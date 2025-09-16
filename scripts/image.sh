@@ -459,7 +459,6 @@ perform_system_cleanup() {
 
     # Clear temporary files (preserve sd-fuse directory if it exists)
     enhanced_status_indicator "info" "Clearing temporary files..."
-    find /tmp -mindepth 1 -maxdepth 1 ! -name "sd-fuse_rk3588" -exec rm -rf {} \; 2>/dev/null || true
     rm -rf /var/tmp/* 2>/dev/null || true
 
     # Clear package caches
@@ -617,7 +616,7 @@ create_system_backup() {
     log_info "Creating system backup (this may take 5-15 minutes)..."
 
     # Create backup excluding unnecessary files (matches sd-fuse recommended format)
-    if tar --warning=no-file-changed -cpzf "$backup_file" \
+    if tar --warning=no-file-changed --numeric-owner -czf "$backup_file" \
         --exclude="$backup_file" \
         --exclude=/var/lib/docker/runtimes \
         --exclude=/etc/firstuse \
