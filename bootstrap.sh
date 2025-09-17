@@ -447,36 +447,74 @@ check_screen_sessions() {
     return 1
 }
 
-# Handle TTY connection for screen session management
-setup_tty_for_screen() {
-    # Check for truly non-interactive environments (both stdin AND stdout not terminals)
-    if [[ ! -t 0 && ! -t 1 ]] || [[ "${TERM:-}" == "dumb" ]]; then
-        log_warn "Non-interactive environment detected - falling back to direct execution"
-        return 1
-    fi
-
-    # Special handling for piped execution (stdin not terminal but stdout is)
+# Check if we're in a piped execution environment
+is_piped_execution() {
+    # Check for piped execution (stdin not terminal but stdout is)
     # This is the case when running: curl ... | sudo bash
     if [[ ! -t 0 && -t 1 ]]; then
-        log_info "Piped execution detected (likely from curl/wget)"
-        log_info "Attempting to connect to controlling terminal for screen session"
-
-        # Try to reconnect to the controlling terminal for input
-        if [[ -c /dev/tty ]]; then
-            log_info "Using controlling terminal for screen session management"
-            # Redirect stdin to the controlling terminal
-            exec 0</dev/tty
-            log_success "Successfully connected to controlling terminal"
-            return 0
-        else
-            log_warn "No controlling terminal available"
-            log_warn "Falling back to direct execution"
-            return 1
-        fi
+        return 0  # Piped execution
     fi
 
-    # All file descriptors are terminals - we're good to go
-    return 0
+    # Check for truly non-interactive environments
+    if [[ ! -t 0 && ! -t 1 ]] || [[ "${TERM:-}" == "dumb" ]]; then
+        return 0  # Non-interactive
+    fi
+
+    return 1  # Interactive terminal
+}
+
+# Create detached screen session for piped execution
+create_detached_screen_session() {
+    local session_name="dangerprep"
+
+    log_info "Piped execution detected - creating detached screen session"
+    log_info "This allows the setup to survive SSH disconnections"
+
+    # Create detached screen session with setup commands
+    screen -dm -S "$session_name" bash -c "
+        cd '$INSTALL_DIR'
+
+        # Ensure proper permissions
+        chmod -R 755 '$INSTALL_DIR'
+
+        # Download required tools
+        echo -e '${BLUE}[INFO]${NC} Downloading gum...'
+        bash lib/gum/download.sh
+
+        # Run the main setup script with appropriate flags
+        echo -e '${BLUE}[INFO]${NC} Running main setup script...'
+        local setup_args=()
+
+        if [[ '$NON_INTERACTIVE' == 'true' ]]; then
+            echo -e '${BLUE}[INFO]${NC} Using non-interactive mode (defaults only)'
+            setup_args+=('--non-interactive')
+        else
+            echo -e '${BLUE}[INFO]${NC} Using interactive mode for configuration (bootstrap default)'
+            setup_args+=('--force-interactive')
+        fi
+
+        bash scripts/setup.sh \"\${setup_args[@]}\"
+
+        echo -e '${GREEN}[SUCCESS]${NC} DangerPrep setup completed successfully!'
+        echo -e '${BLUE}[INFO]${NC} Setup complete. You can safely detach this session.'
+        echo -e '${BLUE}[INFO]${NC} Press Enter to keep session alive or Ctrl+C to exit...'
+        read
+    "
+
+    # Give the session a moment to start
+    sleep 2
+
+    log_success "Detached screen session '$session_name' created successfully!"
+    echo
+    log_info "📋 SCREEN SESSION INSTRUCTIONS:"
+    log_info "• To attach to the session: screen -r $session_name"
+    log_info "• To detach from session: Ctrl+A, then D"
+    log_info "• To list sessions: screen -ls"
+    log_info "• To kill session: screen -X -S $session_name quit"
+    echo
+    log_info "The setup is now running in the background."
+    log_info "You can safely close this terminal and reconnect later."
+    log_info "Run 'screen -r $session_name' to attach to the setup session."
 }
 
 # Attach to existing screen session or create new one
@@ -489,10 +527,10 @@ manage_screen_session() {
         return 0
     fi
 
-    # Setup TTY connection for screen
-    if ! setup_tty_for_screen; then
-        run_setup_direct
-        return
+    # Handle piped execution - create detached session
+    if is_piped_execution; then
+        create_detached_screen_session
+        return 0
     fi
 
     # Check for existing sessions
