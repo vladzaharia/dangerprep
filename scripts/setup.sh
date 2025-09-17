@@ -1967,6 +1967,12 @@ FRIENDLYELEC_ENABLE_FEATURES="$FRIENDLYELEC_ENABLE_FEATURES"
 NVME_PARTITION_CONFIRMED="${NVME_PARTITION_CONFIRMED:-false}"
 NVME_DEVICE="${NVME_DEVICE:-}"
 
+# Kiosk Configuration (NanoPi M6)
+KIOSK_ENABLED="${KIOSK_ENABLED:-false}"
+KIOSK_URL="${KIOSK_URL:-}"
+KIOSK_VNC_ENABLED="${KIOSK_VNC_ENABLED:-false}"
+KIOSK_VNC_PASSWORD="${KIOSK_VNC_PASSWORD:-}"
+
 # System Detection
 IS_FRIENDLYELEC="$IS_FRIENDLYELEC"
 EOF
@@ -2239,6 +2245,11 @@ collect_configuration() {
         collect_friendlyelec_configuration
     fi
 
+    # Kiosk mode configuration (NanoPi M6 only)
+    if [[ "$IS_FRIENDLYELEC" == true && "$FRIENDLYELEC_MODEL" == "NanoPi-M6" ]]; then
+        collect_kiosk_configuration
+    fi
+
     # User account configuration
     collect_user_account_configuration
 
@@ -2262,6 +2273,7 @@ collect_configuration() {
     export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
+    export KIOSK_ENABLED KIOSK_URL KIOSK_VNC_ENABLED KIOSK_VNC_PASSWORD
 
     # Save configuration for resumable installations
     save_configuration
@@ -2393,6 +2405,89 @@ collect_friendlyelec_configuration() {
     package_count=$(echo "$FRIENDLYELEC_INSTALL_PACKAGES" | wc -l)
     feature_count=$(echo "$FRIENDLYELEC_ENABLE_FEATURES" | wc -l)
     enhanced_status_indicator "success" "Selected $package_count package categories and $feature_count features"
+}
+
+# Collect kiosk mode configuration upfront (NanoPi M6 only)
+collect_kiosk_configuration() {
+    echo
+    log_info "🖥️ Kiosk Mode Configuration"
+    echo
+
+    # Check if kiosk configuration is already set
+    if [[ -n "${KIOSK_ENABLED:-}" ]] && [[ -n "${KIOSK_URL:-}" ]] && [[ -n "${KIOSK_VNC_ENABLED:-}" ]]; then
+        log_debug "Kiosk configuration already set"
+        return 0
+    fi
+
+    log_info "The NanoPi M6 touchscreen can be configured in kiosk mode to display a web interface."
+    log_info "This will also set up VNC access for remote administration."
+    echo
+
+    # Enable kiosk mode by default for NanoPi M6
+    local kiosk_enabled="true"
+    if [[ "$INTERACTIVE_MODE" == true ]]; then
+        if enhanced_confirm "Enable kiosk mode on the touchscreen?" "true"; then
+            kiosk_enabled="true"
+        else
+            kiosk_enabled="false"
+        fi
+    fi
+
+    if [[ "$kiosk_enabled" == "true" ]]; then
+        # Kiosk URL configuration
+        local default_url="https://google.com"
+        local kiosk_url="$default_url"
+
+        if [[ "$INTERACTIVE_MODE" == true ]]; then
+            echo
+            log_info "Configure the URL to display in kiosk mode:"
+            kiosk_url=$(gum_input "Kiosk URL" "$default_url" "Enter the URL to display in kiosk mode")
+        fi
+
+        # VNC access configuration
+        local vnc_enabled="true"
+        if [[ "$INTERACTIVE_MODE" == true ]]; then
+            echo
+            if enhanced_confirm "Enable VNC server for remote desktop access?" "true"; then
+                vnc_enabled="true"
+            else
+                vnc_enabled="false"
+            fi
+        fi
+
+        # Generate VNC password if VNC is enabled
+        local vnc_password=""
+        if [[ "$vnc_enabled" == "true" ]]; then
+            if [[ "$INTERACTIVE_MODE" == true ]]; then
+                vnc_password=$(gum_input "VNC Password" "" "Enter VNC password (leave empty to generate)" "password")
+            fi
+
+            if [[ -z "$vnc_password" ]]; then
+                # Generate secure random password
+                vnc_password=$(openssl rand -base64 12 | tr -d "=+/" | cut -c1-12)
+                log_info "Generated VNC password: $vnc_password"
+            fi
+        fi
+
+        # Export configuration
+        export KIOSK_ENABLED="$kiosk_enabled"
+        export KIOSK_URL="$kiosk_url"
+        export KIOSK_VNC_ENABLED="$vnc_enabled"
+        export KIOSK_VNC_PASSWORD="$vnc_password"
+
+        log_info "Kiosk mode will be enabled with URL: $kiosk_url"
+        if [[ "$vnc_enabled" == "true" ]]; then
+            log_info "VNC server will be enabled for remote access"
+        fi
+    else
+        export KIOSK_ENABLED="false"
+        export KIOSK_URL=""
+        export KIOSK_VNC_ENABLED="false"
+        export KIOSK_VNC_PASSWORD=""
+        log_info "Kiosk mode disabled"
+    fi
+
+    enhanced_status_indicator "success" "Kiosk configuration completed"
 }
 
 # Collect storage configuration upfront
@@ -2655,6 +2750,26 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
         fi
 
         enhanced_card "🔧 FriendlyElec Configuration" "$friendlyelec_config" "208" "208"
+
+        # Kiosk configuration if applicable (NanoPi M6 only)
+        if [[ "$FRIENDLYELEC_MODEL" == "NanoPi-M6" ]]; then
+            local kiosk_config="Kiosk Mode: "
+            if [[ "${KIOSK_ENABLED:-false}" == "true" ]]; then
+                kiosk_config+="Enabled"$'\n'
+                kiosk_config+="Kiosk URL: ${KIOSK_URL:-https://google.com}"$'\n'
+                kiosk_config+="VNC Access: "
+                if [[ "${KIOSK_VNC_ENABLED:-false}" == "true" ]]; then
+                    kiosk_config+="Enabled (Port 5900)"$'\n'
+                    kiosk_config+="VNC Password: ${KIOSK_VNC_PASSWORD:0:3}***"
+                else
+                    kiosk_config+="Disabled"
+                fi
+            else
+                kiosk_config+="Disabled"
+            fi
+
+            enhanced_card "🖥️ Kiosk Configuration" "$kiosk_config" "45" "45"
+        fi
     fi
 }
 
@@ -8096,6 +8211,269 @@ EOF
     log_success "Emergency recovery service created and enabled"
 }
 
+# Setup kiosk mode and VNC access (NanoPi M6 only)
+setup_kiosk_mode() {
+    # Only run on NanoPi M6 with kiosk enabled
+    if [[ "$IS_FRIENDLYELEC" != true || "$FRIENDLYELEC_MODEL" != "NanoPi-M6" || "${KIOSK_ENABLED:-false}" != "true" ]]; then
+        log_info "Kiosk mode not enabled or not applicable, skipping kiosk setup"
+        return 0
+    fi
+
+    enhanced_section "Kiosk Mode Setup" "Configuring touchscreen kiosk and VNC access" "🖥️"
+
+    # Install required packages
+    log_info "Installing kiosk mode packages..."
+    local kiosk_packages=(
+        "gnome-kiosk"
+        "gnome-kiosk-script-session"
+        "firefox"
+    )
+
+    if [[ "${KIOSK_VNC_ENABLED:-false}" == "true" ]]; then
+        kiosk_packages+=("x11vnc")
+    fi
+
+    if enhanced_spin "Installing kiosk packages" \
+        bash -c "env DEBIAN_FRONTEND=noninteractive apt install -y ${kiosk_packages[*]}"; then
+        enhanced_status_indicator "success" "Kiosk packages installed"
+    else
+        enhanced_status_indicator "failure" "Failed to install kiosk packages"
+        return 1
+    fi
+
+    # Configure kiosk mode for the new user
+    if [[ -n "${NEW_USERNAME:-}" ]]; then
+        configure_gnome_kiosk "$NEW_USERNAME"
+
+        if [[ "${KIOSK_VNC_ENABLED:-false}" == "true" ]]; then
+            setup_vnc_server "$NEW_USERNAME"
+        fi
+
+        create_kiosk_mode_switcher "$NEW_USERNAME"
+
+        # Set kiosk mode as default
+        set_kiosk_mode_default "$NEW_USERNAME"
+    else
+        log_warn "No user account configured, skipping kiosk user setup"
+    fi
+
+    enhanced_status_indicator "success" "Kiosk mode setup completed"
+    log_info "Kiosk URL: ${KIOSK_URL:-https://google.com}"
+    if [[ "${KIOSK_VNC_ENABLED:-false}" == "true" ]]; then
+        log_info "VNC server enabled - connect to port 5900"
+        log_info "VNC password: ${KIOSK_VNC_PASSWORD:-not set}"
+    fi
+    log_info "Switch modes: dp-kiosk / dp-desktop"
+}
+
+# Configure GNOME kiosk session for user
+configure_gnome_kiosk() {
+    local username="$1"
+    local user_home="/home/$username"
+
+    log_info "Configuring GNOME kiosk for user: $username"
+
+    # Create kiosk script directory
+    if ! standard_create_directory "$user_home/.local/bin" "755" "$username" "$username"; then
+        log_error "Failed to create kiosk script directory"
+        return 1
+    fi
+
+    # Create GNOME kiosk script
+    local kiosk_script="$user_home/.local/bin/gnome-kiosk-script"
+    cat > "$kiosk_script" << EOF
+#!/bin/bash
+# DangerPrep GNOME Kiosk Script
+# This script runs the kiosk application in fullscreen mode
+
+# Set display
+export DISPLAY=:0
+
+# Clear any crash flags from previous Firefox sessions
+if [[ -f "$user_home/.mozilla/firefox/*/prefs.js" ]]; then
+    find "$user_home/.mozilla/firefox" -name "prefs.js" -exec sed -i 's/user_pref("toolkit.startup.max_resumed_crashes", [0-9]*);/user_pref("toolkit.startup.max_resumed_crashes", -1);/' {} \; 2>/dev/null || true
+fi
+
+# Launch Firefox in kiosk mode
+firefox --kiosk --no-first-run --disable-restore-session-state "${KIOSK_URL:-https://google.com}" &
+
+# Keep the script running and restart Firefox if it crashes
+while true; do
+    sleep 10
+    if ! pgrep -f "firefox.*kiosk" >/dev/null; then
+        log_info "Firefox kiosk crashed, restarting..."
+        firefox --kiosk --no-first-run --disable-restore-session-state "${KIOSK_URL:-https://google.com}" &
+    fi
+done
+EOF
+
+    chmod +x "$kiosk_script"
+    chown "$username:$username" "$kiosk_script"
+
+    enhanced_status_indicator "success" "GNOME kiosk script created"
+}
+
+# Setup VNC server for remote access
+setup_vnc_server() {
+    local username="$1"
+    local user_home="/home/$username"
+
+    log_info "Setting up VNC server for user: $username"
+
+    # Create VNC password file
+    local vnc_password="${KIOSK_VNC_PASSWORD:-dangerprep}"
+    if ! standard_create_directory "$user_home/.vnc" "700" "$username" "$username"; then
+        log_error "Failed to create VNC directory"
+        return 1
+    fi
+
+    # Set VNC password
+    echo "$vnc_password" | sudo -u "$username" x11vnc -storepasswd "$user_home/.vnc/passwd" 2>/dev/null || {
+        log_error "Failed to set VNC password"
+        return 1
+    }
+
+    # Create VNC systemd service
+    cat > "/etc/systemd/system/x11vnc.service" << EOF
+[Unit]
+Description=X11VNC Server for DangerPrep Kiosk
+Documentation=man:x11vnc(1)
+After=display-manager.service network.target
+Wants=display-manager.service
+
+[Service]
+Type=simple
+User=$username
+Environment=DISPLAY=:0
+ExecStart=/usr/bin/x11vnc -display :0 -auth guess -forever -loop -noxdamage -repeat -rfbauth $user_home/.vnc/passwd -rfbport 5900 -shared -capslock -nomodtweak
+ExecStop=/usr/bin/killall x11vnc
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Enable and start VNC service
+    if standard_service_operation "x11vnc" "enable" && standard_service_operation "x11vnc" "start"; then
+        enhanced_status_indicator "success" "VNC server configured and started"
+    else
+        enhanced_status_indicator "warning" "VNC server configured but may not be running"
+    fi
+}
+
+# Create kiosk mode switcher utilities
+create_kiosk_mode_switcher() {
+    local username="$1"
+
+    log_info "Creating kiosk mode switcher utilities"
+
+    # Create kiosk mode switcher script
+    cat > "/usr/local/bin/dp-kiosk" << EOF
+#!/bin/bash
+# DangerPrep Kiosk Mode Switcher
+# Switch to kiosk mode
+
+USERNAME="$username"
+ACCOUNTS_SERVICE_FILE="/var/lib/AccountsService/users/\$USERNAME"
+
+if [[ ! -f "\$ACCOUNTS_SERVICE_FILE" ]]; then
+    echo "Error: User account file not found: \$ACCOUNTS_SERVICE_FILE"
+    exit 1
+fi
+
+echo "Switching to kiosk mode for user: \$USERNAME"
+
+# Backup current session configuration
+cp "\$ACCOUNTS_SERVICE_FILE" "\$ACCOUNTS_SERVICE_FILE.backup-\$(date +%Y%m%d-%H%M%S)"
+
+# Update session to kiosk mode
+sed -i 's/^Session=.*/Session=gnome-kiosk-script-wayland/' "\$ACCOUNTS_SERVICE_FILE"
+
+# Ensure the session line exists
+if ! grep -q "^Session=" "\$ACCOUNTS_SERVICE_FILE"; then
+    echo "Session=gnome-kiosk-script-wayland" >> "\$ACCOUNTS_SERVICE_FILE"
+fi
+
+echo "Kiosk mode enabled. Restart the display manager or reboot to take effect."
+echo "To restart display manager: sudo systemctl restart gdm3"
+EOF
+
+    # Create desktop mode switcher script
+    cat > "/usr/local/bin/dp-desktop" << EOF
+#!/bin/bash
+# DangerPrep Desktop Mode Switcher
+# Switch to desktop mode
+
+USERNAME="$username"
+ACCOUNTS_SERVICE_FILE="/var/lib/AccountsService/users/\$USERNAME"
+
+if [[ ! -f "\$ACCOUNTS_SERVICE_FILE" ]]; then
+    echo "Error: User account file not found: \$ACCOUNTS_SERVICE_FILE"
+    exit 1
+fi
+
+echo "Switching to desktop mode for user: \$USERNAME"
+
+# Backup current session configuration
+cp "\$ACCOUNTS_SERVICE_FILE" "\$ACCOUNTS_SERVICE_FILE.backup-\$(date +%Y%m%d-%H%M%S)"
+
+# Update session to desktop mode
+sed -i 's/^Session=.*/Session=ubuntu/' "\$ACCOUNTS_SERVICE_FILE"
+
+# Ensure the session line exists
+if ! grep -q "^Session=" "\$ACCOUNTS_SERVICE_FILE"; then
+    echo "Session=ubuntu" >> "\$ACCOUNTS_SERVICE_FILE"
+fi
+
+echo "Desktop mode enabled. Restart the display manager or reboot to take effect."
+echo "To restart display manager: sudo systemctl restart gdm3"
+EOF
+
+    # Make scripts executable
+    chmod +x "/usr/local/bin/dp-kiosk"
+    chmod +x "/usr/local/bin/dp-desktop"
+
+    enhanced_status_indicator "success" "Mode switcher utilities created"
+}
+
+# Set kiosk mode as default for user
+set_kiosk_mode_default() {
+    local username="$1"
+    local accounts_service_file="/var/lib/AccountsService/users/$username"
+
+    log_info "Setting kiosk mode as default for user: $username"
+
+    # Ensure AccountsService directory exists
+    if ! standard_create_directory "/var/lib/AccountsService/users" "755" "root" "root"; then
+        log_error "Failed to create AccountsService directory"
+        return 1
+    fi
+
+    # Create or update user's session configuration
+    if [[ -f "$accounts_service_file" ]]; then
+        # Backup existing configuration
+        cp "$accounts_service_file" "$accounts_service_file.backup-$(date +%Y%m%d-%H%M%S)"
+
+        # Update session to kiosk mode
+        sed -i 's/^Session=.*/Session=gnome-kiosk-script-wayland/' "$accounts_service_file"
+
+        # Add session line if it doesn't exist
+        if ! grep -q "^Session=" "$accounts_service_file"; then
+            echo "Session=gnome-kiosk-script-wayland" >> "$accounts_service_file"
+        fi
+    else
+        # Create new configuration file
+        cat > "$accounts_service_file" << EOF
+[User]
+Session=gnome-kiosk-script-wayland
+SystemAccount=false
+EOF
+    fi
+
+    enhanced_status_indicator "success" "Kiosk mode set as default"
+}
+
 # Generate sync service configurations
 generate_sync_configs() {
     log_info "Generating sync service configurations..."
@@ -8528,6 +8906,7 @@ main() {
         "setup_encrypted_backups:Setting up encrypted backups"
         "configure_user_accounts:Configuring user accounts"
         "configure_screen_lock:Configuring screen lock settings"
+        "setup_kiosk_mode:Setting up kiosk mode and VNC access"
         "create_emergency_recovery_service:Creating emergency recovery service"
         "enable_essential_services:Enabling essential system services"
         "start_all_services:Starting all services"
