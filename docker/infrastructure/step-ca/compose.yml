@@ -2,6 +2,7 @@ services:
   step-ca:
     image: smallstep/step-ca:latest
     restart: unless-stopped
+    user: root
     ports:
       - "9000:9000"
     volumes:
@@ -9,8 +10,6 @@ services:
       - step-ca-certs:/home/step/certs
     env_file:
       - compose.env
-    # Note: Step-CA runs as its own internal user, not 1337:1337
-    # Forcing UID 1337 causes permission issues with secrets directory
     labels:
       - "traefik.enable=true"
       

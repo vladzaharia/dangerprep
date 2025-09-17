@@ -5002,7 +5002,79 @@ start_docker_service() {
     return 1
 }
 
+# Configure Docker client to use local socket without TLS
+# This prevents the recurring "ca.pem: no such file or directory" error
+configure_docker_client_local_socket() {
+    log_info "Configuring Docker client for local socket access..."
 
+    # Ensure Docker client uses local socket without TLS
+    # This prevents the "ca.pem: no such file or directory" error
+    export DOCKER_HOST="unix:///var/run/docker.sock"
+    export DOCKER_TLS_VERIFY=""
+    unset DOCKER_CERT_PATH
+    unset DOCKER_TLS_VERIFY
+
+    # Remove any existing Docker context that might use TLS
+    if command -v docker >/dev/null 2>&1; then
+        # Reset to default context (local socket)
+        docker context use default >/dev/null 2>&1 || true
+
+        # Remove any TLS-enabled contexts that might cause issues
+        local contexts
+        contexts=$(docker context ls --format "{{.Name}}" 2>/dev/null | grep -v "^default$" || true)
+        if [[ -n "$contexts" ]]; then
+            while IFS= read -r context; do
+                if [[ -n "$context" ]]; then
+                    log_debug "Removing Docker context: $context"
+                    docker context rm "$context" >/dev/null 2>&1 || true
+                fi
+            done <<< "$contexts"
+        fi
+    fi
+
+    # Create/update Docker client configuration to ensure local socket usage
+    local docker_config_dir="/root/.docker"
+    mkdir -p "$docker_config_dir"
+
+    # Create a minimal Docker client config that forces local socket usage
+    cat > "$docker_config_dir/config.json" << 'EOF'
+{
+    "currentContext": "default"
+}
+EOF
+
+    # Set proper permissions
+    chmod 600 "$docker_config_dir/config.json"
+
+    # Ensure Docker environment variables persist across reboots
+    # Add to system-wide environment configuration
+    local docker_env_file="/etc/environment.d/99-docker-client.conf"
+    mkdir -p "/etc/environment.d"
+    cat > "$docker_env_file" << 'EOF'
+# Docker client configuration to prevent TLS certificate errors
+DOCKER_HOST=unix:///var/run/docker.sock
+DOCKER_TLS_VERIFY=
+EOF
+
+    # Also add to profile.d for immediate availability
+    local docker_profile_file="/etc/profile.d/99-docker-client.sh"
+    cat > "$docker_profile_file" << 'EOF'
+# Docker client configuration to prevent TLS certificate errors
+export DOCKER_HOST="unix:///var/run/docker.sock"
+export DOCKER_TLS_VERIFY=""
+unset DOCKER_CERT_PATH
+EOF
+    chmod 644 "$docker_profile_file"
+
+    # Verify Docker client configuration
+    if docker info >/dev/null 2>&1; then
+        enhanced_status_indicator "success" "Docker client configured for local socket access"
+        log_debug "Docker client successfully configured to use unix:///var/run/docker.sock"
+    else
+        enhanced_status_indicator "warning" "Docker client configuration may need manual adjustment"
+        log_warn "Docker client may still have TLS configuration issues"
+    fi
+}
 
 # Setup Docker services using standardized patterns
 setup_docker_services() {
@@ -5061,6 +5133,10 @@ setup_docker_services() {
         log_info "Docker services can be configured later after Docker daemon is started"
         return 0
     fi
+
+    # Configure Docker client to use local socket without TLS
+    # This prevents the recurring "ca.pem: no such file or directory" error
+    configure_docker_client_local_socket
 
     # Setup shared Docker infrastructure (networks and volumes)
     if ! setup_shared_docker_infrastructure; then
