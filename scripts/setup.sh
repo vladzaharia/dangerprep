@@ -3616,6 +3616,11 @@ install_essential_packages() {
     # Core packages: Always installed (Essential for DangerPrep functionality)
     local core_packages="curl,wget,git,bc,unzip,software-properties-common,apt-transport-https,ca-certificates,gnupg,lsb-release,iptables,iptables-persistent"
 
+    # Add touchscreen power management packages for NanoPi M6
+    if [[ "$FRIENDLYELEC_MODEL" == "NanoPi-M6" ]]; then
+        core_packages+=",x11-xserver-utils"
+    fi
+
     # Build package categories based on upfront configuration
     local package_categories=("Core:$core_packages")
 
@@ -3654,7 +3659,7 @@ install_essential_packages() {
             case "$category" in
                 *"Hardware acceleration packages"*)
                     if [[ "$IS_RK3588" == true || "$IS_RK3588S" == true ]]; then
-                        package_categories+=("Hardware:mesa-utils,glmark2-es2,v4l-utils,gstreamer1.0-tools,gstreamer1.0-plugins-bad,gstreamer1.0-rockchip1")
+                        package_categories+=("Hardware:mesa-utils,glmark2-es2,v4l-utils,gstreamer1.0-tools,gstreamer1.0-plugins-bad,gstreamer1.0-rockchip1,x11-xserver-utils")
                     fi
                     ;;
                 *"Development packages"*)
@@ -3926,6 +3931,9 @@ configure_nanopi_m6_specific() {
     # Configure thermal management
     configure_nanopi_m6_thermal
 
+    # Configure touchscreen power management
+    configure_nanopi_m6_touchscreen_power
+
     # Configure network optimizations
     configure_nanopi_m6_network
 
@@ -4117,6 +4125,144 @@ net.ipv4.tcp_congestion_control = bbr
 EOF
 
     log_info "Network optimizations configured for Gigabit Ethernet"
+}
+
+# Configure NanoPi M6 touchscreen power management
+configure_nanopi_m6_touchscreen_power() {
+    log_info "Configuring NanoPi M6 touchscreen power management..."
+
+    # Configure GNOME/Ubuntu Desktop screen timeout (60 seconds)
+    if command -v gsettings >/dev/null 2>&1; then
+        log_info "Configuring GNOME desktop screen timeout..."
+
+        # Set screen blank timeout to 60 seconds
+        gsettings set org.gnome.desktop.session idle-delay 60 2>/dev/null || true
+
+        # Disable automatic screen lock (wake on touch without password)
+        gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null || true
+        gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null || true
+
+        # Configure power settings to not suspend on idle
+        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
+        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
+
+        log_info "GNOME desktop screen timeout configured"
+    fi
+
+    # Configure X11 DPMS settings for all users
+    log_info "Configuring X11 display power management..."
+
+    # Create X11 startup script for DPMS configuration
+    cat > /etc/X11/Xsession.d/95-touchscreen-power-mgmt << 'EOF'
+#!/bin/bash
+# DangerPrep Touchscreen Power Management for X11
+# Configure DPMS settings for 60-second screen timeout
+
+# Enable DPMS (Display Power Management Signaling)
+xset +dpms 2>/dev/null || true
+
+# Set DPMS timeouts: standby=60s, suspend=60s, off=60s
+xset dpms 60 60 60 2>/dev/null || true
+
+# Disable X11 screensaver (we only want display power management)
+xset s off 2>/dev/null || true
+
+# Log configuration
+logger "DangerPrep: Configured touchscreen power management - 60s timeout"
+EOF
+
+    chmod +x /etc/X11/Xsession.d/95-touchscreen-power-mgmt
+
+    # Configure XFCE power manager if present
+    if command -v xfconf-query >/dev/null 2>&1; then
+        log_info "Configuring XFCE power manager..."
+
+        # Set display blanking timeout to 60 seconds for AC power
+        xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/blank-on-ac -s 1 2>/dev/null || true
+        xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-on-ac-sleep -s 1 2>/dev/null || true
+
+        # Set display blanking timeout to 60 seconds for battery power
+        xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/blank-on-battery -s 1 2>/dev/null || true
+        xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-on-battery-sleep -s 1 2>/dev/null || true
+
+        # Disable system suspend on idle
+        xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/inactivity-on-ac -s 14 2>/dev/null || true
+        xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/inactivity-on-battery -s 14 2>/dev/null || true
+
+        log_info "XFCE power manager configured"
+    fi
+
+    # Configure systemd-logind for system-level power management
+    log_info "Configuring systemd-logind power management..."
+
+    # Backup original logind.conf
+    if [[ -f /etc/systemd/logind.conf ]]; then
+        cp /etc/systemd/logind.conf /etc/systemd/logind.conf.backup 2>/dev/null || true
+    fi
+
+    # Configure logind to handle idle timeout appropriately
+    cat > /etc/systemd/logind.conf.d/touchscreen-power-mgmt.conf << 'EOF'
+# DangerPrep Touchscreen Power Management
+# Configure systemd-logind for touchscreen timeout behavior
+
+[Login]
+# Don't suspend the system on idle - let display power management handle it
+IdleAction=ignore
+
+# Set a longer idle timeout to prevent conflicts with display power management
+IdleActionSec=30min
+
+# Handle power key properly
+HandlePowerKey=poweroff
+
+# Don't suspend on lid close (if applicable)
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+EOF
+
+    # Create directory if it doesn't exist
+    mkdir -p /etc/systemd/logind.conf.d
+
+    log_info "systemd-logind power management configured"
+
+    # Create user configuration script for desktop environments
+    cat > /usr/local/bin/configure-touchscreen-power-user << 'EOF'
+#!/bin/bash
+# DangerPrep User-level Touchscreen Power Management Configuration
+# This script configures user-specific settings for touchscreen power management
+
+# Configure GNOME settings for current user
+if command -v gsettings >/dev/null 2>&1; then
+    # Set screen blank timeout to 60 seconds
+    gsettings set org.gnome.desktop.session idle-delay 60 2>/dev/null || true
+
+    # Disable screen lock
+    gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null || true
+    gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null || true
+
+    # Configure power settings
+    gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
+    gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
+
+    echo "Configured GNOME touchscreen power management for user: $(whoami)"
+fi
+
+# Configure X11 settings for current session
+if [[ -n "${DISPLAY:-}" ]] && command -v xset >/dev/null 2>&1; then
+    # Enable DPMS and set 60-second timeout
+    xset +dpms 2>/dev/null || true
+    xset dpms 60 60 60 2>/dev/null || true
+    xset s off 2>/dev/null || true
+
+    echo "Configured X11 touchscreen power management for user: $(whoami)"
+fi
+EOF
+
+    chmod +x /usr/local/bin/configure-touchscreen-power-user
+
+    log_success "NanoPi M6 touchscreen power management configured"
+    log_info "Screen will automatically turn off after 60 seconds of inactivity"
+    log_info "Touch, mouse, or keyboard input will wake the screen immediately"
 }
 
 # Configure RK3588/RK3588S GPU settings
@@ -7130,6 +7276,36 @@ create_new_user() {
 
     # Update configuration files that reference pi user
     update_user_references "$username"
+
+    # Configure touchscreen power management for new user (NanoPi M6 specific)
+    if [[ "$FRIENDLYELEC_MODEL" == "NanoPi-M6" ]]; then
+        log_info "Configuring touchscreen power management for $username..."
+
+        # Create autostart directory for user
+        local autostart_dir="/home/$username/.config/autostart"
+        if standard_create_directory "$autostart_dir" "755" "$username" "$username"; then
+            # Create desktop entry to run touchscreen power configuration on login
+            cat > "$autostart_dir/touchscreen-power-mgmt.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=DangerPrep Touchscreen Power Management
+Comment=Configure touchscreen power management settings
+Exec=/usr/local/bin/configure-touchscreen-power-user
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+StartupNotify=false
+EOF
+
+            # Set proper ownership
+            chown "$username:$username" "$autostart_dir/touchscreen-power-mgmt.desktop"
+            chmod 644 "$autostart_dir/touchscreen-power-mgmt.desktop"
+
+            log_success "Touchscreen power management configured for $username"
+        else
+            log_warn "Failed to create autostart directory for touchscreen power management"
+        fi
+    fi
 
     # Create reboot finalization script for pi user removal
     create_reboot_finalization_script "$username"
