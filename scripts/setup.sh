@@ -2441,7 +2441,8 @@ collect_kiosk_configuration() {
         if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
             echo
             log_info "Configure the URL to display in kiosk mode:"
-            kiosk_url=$(gum_input "Kiosk URL" "$default_url" "Enter the URL to display in kiosk mode")
+            read -p "Enter the URL to display in kiosk mode [$default_url]: " kiosk_url
+            kiosk_url="${kiosk_url:-$default_url}"
         fi
 
         # VNC access configuration
@@ -2459,7 +2460,7 @@ collect_kiosk_configuration() {
         local vnc_password=""
         if [[ "$vnc_enabled" == "true" ]]; then
             if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
-                vnc_password=$(gum_input "VNC Password" "" "Enter VNC password (leave empty to generate)" "password")
+                vnc_password=$(enhanced_password "VNC Password" "Enter VNC password (leave empty to generate)")
             fi
 
             if [[ -z "$vnc_password" ]]; then

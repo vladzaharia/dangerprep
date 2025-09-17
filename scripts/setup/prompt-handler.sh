@@ -65,31 +65,32 @@ prompt_password() {
     local description="$1"
     local current_value="$2"
     local is_optional="$3"
-    
+
     local safe_description
     safe_description="$(sanitize_description "$description")"
-    
+
     # Add password context to description
     if [[ "$safe_description" != *"password"* ]]; then
         safe_description="$safe_description (password)"
     fi
-    
+
+    # For passwords, do NOT include any existing text in the prompt
     local value
     value=$(enhanced_password "$safe_description" "Enter password (hidden input)")
-    
+
     # Handle optional fields
     if [[ "$is_optional" == "true" && -z "$value" ]]; then
         log_debug "Skipping optional password field"
         echo ""
         return 0
     fi
-    
+
     # Validate required password
     if [[ "$is_optional" != "true" && -z "$value" ]]; then
         log_error "Password cannot be empty"
         return 1
     fi
-    
+
     echo "$value"
 }
 
@@ -129,15 +130,23 @@ prompt_text() {
 # =============================================================================
 
 # Main function to handle PROMPT directives
-# Usage: handle_prompt_directive var_name current_value param_type is_optional description
+# Usage: handle_prompt_directive var_name current_value param_type is_optional description example_value
 handle_prompt_directive() {
     local var_name="$1"
     local current_value="$2"
     local param_type="$3"
     local is_optional="$4"
     local description="$5"
+    local example_value="$6"
 
     log_debug "Handling PROMPT for $var_name (type: '$param_type', optional: $is_optional)"
+
+    # If a value is already set (different from the example file), do NOT prompt for it
+    if [[ -n "$example_value" && -n "$current_value" && "$current_value" != "$example_value" ]]; then
+        log_debug "Skipping prompt for $var_name - value already changed from example (current: '$current_value', example: '$example_value')"
+        echo "$current_value"
+        return 0
+    fi
 
     # Check if we should use default values (non-interactive mode)
     if [[ "${DOCKER_ENV_USE_DEFAULTS:-false}" == "true" ]]; then
@@ -212,7 +221,8 @@ generate_default_value() {
     local description="$3"
 
     # Convert variable name to lowercase for pattern matching
-    local var_lower="${var_name,,}"
+    local var_lower
+    var_lower=$(echo "$var_name" | tr '[:upper:]' '[:lower:]')
 
     # Generate defaults based on variable name patterns
     case "$var_lower" in

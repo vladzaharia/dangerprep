@@ -217,7 +217,7 @@ process_directive_variable_with_target() {
     case "$directive" in
         "PROMPT")
             new_value=$(handle_prompt_directive "$var_name" "$actual_current_value" \
-                "$param_type" "$is_optional" "$description")
+                "$param_type" "$is_optional" "$description" "$current_value")
             ;;
         "GENERATE")
             new_value=$(handle_generate_directive "$var_name" "$actual_current_value" \
@@ -286,7 +286,7 @@ process_directive_variable() {
     case "$directive" in
         "PROMPT")
             new_value=$(handle_prompt_directive "$var_name" "$current_value" \
-                "$param_type" "$is_optional" "$description")
+                "$param_type" "$is_optional" "$description" "$current_value")
             ;;
         "GENERATE")
             new_value=$(handle_generate_directive "$var_name" "$current_value" \
