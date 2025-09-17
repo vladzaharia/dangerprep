@@ -1,47 +1,48 @@
 services:
-  # AdGuard Home for ad-blocking and DNS filtering
-  adguardhome:
-    image: adguard/adguardhome:latest
-    restart: unless-stopped
-    user: root
-    volumes:
-      - adguard-work:/opt/adguardhome/work
-      - adguard-conf:/opt/adguardhome/conf
-    env_file:
-      - compose.env
-    labels:
-      - "traefik.enable=true"
-
-      # Web interface - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.adguardhome-internal.rule=Host(`dns.danger`)"
-      - "traefik.http.routers.adguardhome-internal.entrypoints=websecure"
-      - "traefik.http.routers.adguardhome-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.adguardhome-internal.service=adguardhome"
-
-      # Web interface - External (.danger.diy domain with Let's Encrypt)
-      - "traefik.http.routers.adguardhome-external.rule=Host(`dns.danger.diy`)"
-      - "traefik.http.routers.adguardhome-external.entrypoints=websecure"
-      - "traefik.http.routers.adguardhome-external.tls.certresolver=letsencrypt-cloudflare"
-      - "traefik.http.routers.adguardhome-external.service=adguardhome"
-
-      # Service definition (shared by both routers)
-      - "traefik.http.services.adguardhome.loadbalancer.server.port=80"
-
-      # DNS registration
-      - "dns.register=dns"
-
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
-    networks:
-      traefik: {}
-      dns:
-        ipv4_address: 172.21.0.2
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+  # AdGuard Home for ad-blocking and DNS filtering - DISABLED
+  # Commented out to use CoreDNS with NextDNS directly
+  # adguardhome:
+  #   image: adguard/adguardhome:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - adguard-work:/opt/adguardhome/work
+  #     - adguard-conf:/opt/adguardhome/conf
+  #   env_file:
+  #     - compose.env
+  #   user: "1337:1337"
+  #   labels:
+  #     - "traefik.enable=true"
+  #
+  #     # Web interface - Internal (.danger domain with step-ca)
+  #     - "traefik.http.routers.adguardhome-internal.rule=Host(`dns.danger`)"
+  #     - "traefik.http.routers.adguardhome-internal.entrypoints=websecure"
+  #     - "traefik.http.routers.adguardhome-internal.tls.certresolver=step-ca"
+  #     - "traefik.http.routers.adguardhome-internal.service=adguardhome"
+  #
+  #     # Web interface - External (.danger.diy domain with Let's Encrypt)
+  #     - "traefik.http.routers.adguardhome-external.rule=Host(`dns.danger.diy`)"
+  #     - "traefik.http.routers.adguardhome-external.entrypoints=websecure"
+  #     - "traefik.http.routers.adguardhome-external.tls.certresolver=letsencrypt-cloudflare"
+  #     - "traefik.http.routers.adguardhome-external.service=adguardhome"
+  #
+  #     # Service definition (shared by both routers)
+  #     - "traefik.http.services.adguardhome.loadbalancer.server.port=80"
+  #
+  #     # DNS registration
+  #     - "dns.register=dns"
+  #
+  #     # Watchtower
+  #     - "com.centurylinklabs.watchtower.enable=true"
+  #   networks:
+  #     traefik: {}
+  #     dns:
+  #       ipv4_address: 172.21.0.2
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
 
   # Local DNS resolver for internal domain registration
   coredns:
@@ -96,8 +97,8 @@ services:
     networks:
       dns:
         ipv4_address: 172.21.0.5
-    depends_on:
-      - adguardhome
+    # depends_on:
+    #   - adguardhome  # Removed dependency since AdGuard Home is disabled
     healthcheck:
       test: ["CMD", "pgrep", "-f", "dns-registrar.sh"]
       interval: 30s
@@ -106,10 +107,10 @@ services:
       start_period: 10s
 
 volumes:
-  adguard-work:
-    driver: local
-  adguard-conf:
-    driver: local
+  # adguard-work:  # Disabled - AdGuard Home not in use
+  #   driver: local
+  # adguard-conf:  # Disabled - AdGuard Home not in use
+  #   driver: local
   coredns-config:
     driver: local
 

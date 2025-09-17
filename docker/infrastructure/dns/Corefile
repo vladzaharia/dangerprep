@@ -15,11 +15,28 @@ danger.diy {
     errors
 }
 
-# Fallback to upstream DNS (AdGuard Home)
-# Use IP address instead of hostname to avoid circular dependency
+# Fallback to upstream DNS (NextDNS directly)
+# Using NextDNS endpoints for secure DNS resolution with redundancy
 . {
-    forward . 172.21.0.2:53
+    # Primary: DNS-over-TLS with NextDNS
+    forward . tls://3ca9ab.dns.nextdns.io {
+        tls_servername 3ca9ab.dns.nextdns.io
+        health_check 5s
+        except danger danger.diy
+    }
+
+    # Fallback configuration for redundancy
+    # If TLS fails, fallback to IPv6 NextDNS servers
+    # Uncomment the following lines if IPv6 is available:
+    # forward . 2a07:a8c0::3c:a9ab 2a07:a8c1::3c:a9ab {
+    #     except danger danger.diy
+    # }
+
     log
     errors
-    cache 30
+    cache 300  # 5 minutes cache for better performance
+    reload
+
+    # Enable DNSSEC validation
+    dnssec
 }
