@@ -24,6 +24,7 @@ FORCE_CLONE=false
 FORCE_UPDATE=false
 DRY_RUN=false
 NON_INTERACTIVE=false
+NO_SCREEN=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -65,6 +66,7 @@ Options:
   --update             Force update of existing installation
   --dry-run            Show what would be done without executing
   --non-interactive    Skip interactive configuration (use defaults)
+  --no-screen          Skip screen session management (run setup directly)
   --help               Show this help message
 
 Examples:
@@ -82,6 +84,9 @@ Examples:
 
   # Skip interactive configuration (use defaults):
   curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --non-interactive
+
+  # Run without screen session management:
+  curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash -s -- --no-screen
 
   # Dry run (show what would be done):
   curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | bash -s -- --dry-run
@@ -109,6 +114,10 @@ parse_args() {
                 NON_INTERACTIVE=true
                 shift
                 ;;
+            --no-screen)
+                NO_SCREEN=true
+                shift
+                ;;
             --help)
                 show_help
                 exit 0
@@ -120,6 +129,51 @@ parse_args() {
                 ;;
         esac
     done
+}
+
+# Install screen if not available (only if screen management is enabled)
+install_screen() {
+    # Skip screen installation if --no-screen flag is used
+    if [[ "$NO_SCREEN" == "true" ]]; then
+        return 0
+    fi
+
+    if command -v screen >/dev/null 2>&1; then
+        return 0
+    fi
+
+    log_info "Screen not found, attempting to install..."
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would install screen package"
+        return 0
+    fi
+
+    # Try different package managers
+    if command -v apt-get >/dev/null 2>&1; then
+        apt-get update && apt-get install -y screen
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y screen
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y screen
+    elif command -v pacman >/dev/null 2>&1; then
+        pacman -S --noconfirm screen
+    elif command -v apk >/dev/null 2>&1; then
+        apk add screen
+    else
+        log_warn "Could not install screen - no supported package manager found"
+        log_warn "Falling back to direct setup execution"
+        NO_SCREEN=true
+        return 0
+    fi
+
+    if ! command -v screen >/dev/null 2>&1; then
+        log_warn "Failed to install screen, falling back to direct setup execution"
+        NO_SCREEN=true
+        return 0
+    fi
+
+    log_success "Screen installed successfully"
 }
 
 # Check for required dependencies
@@ -146,6 +200,9 @@ check_dependencies() {
         log_info "Please install the missing dependencies and try again"
         exit 1
     fi
+
+    # Install screen if needed
+    install_screen
 }
 
 # Get the latest release information from GitHub API
@@ -377,24 +434,89 @@ handle_existing_installation() {
     return 0
 }
 
-# Run the setup process
-run_setup() {
-    log_info "Starting DangerPrep setup process..."
+# Check for existing screen sessions
+check_screen_sessions() {
+    local sessions
+    sessions=$(screen -ls 2>/dev/null | grep -E "^\s+[0-9]+\.dangerprep" | awk '{print $1}' || true)
+
+    if [[ -n "$sessions" ]]; then
+        echo "$sessions"
+        return 0
+    fi
+
+    return 1
+}
+
+# Attach to existing screen session or create new one
+manage_screen_session() {
+    local session_name="dangerprep"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        log_info "[DRY RUN] Would change to directory: $INSTALL_DIR"
-        log_info "[DRY RUN] Would set permissions: chmod -R 755 $INSTALL_DIR"
-        log_info "[DRY RUN] Would run: bash lib/gum/download.sh"
-        local setup_args=""
-        if [[ "$NON_INTERACTIVE" == "true" ]]; then
-            setup_args="--non-interactive"
-        else
-            setup_args="--force-interactive"
-        fi
-        log_info "[DRY RUN] Would run: bash scripts/setup.sh $setup_args"
-        log_success "[DRY RUN] Setup process would complete here"
-        return
+        log_info "[DRY RUN] Would check for existing screen sessions"
+        log_info "[DRY RUN] Would either attach to existing session or create new one"
+        return 0
     fi
+
+    # Check for existing sessions
+    local existing_sessions
+    if existing_sessions=$(check_screen_sessions); then
+        local session_count
+        session_count=$(echo "$existing_sessions" | wc -l)
+
+        if [[ $session_count -eq 1 ]]; then
+            local session_id
+            session_id=$(echo "$existing_sessions" | head -1)
+            log_info "Found existing DangerPrep screen session: $session_id"
+            log_info "Attaching to existing session..."
+            log_info "Use Ctrl+A, D to detach from the session"
+            exec screen -r "$session_id"
+        else
+            log_info "Found multiple DangerPrep screen sessions:"
+            echo "$existing_sessions"
+            log_info "Please manually attach to the desired session using: screen -r <session_id>"
+            log_info "Or kill unwanted sessions using: screen -X -S <session_id> quit"
+            exit 1
+        fi
+    else
+        log_info "No existing DangerPrep screen sessions found"
+        log_info "Creating new screen session: $session_name"
+        log_info "Use Ctrl+A, D to detach from the session"
+
+        # Create new screen session and run setup inside it
+        exec screen -S "$session_name" -c /dev/null bash -c "
+            cd '$INSTALL_DIR'
+
+            # Ensure proper permissions
+            chmod -R 755 '$INSTALL_DIR'
+
+            # Download required tools
+            echo -e '${BLUE}[INFO]${NC} Downloading gum...'
+            bash lib/gum/download.sh
+
+            # Run the main setup script with appropriate flags
+            echo -e '${BLUE}[INFO]${NC} Running main setup script...'
+            local setup_args=()
+
+            if [[ '$NON_INTERACTIVE' == 'true' ]]; then
+                echo -e '${BLUE}[INFO]${NC} Using non-interactive mode (defaults only)'
+                setup_args+=('--non-interactive')
+            else
+                echo -e '${BLUE}[INFO]${NC} Using interactive mode for configuration (bootstrap default)'
+                setup_args+=('--force-interactive')
+            fi
+
+            bash scripts/setup.sh \"\${setup_args[@]}\"
+
+            echo -e '${GREEN}[SUCCESS]${NC} DangerPrep setup completed successfully!'
+            echo -e '${BLUE}[INFO]${NC} Press any key to exit screen session...'
+            read -n 1
+        "
+    fi
+}
+
+# Run setup directly without screen
+run_setup_direct() {
+    log_info "Running setup directly (no screen session)..."
 
     cd "$INSTALL_DIR"
 
@@ -421,6 +543,44 @@ run_setup() {
     bash scripts/setup.sh "${setup_args[@]}"
 
     log_success "DangerPrep setup completed successfully!"
+}
+
+# Run the setup process
+run_setup() {
+    log_info "Starting DangerPrep setup process..."
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would change to directory: $INSTALL_DIR"
+        log_info "[DRY RUN] Would set permissions: chmod -R 755 $INSTALL_DIR"
+        log_info "[DRY RUN] Would run: bash lib/gum/download.sh"
+        local setup_args=""
+        if [[ "$NON_INTERACTIVE" == "true" ]]; then
+            setup_args="--non-interactive"
+        else
+            setup_args="--force-interactive"
+        fi
+        log_info "[DRY RUN] Would run: bash scripts/setup.sh $setup_args"
+        log_success "[DRY RUN] Setup process would complete here"
+        if [[ "$NO_SCREEN" == "true" ]]; then
+            log_info "[DRY RUN] Would run setup directly (no screen)"
+        else
+            log_info "[DRY RUN] Would use screen session management"
+        fi
+        return
+    fi
+
+    cd "$INSTALL_DIR"
+
+    # Check if we should use screen session management
+    if [[ "$NO_SCREEN" == "true" ]] || ! command -v screen >/dev/null 2>&1; then
+        if [[ "$NO_SCREEN" != "true" ]]; then
+            log_warn "Screen not available, running setup directly"
+        fi
+        run_setup_direct
+    else
+        # Use screen session management for the actual setup
+        manage_screen_session
+    fi
 }
 
 # Cleanup function for error handling
