@@ -2548,7 +2548,7 @@ configure_nvme_storage_options() {
         echo
 
         enhanced_warning_box "DESTRUCTIVE OPERATION WARNING" \
-            "⚠️  REPARTITIONING WILL PERMANENTLY DESTROY ALL EXISTING DATA!\n\n• All files and partitions on ${nvme_device} will be erased\n• This action cannot be undone\n• Make sure you have backups of any important data\n\nNew partition layout will be:\n• 256GB partition for /var/lib/docker (Docker storage)\n• Remaining space for /content (media and files)" \
+            "⚠️  REPARTITIONING WILL PERMANENTLY DESTROY ALL EXISTING DATA!\n\n• All files and partitions on ${nvme_device} will be erased\n• This action cannot be undone\n• Make sure you have backups of any important data\n\nNew partition layout will be:\n• Single partition for /content using entire drive (media and files)" \
             "danger"
 
         if enhanced_confirm "I understand the risks and want to proceed with repartitioning ${nvme_device}" "false"; then
@@ -2562,7 +2562,7 @@ configure_nvme_storage_options() {
         fi
     else
         # No existing partitions, safe to proceed
-        if enhanced_confirm "Set up NVMe storage with 256GB /var/lib/docker and remaining space for /content?" "true"; then
+        if enhanced_confirm "Set up NVMe storage with entire drive allocated to /content?" "true"; then
             export NVME_PARTITION_CONFIRMED="true"
             export NVME_DEVICE="${nvme_device}"
             log_info "NVMe partitioning confirmed for ${nvme_device}"
@@ -5806,9 +5806,9 @@ detect_and_configure_nvme_storage() {
 
     # Check if partitioning was confirmed during configuration
     if [[ "${NVME_PARTITION_CONFIRMED:-false}" != "true" ]]; then
-        # Check if there are exactly 2 partitions that we can try to mount
-        if [[ ${existing_partitions} -eq 2 ]]; then
-            log_info "Partitioning was declined, but found exactly 2 partitions. Attempting to mount existing partitions..."
+        # Check if there is exactly 1 partition that we can try to mount
+        if [[ ${existing_partitions} -eq 1 ]]; then
+            log_info "Partitioning was declined, but found exactly 1 partition. Attempting to mount existing partition..."
             mount_existing_nvme_partitions "${nvme_device}"
             return $?
         else
@@ -5978,7 +5978,7 @@ detect_and_configure_nvme_storage() {
 
 
 
-# Create NVMe partitions (256GB /var/lib/docker, rest /content)
+# Create NVMe partitions (entire drive for /content)
 create_nvme_partitions() {
     local nvme_device="$1"
 
@@ -6002,68 +6002,38 @@ create_nvme_partitions() {
     log_info "Creating GPT partition table..."
     parted -s "${nvme_device}" mklabel gpt
 
-    # Create 256GB partition for /var/lib/docker (starting at 1MB for alignment)
-    log_info "Creating 256GB /var/lib/docker partition..."
-    parted -s "${nvme_device}" mkpart primary ext4 1MiB 256GiB
-
-    # Create partition for /content using remaining space
-    log_info "Creating /content partition with remaining space..."
-    parted -s "${nvme_device}" mkpart primary ext4 256GiB 100%
+    # Create single partition for /content using entire drive
+    log_info "Creating /content partition using entire drive..."
+    parted -s "${nvme_device}" mkpart primary ext4 1MiB 100%
 
     # Wait for kernel to recognize new partitions
     sleep 2
     partprobe "${nvme_device}"
     sleep 2
 
-    # Format partitions
-    local docker_partition="${nvme_device}p1"
-    local content_partition="${nvme_device}p2"
-
-    log_info "Formatting /var/lib/docker partition (${docker_partition})..."
-    mkfs.ext4 -F -L "danger-docker" "${docker_partition}"
+    # Format partition
+    local content_partition="${nvme_device}p1"
 
     log_info "Formatting /content partition (${content_partition})..."
     mkfs.ext4 -F -L "danger-content" "${content_partition}"
 
-    # Create mount points using standardized directory creation
-    if ! standard_create_directory "/var/lib/docker" "755" "root" "root"; then
-        log_error "Failed to create /var/lib/docker mount point"
-        return 1
-    fi
-
+    # Create mount point using standardized directory creation
     if ! standard_create_directory "/content" "755" "root" "root"; then
         log_error "Failed to create /content mount point"
         return 1
     fi
 
-    # BOOT FIX: Mount partitions with comprehensive error handling
-    log_info "Mounting partitions with boot safety checks..."
+    # BOOT FIX: Mount partition with comprehensive error handling
+    log_info "Mounting partition with boot safety checks..."
 
-    # Create mount points if they don't exist
-    mkdir -p /var/lib/docker /content
+    # Create mount point if it doesn't exist
+    mkdir -p /content
 
     # Backup fstab before making changes
     cp /etc/fstab /etc/fstab.backup-$(date +%Y%m%d-%H%M%S)
 
-    # Test mount docker partition first
-    if mount "${docker_partition}" /var/lib/docker 2>/dev/null; then
-        log_success "Successfully mounted Docker partition"
-
-        # Test if mount is working properly
-        if touch /var/lib/docker/.mount-test 2>/dev/null && rm /var/lib/docker/.mount-test 2>/dev/null; then
-            log_info "Docker partition mount verified"
-        else
-            log_warn "Docker partition mounted but not writable"
-            umount /var/lib/docker 2>/dev/null || true
-        fi
-    else
-        log_error "Failed to mount Docker partition: ${docker_partition}"
-        log_warn "Continuing without Docker partition - can be fixed after boot"
-        docker_partition=""
-    fi
-
     # Test mount content partition
-    if [[ -n "${content_partition}" ]] && mount "${content_partition}" /content 2>/dev/null; then
+    if mount "${content_partition}" /content 2>/dev/null; then
         log_success "Successfully mounted content partition"
 
         # Test if mount is working properly
@@ -6075,24 +6045,19 @@ create_nvme_partitions() {
             content_partition=""
         fi
     else
-        log_warn "Failed to mount content partition or partition not available"
-        log_info "Continuing without content partition - can be configured later"
-        content_partition=""
+        log_warn "Failed to mount content partition"
+        log_error "Content partition mount failed - this is critical for the setup"
+        return 1
     fi
 
-    # BOOT FIX: Only add to fstab if mounts were successful
-    log_info "Adding successfully mounted partitions to /etc/fstab..."
+    # BOOT FIX: Only add to fstab if mount was successful
+    log_info "Adding successfully mounted partition to /etc/fstab..."
 
     # Remove any existing entries for these mount points
     sed -i '\|/var/lib/docker|d' /etc/fstab
     sed -i '\|/content|d' /etc/fstab
 
-    # Add new entries only for successfully mounted partitions
-    if [[ -n "${docker_partition}" ]] && mountpoint -q /var/lib/docker; then
-        echo "LABEL=danger-docker /var/lib/docker ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
-        log_info "Added Docker partition to fstab with nofail option"
-    fi
-
+    # Add new entry for successfully mounted partition
     if [[ -n "${content_partition}" ]] && mountpoint -q /content; then
         echo "LABEL=danger-content /content ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
         log_info "Added content partition to fstab with nofail option"
@@ -6106,32 +6071,13 @@ create_nvme_partitions() {
         cp /etc/fstab.backup-$(date +%Y%m%d-%H%M%S) /etc/fstab
     fi
 
-    # Note: Service-specific data directories are now handled by Docker volumes
-    # Only create essential system directories that still need bind mounts
-
-    # Directories that still need bind mounts (system integration, shared data)
-    local system_dirs_root=(
-        "/var/lib/docker/bind-mounts/logs"
-        "/var/lib/docker/bind-mounts/backups"
-        "/var/lib/docker/bind-mounts/raspap"
-        "/var/lib/docker/bind-mounts/cdn-assets"
-        "/var/lib/docker/bind-mounts/step-ca-certs"
-    )
-
+    # Create content subdirectories on /content partition
     local content_subdirs=(
         "/content/movies" "/content/tv" "/content/webtv" "/content/music"
         "/content/audiobooks" "/content/books" "/content/comics" "/content/magazines"
         "/content/games/roms" "/content/kiwix" "/content/media" "/content/documents"
         "/content/downloads" "/content/sync"
     )
-
-    log_info "Creating system bind-mount directories with root ownership..."
-    for subdir in "${system_dirs_root[@]}"; do
-        if ! standard_create_directory "${subdir}" "755" "root" "root"; then
-            log_error "Failed to create directory: ${subdir}"
-            return 1
-        fi
-    done
 
     log_info "Creating content subdirectories on /content partition with dockerapp ownership..."
     for subdir in "${content_subdirs[@]}"; do
@@ -6142,69 +6088,50 @@ create_nvme_partitions() {
     done
 
     log_info "NVMe partition layout:"
-    log_info "  ${docker_partition} -> /var/lib/docker (256GB)"
-    log_info "  ${content_partition} -> /content (remaining space)"
+    log_info "  ${content_partition} -> /content (entire drive)"
 
     # Show final layout
     if gum_available; then
         log_info "📋 Final NVMe Partition Layout"
         enhanced_table "Partition,Mount,Size,Filesystem,Label" \
-            "${docker_partition},/var/lib/docker,256GB,ext4,danger-docker" \
             "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}" || echo "Unknown"),ext4,danger-content"
     fi
 
     log_success "NVMe partitions created and mounted successfully"
 }
 
-# Mount existing NVMe partitions without formatting
+# Mount existing NVMe partition without formatting
 mount_existing_nvme_partitions() {
     local nvme_device="$1"
 
-    log_info "Attempting to mount existing partitions on ${nvme_device}..."
+    log_info "Attempting to mount existing partition on ${nvme_device}..."
 
-    # Get the partition names
-    local docker_partition="${nvme_device}p1"
-    local content_partition="${nvme_device}p2"
+    # Get the partition name (single partition layout)
+    local content_partition="${nvme_device}p1"
 
-    # Verify partitions exist
-    if [[ ! -b "${docker_partition}" ]]; then
-        log_error "Expected partition ${docker_partition} does not exist"
-        return 1
-    fi
-
+    # Verify partition exists
     if [[ ! -b "${content_partition}" ]]; then
         log_error "Expected partition ${content_partition} does not exist"
         return 1
     fi
 
-    log_info "Found partitions: ${docker_partition} and ${content_partition}"
+    log_info "Found partition: ${content_partition}"
 
     # Show current partition information
     log_info "Current partition layout:"
     lsblk "${nvme_device}" 2>/dev/null || true
 
-    # Create mount points using standardized directory creation
-    if ! standard_create_directory "/var/lib/docker" "755" "root" "root"; then
-        log_error "Failed to create /var/lib/docker mount point"
-        return 1
-    fi
-
+    # Create mount point using standardized directory creation
     if ! standard_create_directory "/content" "755" "root" "root"; then
         log_error "Failed to create /content mount point"
         return 1
     fi
 
-    # Create mount points if they don't exist (fallback)
-    mkdir -p /var/lib/docker /content
+    # Create mount point if it doesn't exist (fallback)
+    mkdir -p /content
 
-    # Check if partitions are already mounted
-    local docker_already_mounted=""
+    # Check if partition is already mounted
     local content_already_mounted=""
-
-    if mountpoint -q /var/lib/docker 2>/dev/null; then
-        docker_already_mounted=$(findmnt -n -o SOURCE /var/lib/docker 2>/dev/null || echo "")
-        log_info "/var/lib/docker is already mounted from: ${docker_already_mounted}"
-    fi
 
     if mountpoint -q /content 2>/dev/null; then
         content_already_mounted=$(findmnt -n -o SOURCE /content 2>/dev/null || echo "")
@@ -6213,34 +6140,6 @@ mount_existing_nvme_partitions() {
 
     # Backup fstab before making changes
     cp /etc/fstab /etc/fstab.backup-$(date +%Y%m%d-%H%M%S)
-
-    # Mount docker partition
-    local docker_mount_success=false
-    if [[ "${docker_already_mounted}" == "${docker_partition}" ]]; then
-        log_info "Docker partition already correctly mounted"
-        docker_mount_success=true
-    elif [[ -n "${docker_already_mounted}" ]]; then
-        log_warn "/var/lib/docker is mounted from different device (${docker_already_mounted}), unmounting first"
-        umount /var/lib/docker 2>/dev/null || true
-    fi
-
-    if [[ "${docker_mount_success}" != "true" ]]; then
-        log_info "Attempting to mount ${docker_partition} to /var/lib/docker..."
-        if mount "${docker_partition}" /var/lib/docker 2>/dev/null; then
-            log_success "Successfully mounted Docker partition"
-
-            # Test if mount is working properly
-            if touch /var/lib/docker/.mount-test 2>/dev/null && rm /var/lib/docker/.mount-test 2>/dev/null; then
-                log_info "Docker partition mount verified"
-                docker_mount_success=true
-            else
-                log_warn "Docker partition mounted but not writable"
-                umount /var/lib/docker 2>/dev/null || true
-            fi
-        else
-            log_error "Failed to mount Docker partition: ${docker_partition}"
-        fi
-    fi
 
     # Mount content partition
     local content_mount_success=false
@@ -6267,32 +6166,12 @@ mount_existing_nvme_partitions() {
             fi
         else
             log_error "Failed to mount content partition: ${content_partition}"
+            return 1
         fi
     fi
 
-    # Update fstab for persistent mounting (only for successfully mounted partitions)
+    # Update fstab for persistent mounting (only for successfully mounted partition)
     local fstab_updated=false
-
-    if [[ "${docker_mount_success}" == "true" ]]; then
-        # Get UUID for docker partition
-        local docker_uuid
-        docker_uuid=$(blkid -s UUID -o value "${docker_partition}" 2>/dev/null || echo "")
-
-        if [[ -n "${docker_uuid}" ]]; then
-            # Remove any existing entries for /var/lib/docker
-            sed -i '\|/var/lib/docker|d' /etc/fstab
-
-            # Add new entry using UUID
-            echo "UUID=${docker_uuid} /var/lib/docker ext4 defaults,noatime 0 2" >> /etc/fstab
-            log_info "Added /var/lib/docker to fstab with UUID=${docker_uuid}"
-            fstab_updated=true
-        else
-            log_warn "Could not get UUID for Docker partition, using device path in fstab"
-            sed -i '\|/var/lib/docker|d' /etc/fstab
-            echo "${docker_partition} /var/lib/docker ext4 defaults,noatime 0 2" >> /etc/fstab
-            fstab_updated=true
-        fi
-    fi
 
     if [[ "${content_mount_success}" == "true" ]]; then
         # Get UUID for content partition
@@ -6300,7 +6179,8 @@ mount_existing_nvme_partitions() {
         content_uuid=$(blkid -s UUID -o value "${content_partition}" 2>/dev/null || echo "")
 
         if [[ -n "${content_uuid}" ]]; then
-            # Remove any existing entries for /content
+            # Remove any existing entries for /content and /var/lib/docker
+            sed -i '\|/var/lib/docker|d' /etc/fstab
             sed -i '\|/content|d' /etc/fstab
 
             # Add new entry using UUID
@@ -6309,6 +6189,7 @@ mount_existing_nvme_partitions() {
             fstab_updated=true
         else
             log_warn "Could not get UUID for content partition, using device path in fstab"
+            sed -i '\|/var/lib/docker|d' /etc/fstab
             sed -i '\|/content|d' /etc/fstab
             echo "${content_partition} /content ext4 defaults,noatime 0 2" >> /etc/fstab
             fstab_updated=true
@@ -6326,27 +6207,22 @@ mount_existing_nvme_partitions() {
     fi
 
     # Report results
-    if [[ "${docker_mount_success}" == "true" && "${content_mount_success}" == "true" ]]; then
-        log_success "Both existing partitions mounted successfully"
+    if [[ "${content_mount_success}" == "true" ]]; then
+        log_success "Existing partition mounted successfully"
 
         # Show final layout
         if gum_available; then
             log_info "📋 Mounted NVMe Partition Layout"
             enhanced_table "Partition,Mount,Size,Filesystem" \
-                "${docker_partition},/var/lib/docker,$(lsblk -n -o SIZE "${docker_partition}" || echo "Unknown"),$(lsblk -n -o FSTYPE "${docker_partition}" || echo "Unknown")" \
                 "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}" || echo "Unknown"),$(lsblk -n -o FSTYPE "${content_partition}" || echo "Unknown")"
         fi
 
         log_info "NVMe partition layout:"
-        log_info "  ${docker_partition} -> /var/lib/docker ($(lsblk -n -o SIZE "${docker_partition}" || echo "Unknown"))"
         log_info "  ${content_partition} -> /content ($(lsblk -n -o SIZE "${content_partition}" || echo "Unknown"))"
 
         return 0
-    elif [[ "${docker_mount_success}" == "true" || "${content_mount_success}" == "true" ]]; then
-        log_warn "Partial success: only some partitions could be mounted"
-        return 0
     else
-        log_error "Failed to mount any existing partitions"
+        log_error "Failed to mount existing partition"
         return 1
     fi
 }
