@@ -70,7 +70,7 @@ Options:
   --help               Show this help message
 
 Examples:
-  # Download and run directly (recommended):
+  # Download and run directly with screen session management (recommended):
   curl -4 -fsSL https://raw.githubusercontent.com/vladzaharia/dangerprep/main/bootstrap.sh | sudo bash
 
   # Or with wget:
@@ -447,6 +447,38 @@ check_screen_sessions() {
     return 1
 }
 
+# Handle TTY connection for screen session management
+setup_tty_for_screen() {
+    # Check for truly non-interactive environments (both stdin AND stdout not terminals)
+    if [[ ! -t 0 && ! -t 1 ]] || [[ "${TERM:-}" == "dumb" ]]; then
+        log_warn "Non-interactive environment detected - falling back to direct execution"
+        return 1
+    fi
+
+    # Special handling for piped execution (stdin not terminal but stdout is)
+    # This is the case when running: curl ... | sudo bash
+    if [[ ! -t 0 && -t 1 ]]; then
+        log_info "Piped execution detected (likely from curl/wget)"
+        log_info "Attempting to connect to controlling terminal for screen session"
+
+        # Try to reconnect to the controlling terminal for input
+        if [[ -c /dev/tty ]]; then
+            log_info "Using controlling terminal for screen session management"
+            # Redirect stdin to the controlling terminal
+            exec 0</dev/tty
+            log_success "Successfully connected to controlling terminal"
+            return 0
+        else
+            log_warn "No controlling terminal available"
+            log_warn "Falling back to direct execution"
+            return 1
+        fi
+    fi
+
+    # All file descriptors are terminals - we're good to go
+    return 0
+}
+
 # Attach to existing screen session or create new one
 manage_screen_session() {
     local session_name="dangerprep"
@@ -455,6 +487,12 @@ manage_screen_session() {
         log_info "[DRY RUN] Would check for existing screen sessions"
         log_info "[DRY RUN] Would either attach to existing session or create new one"
         return 0
+    fi
+
+    # Setup TTY connection for screen
+    if ! setup_tty_for_screen; then
+        run_setup_direct
+        return
     fi
 
     # Check for existing sessions
