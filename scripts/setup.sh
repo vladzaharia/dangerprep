@@ -2425,7 +2425,7 @@ collect_kiosk_configuration() {
 
     # Enable kiosk mode by default for NanoPi M6
     local kiosk_enabled="true"
-    if [[ "$INTERACTIVE_MODE" == true ]]; then
+    if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
         if enhanced_confirm "Enable kiosk mode on the touchscreen?" "true"; then
             kiosk_enabled="true"
         else
@@ -2438,7 +2438,7 @@ collect_kiosk_configuration() {
         local default_url="https://google.com"
         local kiosk_url="$default_url"
 
-        if [[ "$INTERACTIVE_MODE" == true ]]; then
+        if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
             echo
             log_info "Configure the URL to display in kiosk mode:"
             kiosk_url=$(gum_input "Kiosk URL" "$default_url" "Enter the URL to display in kiosk mode")
@@ -2446,7 +2446,7 @@ collect_kiosk_configuration() {
 
         # VNC access configuration
         local vnc_enabled="true"
-        if [[ "$INTERACTIVE_MODE" == true ]]; then
+        if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
             echo
             if enhanced_confirm "Enable VNC server for remote desktop access?" "true"; then
                 vnc_enabled="true"
@@ -2458,7 +2458,7 @@ collect_kiosk_configuration() {
         # Generate VNC password if VNC is enabled
         local vnc_password=""
         if [[ "$vnc_enabled" == "true" ]]; then
-            if [[ "$INTERACTIVE_MODE" == true ]]; then
+            if [[ "${NON_INTERACTIVE:-false}" != "true" ]]; then
                 vnc_password=$(gum_input "VNC Password" "" "Enter VNC password (leave empty to generate)" "password")
             fi
 
