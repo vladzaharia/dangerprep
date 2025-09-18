@@ -8110,13 +8110,37 @@ setup_kiosk_mode() {
         kiosk_packages+=("x11vnc")
     fi
 
-    if enhanced_spin "Installing kiosk packages" \
-        bash -c "env DEBIAN_FRONTEND=noninteractive apt install -y ${kiosk_packages[*]}"; then
-        enhanced_status_indicator "success" "Kiosk packages installed"
-    else
-        enhanced_status_indicator "failure" "Failed to install kiosk packages"
+    # Install packages individually to handle failures gracefully
+    local failed_packages=()
+    local installed_count=0
+    local total_packages=${#kiosk_packages[@]}
+
+    for package in "${kiosk_packages[@]}"; do
+        ((++installed_count))
+
+        # Check if package is already installed
+        if dpkg -l "${package}" 2>/dev/null | grep -q "^ii"; then
+            enhanced_status_indicator "success" "${package} (already installed)"
+            continue
+        fi
+
+        # Install package with standardized pattern
+        if enhanced_spin "Installing ${package} (${installed_count}/${total_packages})" \
+            env DEBIAN_FRONTEND=noninteractive apt install -y "${package}"; then
+            enhanced_status_indicator "success" "Installed ${package}"
+        else
+            enhanced_status_indicator "failure" "Failed to install ${package}"
+            failed_packages+=("${package}")
+        fi
+    done
+
+    # Report installation results
+    if [[ ${#failed_packages[@]} -gt 0 ]]; then
+        enhanced_status_indicator "failure" "Failed to install ${#failed_packages[@]} kiosk packages: ${failed_packages[*]}"
         return 1
     fi
+
+    enhanced_status_indicator "success" "Installed ${total_packages} kiosk packages"
 
     # Configure kiosk mode for the new user
     if [[ -n "${NEW_USERNAME:-}" ]]; then
