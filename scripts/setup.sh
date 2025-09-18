@@ -4967,6 +4967,12 @@ setup_hardware_monitoring() {
 setup_advanced_security_tools() {
     log_info "Setting up advanced security tools..."
 
+    # Configure SSH hardening first
+    if ! configure_ssh_hardening; then
+        log_error "Failed to configure SSH hardening"
+        return 1
+    fi
+
     # Configure ClamAV using standardized cron job creation
     if command -v clamscan >/dev/null 2>&1; then
         # Stop any running freshclam processes to avoid lock conflicts
@@ -7269,13 +7275,13 @@ create_new_user() {
     # Update configuration files that reference pi user
     update_user_references "$username"
 
-    # Configure touchscreen power management for new user (NanoPi M6 specific)
+    # Configure touchscreen power management for pi user (NanoPi M6 specific)
     if [[ "$FRIENDLYELEC_MODEL" == "NanoPi-M6" ]]; then
-        log_info "Configuring touchscreen power management for $username..."
+        log_info "Configuring touchscreen power management for pi user..."
 
-        # Create autostart directory for user
-        local autostart_dir="/home/$username/.config/autostart"
-        if standard_create_directory "$autostart_dir" "755" "$username" "$username"; then
+        # Create autostart directory for pi user
+        local autostart_dir="/home/pi/.config/autostart"
+        if standard_create_directory "$autostart_dir" "755" "pi" "pi"; then
             # Create desktop entry to run touchscreen power configuration on login
             cat > "$autostart_dir/touchscreen-power-mgmt.desktop" << EOF
 [Desktop Entry]
@@ -7290,17 +7296,16 @@ StartupNotify=false
 EOF
 
             # Set proper ownership
-            chown "$username:$username" "$autostart_dir/touchscreen-power-mgmt.desktop"
+            chown "pi:pi" "$autostart_dir/touchscreen-power-mgmt.desktop"
             chmod 644 "$autostart_dir/touchscreen-power-mgmt.desktop"
 
-            log_success "Touchscreen power management configured for $username"
+            log_success "Touchscreen power management configured for pi user"
         else
             log_warn "Failed to create autostart directory for touchscreen power management"
         fi
     fi
 
-    # Create reboot finalization script for pi user removal
-    create_reboot_finalization_script "$username"
+
 
     log_success "User $username created successfully"
 }
@@ -7313,41 +7318,40 @@ update_user_references() {
 
     log_info "Updating configuration files..."
 
-    # CRITICAL FIX: Disable autologin completely to prevent boot hangs
-    # Instead of updating autologin to new user, disable it entirely
-    # This prevents the system from hanging if the user doesn't exist during boot
+    # Keep autologin enabled for pi user
     local autologin_dir="/etc/systemd/system/getty@tty1.service.d"
     local autologin_conf="$autologin_dir/autologin.conf"
 
     if [[ -f "$autologin_conf" ]]; then
-        log_info "BOOT FIX: Disabling autologin to prevent boot hangs"
+        log_info "Keeping autologin enabled for pi user"
         # Backup original configuration
         cp "$autologin_conf" "$autologin_conf.backup-$(date +%Y%m%d-%H%M%S)"
 
-        # Disable autologin completely by commenting out the ExecStart line
-        sed -i 's/^ExecStart=/#ExecStart=/' "$autologin_conf"
-
-        # Add safe fallback configuration
-        cat >> "$autologin_conf" << 'EOF'
-# BOOT HANG FIX: Safe fallback - no autologin to prevent boot hangs
-# This ensures the system boots to a login prompt instead of hanging
-ExecStart=
-ExecStart=-/sbin/agetty --noclear %I $TERM
-EOF
-        log_success "Autologin safely disabled to prevent boot hangs"
+        # Ensure autologin is configured for pi user
+        if ! grep -q "pi" "$autologin_conf"; then
+            # Update autologin to use pi user
+            sed -i 's/--autologin [^ ]*/--autologin pi/' "$autologin_conf"
+            log_success "Autologin configured for pi user"
+        else
+            log_info "Autologin already configured for pi user"
+        fi
     fi
 
-    # CRITICAL FIX: Disable lightdm autologin as well
+    # Keep lightdm autologin enabled for pi user
     if [[ -f "/etc/lightdm/lightdm.conf" ]]; then
-        log_info "BOOT FIX: Disabling lightdm autologin to prevent boot hangs"
+        log_info "Keeping lightdm autologin enabled for pi user"
         # Backup original configuration
         cp /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup-$(date +%Y%m%d-%H%M%S)
 
-        # Disable autologin in lightdm by commenting out autologin settings
-        sed -i 's/^autologin-user=/#autologin-user=/' /etc/lightdm/lightdm.conf
-        sed -i 's/^autologin-user-timeout=/#autologin-user-timeout=/' /etc/lightdm/lightdm.conf
-
-        log_success "Lightdm autologin safely disabled"
+        # Ensure autologin is configured for pi user
+        if ! grep -q "autologin-user=pi" /etc/lightdm/lightdm.conf; then
+            # Update autologin to use pi user
+            sed -i 's/^autologin-user=.*/autologin-user=pi/' /etc/lightdm/lightdm.conf
+            sed -i 's/^#autologin-user=.*/autologin-user=pi/' /etc/lightdm/lightdm.conf
+            log_success "Lightdm autologin configured for pi user"
+        else
+            log_info "Lightdm autologin already configured for pi user"
+        fi
     fi
 
     # Transfer cron jobs using standardized file operations
@@ -7473,550 +7477,8 @@ EOF
     log_success "Screen lock configuration completed"
 }
 
-# Create reboot finalization script for pi user cleanup
-create_reboot_finalization_script() {
-    local new_username="$1"
 
-    log_info "Creating reboot finalization service..."
 
-    # Create the cleanup script
-    local cleanup_script="/usr/local/bin/dangerprep-finalize.sh"
-    cat > "$cleanup_script" << EOF
-#!/bin/bash
-# DangerPrep Reboot Finalization Script
-# This script runs once on reboot to complete pi user cleanup
-
-# BOOT FIX: Don't exit on errors to prevent boot hangs
-set -uo pipefail
-
-# BOOT FIX: Trap errors and continue boot process
-trap 'log_error "Finalization error at line \$LINENO, but continuing boot..."; exit 0' ERR
-
-# Configuration
-NEW_USERNAME="$new_username"
-SSH_PORT="${SSH_PORT}"
-FAIL2BAN_BANTIME="${FAIL2BAN_BANTIME}"
-FAIL2BAN_MAXRETRY="${FAIL2BAN_MAXRETRY}"
-LOG_FILE="/var/log/dangerprep-finalization.log"
-
-# Logging setup
-exec 1> >(tee -a "\$LOG_FILE")
-exec 2> >(tee -a "\$LOG_FILE" >&2)
-
-log_info() {
-    echo "\$(date): [INFO] \$*"
-}
-
-log_warn() {
-    echo "\$(date): [WARN] \$*"
-}
-
-log_error() {
-    echo "\$(date): [ERROR] \$*"
-}
-
-log_success() {
-    echo "\$(date): [SUCCESS] \$*"
-}
-
-# Apply SSH hardening configuration
-apply_ssh_hardening() {
-    log_info "Configuring SSH hardening..."
-
-    # Configuration variables (passed from main setup)
-    local SSH_PORT="${SSH_PORT}"
-    local NEW_USERNAME="\$NEW_USERNAME"
-
-    # Create SSH privilege separation directory if missing
-    if [[ ! -d /run/sshd ]]; then
-        log_info "Creating SSH privilege separation directory..."
-        mkdir -p /run/sshd
-        chmod 755 /run/sshd
-    fi
-
-    # Apply SSH configuration template
-    log_info "Applying SSH configuration..."
-    cat > /etc/ssh/sshd_config << 'SSHD_CONFIG'
-# DangerPrep SSH Configuration
-Port \${SSH_PORT}
-
-# Protocol and encryption (Ed25519 preferred)
-HostKey /etc/ssh/ssh_host_ed25519_key
-HostKey /etc/ssh/ssh_host_ecdsa_key
-
-# Authentication
-PermitRootLogin no
-PubkeyAuthentication yes
-AuthorizedKeysFile /home/%u/.ssh/authorized_keys
-PasswordAuthentication no
-PermitEmptyPasswords no
-KbdInteractiveAuthentication no
-ChallengeResponseAuthentication no
-GSSAPIAuthentication no
-UsePAM yes
-
-# Modern public key algorithms
-PubkeyAcceptedAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
-
-# Security settings
-X11Forwarding no
-PrintMotd no
-PrintLastLog yes
-TCPKeepAlive no
-StrictModes yes
-IgnoreRhosts yes
-HostbasedAuthentication no
-PermitUserEnvironment no
-Compression no
-ClientAliveInterval 300
-ClientAliveCountMax 2
-LoginGraceTime 30
-MaxAuthTries 3
-MaxSessions 4
-MaxStartups 10:30:60
-
-# Modern ciphers and algorithms (AEAD ciphers only)
-Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
-MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
-KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256
-
-# Certificate authority signature algorithms
-CASignatureAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
-
-# Logging
-SyslogFacility AUTH
-LogLevel VERBOSE
-
-# Banner
-Banner /etc/ssh/ssh_banner
-
-# Allow specific users only
-AllowUsers \${NEW_USERNAME}
-
-# Forwarding and tunneling (balanced security vs usability)
-AllowAgentForwarding no
-AllowTcpForwarding local
-GatewayPorts no
-PermitTunnel no
-
-# Additional security settings
-Protocol 2
-RequiredRSASize 2048
-SSHD_CONFIG
-
-    # Set proper permissions
-    chmod 644 /etc/ssh/sshd_config
-
-    # Test SSH configuration
-    if sshd -t 2>/dev/null; then
-        log_success "SSH configuration is valid"
-
-        # Restart SSH service
-        systemctl restart ssh
-        log_success "SSH service restarted with hardened configuration"
-        log_info "SSH is now configured on port \${SSH_PORT} with key-only authentication"
-    else
-        log_error "SSH configuration is invalid, keeping original configuration"
-        return 1
-    fi
-}
-
-# Apply fail2ban configuration with correct SSH port
-apply_fail2ban_config() {
-    log_info "Configuring fail2ban with SSH port \${SSH_PORT}..."
-
-    # Create fail2ban jail.local configuration
-    cat > /etc/fail2ban/jail.local << 'FAIL2BAN_CONFIG'
-# DangerPrep Fail2ban Configuration
-
-[DEFAULT]
-# Ban settings
-bantime = \${FAIL2BAN_BANTIME}
-findtime = 600
-maxretry = \${FAIL2BAN_MAXRETRY}
-backend = systemd
-
-# Email notifications (disabled by default)
-destemail = root@localhost
-sendername = Fail2Ban
-mta = sendmail
-
-# Action
-action = %(action_mwl)s
-
-[sshd]
-enabled = true
-port = \${SSH_PORT}
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = \${FAIL2BAN_MAXRETRY}
-bantime = \${FAIL2BAN_BANTIME}
-
-[nginx-http-auth]
-enabled = true
-filter = nginx-http-auth
-logpath = /var/log/nginx/error.log
-maxretry = 3
-bantime = 3600
-
-[nginx-botsearch]
-enabled = true
-filter = nginx-botsearch
-logpath = /var/log/nginx/access.log
-maxretry = 2
-bantime = 86400
-
-[recidive]
-enabled = true
-filter = recidive
-logpath = /var/log/fail2ban.log
-action = %(action_mwl)s
-bantime = 604800  # 1 week
-findtime = 86400   # 1 day
-maxretry = 5
-FAIL2BAN_CONFIG
-
-    # Restart fail2ban to apply new configuration
-    systemctl restart fail2ban
-    log_success "Fail2ban configured and restarted with SSH port \${SSH_PORT}"
-}
-
-main() {
-    # Record start time for performance tracking
-    START_TIME=\$(date +%s)
-
-    log_info "=========================================="
-    log_info "Starting DangerPrep reboot finalization..."
-    log_info "=========================================="
-    log_info "Timestamp: \$(date)"
-    log_info "Hostname: \$(hostname)"
-    log_info "Kernel: \$(uname -r)"
-    log_info "Uptime: \$(uptime)"
-    log_info "Service: \${SYSTEMD_UNIT_NAME:-manual}"
-    log_info "PID: \$$"
-    log_info "User: \$(whoami)"
-    log_info "Working directory: \$(pwd)"
-    log_info "Script path: \$0"
-    log_info "=========================================="
-
-    # BOOT FIX: Check if pi user still exists before proceeding
-    log_info "Checking if pi user exists..."
-    if ! id pi >/dev/null 2>&1; then
-        log_info "Pi user already removed, finalization already completed"
-        log_info "Cleaning up finalization services..."
-        # Clean up this service and exit successfully
-        systemctl disable dangerprep-finalize.service 2>/dev/null || true
-        systemctl disable dangerprep-finalize-graphical.service 2>/dev/null || true
-        rm -f /etc/systemd/system/dangerprep-finalize.service 2>/dev/null || true
-        rm -f /etc/systemd/system/dangerprep-finalize-graphical.service 2>/dev/null || true
-        systemctl daemon-reload 2>/dev/null || true
-        rm -f "\$0" 2>/dev/null || true
-        log_success "Finalization cleanup completed - pi user was already removed"
-        exit 0
-    fi
-
-    log_info "Pi user found, proceeding with finalization..."
-    log_info "Pi user info: \$(id pi 2>/dev/null || echo 'Failed to get pi user info')"
-    log_info "Pi user groups: \$(groups pi 2>/dev/null || echo 'Failed to get pi user groups')"
-    log_info "Pi user processes: \$(pgrep -u pi | wc -l) running"
-
-    # Apply SSH hardening now that user account is created
-    log_info "Applying SSH hardening configuration..."
-    if ! apply_ssh_hardening; then
-        log_warn "SSH hardening failed, but continuing..."
-    fi
-
-    # Apply fail2ban configuration with correct SSH port
-    log_info "Applying fail2ban configuration..."
-    if ! apply_fail2ban_config; then
-        log_warn "Fail2ban configuration failed, but continuing..."
-    fi
-
-    # BOOT FIX: More robust process termination
-    log_info "Safely terminating pi user processes..."
-    local pi_processes
-    pi_processes=\$(pgrep -u pi 2>/dev/null | wc -l)
-    log_info "Found \$pi_processes processes running as pi user"
-
-    if pgrep -u pi >/dev/null 2>&1; then
-        log_info "Listing pi user processes before termination:"
-        ps -u pi -o pid,ppid,cmd 2>/dev/null | head -20 | while read -r line; do
-            log_info "  \$line"
-        done
-
-        log_info "Attempting graceful termination (SIGTERM)..."
-        pkill -TERM -u pi 2>/dev/null || true
-        sleep 3
-
-        # Check remaining processes
-        local remaining_processes
-        remaining_processes=\$(pgrep -u pi 2>/dev/null | wc -l)
-        log_info "Processes remaining after SIGTERM: \$remaining_processes"
-
-        if pgrep -u pi >/dev/null 2>&1; then
-            log_warn "Some processes still running, attempting force kill (SIGKILL)..."
-            ps -u pi -o pid,ppid,cmd 2>/dev/null | head -10 | while read -r line; do
-                log_warn "  Still running: \$line"
-            done
-            pkill -KILL -u pi 2>/dev/null || true
-            sleep 2
-
-            # Final check
-            remaining_processes=\$(pgrep -u pi 2>/dev/null | wc -l)
-            log_info "Processes remaining after SIGKILL: \$remaining_processes"
-        fi
-    else
-        log_info "No processes found running as pi user"
-    fi
-
-    # Transfer ownership of any remaining pi user files
-    log_info "Transferring ownership of remaining pi user files..."
-    find / -user pi -not -path "/home/pi*" -not -path "/proc/*" -not -path "/sys/*" 2>/dev/null | \
-        head -1000 | xargs chown "\$NEW_USERNAME:\$NEW_USERNAME" 2>/dev/null || true
-
-    # BOOT FIX: More robust user removal
-    log_info "Removing pi user account..."
-    log_info "Pi user home directory: \$(ls -la /home/pi 2>/dev/null | wc -l) items"
-    log_info "Pi user disk usage: \$(du -sh /home/pi 2>/dev/null || echo 'N/A')"
-
-    # Check for any remaining processes one more time
-    if pgrep -u pi >/dev/null 2>&1; then
-        log_warn "Warning: Pi user still has running processes during removal attempt"
-        ps -u pi -o pid,ppid,cmd 2>/dev/null | head -5 | while read -r line; do
-            log_warn "  Active process: \$line"
-        done
-    fi
-
-    # Attempt user removal with detailed logging
-    log_info "Attempting to remove pi user with home directory..."
-    if userdel -r pi 2>/tmp/userdel.log; then
-        log_success "Pi user removed successfully with home directory"
-    elif userdel pi 2>/tmp/userdel.log; then
-        log_warn "Pi user removed but home directory may remain"
-        if [[ -f /tmp/userdel.log ]]; then
-            log_warn "userdel output: \$(cat /tmp/userdel.log)"
-        fi
-        # Clean up home directory manually
-        if [[ -d "/home/pi" ]]; then
-            log_info "Removing pi home directory manually..."
-            local home_size
-            home_size=\$(du -sh /home/pi 2>/dev/null | cut -f1 || echo "unknown")
-            log_info "Home directory size: \$home_size"
-            if rm -rf /home/pi 2>/tmp/rmdir.log; then
-                log_success "Pi home directory removed manually"
-            else
-                log_warn "Failed to remove pi home directory: \$(cat /tmp/rmdir.log 2>/dev/null || echo 'No error log')"
-            fi
-        fi
-    else
-        log_error "Failed to remove pi user, but system should still boot"
-        if [[ -f /tmp/userdel.log ]]; then
-            log_error "userdel error: \$(cat /tmp/userdel.log)"
-        fi
-        # Don't exit with error - let boot continue
-    fi
-
-    # Verify user removal
-    if id pi >/dev/null 2>&1; then
-        log_error "Pi user still exists after removal attempt"
-        log_error "Pi user info: \$(id pi 2>/dev/null)"
-    else
-        log_success "Pi user successfully removed from system"
-    fi
-
-    # Check home directory status
-    if [[ -d "/home/pi" ]]; then
-        log_warn "Pi home directory still exists: \$(ls -la /home/pi 2>/dev/null | wc -l) items"
-    else
-        log_success "Pi home directory successfully removed"
-    fi
-
-    # Remove pi crontab if it exists
-    log_info "Checking for pi user crontab..."
-    if [[ -f /var/spool/cron/crontabs/pi ]]; then
-        log_info "Removing pi user crontab..."
-        rm -f /var/spool/cron/crontabs/pi 2>/dev/null || true
-        log_success "Pi user crontab removed"
-    else
-        log_info "No pi user crontab found"
-    fi
-
-    # Clean up this service
-    log_info "Cleaning up finalization services..."
-    log_info "Disabling dangerprep-finalize.service..."
-    if systemctl disable dangerprep-finalize.service 2>/dev/null; then
-        log_success "dangerprep-finalize.service disabled"
-    else
-        log_warn "Failed to disable dangerprep-finalize.service"
-    fi
-
-    log_info "Disabling dangerprep-finalize-graphical.service..."
-    if systemctl disable dangerprep-finalize-graphical.service 2>/dev/null; then
-        log_success "dangerprep-finalize-graphical.service disabled"
-    else
-        log_warn "Failed to disable dangerprep-finalize-graphical.service"
-    fi
-
-    log_info "Removing service files..."
-    rm -f /etc/systemd/system/dangerprep-finalize.service 2>/dev/null || true
-    rm -f /etc/systemd/system/dangerprep-finalize-graphical.service 2>/dev/null || true
-
-    log_info "Reloading systemd daemon..."
-    if systemctl daemon-reload 2>/dev/null; then
-        log_success "Systemd daemon reloaded"
-    else
-        log_warn "Failed to reload systemd daemon"
-    fi
-
-    # Create completion marker
-    log_info "Creating completion marker..."
-    touch /var/lib/dangerprep-finalization-complete 2>/dev/null || true
-    echo "\$(date): Pi user finalization completed successfully" >> /var/lib/dangerprep-finalization-complete 2>/dev/null || true
-
-    # Remove this script
-    log_info "Removing finalization script..."
-    rm -f "\$0" 2>/dev/null || true
-
-    log_info "=========================================="
-    log_success "DangerPrep finalization completed successfully!"
-    log_info "Pi user has been removed and system is ready for use"
-    log_info "Completion time: \$(date)"
-    log_info "Total runtime: \$((\$(date +%s) - \${START_TIME:-\$(date +%s)})) seconds"
-    log_info "=========================================="
-}
-
-# BOOT FIX: Run main function with error handling to prevent boot hangs
-if ! main "\$@"; then
-    log_error "Finalization failed, but system should still boot normally"
-    log_info "Manual cleanup may be required after boot"
-    # Exit successfully to prevent boot hang
-    exit 0
-fi
-EOF
-
-    chmod +x "$cleanup_script"
-
-    # Create systemd service for reboot finalization
-    local service_file="/etc/systemd/system/dangerprep-finalize.service"
-    cat > "$service_file" << EOF
-[Unit]
-Description=DangerPrep Finalization Service - Pi User Cleanup
-Documentation=file:///dangerprep/scripts/setup/README.md
-After=multi-user.target network.target systemd-user-sessions.service
-Before=getty@tty1.service lightdm.service gdm.service display-manager.service
-DefaultDependencies=yes
-# Prevent conflicts with login services during user removal
-Conflicts=getty@tty1.service
-# Only run if pi user exists (condition for cleanup)
-ConditionUser=pi
-# Ensure we run early in the boot process but after essential services
-Wants=systemd-user-sessions.service
-
-[Service]
-Type=oneshot
-ExecStart=$cleanup_script
-# Create a status file to track completion
-ExecStartPost=/bin/touch /var/lib/dangerprep-finalization-complete
-RemainAfterExit=yes
-TimeoutStartSec=600
-# Increase timeout for user cleanup operations
-TimeoutStopSec=60
-StandardOutput=journal+console
-StandardError=journal+console
-# Don't fail boot if finalization has issues, but log them
-SuccessExitStatus=0 1 2
-# Restart on failure with delay
-Restart=on-failure
-RestartSec=30
-# Limit restart attempts
-StartLimitBurst=3
-StartLimitIntervalSec=300
-# Set working directory
-WorkingDirectory=/tmp
-# Run with full privileges for user management
-User=root
-Group=root
-# Security settings
-NoNewPrivileges=false
-PrivateTmp=true
-ProtectSystem=false
-ProtectHome=false
-
-[Install]
-WantedBy=multi-user.target
-# Also wanted by graphical target in case system boots to GUI
-Also=dangerprep-finalize-graphical.service
-EOF
-
-    # Create a companion service for graphical target
-    local graphical_service_file="/etc/systemd/system/dangerprep-finalize-graphical.service"
-    cat > "$graphical_service_file" << EOF
-[Unit]
-Description=DangerPrep Finalization Service - Graphical Target
-Documentation=file:///dangerprep/scripts/setup/README.md
-After=graphical.target
-Before=display-manager.service
-ConditionUser=pi
-ConditionPathExists=!/var/lib/dangerprep-finalization-complete
-
-[Service]
-Type=oneshot
-ExecStart=$cleanup_script
-ExecStartPost=/bin/touch /var/lib/dangerprep-finalization-complete
-RemainAfterExit=yes
-TimeoutStartSec=600
-StandardOutput=journal+console
-StandardError=journal+console
-SuccessExitStatus=0 1 2
-
-[Install]
-WantedBy=graphical.target
-EOF
-
-    # Enable the services using standardized service management
-    if ! standard_service_operation "" "reload"; then
-        log_error "Failed to reload systemd daemon"
-        return 1
-    fi
-
-    # Enable finalization service with detailed error reporting
-    log_debug "Attempting to enable dangerprep-finalize.service"
-    if ! standard_service_operation "dangerprep-finalize" "enable"; then
-        log_error "Failed to enable finalization service"
-        # Try manual enable with more detailed error output
-        log_debug "Attempting manual systemctl enable with error output"
-        if ! systemctl enable dangerprep-finalize.service 2>&1 | tee /tmp/systemctl-enable.log; then
-            log_error "Manual enable also failed. Error output:"
-            cat /tmp/systemctl-enable.log 2>/dev/null | while read -r line; do
-                log_error "  $line"
-            done
-        fi
-        return 1
-    fi
-
-    # Enable graphical finalization service (non-critical)
-    log_debug "Attempting to enable dangerprep-finalize-graphical.service"
-    if ! standard_service_operation "dangerprep-finalize-graphical" "enable"; then
-        log_warn "Failed to enable graphical finalization service (non-critical)"
-        # Log the error but don't fail
-        systemctl enable dangerprep-finalize-graphical.service 2>&1 | while read -r line; do
-            log_debug "  graphical service enable: $line"
-        done
-    fi
-
-    # Create status tracking directory
-    mkdir -p /var/lib
-
-    # Validate service configuration
-    if systemctl is-enabled dangerprep-finalize.service >/dev/null 2>&1; then
-        log_success "Reboot finalization service created and enabled"
-        log_info "Pi user will be removed automatically on next reboot"
-        log_info "Manual fallback available: sudo /dangerprep/scripts/setup/finalize-user-migration.sh"
-    else
-        log_warn "Finalization service may not be properly enabled"
-        log_info "Manual cleanup will be required: sudo /dangerprep/scripts/setup/finalize-user-migration.sh"
-    fi
-}
 
 # Create emergency recovery service to prevent permanent boot hangs
 create_emergency_recovery_service() {
@@ -8038,9 +7500,9 @@ log_info() {
 
 log_info "Emergency recovery service started"
 
-# Re-enable standard getty if autologin fails
+# Ensure getty service is running
 if ! systemctl is-active getty@tty1.service >/dev/null 2>&1; then
-    log_info "Re-enabling getty service"
+    log_info "Ensuring getty service is running"
     systemctl enable getty@tty1.service 2>/dev/null || true
     systemctl start getty@tty1.service 2>/dev/null || true
 fi
@@ -8142,21 +7604,17 @@ setup_kiosk_mode() {
 
     enhanced_status_indicator "success" "Installed ${total_packages} kiosk packages"
 
-    # Configure kiosk mode for the new user
-    if [[ -n "${NEW_USERNAME:-}" ]]; then
-        configure_gnome_kiosk "$NEW_USERNAME"
+    # Configure kiosk mode for the pi user
+    configure_gnome_kiosk "pi"
 
-        if [[ "${KIOSK_VNC_ENABLED:-false}" == "true" ]]; then
-            setup_vnc_server "$NEW_USERNAME"
-        fi
-
-        create_kiosk_mode_switcher "$NEW_USERNAME"
-
-        # Set kiosk mode as default
-        set_kiosk_mode_default "$NEW_USERNAME"
-    else
-        log_warn "No user account configured, skipping kiosk user setup"
+    if [[ "${KIOSK_VNC_ENABLED:-false}" == "true" ]]; then
+        setup_vnc_server "pi"
     fi
+
+    create_kiosk_mode_switcher "pi"
+
+    # Set kiosk mode as default
+    set_kiosk_mode_default "pi"
 
     enhanced_status_indicator "success" "Kiosk mode setup completed"
     log_info "Kiosk URL: ${KIOSK_URL:-https://google.com}"
@@ -8955,10 +8413,10 @@ main() {
     # BOOT FIX: Comprehensive final safety checks and warnings
     log_info ""
     log_info "🛡️  BOOT SAFETY MEASURES APPLIED:"
-    log_info "✅ Autologin disabled to prevent boot hangs"
+    log_info "✅ Autologin configured for pi user"
     log_info "✅ Emergency recovery service enabled"
     log_info "✅ Service failures won't block boot process"
-    log_info "✅ Finalization script has error handling"
+
     log_info "✅ Kernel hardening applied safely"
     log_info "✅ Firewall configured with boot safety"
     log_info "✅ Hardware services have fallbacks"
@@ -8998,42 +8456,7 @@ main() {
         potential_blockers+=("no emergency recovery")
     fi
 
-    # Check if pi user cleanup is properly configured
-    if [[ -n "${NEW_USERNAME:-}" ]] && id pi >/dev/null 2>&1; then
-        log_info "🔍 Validating pi user cleanup configuration..."
 
-        # Check if finalization service exists and is enabled
-        if systemctl is-enabled dangerprep-finalize.service >/dev/null 2>&1; then
-            log_info "✅ Pi user cleanup service enabled"
-        else
-            log_warn "⚠️  Pi user cleanup service not enabled"
-            potential_blockers+=("pi cleanup service not enabled")
-        fi
-
-        # Check if finalization script exists
-        if [[ -f /usr/local/bin/dangerprep-finalize.sh ]]; then
-            log_info "✅ Pi user cleanup script created"
-        else
-            log_warn "⚠️  Pi user cleanup script missing"
-            potential_blockers+=("pi cleanup script missing")
-        fi
-
-        # Check if manual cleanup script exists
-        if [[ -f /dangerprep/scripts/setup/finalize-user-migration.sh ]]; then
-            log_info "✅ Manual cleanup script available"
-        else
-            log_warn "⚠️  Manual cleanup script missing"
-            potential_blockers+=("manual cleanup script missing")
-        fi
-
-        # Validate service configuration
-        if systemctl cat dangerprep-finalize.service 2>/dev/null | grep -q "ConditionUser=pi"; then
-            log_info "✅ Pi user cleanup service properly configured"
-        else
-            log_warn "⚠️  Pi user cleanup service configuration issue"
-            potential_blockers+=("pi cleanup service misconfigured")
-        fi
-    fi
 
     # Final warnings and instructions
     log_info ""
@@ -9048,27 +8471,17 @@ main() {
         log_info "System should still boot, but manual intervention may be needed"
     fi
 
-    if [[ -n "${NEW_USERNAME:-}" ]]; then
-        log_info ""
-        log_info "📋 POST-REBOOT ACCESS INSTRUCTIONS:"
-        log_info "1. Primary: SSH as ${NEW_USERNAME} on port ${SSH_PORT:-2222}"
-        log_info "2. Fallback: Console login as ${NEW_USERNAME}"
-        log_info "3. Recovery: Check logs at /var/log/dangerprep-*.log"
-        log_info ""
-        log_info "🔄 PI USER CLEANUP VERIFICATION:"
-        log_info "After reboot, verify pi user removal:"
-        log_info "   - Check user removal: id pi (should fail)"
-        log_info "   - Check cleanup logs: journalctl -u dangerprep-finalize"
-        log_info "   - Check completion: ls -la /var/lib/dangerprep-finalization-complete"
-        log_info "   - Manual cleanup: sudo /dangerprep/scripts/setup/finalize-user-migration.sh"
-        log_info ""
-        log_info "🔧 TROUBLESHOOTING:"
-        log_info "   - If system hangs: Power cycle and check console"
-        log_info "   - If SSH fails: Check port ${SSH_PORT:-2222} and firewall"
-        log_info "   - If services fail: Use 'systemctl status <service>' to diagnose"
-        log_info "   - If pi user remains: Run manual cleanup script"
-        log_info "   - Emergency recovery: Service runs automatically if needed"
-    fi
+    log_info ""
+    log_info "📋 ACCESS INSTRUCTIONS:"
+    log_info "1. Primary: SSH as pi on port ${SSH_PORT:-2222}"
+    log_info "2. Fallback: Console login as pi"
+    log_info "3. Recovery: Check logs at /var/log/dangerprep-*.log"
+    log_info ""
+    log_info "🔧 TROUBLESHOOTING:"
+    log_info "   - If system hangs: Power cycle and check console"
+    log_info "   - If SSH fails: Check port ${SSH_PORT:-2222} and firewall"
+    log_info "   - If services fail: Use 'systemctl status <service>' to diagnose"
+    log_info "   - Emergency recovery: Service runs automatically if needed"
 
     return 0
 }

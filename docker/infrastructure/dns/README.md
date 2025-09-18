@@ -1,18 +1,18 @@
 # DNS Infrastructure
 
-DNS infrastructure for DangerPrep, including AdGuard Home for ad-blocking and local DNS server for internal domain resolution.
+DNS infrastructure for DangerPrep, using CoreDNS with NextDNS for secure DNS resolution and local domain resolution.
 
 ## Components
 
-**AdGuard Home (`adguardhome`):**
-- Purpose: Ad-blocking and DNS filtering
-- Port: 53 (DNS), 3000 (Web Interface)
-- Access: `https://dns.${DOMAIN_NAME}`
-
 **CoreDNS (`coredns`):**
-- Purpose: Internal domain resolution
+- Purpose: Internal domain resolution and secure DNS forwarding
 - Port: 5353 (Alternative DNS)
 - Configuration: Managed by registrar service
+- Upstream: NextDNS (3ca9ab.dns.nextdns.io) for secure DNS-over-TLS
+
+**AdGuard Home (`adguardhome`):** ⚠️ **DISABLED**
+- Status: Commented out in favor of NextDNS direct integration
+- Reason: Simplified DNS chain with NextDNS providing built-in filtering
 
 **DNS Registrar (`registrar`):**
 - Purpose: Watches Docker labels and updates DNS records
@@ -27,9 +27,11 @@ nano compose.dns.env
 # 2. Deploy
 docker compose up -d
 
-# 3. Setup AdGuard
-# Access http://your-server-ip:3000, follow setup wizard
-# Set upstream DNS to 172.21.0.4:53
+# 3. Test DNS resolution
+dig @your-server-ip google.com
+
+# 4. Test local domain resolution
+dig @your-server-ip jellyfin.danger
 ```
 
 ## Service Registration
@@ -44,7 +46,11 @@ Creates DNS record: `myservice.yourdomain.com → service-ip`
 ## Network Architecture
 
 ```
-Client Request → AdGuard Home (172.21.0.2:53) → CoreDNS (172.21.0.4:53) → DNS Zone File → DNS Registrar
+Client Request → CoreDNS (172.21.0.4:5353) → NextDNS (3ca9ab.dns.nextdns.io) via DNS-over-TLS
+                     ↓
+               Local DNS Zone Files (.danger/.danger.diy domains)
+                     ↓
+               DNS Registrar (Auto-registration from Docker labels)
 ```
 
 ## Troubleshooting
@@ -57,7 +63,7 @@ cat /data/local-dns/db.yourdomain.com            # Check zone file
 
 **Check Service Logs:**
 ```bash
-docker logs dns-adguardhome-1
+# docker logs dns-adguardhome-1  # AdGuard Home disabled
 docker logs dns-coredns-1
 docker logs dns-registrar-1
 ```

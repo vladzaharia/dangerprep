@@ -70,12 +70,6 @@ services:
         ipv4_address: 172.21.0.4
     depends_on:
       - registrar
-    healthcheck:
-      test: ["CMD", "dig", "@127.0.0.1", "health.check", "+short", "+time=5"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   # DNS registrar service to manage domain registrations from labels
   registrar:
