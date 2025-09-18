@@ -121,30 +121,7 @@ load_hardware_monitoring_config() {
     cat "$CONFIG_DIR/monitoring/sensors3_dangerprep.conf.tmpl" >> /etc/sensors3.conf
 }
 
-load_hostapd_config() {
-    log_info "Loading hostapd configuration..."
-    process_template "$CONFIG_DIR/network/hostapd.conf.tmpl" "/etc/hostapd/hostapd.conf"
-    # Configure hostapd to use our config file
-    sed -i 's|#DAEMON_CONF=""|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
-}
 
-load_dnsmasq_config() {
-    log_info "Loading dnsmasq configuration..."
-    process_template "$CONFIG_DIR/network/dnsmasq.conf.tmpl" "/etc/dnsmasq.conf"
-    # Create log file
-    touch /var/log/dnsmasq.log
-    chown dnsmasq:nogroup /var/log/dnsmasq.log
-}
-
-load_dnsmasq_advanced_config() {
-    log_info "Loading advanced dnsmasq configuration..."
-    process_template "$CONFIG_DIR/dns/dnsmasq_advanced.conf.tmpl" "/etc/dnsmasq.conf"
-}
-
-load_wan_config() {
-    log_info "Loading WAN interface configuration..."
-    process_template "$CONFIG_DIR/network/netplan_wan.yaml.tmpl" "/etc/netplan/01-dangerprep-wan.yaml"
-}
 
 load_sync_configs() {
     log_info "Loading sync service configurations..."
@@ -195,13 +172,7 @@ validate_config_files() {
         "$CONFIG_DIR/security/aide_dangerprep.conf.tmpl"
 
         # Network configs
-        "$CONFIG_DIR/network/hostapd.conf.tmpl"
-        "$CONFIG_DIR/network/dnsmasq.conf.tmpl"
-        "$CONFIG_DIR/network/netplan_wan.yaml.tmpl"
         "$CONFIG_DIR/network/network_performance.conf.tmpl"
-
-        # DNS configs
-        "$CONFIG_DIR/dns/dnsmasq_advanced.conf.tmpl"
 
         # Monitoring configs
         "$CONFIG_DIR/monitoring/sensors3_dangerprep.conf.tmpl"

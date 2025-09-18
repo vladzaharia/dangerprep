@@ -1803,6 +1803,7 @@ load_configuration() {
         load_docker_config() { log_debug "Docker config loading not available"; }
         load_watchtower_config() { log_debug "Watchtower config loading not available"; }
         load_sync_configs() { log_debug "Sync config loading not available"; }
+        load_network_performance_config() { log_debug "Network performance config loading not available"; }
         # Add other fallback functions as needed
     fi
 }
@@ -4614,6 +4615,9 @@ check_bbr_availability() {
 configure_kernel_hardening() {
     log_info "Configuring kernel hardening..."
     load_kernel_hardening_config
+
+    # Load network performance optimizations
+    load_network_performance_config
 
     # BOOT FIX: Apply sysctl settings with comprehensive error handling
     log_info "Applying kernel hardening with boot safety checks..."
