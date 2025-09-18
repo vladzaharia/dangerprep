@@ -98,11 +98,6 @@ load_kernel_hardening_config() {
     cat "$CONFIG_DIR/security/sysctl_hardening.conf.tmpl" >> /etc/sysctl.conf
 }
 
-load_aide_config() {
-    log_info "Loading AIDE configuration..."
-    cat "$CONFIG_DIR/security/aide_dangerprep.conf.tmpl" >> /etc/aide/aide.conf
-}
-
 load_motd_config() {
     log_info "Loading MOTD configuration..."
     # Install DangerPrep banner for MOTD
@@ -169,7 +164,6 @@ validate_config_files() {
         "$CONFIG_DIR/security/jail.local.tmpl"
         "$CONFIG_DIR/security/nginx-botsearch.conf.tmpl"
         "$CONFIG_DIR/security/sysctl_hardening.conf.tmpl"
-        "$CONFIG_DIR/security/aide_dangerprep.conf.tmpl"
 
         # Network configs
         "$CONFIG_DIR/network/network_performance.conf.tmpl"

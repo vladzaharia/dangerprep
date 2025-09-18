@@ -911,7 +911,6 @@ remove_configurations() {
     [[ -f /var/lib/unbound/root.hints ]] && rm -f /var/lib/unbound/root.hints 2>/dev/null || true
 
     # Remove security tools configurations and cron jobs (optimistic cleanup)
-    [[ -f /etc/cron.d/aide-check ]] && rm -f /etc/cron.d/aide-check 2>/dev/null || true
     [[ -f /etc/cron.d/antivirus-scan ]] && rm -f /etc/cron.d/antivirus-scan 2>/dev/null || true
     [[ -f /etc/cron.d/security-audit ]] && rm -f /etc/cron.d/security-audit 2>/dev/null || true
     [[ -f /etc/cron.d/rootkit-scan ]] && rm -f /etc/cron.d/rootkit-scan 2>/dev/null || true
@@ -944,7 +943,6 @@ remove_configurations() {
 
     # Remove log files and directories (optimistic cleanup)
     rm -f /var/log/dangerprep*.log 2>/dev/null || true
-    rm -f /var/log/aide-check.log 2>/dev/null || true
     rm -f /var/log/clamav-scan.log 2>/dev/null || true
     rm -f /var/log/lynis-audit.log 2>/dev/null || true
     rm -f /var/log/rkhunter-scan.log 2>/dev/null || true
@@ -999,16 +997,6 @@ remove_configurations() {
     # Remove backup encryption key (optimistic cleanup)
     [[ -d /etc/dangerprep/backup ]] && rm -rf /etc/dangerprep/backup 2>/dev/null || true
 
-    # Remove AIDE database and configuration additions (optimistic cleanup)
-    [[ -f /var/lib/aide/aide.db ]] && rm -f /var/lib/aide/aide.db 2>/dev/null || true
-    [[ -f /var/lib/aide/aide.db.new ]] && rm -f /var/lib/aide/aide.db.new 2>/dev/null || true
-
-    # Restore original AIDE configuration by removing DangerPrep additions (optimistic cleanup)
-    if [[ -f /etc/aide/aide.conf ]]; then
-        # Remove DangerPrep specific monitoring rules
-        sed -i '/# DangerPrep specific monitoring rules/,$d' /etc/aide/aide.conf 2>/dev/null || true
-    fi
-
     # Remove certificate management files (optimistic cleanup)
     [[ -d /etc/letsencrypt ]] && rm -rf /etc/letsencrypt 2>/dev/null || true
     [[ -d /etc/ssl/dangerprep ]] && rm -rf /etc/ssl/dangerprep 2>/dev/null || true
@@ -1038,7 +1026,6 @@ remove_configurations() {
 
     # Remove temporary files (optimistic cleanup)
     rm -rf /tmp/dangerprep* 2>/dev/null || true
-    rm -rf /tmp/aide-report-* 2>/dev/null || true
     rm -rf /tmp/lynis-report-* 2>/dev/null || true
 
     # Remove additional configurations that setup script creates
@@ -1098,7 +1085,7 @@ remove_packages() {
 
     # Define package categories
     local security_packages=(
-        "aide" "rkhunter" "chkrootkit" "clamav" "clamav-daemon" "clamav-freshclam"
+        "rkhunter" "chkrootkit" "clamav" "clamav-daemon" "clamav-freshclam"
         "lynis" "ossec-hids" "acct" "psacct" "suricata"
         "apparmor" "apparmor-utils" "libpam-pwquality" "libpam-tmpdir"
         "fail2ban" "ufw"
@@ -1650,7 +1637,6 @@ final_cleanup() {
 
     # Remove temporary files
     rm -rf /tmp/dangerprep* 2>/dev/null || true
-    rm -rf /tmp/aide-report-* 2>/dev/null || true
     rm -rf /tmp/lynis-report-* 2>/dev/null || true
 
     # Clean up systemd

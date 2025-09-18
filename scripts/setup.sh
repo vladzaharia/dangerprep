@@ -1871,7 +1871,7 @@ set_default_configuration_values() {
     if [[ -z "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
         SELECTED_PACKAGE_CATEGORIES="Convenience packages (vim, nano, htop, pv, gzip, exfatprogs, etc.)
 Network packages (netplan, tc, iperf3, tailscale, etc.)
-Security packages (fail2ban, aide, clamav, etc.)
+Security packages (fail2ban, clamav, etc.)
 Monitoring packages (sensors, collectd, etc.)
 Backup packages (borgbackup, restic)
 Automatic update packages"
@@ -2298,7 +2298,7 @@ collect_package_configuration() {
     local package_categories=(
         "Convenience packages (vim, nano, htop, pv, gzip, exfatprogs, etc.)"
         "Network packages (netplan, tc, iperf3, tailscale, etc.)"
-        "Security packages (fail2ban, aide, clamav, etc.)"
+        "Security packages (fail2ban, clamav, etc.)"
         "Monitoring packages (sensors, collectd, etc.)"
         "Backup packages (borgbackup, restic)"
         "Automatic update packages"
@@ -3203,7 +3203,7 @@ backup_original_configs() {
         "/etc/ssh/sshd_config"
         "/etc/sysctl.conf"
         "/etc/fail2ban/jail.conf"
-        "/etc/aide/aide.conf"
+        ""
         "/etc/sensors3.conf"
         "/etc/fstab"
         "/etc/lightdm/lightdm.conf"
@@ -3515,8 +3515,7 @@ while IFS= read -r -d '' backup_file; do
             original_path="/etc/$original_name"
         elif [[ "$original_name" =~ ^(jail\.conf|jail\.local)$ ]]; then
             original_path="/etc/fail2ban/$original_name"
-        elif [[ "$original_name" =~ ^(aide\.conf)$ ]]; then
-            original_path="/etc/aide/$original_name"
+
         elif [[ "$original_name" =~ ^(sensors3\.conf)$ ]]; then
             original_path="/etc/$original_name"
         elif [[ "$original_name" =~ ^(lightdm\.conf)$ ]]; then
@@ -3745,7 +3744,7 @@ install_essential_packages() {
                     package_categories+=("Network:netplan.io,iproute2,wondershaper,iperf3,tailscale")
                     ;;
                 *"Security packages"*)
-                    package_categories+=("Security:fail2ban,aide,rkhunter,chkrootkit,clamav,clamav-daemon,lynis,suricata,apparmor,apparmor-utils,libpam-pwquality,libpam-tmpdir,acct")
+                    package_categories+=("Security:fail2ban,rkhunter,chkrootkit,clamav,clamav-daemon,lynis,suricata,apparmor,apparmor-utils,libpam-pwquality,libpam-tmpdir,acct")
                     ;;
                 *"Monitoring packages"*)
                     package_categories+=("Monitoring:lm-sensors,fancontrol,sensors-applet,collectd,collectd-utils,logwatch,rsyslog-gnutls,smartmontools")
@@ -4727,79 +4726,7 @@ check_disk_space() {
     return 0
 }
 
-# Setup file integrity monitoring
-setup_file_integrity_monitoring() {
-    log_info "Setting up file integrity monitoring..."
 
-    # Load AIDE configuration first
-    load_aide_config
-
-    # Add common exclusions to prevent permission issues and hanging
-    cat >> /etc/aide/aide.conf << 'EOF'
-
-# DangerPrep exclusions to prevent permission issues and hanging
-!/run/user
-!/proc
-!/sys
-!/dev
-!/tmp
-!/var/tmp
-!/var/cache
-!/var/log/journal
-!/var/lib/docker
-!/var/lib/containerd
-!/snap
-!/home/*/snap
-!/home/*/.cache
-!/home/*/.local/share/Trash
-!/root/.cache
-!/root/.local/share/Trash
-EOF
-
-    # BOOT FIX: Initialize AIDE database with comprehensive safety checks
-    log_info "Initializing AIDE database with boot safety measures..."
-
-    # Check disk space before AIDE initialization (needs at least 3GB)
-    if ! check_disk_space 3 "AIDE database initialization"; then
-        log_warn "Insufficient disk space for AIDE initialization, skipping"
-        log_info "You can manually initialize AIDE later when more space is available"
-        return 0
-    fi
-
-    # Create AIDE database directory with proper permissions
-    mkdir -p /var/lib/aide
-    chmod 700 /var/lib/aide
-
-    # Use shorter timeout and background process to prevent hanging
-    log_info "Starting AIDE database initialization (max 10 minutes)..."
-
-    # Run AIDE initialization in background with timeout
-    if timeout 600 aide --init --config=/etc/aide/aide.conf >/var/log/aide-init.log 2>&1; then
-        if [[ -f /var/lib/aide/aide.db.new ]]; then
-            mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
-            log_success "AIDE database initialized successfully"
-
-            # Check final database size
-            local db_size=$(du -h /var/lib/aide/aide.db 2>/dev/null | cut -f1)
-            log_info "AIDE database size: ${db_size:-unknown}"
-        else
-            log_warn "AIDE initialization completed but database file not found"
-            log_info "Check /var/log/aide-init.log for details"
-        fi
-    else
-        log_warn "AIDE initialization timed out or failed (this is not critical)"
-        log_info "AIDE can be initialized later with: aide --init"
-        log_info "Check /var/log/aide-init.log for details"
-
-        # Don't fail the setup - AIDE is not critical for boot
-        return 0
-    fi
-
-    # AIDE monitoring would be configured here if monitoring scripts were available
-    log_info "AIDE file integrity monitoring configured"
-
-    log_success "File integrity monitoring configured"
-}
 
 # Detect ARM64 thermal sensors and hwmon devices
 detect_arm64_sensors() {
@@ -8175,7 +8102,6 @@ main() {
         "setup_automatic_updates:Setting up automatic updates"
         "load_motd_config:Loading MOTD configuration"
         "configure_kernel_hardening:Configuring kernel hardening"
-        "setup_file_integrity_monitoring:Setting up file integrity monitoring"
         "setup_hardware_monitoring:Setting up hardware monitoring"
         "setup_advanced_security_tools:Setting up advanced security tools"
         "configure_rootless_docker:Configuring rootless Docker"
