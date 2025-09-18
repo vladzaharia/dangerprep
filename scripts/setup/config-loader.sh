@@ -62,6 +62,12 @@ process_template() {
     [[ -n "${FAIL2BAN_BANTIME:-}" ]] && content="${content//\{\{FAIL2BAN_BANTIME\}\}/$FAIL2BAN_BANTIME}"
     [[ -n "${FAIL2BAN_MAXRETRY:-}" ]] && content="${content//\{\{FAIL2BAN_MAXRETRY\}\}/$FAIL2BAN_MAXRETRY}"
     [[ -n "${NEW_USERNAME:-}" ]] && content="${content//\{\{NEW_USERNAME\}\}/$NEW_USERNAME}"
+    [[ -n "${SMTP_HOST:-}" ]] && content="${content//\{\{SMTP_HOST\}\}/$SMTP_HOST}"
+    [[ -n "${SMTP_PORT:-}" ]] && content="${content//\{\{SMTP_PORT\}\}/$SMTP_PORT}"
+    [[ -n "${SMTP_USER:-}" ]] && content="${content//\{\{SMTP_USER\}\}/$SMTP_USER}"
+    [[ -n "${SMTP_PASSWORD:-}" ]] && content="${content//\{\{SMTP_PASSWORD\}\}/$SMTP_PASSWORD}"
+    [[ -n "${SMTP_FROM:-}" ]] && content="${content//\{\{SMTP_FROM\}\}/$SMTP_FROM}"
+    [[ -n "${NOTIFICATION_EMAIL:-}" ]] && content="${content//\{\{NOTIFICATION_EMAIL\}\}/$NOTIFICATION_EMAIL}"
 
     # Write the processed content to output file
     echo "$content" > "$output_file"

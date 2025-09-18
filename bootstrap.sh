@@ -495,7 +495,6 @@ create_detached_screen_session() {
 
         bash scripts/setup.sh \"\${setup_args[@]}\"
 
-        echo -e '${GREEN}[SUCCESS]${NC} DangerPrep setup completed successfully!'
         echo -e '${BLUE}[INFO]${NC} Setup complete. You can safely detach this session.'
         echo -e '${BLUE}[INFO]${NC} Press Enter to keep session alive or Ctrl+C to exit...'
         read
@@ -507,14 +506,10 @@ create_detached_screen_session() {
     log_success "Detached screen session '$session_name' created successfully!"
     echo
     log_info "📋 SCREEN SESSION INSTRUCTIONS:"
-    log_info "• To attach to the session: screen -r $session_name"
+    log_info "• To attach to the session: sudo screen -r $session_name"
     log_info "• To detach from session: Ctrl+A, then D"
-    log_info "• To list sessions: screen -ls"
-    log_info "• To kill session: screen -X -S $session_name quit"
-    echo
-    log_info "The setup is now running in the background."
-    log_info "You can safely close this terminal and reconnect later."
-    log_info "Run 'screen -r $session_name' to attach to the setup session."
+    log_info "• To list sessions: sudo screen -ls"
+    log_info "• To kill session: sudo screen -X -S $session_name quit"
 }
 
 # Attach to existing screen session or create new one

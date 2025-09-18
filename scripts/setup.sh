@@ -1916,6 +1916,7 @@ GPIO/PWM access"
     export NEW_USERNAME NEW_USER_FULLNAME PI_USER_PASSWORD
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
+    export SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM NOTIFICATION_EMAIL
 
     log_debug "Configuration values set and exported"
 }
@@ -1970,6 +1971,14 @@ KIOSK_ENABLED="${KIOSK_ENABLED:-false}"
 KIOSK_URL="${KIOSK_URL:-}"
 KIOSK_VNC_ENABLED="${KIOSK_VNC_ENABLED:-false}"
 KIOSK_VNC_PASSWORD="${KIOSK_VNC_PASSWORD:-}"
+
+# SMTP/Notification Configuration
+SMTP_HOST="${SMTP_HOST:-}"
+SMTP_PORT="${SMTP_PORT:-}"
+SMTP_USER="${SMTP_USER:-}"
+SMTP_PASSWORD="${SMTP_PASSWORD:-}"
+SMTP_FROM="${SMTP_FROM:-}"
+NOTIFICATION_EMAIL="${NOTIFICATION_EMAIL:-}"
 
 # System Detection
 IS_FRIENDLYELEC="$IS_FRIENDLYELEC"
@@ -2272,6 +2281,7 @@ collect_configuration() {
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
     export KIOSK_ENABLED KIOSK_URL KIOSK_VNC_ENABLED KIOSK_VNC_PASSWORD
+    export SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM NOTIFICATION_EMAIL
 
     # Save configuration for resumable installations
     save_configuration
@@ -2716,6 +2726,15 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
 
 
 
+    # SMTP/Notification configuration
+    local smtp_config="SMTP Host: ${SMTP_HOST:-"Not configured"}
+Notification Email: ${NOTIFICATION_EMAIL:-"Not configured"}"
+    if [[ -n "${SMTP_HOST:-}" ]]; then
+        smtp_config+=$'\n'"SMTP Port: ${SMTP_PORT:-587}"
+        smtp_config+=$'\n'"SMTP User: ${SMTP_USER:-"Not set"}"
+        smtp_config+=$'\n'"SMTP From: ${SMTP_FROM:-"Not set"}"
+    fi
+
     # Display all configuration cards
     enhanced_card "🌐 Network Configuration" "$network_config" "39" "39"
     enhanced_card "🔒 Security Configuration" "$security_config" "196" "196"
@@ -2723,6 +2742,7 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
     enhanced_card "🐳 Docker Configuration" "$docker_config" "34" "34"
     enhanced_card "👤 User Configuration" "$user_config" "35" "35"
     enhanced_card "💾 Storage Configuration" "$storage_config" "93" "93"
+    enhanced_card "📧 SMTP/Notification Configuration" "$smtp_config" "214" "214"
 
     # FriendlyElec configuration if applicable
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
