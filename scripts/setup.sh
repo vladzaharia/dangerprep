@@ -1839,10 +1839,7 @@ set_default_configuration_values() {
         NEW_USER_FULLNAME="DangerPrep User"
     fi
 
-    # Set default SSH key transfer settings
-    if [[ -z "${TRANSFER_SSH_KEYS:-}" ]]; then
-        TRANSFER_SSH_KEYS="yes"
-    fi
+
 
     # Set default GitHub key import settings
     if [[ -z "${IMPORT_GITHUB_KEYS:-}" ]]; then
@@ -1916,7 +1913,7 @@ GPIO/PWM access"
     export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
     export SELECTED_PACKAGE_CATEGORIES SELECTED_DOCKER_SERVICES
     export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
-    export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
+    export NEW_USERNAME NEW_USER_FULLNAME PI_USER_PASSWORD
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
 
@@ -1952,7 +1949,7 @@ FAIL2BAN_MAXRETRY="$FAIL2BAN_MAXRETRY"
 # User Account Configuration
 NEW_USERNAME="$NEW_USERNAME"
 NEW_USER_FULLNAME="$NEW_USER_FULLNAME"
-TRANSFER_SSH_KEYS="$TRANSFER_SSH_KEYS"
+PI_USER_PASSWORD="$PI_USER_PASSWORD"
 IMPORT_GITHUB_KEYS="$IMPORT_GITHUB_KEYS"
 GITHUB_USERNAME="$GITHUB_USERNAME"
 
@@ -2271,7 +2268,7 @@ collect_configuration() {
     export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
     export SELECTED_PACKAGE_CATEGORIES SELECTED_DOCKER_SERVICES
     export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
-    export NEW_USERNAME NEW_USER_FULLNAME TRANSFER_SSH_KEYS
+    export NEW_USERNAME NEW_USER_FULLNAME PI_USER_PASSWORD
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
     export KIOSK_ENABLED KIOSK_URL KIOSK_VNC_ENABLED KIOSK_VNC_PASSWORD
@@ -2585,12 +2582,12 @@ collect_user_account_configuration() {
     echo
 
     # Get new username
-    NEW_USERNAME=$(enhanced_input "New Username" "" "Enter username for new account (will replace pi user)")
+    NEW_USERNAME=$(enhanced_input "New Username" "" "Enter username for new account (will be created alongside pi user)")
     while [[ -z "$NEW_USERNAME" ]] || [[ "$NEW_USERNAME" == "pi" ]] || [[ "$NEW_USERNAME" == "root" ]]; do
         if [[ -z "$NEW_USERNAME" ]]; then
             log_warn "Username cannot be empty"
         elif [[ "$NEW_USERNAME" == "pi" ]]; then
-            log_warn "Cannot use 'pi' as username (will be removed)"
+            log_warn "Cannot use 'pi' as username (choose a different username)"
         elif [[ "$NEW_USERNAME" == "root" ]]; then
             log_warn "Cannot use 'root' as username"
         fi
@@ -2600,61 +2597,52 @@ collect_user_account_configuration() {
     # Get full name (optional)
     NEW_USER_FULLNAME=$(enhanced_input "Full Name (optional)" "" "Enter full name for new user")
 
+    # Prompt to change pi user password
+    echo
+    log_info "🔐 Pi User Security"
+    if enhanced_confirm "Change Pi User Password" "Change the default pi user password for security?" "yes"; then
+        local pi_password
+        pi_password=$(enhanced_password "Pi User Password" "Enter new password for pi user")
+        while [[ -z "$pi_password" ]]; do
+            log_warn "Password cannot be empty"
+            pi_password=$(enhanced_password "Pi User Password" "Enter new password for pi user")
+        done
+        # Store for later use
+        export PI_USER_PASSWORD="$pi_password"
+        log_success "Pi user password will be updated"
+    else
+        log_warn "Pi user password will remain unchanged (security risk)"
+        export PI_USER_PASSWORD=""
+    fi
+
     # SSH key configuration options
     echo
     log_info "🔑 SSH Key Configuration"
 
     local ssh_options=()
-    local has_pi_keys=false
 
-    # Check if pi user has SSH keys
-    if [[ -d "/home/pi/.ssh" && -f "/home/pi/.ssh/authorized_keys" ]]; then
-        has_pi_keys=true
-        ssh_options+=("Transfer existing SSH keys from pi user")
-    fi
-
-    # Always offer GitHub import option
-    ssh_options+=("Import SSH keys from GitHub account")
+    # Always offer GitHub import option (will apply to both pi and new user)
+    ssh_options+=("Import SSH keys from GitHub account (applies to both pi and new user)")
     ssh_options+=("Skip SSH key setup (configure manually later)")
 
-    if [[ ${#ssh_options[@]} -gt 1 ]]; then
-        local ssh_choice
-        ssh_choice=$(enhanced_choose "SSH Key Setup" "${ssh_options[@]}")
+    local ssh_choice
+    ssh_choice=$(enhanced_choose "SSH Key Setup" "${ssh_options[@]}")
 
-        case "$ssh_choice" in
-            *"Transfer existing SSH keys"*)
-                TRANSFER_SSH_KEYS="yes"
-                IMPORT_GITHUB_KEYS="no"
-                GITHUB_USERNAME=""
-                ;;
-            *"Import SSH keys from GitHub"*)
-                TRANSFER_SSH_KEYS="no"
-                IMPORT_GITHUB_KEYS="yes"
-                # Get GitHub username
+    case "$ssh_choice" in
+        *"Import SSH keys from GitHub"*)
+            IMPORT_GITHUB_KEYS="yes"
+            # Get GitHub username
+            GITHUB_USERNAME=$(enhanced_input "GitHub Username" "" "Enter your GitHub username to import SSH keys")
+            while [[ -z "$GITHUB_USERNAME" ]]; do
+                log_warn "GitHub username cannot be empty"
                 GITHUB_USERNAME=$(enhanced_input "GitHub Username" "" "Enter your GitHub username to import SSH keys")
-                while [[ -z "$GITHUB_USERNAME" ]]; do
-                    log_warn "GitHub username cannot be empty"
-                    GITHUB_USERNAME=$(enhanced_input "GitHub Username" "" "Enter your GitHub username to import SSH keys")
-                done
-                ;;
-            *)
-                TRANSFER_SSH_KEYS="no"
-                IMPORT_GITHUB_KEYS="no"
-                GITHUB_USERNAME=""
-                ;;
-        esac
-    else
-        # Only one option available
-        if [[ "$has_pi_keys" == "true" ]]; then
-            TRANSFER_SSH_KEYS="yes"
+            done
+            ;;
+        *)
             IMPORT_GITHUB_KEYS="no"
             GITHUB_USERNAME=""
-        else
-            TRANSFER_SSH_KEYS="no"
-            IMPORT_GITHUB_KEYS="no"
-            GITHUB_USERNAME=""
-        fi
-    fi
+            ;;
+    esac
 
     enhanced_status_indicator "success" "User account configuration completed"
 }
@@ -2702,11 +2690,16 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
 
     # Add SSH key configuration details
     if [[ "${IMPORT_GITHUB_KEYS:-no}" == "yes" ]]; then
-        user_config+=$'\n'"SSH Keys: Import from GitHub (@${GITHUB_USERNAME})"
-    elif [[ "${TRANSFER_SSH_KEYS:-no}" == "yes" ]]; then
-        user_config+=$'\n'"SSH Keys: Transfer from pi user"
+        user_config+=$'\n'"SSH Keys: Import from GitHub (@${GITHUB_USERNAME}) for both pi and new user"
     else
         user_config+=$'\n'"SSH Keys: Manual setup required"
+    fi
+
+    # Add pi user password configuration
+    if [[ -n "${PI_USER_PASSWORD:-}" ]]; then
+        user_config+=$'\n'"Pi User Password: Will be updated"
+    else
+        user_config+=$'\n'"Pi User Password: Unchanged (security risk)"
     fi
 
     # Storage configuration
@@ -7025,13 +7018,13 @@ configure_user_accounts() {
         return 0
     fi
 
-    enhanced_section "User Account Configuration" "Replace default pi user with custom account" "👤"
+    enhanced_section "User Account Configuration" "Create new user account alongside pi user" "👤"
 
     # Use pre-collected configuration if available
     local new_username="${NEW_USERNAME:-}"
     local new_password=""
     local new_fullname="${NEW_USER_FULLNAME:-}"
-    local transfer_ssh_keys="${TRANSFER_SSH_KEYS:-yes}"
+
 
     # If configuration wasn't collected upfront, collect it now (fallback)
     if [[ -z "$new_username" ]]; then
@@ -7039,7 +7032,7 @@ configure_user_accounts() {
 
         # Get username with validation
         while true; do
-            new_username=$(enhanced_input "New Username" "" "Enter username for new account (lowercase, no spaces)")
+            new_username=$(enhanced_input "New Username" "" "Enter username for new account alongside pi user (lowercase, no spaces)")
             if [[ -z "$new_username" ]]; then
                 log_warn "Username cannot be empty"
                 continue
@@ -7086,16 +7079,12 @@ configure_user_accounts() {
     local import_github_keys="${IMPORT_GITHUB_KEYS:-no}"
     local github_username="${GITHUB_USERNAME:-}"
 
-    # Determine transfer_ssh_keys based on existing configuration
+    # Show SSH key configuration
     if [[ "${import_github_keys}" == "yes" ]]; then
-        transfer_ssh_keys="no"
         log_info "Using GitHub SSH key import configuration from initial setup"
         log_info "GitHub username: ${github_username}"
-    elif [[ "${TRANSFER_SSH_KEYS:-no}" == "yes" ]]; then
-        transfer_ssh_keys="yes"
-        log_info "Using SSH key transfer configuration from initial setup"
+        log_info "SSH keys will be applied to both pi and new user"
     else
-        transfer_ssh_keys="no"
         log_info "SSH key setup will be skipped (manual configuration required)"
     fi
 
@@ -7106,11 +7095,16 @@ configure_user_accounts() {
 
     # Show SSH key configuration
     if [[ "${import_github_keys}" == "yes" ]]; then
-        log_info "SSH Keys: Import from GitHub (@${github_username})"
-    elif [[ "${transfer_ssh_keys}" == "yes" ]]; then
-        log_info "SSH Keys: Transfer from pi user"
+        log_info "SSH Keys: Import from GitHub (@${github_username}) for both pi and new user"
     else
         log_info "SSH Keys: Manual setup required"
+    fi
+
+    # Show pi user password configuration
+    if [[ -n "${PI_USER_PASSWORD:-}" ]]; then
+        log_info "Pi User Password: Will be updated"
+    else
+        log_info "Pi User Password: Unchanged (security risk)"
     fi
 
     log_info "Groups: Will inherit all groups from pi user"
@@ -7122,7 +7116,7 @@ configure_user_accounts() {
     fi
 
     # Create the new user
-    create_new_user "$new_username" "$new_password" "$new_fullname" "$transfer_ssh_keys"
+    create_new_user "$new_username" "$new_password" "$new_fullname"
 
     log_success "User account configuration completed"
     log_info ""
@@ -7133,7 +7127,6 @@ create_new_user() {
     local username="$1"
     local password="$2"
     local fullname="$3"
-    local transfer_ssh="$4"
 
     enhanced_status_indicator "info" "Creating user account: $username"
 
@@ -7248,32 +7241,35 @@ create_new_user() {
         log_error "Failed to generate ECDSA SSH key pair"
     fi
 
-    # Handle additional SSH key setup based on configuration
-    if [[ "${IMPORT_GITHUB_KEYS:-no}" == "yes" ]] && [[ -n "${GITHUB_USERNAME:-}" ]]; then
-        log_info "Importing SSH keys from GitHub..."
-        if import_github_ssh_keys "$GITHUB_USERNAME" "$username"; then
-            log_success "GitHub SSH keys imported successfully"
+    # Change pi user password if requested
+    if [[ -n "${PI_USER_PASSWORD:-}" ]]; then
+        log_info "Updating pi user password..."
+        if echo "pi:$PI_USER_PASSWORD" | chpasswd; then
+            log_success "Pi user password updated successfully"
         else
-            log_error "Failed to import GitHub SSH keys"
-            log_warn "You can manually import SSH keys later"
+            log_error "Failed to update pi user password"
         fi
-    elif [[ "$transfer_ssh" == "yes" ]] && [[ -d "/home/pi/.ssh" ]]; then
-        log_info "Transferring SSH keys from pi user..."
+    fi
 
-        # Copy SSH files individually with proper permissions
-        for ssh_file in /home/pi/.ssh/*; do
-            if [[ -f "$ssh_file" ]]; then
-                local filename
-                filename=$(basename "$ssh_file")
-                if standard_secure_copy "$ssh_file" "/home/$username/.ssh/$filename" "600" "$username" "$username"; then
-                    log_debug "Transferred SSH file: $filename"
-                else
-                    log_warn "Failed to transfer SSH file: $filename"
-                fi
-            fi
-        done
+    # Handle GitHub SSH key import for both users
+    if [[ "${IMPORT_GITHUB_KEYS:-no}" == "yes" ]] && [[ -n "${GITHUB_USERNAME:-}" ]]; then
+        log_info "Importing SSH keys from GitHub for both pi and $username users..."
 
-        log_success "SSH keys transferred from pi user"
+        # Import for new user
+        if import_github_ssh_keys "$GITHUB_USERNAME" "$username"; then
+            log_success "GitHub SSH keys imported successfully for $username"
+        else
+            log_error "Failed to import GitHub SSH keys for $username"
+            log_warn "You can manually import SSH keys later for $username"
+        fi
+
+        # Import for pi user
+        if import_github_ssh_keys "$GITHUB_USERNAME" "pi"; then
+            log_success "GitHub SSH keys imported successfully for pi user"
+        else
+            log_error "Failed to import GitHub SSH keys for pi user"
+            log_warn "You can manually import SSH keys later for pi user"
+        fi
     fi
 
     # Update configuration files that reference pi user
@@ -7484,75 +7480,7 @@ EOF
 
 
 
-# Create emergency recovery service to prevent permanent boot hangs
-create_emergency_recovery_service() {
-    log_info "Creating emergency recovery service..."
 
-    # Create emergency recovery script
-    cat > /usr/local/bin/dangerprep-emergency-recovery.sh << 'EOF'
-#!/bin/bash
-# Emergency recovery script for DangerPrep boot issues
-# This runs if the system has boot problems
-
-LOG_FILE="/var/log/dangerprep-emergency-recovery.log"
-exec 1> >(tee -a "$LOG_FILE")
-exec 2> >(tee -a "$LOG_FILE" >&2)
-
-log_info() {
-    echo "$(date): [RECOVERY] $*"
-}
-
-log_info "Emergency recovery service started"
-
-# Ensure getty service is running
-if ! systemctl is-active getty@tty1.service >/dev/null 2>&1; then
-    log_info "Ensuring getty service is running"
-    systemctl enable getty@tty1.service 2>/dev/null || true
-    systemctl start getty@tty1.service 2>/dev/null || true
-fi
-
-# Ensure SSH is accessible
-if ! systemctl is-active ssh >/dev/null 2>&1; then
-    log_info "Ensuring SSH service is running"
-    systemctl enable ssh 2>/dev/null || true
-    systemctl start ssh 2>/dev/null || true
-fi
-
-log_info "Recovery service active - check system logs for issues"
-log_info "For access issues, use console recovery mode or reinstall"
-
-log_info "Emergency recovery completed"
-EOF
-
-    chmod +x /usr/local/bin/dangerprep-emergency-recovery.sh
-
-    # Create recovery service that runs if needed
-    cat > /etc/systemd/system/dangerprep-recovery.service << 'EOF'
-[Unit]
-Description=DangerPrep Emergency Recovery
-After=multi-user.target
-# Only run if pi user doesn't exist (indicating setup completed)
-ConditionPathExists=!/home/pi
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/dangerprep-emergency-recovery.sh
-RemainAfterExit=yes
-StandardOutput=journal
-StandardError=journal
-# Don't fail boot if recovery has issues
-SuccessExitStatus=0 1
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Enable the recovery service
-    systemctl enable dangerprep-recovery.service 2>/dev/null || true
-    systemctl daemon-reload
-
-    log_success "Emergency recovery service created and enabled"
-}
 
 # Setup kiosk mode and VNC access (NanoPi M6 only)
 setup_kiosk_mode() {
@@ -8270,7 +8198,6 @@ main() {
         "configure_user_accounts:Configuring user accounts"
         "configure_screen_lock:Configuring screen lock settings"
         "setup_kiosk_mode:Setting up kiosk mode and VNC access"
-        "create_emergency_recovery_service:Creating emergency recovery service"
         "enable_essential_services:Enabling essential system services"
         "start_all_services:Starting all services"
         "verify_setup:Verifying setup"
@@ -8406,86 +8333,15 @@ main() {
     clear_install_state
     log_debug "Cleared installation state after successful completion"
 
+
+
     # Show completion information
     log_success "DangerPrep setup completed successfully!"
     log_info "Next steps:"
     log_info "1. Reboot the system to complete setup and apply all configurations"
     log_info "2. SSH hardening and fail2ban will be activated on reboot (port ${SSH_PORT})"
     log_info "3. Log in with your new user account: ${NEW_USERNAME}"
-    log_info "4. The pi user will be automatically removed on reboot"
-
-    # BOOT FIX: Comprehensive final safety checks and warnings
-    log_info ""
-    log_info "🛡️  BOOT SAFETY MEASURES APPLIED:"
-    log_info "✅ Autologin configured for pi user"
-    log_info "✅ Emergency recovery service enabled"
-    log_info "✅ Service failures won't block boot process"
-
-    log_info "✅ Kernel hardening applied safely"
-    log_info "✅ Firewall configured with boot safety"
-    log_info "✅ Hardware services have fallbacks"
-    log_info "✅ Cron jobs created with error handling"
-    log_info "✅ Disk space monitored throughout setup"
-    log_info "✅ Mount operations have error handling"
-    log_info "✅ AIDE initialization with safety checks"
-
-    # Perform final boot safety validation
-    log_info ""
-    log_info "🔍 PERFORMING FINAL BOOT SAFETY VALIDATION:"
-
-    # Check critical services
-    local critical_services=("ssh" "systemd-resolved" "systemd-networkd")
-    for service in "${critical_services[@]}"; do
-        if systemctl is-enabled "$service" >/dev/null 2>&1; then
-            log_info "✅ Critical service enabled: $service"
-        else
-            log_warn "⚠️  Critical service not enabled: $service"
-        fi
-    done
-
-    # Check for potential boot blockers
-    local potential_blockers=()
-
-    # Check if any services have failed
-    if systemctl --failed --no-legend | grep -q .; then
-        log_warn "⚠️  Some services have failed - check with: systemctl --failed"
-        potential_blockers+=("failed services")
-    fi
-
-    # Check if emergency recovery service is enabled
-    if systemctl is-enabled dangerprep-recovery.service >/dev/null 2>&1; then
-        log_info "✅ Emergency recovery service enabled"
-    else
-        log_warn "⚠️  Emergency recovery service not enabled"
-        potential_blockers+=("no emergency recovery")
-    fi
-
-
-
-    # Final warnings and instructions
-    log_info ""
-    if [[ ${#potential_blockers[@]} -eq 0 ]]; then
-        log_success "🎉 ALL BOOT SAFETY CHECKS PASSED!"
-        log_info "System should boot safely without hanging"
-    else
-        log_warn "⚠️  POTENTIAL BOOT ISSUES DETECTED:"
-        for issue in "${potential_blockers[@]}"; do
-            log_warn "   - $issue"
-        done
-        log_info "System should still boot, but manual intervention may be needed"
-    fi
-
-    log_info ""
-    log_info "📋 ACCESS INSTRUCTIONS:"
-    log_info "1. Primary: SSH as pi on port ${SSH_PORT:-2222}"
-    log_info "2. Fallback: Console login as pi"
-    log_info "3. Recovery: Check logs at /var/log/dangerprep-*.log"
-    log_info ""
-    log_info "🔧 TROUBLESHOOTING:"
-    log_info "   - If system hangs: Power cycle and check console"
-    log_info "   - If SSH fails: Check port ${SSH_PORT:-2222} and firewall"
-    log_info "   - If services fail: Use 'systemctl status <service>' to diagnose"
-    log_info "   - Emergency recovery: Service runs automatically if needed"
+    log_info "4. Both pi and ${NEW_USERNAME} users are available for login"
 
     return 0
 }
