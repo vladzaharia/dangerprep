@@ -1983,6 +1983,25 @@ set_default_configuration_values() {
         IMPORT_GITHUB_KEYS="no"
     fi
 
+    if [[ -z "${GITHUB_USERNAME:-}" ]]; then
+        GITHUB_USERNAME=""
+    fi
+
+    # Set default timezone
+    if [[ -z "${TZ:-}" ]]; then
+        TZ="America/Los_Angeles"
+    fi
+
+    # Set default Docker environment configuration flag
+    if [[ -z "${DOCKER_ENV_CONFIGURED:-}" ]]; then
+        DOCKER_ENV_CONFIGURED="false"
+    fi
+
+    # Set default admin email
+    if [[ -z "${ADMIN_EMAIL:-}" ]]; then
+        ADMIN_EMAIL="admin@danger"
+    fi
+
     # Set default storage configuration with auto-detection
     if [[ -z "${NVME_PARTITION_CONFIRMED:-}" ]]; then
         # Auto-detect NVMe devices and enable partitioning if found
@@ -2126,6 +2145,11 @@ SMTP_USER="${SMTP_USER:-}"
 SMTP_PASSWORD="${SMTP_PASSWORD:-}"
 SMTP_FROM="${SMTP_FROM:-}"
 NOTIFICATION_EMAIL="${NOTIFICATION_EMAIL:-}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-}"
+
+# Docker Environment Configuration
+TZ="${TZ:-}"
+DOCKER_ENV_CONFIGURED="${DOCKER_ENV_CONFIGURED:-false}"
 
 # NFS Configuration
 NFS_ENABLED="${NFS_ENABLED:-false}"
@@ -2405,9 +2429,6 @@ collect_configuration() {
     # Docker services configuration
     collect_docker_services_configuration
 
-    # Docker environment configuration (after service selection)
-    collect_docker_environment_configuration
-
     # FriendlyElec-specific configuration
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
         collect_friendlyelec_configuration
@@ -2427,6 +2448,9 @@ collect_configuration() {
     # NFS configuration (external content storage)
     collect_nfs_configuration
 
+    # Docker environment configuration (after service selection)
+    collect_docker_environment_configuration
+
     # Show comprehensive configuration summary
     show_complete_configuration_summary
 
@@ -2445,7 +2469,8 @@ collect_configuration() {
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
     export KIOSK_ENABLED KIOSK_URL KIOSK_VNC_ENABLED KIOSK_VNC_PASSWORD
-    export SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM NOTIFICATION_EMAIL
+    export SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM NOTIFICATION_EMAIL ADMIN_EMAIL
+    export TZ DOCKER_ENV_CONFIGURED
     export NFS_ENABLED NFS_SERVER NFS_SELECTED_SHARES
 
     # Save configuration for resumable installations
@@ -3046,13 +3071,30 @@ Notification Email: ${NOTIFICATION_EMAIL:-"Not configured"}"
         smtp_config+=$'\n'"SMTP From: ${SMTP_FROM:-"Not set"}"
     fi
 
+    # Docker environment configuration
+    local docker_env_config="Timezone: ${TZ:-"America/Los_Angeles"}
+Environment Configured: ${DOCKER_ENV_CONFIGURED:-"false"}"
+
+    # NFS configuration
+    local nfs_config="NFS Enabled: ${NFS_ENABLED:-"false"}"
+    if [[ "${NFS_ENABLED:-false}" == "true" ]]; then
+        nfs_config+=$'\n'"NFS Server: ${NFS_SERVER:-"Not set"}"
+        if [[ -n "${NFS_SELECTED_SHARES:-}" ]]; then
+            local share_count
+            share_count=$(echo "${NFS_SELECTED_SHARES:-}" | wc -l)
+            nfs_config+=$'\n'"Selected Shares: $share_count shares"
+        fi
+    fi
+
     # Display all configuration cards
     enhanced_card "🌐 Network Configuration" "$network_config" "39" "39"
     enhanced_card "🔒 Security Configuration" "$security_config" "196" "196"
     enhanced_card "📦 Package Configuration" "$package_config" "33" "33"
     enhanced_card "🐳 Docker Configuration" "$docker_config" "34" "34"
+    enhanced_card "⚙️ Docker Environment" "$docker_env_config" "36" "36"
     enhanced_card "👤 User Configuration" "$user_config" "35" "35"
     enhanced_card "💾 Storage Configuration" "$storage_config" "93" "93"
+    enhanced_card "🗂️ NFS Configuration" "$nfs_config" "37" "37"
     enhanced_card "📧 SMTP/Notification Configuration" "$smtp_config" "214" "214"
 
     # FriendlyElec configuration if applicable
@@ -7521,9 +7563,14 @@ configure_user_accounts() {
     log_info "Groups: Will inherit all groups from pi user"
     log_info "Sudo Access: Yes"
 
-    if ! enhanced_confirm "Create User" "Create new user account with these settings?" "yes"; then
-        log_info "User account configuration cancelled"
-        return 0
+    # Skip confirmation in non-interactive mode or when configuration is pre-loaded
+    if [[ "${NON_INTERACTIVE:-false}" != "true" ]] && [[ -z "${NEW_USERNAME:-}" || -z "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
+        if ! enhanced_confirm "Create User" "Create new user account with these settings?" "yes"; then
+            log_info "User account configuration cancelled"
+            return 0
+        fi
+    else
+        log_info "Proceeding with user account creation (non-interactive mode or pre-configured)"
     fi
 
     # Create the new user
