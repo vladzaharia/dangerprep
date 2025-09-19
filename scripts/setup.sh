@@ -2631,8 +2631,8 @@ collect_user_account_configuration() {
 
     local ssh_options=()
 
-    # Always offer GitHub import option (will apply to both pi and new user)
-    ssh_options+=("Import SSH keys from GitHub account (applies to both pi and new user)")
+    # Always offer GitHub import option (will apply to both pi and new user for SSH access)
+    ssh_options+=("Import SSH keys from GitHub account (SSH access for both users)")
     ssh_options+=("Skip SSH key setup (configure manually later)")
 
     local ssh_choice
@@ -2700,9 +2700,11 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
 
     # Add SSH key configuration details
     if [[ "${IMPORT_GITHUB_KEYS:-no}" == "yes" ]]; then
-        user_config+=$'\n'"SSH Keys: Import from GitHub (@${GITHUB_USERNAME}) for both pi and new user"
+        user_config+=$'\n'"SSH Keys: Import from GitHub (@${GITHUB_USERNAME}) for SSH access"
+        user_config+=$'\n'"Wishlist Access: Primary user only (${NEW_USERNAME})"
     else
         user_config+=$'\n'"SSH Keys: Manual setup required"
+        user_config+=$'\n'"Wishlist Access: Primary user only (${NEW_USERNAME})"
     fi
 
     # Add pi user password configuration
@@ -4565,6 +4567,125 @@ configure_ssh_hardening() {
     log_success "SSH configured on port ${SSH_PORT} with key-only authentication"
 }
 
+# Setup Wishlist SSH frontdoor
+setup_wishlist_ssh_frontdoor() {
+    enhanced_section "Wishlist SSH Frontdoor" "Setting up SSH directory on port 22" "🚪"
+
+    local wishlist_dir="$PROJECT_ROOT/docker/infrastructure/wishlist"
+    local config_dir="$wishlist_dir/config"
+    local keys_dir="$wishlist_dir/keys"
+
+    # Create necessary directories
+    if ! standard_create_directory "$config_dir" "755" "root" "root"; then
+        log_error "Failed to create Wishlist config directory"
+        return 1
+    fi
+
+    if ! standard_create_directory "$keys_dir" "700" "root" "root"; then
+        log_error "Failed to create Wishlist keys directory"
+        return 1
+    fi
+
+    # Process configuration template
+    local config_template="$config_dir/config.yaml.template"
+    local config_file="$config_dir/config.yaml"
+
+    if [[ ! -f "$config_template" ]]; then
+        log_error "Wishlist configuration template not found: $config_template"
+        return 1
+    fi
+
+    # Generate Wishlist configuration from template
+    if ! standard_process_template "$config_template" "$config_file" \
+        "SSH_PORT=$SSH_PORT" \
+        "NEW_USERNAME=${NEW_USERNAME:-dangerprep}"; then
+        log_error "Failed to process Wishlist configuration template"
+        return 1
+    fi
+
+    # Collect SSH public keys for user access
+    setup_wishlist_user_access "$config_file"
+
+    # Create environment file if it doesn't exist
+    local env_file="$wishlist_dir/compose.env"
+    local env_example="$wishlist_dir/compose.env.example"
+
+    if [[ ! -f "$env_file" ]] && [[ -f "$env_example" ]]; then
+        log_info "Creating Wishlist environment file from example..."
+        if ! cp "$env_example" "$env_file"; then
+            log_error "Failed to create Wishlist environment file"
+            return 1
+        fi
+    fi
+
+    log_success "Wishlist SSH frontdoor configured successfully"
+    log_info "Wishlist will run on port 22 and provide access to SSH on port ${SSH_PORT}"
+    return 0
+}
+
+# Setup user access for Wishlist
+setup_wishlist_user_access() {
+    local config_file="$1"
+
+    if [[ ! -f "$config_file" ]]; then
+        log_error "Wishlist config file not found: $config_file"
+        return 1
+    fi
+
+    log_info "Configuring Wishlist user access (primary user only)..."
+
+    # Collect SSH public keys for new user only (pi user does NOT get access)
+    local user_keys=()
+    local user_authorized_keys="/home/${NEW_USERNAME:-dangerprep}/.ssh/authorized_keys"
+    if [[ -f "$user_authorized_keys" ]]; then
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]] && continue
+            # Extract SSH public keys
+            if [[ "$line" =~ ^(ssh-rsa|ssh-ed25519|ssh-dss|ecdsa-sha2-) ]]; then
+                user_keys+=("$line")
+            fi
+        done < "$user_authorized_keys"
+    fi
+
+    # Update configuration file with collected keys
+    local temp_config
+    temp_config=$(mktemp)
+
+    # Process the config file and replace the public-keys sections
+    local current_user=""
+
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*name:[[:space:]]*\"?${NEW_USERNAME:-dangerprep}\"?[[:space:]]*$ ]]; then
+            echo "$line" >> "$temp_config"
+            current_user="${NEW_USERNAME:-dangerprep}"
+        elif [[ "$line" =~ ^[[:space:]]*public-keys:[[:space:]]*\[\][[:space:]]*# ]]; then
+            # Replace empty public-keys array with actual keys for the primary user
+            echo "    public-keys:" >> "$temp_config"
+            if [[ "$current_user" == "${NEW_USERNAME:-dangerprep}" ]]; then
+                for key in "${user_keys[@]}"; do
+                    echo "      - \"$key\"" >> "$temp_config"
+                done
+            fi
+        else
+            echo "$line" >> "$temp_config"
+        fi
+    done < "$config_file"
+
+    # Replace the original config file
+    if mv "$temp_config" "$config_file"; then
+        log_success "Updated Wishlist configuration with user SSH keys"
+        log_info "${NEW_USERNAME:-dangerprep} user: ${#user_keys[@]} SSH keys configured"
+        log_info "Pi user: NO ACCESS (security policy)"
+    else
+        log_error "Failed to update Wishlist configuration"
+        rm -f "$temp_config"
+        return 1
+    fi
+
+    return 0
+}
+
 # Load MOTD configuration
 load_motd_config() {
     log_info "Loading MOTD configuration..."
@@ -6274,6 +6395,7 @@ enumerate_docker_services() {
     # Define Docker service categories
     local infrastructure_services=(
         "traefik:Reverse proxy and load balancer"
+        "wishlist:SSH directory and frontdoor"
         "watchtower:Automatic container updates"
         "step-ca:Internal certificate authority"
         "raspap:Network management interface"
@@ -8002,6 +8124,22 @@ verify_setup() {
     local critical_services=("ssh" "fail2ban" "docker")
     local failed_services=()
 
+    # Check if Wishlist container is running
+    if docker ps --format "{{.Names}}" | grep -q "^wishlist$"; then
+        log_success "Wishlist SSH frontdoor is running"
+
+        # Test SSH connectivity to Wishlist
+        if timeout 5 nc -z localhost 22 2>/dev/null; then
+            log_success "Wishlist SSH frontdoor is accessible on port 22"
+        else
+            log_warn "Wishlist SSH frontdoor is not accessible on port 22"
+            failed_services+=("wishlist-connectivity")
+        fi
+    else
+        log_warn "Wishlist SSH frontdoor container is not running"
+        failed_services+=("wishlist")
+    fi
+
     # Check if RaspAP container is running
     if docker ps --format "{{.Names}}" | grep -q "^raspap$"; then
         log_success "RaspAP container is running"
@@ -8051,7 +8189,7 @@ show_final_info() {
 ║  Network: $LAN_NETWORK                                                       ║
 ║  Gateway: $LAN_IP                                                            ║
 ║                                                                              ║
-║  SSH: Port $SSH_PORT (key-only authentication)                               ║
+║  SSH: Port 22 (Wishlist frontdoor) → Port $SSH_PORT (full access)           ║
 ║  Management: dangerprep --help                                               ║
 ║                                                                              ║
 ║  Services: http://portal.danger                                              ║
@@ -8156,6 +8294,7 @@ main() {
         "configure_kernel_hardening:Configuring kernel hardening"
         "setup_hardware_monitoring:Setting up hardware monitoring"
         "setup_advanced_security_tools:Setting up advanced security tools"
+        "setup_wishlist_ssh_frontdoor:Setting up Wishlist SSH frontdoor"
         "configure_rootless_docker:Configuring rootless Docker"
         "enumerate_docker_services:Enumerating Docker services"
         "setup_docker_services:Setting up Docker services"
@@ -8317,7 +8456,7 @@ main() {
     log_success "DangerPrep setup completed successfully!"
     log_info "Next steps:"
     log_info "1. Reboot the system to complete setup and apply all configurations"
-    log_info "2. SSH hardening and fail2ban will be activated on reboot (port ${SSH_PORT})"
+    log_info "2. SSH access: Port 22 (Wishlist menu) → Port ${SSH_PORT} (full SSH)"
     log_info "3. Log in with your new user account: ${NEW_USERNAME}"
     log_info "4. Both pi and ${NEW_USERNAME} users are available for login"
 

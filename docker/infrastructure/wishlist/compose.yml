@@ -1,0 +1,25 @@
+services:
+  wishlist:
+    image: ghcr.io/charmbracelet/wishlist:latest
+    container_name: wishlist
+    restart: unless-stopped
+    ports:
+      - "22:22"
+    volumes:
+      - ./config:/config:ro
+      - ./keys:/keys:ro
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - WISHLIST_CONFIG=/config/config.yaml
+    networks:
+      - traefik
+    command: ["serve", "--config", "/config/config.yaml"]
+    labels:
+      - "traefik.enable=false"  # SSH doesn't need HTTP routing
+      - "com.dangerprep.service=wishlist"
+      - "com.dangerprep.category=infrastructure"
+      - "com.dangerprep.description=SSH Directory and Frontdoor"
+
+networks:
+  traefik:
+    external: true

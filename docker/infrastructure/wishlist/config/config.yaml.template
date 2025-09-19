@@ -1,0 +1,31 @@
+# Wishlist SSH Directory Configuration
+# This configuration sets up Wishlist as an SSH frontdoor on port 22
+# that provides access to the local SSH server on port {{SSH_PORT}}
+
+# Address and port for Wishlist to listen on
+listen: 0.0.0.0
+port: 22
+
+# SSH endpoints available through Wishlist
+endpoints:
+  - name: "ssh"
+    description: "Local SSH Server - Full system access"
+    address: "host.docker.internal:{{SSH_PORT}}"
+    user: "{{NEW_USERNAME}}"
+    forward_agent: true
+    request_tty: true
+    connect_timeout: 30s
+
+# User access configuration
+# Users are granted access based on their SSH public keys
+# Only the primary user account has access to the Wishlist frontdoor
+users:
+  # Primary user access (pi user does NOT have access for security)
+  - name: "{{NEW_USERNAME}}"
+    public-keys: []  # Will be populated by setup script
+
+# Metrics endpoint (optional)
+metrics:
+  enabled: false
+  name: dangerprep-wishlist
+  address: localhost:9223
