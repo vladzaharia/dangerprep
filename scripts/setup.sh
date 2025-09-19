@@ -2645,7 +2645,9 @@ collect_nfs_configuration() {
 
     # Use gum choose with --no-limit for multiple selection
     local selected_shares
-    if selected_shares=$(gum choose --no-limit --selected "${available_shares[@]}" "${available_shares[@]}"); then
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+    if selected_shares=$("$gum_cmd" choose --no-limit --selected "${available_shares[@]}" "${available_shares[@]}"); then
         if [[ -n "$selected_shares" ]]; then
             # Convert newline-separated output to space-separated
             export NFS_SELECTED_SHARES="$selected_shares"
@@ -4070,7 +4072,9 @@ checkpoint_after_packages() {
 
     # Interactive checkpoint options
     local checkpoint_choice
-    checkpoint_choice=$(gum choose \
+    local gum_cmd
+    gum_cmd=$(get_gum_cmd)
+    checkpoint_choice=$("$gum_cmd" choose \
         "Continue with setup" \
         "Exit setup (resume later)" \
         --header "What would you like to do?" \
