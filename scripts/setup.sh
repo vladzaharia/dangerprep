@@ -4275,29 +4275,52 @@ configure_nanopi_m6_touchscreen_power() {
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
 
+        # CRITICAL: Disable screen dimming (this was missing and causes premature screen blanking)
+        gsettings set org.gnome.settings-daemon.plugins.power idle-dim false 2>/dev/null || true
+
         log_info "GNOME desktop screen timeout configured"
     fi
 
-    # Configure X11 DPMS settings for all users
-    log_info "Configuring X11 display power management..."
+    # Configure GNOME settings for GDM (login screen) - Ubuntu 24.04 specific
+    log_info "Configuring GDM login screen power management..."
+    if command -v sudo >/dev/null 2>&1 && id -u gdm >/dev/null 2>&1; then
+        # Configure GDM user settings to prevent login screen from blanking too quickly
+        sudo -u gdm dbus-run-session gsettings set org.gnome.desktop.session idle-delay 60 2>/dev/null || true
+        sudo -u gdm dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power idle-dim false 2>/dev/null || true
+        sudo -u gdm dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
+        sudo -u gdm dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
+        log_info "GDM login screen power management configured"
+    else
+        log_warn "Could not configure GDM settings - gdm user not found or sudo not available"
+    fi
+
+    # Configure X11 DPMS settings for X11 sessions (fallback for non-Wayland)
+    log_info "Configuring X11 display power management (fallback for X11 sessions)..."
 
     # Create X11 startup script for DPMS configuration
     cat > /etc/X11/Xsession.d/95-touchscreen-power-mgmt << 'EOF'
 #!/bin/bash
 # DangerPrep Touchscreen Power Management for X11
 # Configure DPMS settings for 60-second screen timeout
+# Note: This only applies to X11 sessions, not Wayland (Ubuntu 24.04 default)
 
-# Enable DPMS (Display Power Management Signaling)
-xset +dpms 2>/dev/null || true
+# Check if we're running in X11 (not Wayland)
+if [[ "${XDG_SESSION_TYPE:-}" == "x11" ]] && [[ -n "${DISPLAY:-}" ]]; then
+    # Enable DPMS (Display Power Management Signaling)
+    xset +dpms 2>/dev/null || true
 
-# Set DPMS timeouts: standby=60s, suspend=60s, off=60s
-xset dpms 60 60 60 2>/dev/null || true
+    # Set DPMS timeouts: standby=60s, suspend=60s, off=60s
+    xset dpms 60 60 60 2>/dev/null || true
 
-# Disable X11 screensaver (we only want display power management)
-xset s off 2>/dev/null || true
+    # Disable X11 screensaver (we only want display power management)
+    xset s off 2>/dev/null || true
 
-# Log configuration
-logger "DangerPrep: Configured touchscreen power management - 60s timeout"
+    # Log configuration
+    logger "DangerPrep: Configured X11 touchscreen power management - 60s timeout"
+else
+    # Log that we're using Wayland (expected for Ubuntu 24.04)
+    logger "DangerPrep: Wayland session detected - using GNOME power management instead of X11 DPMS"
+fi
 EOF
 
     chmod +x /etc/X11/Xsession.d/95-touchscreen-power-mgmt
@@ -4373,17 +4396,22 @@ if command -v gsettings >/dev/null 2>&1; then
     gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
     gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
 
+    # CRITICAL: Disable screen dimming (prevents premature screen blanking)
+    gsettings set org.gnome.settings-daemon.plugins.power idle-dim false 2>/dev/null || true
+
     echo "Configured GNOME touchscreen power management for user: $(whoami)"
 fi
 
-# Configure X11 settings for current session
-if [[ -n "${DISPLAY:-}" ]] && command -v xset >/dev/null 2>&1; then
+# Configure X11 settings for current session (only if running X11, not Wayland)
+if [[ "${XDG_SESSION_TYPE:-}" == "x11" ]] && [[ -n "${DISPLAY:-}" ]] && command -v xset >/dev/null 2>&1; then
     # Enable DPMS and set 60-second timeout
     xset +dpms 2>/dev/null || true
     xset dpms 60 60 60 2>/dev/null || true
     xset s off 2>/dev/null || true
 
     echo "Configured X11 touchscreen power management for user: $(whoami)"
+elif [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
+    echo "Wayland session detected - using GNOME power management for user: $(whoami)"
 fi
 EOF
 
@@ -4392,6 +4420,8 @@ EOF
     log_success "NanoPi M6 touchscreen power management configured"
     log_info "Screen will automatically turn off after 60 seconds of inactivity"
     log_info "Touch, mouse, or keyboard input will wake the screen immediately"
+    log_info "Configured for both Wayland (default) and X11 sessions"
+    log_info "Applied settings to both user sessions and GDM login screen"
 }
 
 # Configure RK3588/RK3588S GPU settings
