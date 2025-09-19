@@ -47,11 +47,21 @@ WiFi Clients → RaspAP dnsmasq (port 53) → CoreDNS (port 5353, .danger domain
 
 ## Deployment
 
+**Automatic (via DangerPrep setup):**
+The RaspAP service is automatically deployed and configured during DangerPrep setup, including:
+- Container deployment with proper environment configuration
+- Host firewall rules for WiFi routing (iptables NAT/forwarding)
+- DNS integration with CoreDNS and AdGuard
+
+**Manual deployment:**
 ```bash
 cd docker/infrastructure/raspap
 cp compose.env.example compose.env  # Edit with GitHub credentials
 docker compose up -d
 docker compose logs -f raspap
+
+# Apply firewall rules on host (required for WiFi routing)
+sudo bash firewall-rules.sh
 ```
 
 ## Web Interface

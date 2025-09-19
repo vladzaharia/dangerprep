@@ -69,11 +69,9 @@ RUN mkdir -p /etc/hostapd /etc/raspap /etc/lighttpd /etc/dnsmasq.d /etc/wpa_supp
 
 # Create default configuration files if they don't exist
 RUN touch /etc/hostapd/hostapd.conf /etc/raspap/raspap.auth /etc/lighttpd/lighttpd.conf
-COPY firewall-rules.sh /home/firewall-rules.sh
 COPY wpa_supplicant.conf /etc/wpa_supplicant/
-RUN chmod +x /home/firewall-rules.sh
 COPY env-setup.sh /home/env-setup.sh
 RUN chmod +x /home/env-setup.sh
 COPY password-generator.php /home/password-generator.php
 
-CMD [ "/bin/bash", "-c", "/home/env-setup.sh && /home/firewall-rules.sh && /lib/systemd/systemd" ]
+CMD [ "/bin/bash", "-c", "/home/env-setup.sh && /lib/systemd/systemd" ]

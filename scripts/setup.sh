@@ -7219,6 +7219,20 @@ setup_raspap() {
     # Note: RaspAP container deployment is now handled by deploy_selected_docker_services()
     # This function now only handles configuration that needs to happen after deployment
 
+    # Apply firewall rules on the host (required for RaspAP WiFi routing)
+    log_info "Applying firewall rules for WiFi routing..."
+    local firewall_script="$PROJECT_ROOT/docker/infrastructure/raspap/firewall-rules.sh"
+    if [[ -f "$firewall_script" ]]; then
+        if bash "$firewall_script"; then
+            log_success "Firewall rules applied successfully"
+        else
+            log_warn "Failed to apply firewall rules - WiFi routing may not work properly"
+            log_warn "You can apply them manually later: sudo bash $firewall_script"
+        fi
+    else
+        log_warn "Firewall rules script not found at $firewall_script"
+    fi
+
     # Wait for RaspAP container to be fully started before configuring DNS
     if [[ -f "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh" ]]; then
         log_info "Waiting for RaspAP container to be ready..."
