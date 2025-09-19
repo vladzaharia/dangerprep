@@ -1001,9 +1001,16 @@ import_github_ssh_keys() {
 
     # Check if jq is available for reliable JSON parsing
     if ! command -v jq >/dev/null 2>&1; then
-        log_error "jq is required for SSH key parsing but not found"
-        rm -f "$temp_keys_file" "$temp_auth_keys"
-        return 1
+        log_warn "jq is required for SSH key parsing but not found - installing it now"
+        if enhanced_spin "Installing jq for JSON parsing" \
+            env DEBIAN_FRONTEND=noninteractive apt update && \
+            env DEBIAN_FRONTEND=noninteractive apt install -y jq; then
+            log_success "jq installed successfully"
+        else
+            log_error "Failed to install jq - cannot parse GitHub SSH keys"
+            rm -f "$temp_keys_file" "$temp_auth_keys"
+            return 1
+        fi
     fi
 
     # Extract all SSH keys from JSON using jq
@@ -2721,6 +2728,21 @@ collect_nfs_configuration() {
     fi
 
     export NFS_ENABLED="true"
+
+    # Install NFS utilities if not already installed (needed for showmount)
+    if ! command -v showmount >/dev/null 2>&1; then
+        log_info "Installing NFS utilities for share discovery..."
+        if enhanced_spin "Installing nfs-common package" \
+            env DEBIAN_FRONTEND=noninteractive apt update && \
+            env DEBIAN_FRONTEND=noninteractive apt install -y nfs-common; then
+            log_success "NFS utilities installed successfully"
+        else
+            log_warn "Failed to install NFS utilities - share discovery may not work"
+            log_warn "You can still configure NFS shares manually"
+        fi
+    else
+        log_debug "NFS utilities already available"
+    fi
 
     # Get NFS server address
     local nfs_server
