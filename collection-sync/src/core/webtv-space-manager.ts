@@ -24,7 +24,7 @@ export class WebTVSpaceManager {
 
   /**
    * Perform intelligent channel selection based on WebTV configuration
-   * Prioritizes larger documentaries (marathons/compilations) for better value
+   * Uses random video selection for diverse content variety
    */
   async selectChannels(config: WebTVConfig): Promise<WebTVSelectionResult> {
     console.log(`🎯 Starting WebTV selection for ${config.reserved_space_gb}GB target`);
@@ -180,7 +180,7 @@ export class WebTVSpaceManager {
         continue;
       }
 
-      // Videos are already sorted by size (largest first) from getChannelVideos
+      // Videos are randomly shuffled for diverse selection from getChannelVideos
       console.log(`📹 Found ${videos.length} videos in ${channel.name}, total: ${videos.reduce((sum, v) => sum + v.size_gb, 0).toFixed(1)}GB`);
 
       // Select videos that fit within this channel's allocation

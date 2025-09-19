@@ -68,7 +68,7 @@ export class WebTVChannelScanner {
           continue;
         }
 
-        // Calculate average video size (prefer channels with larger videos - marathons/compilations)
+        // Calculate average video size for informational purposes
         const avgVideoSize = dirInfo.mediaFileCount > 0 ? dirInfo.sizeGB / dirInfo.mediaFileCount : 0;
 
         const channelInfo: WebTVChannelInfo = {
@@ -103,28 +103,57 @@ export class WebTVChannelScanner {
 
   /**
    * Find channels that match the configured channel names using fuzzy matching
+   * Optimized to only analyze configured channels, not all available channels
    */
   async findConfiguredChannels(configuredChannels: WebTVChannel[]): Promise<Map<string, WebTVChannelInfo | null>> {
-    const scanResult = await this.scanChannels();
-    const availableChannelNames = scanResult.channels.map(c => c.name);
-    
+    console.log('🔍 Finding configured WebTV channels...');
+
+    const webtvPath = this.config.nfs_paths.webtv;
+    const availableDirectories = await this.fs.listDirectories(webtvPath);
+
+    console.log(`📁 Found ${availableDirectories.length} directories in ${webtvPath}`);
+
     const results = new Map<string, WebTVChannelInfo | null>();
 
     for (const configChannel of configuredChannels) {
       console.log(`🔍 Looking for configured channel: ${configChannel.name}`);
-      
+
       // Try to find a match using the content matcher
-      const match = this.matcher.findBestMatch(configChannel.name, availableChannelNames, 0.6);
-      
+      const match = this.matcher.findBestMatch(configChannel.name, availableDirectories, 0.6);
+
       if (match) {
-        const channelInfo = scanResult.channels.find(c => c.name === match.item);
-        if (channelInfo) {
-          channelInfo.match_score = match.score;
+        // Only analyze the matched directory (expensive operation)
+        const channelPath = join(webtvPath, match.item);
+
+        try {
+          // Get directory info
+          const dirInfo = await this.fs.getDirectoryInfo(channelPath);
+
+          // Skip empty directories or very small ones (likely metadata only)
+          if (dirInfo.isEmpty || dirInfo.sizeGB < 0.1) {
+            console.log(`⏭️  Skipping ${match.item} (empty or too small: ${dirInfo.sizeGB.toFixed(2)}GB)`);
+            results.set(configChannel.name, null);
+            continue;
+          }
+
+          // Calculate average video size for informational purposes
+          const avgVideoSize = dirInfo.mediaFileCount > 0 ? dirInfo.sizeGB / dirInfo.mediaFileCount : 0;
+
+          const channelInfo: WebTVChannelInfo = {
+            name: match.item,
+            path: channelPath,
+            size_gb: dirInfo.sizeGB,
+            video_count: dirInfo.fileCount,
+            media_file_count: dirInfo.mediaFileCount,
+            avg_video_size_gb: avgVideoSize,
+            match_score: match.score,
+          };
+
           results.set(configChannel.name, channelInfo);
-          console.log(`✅ Found match: "${configChannel.name}" -> "${match.item}" (score: ${match.score.toFixed(2)}, avg size: ${channelInfo.avg_video_size_gb?.toFixed(2)}GB/video)`);
-        } else {
+          console.log(`✅ Found match: "${configChannel.name}" -> "${match.item}" (score: ${match.score.toFixed(2)}, ${dirInfo.sizeGB.toFixed(1)}GB, ${dirInfo.mediaFileCount} videos, avg: ${avgVideoSize.toFixed(2)}GB/video)`);
+        } catch (error) {
+          console.warn(`⚠️  Warning: Could not analyze ${match.item}:`, error);
           results.set(configChannel.name, null);
-          console.log(`❌ Match found but channel info missing for: ${configChannel.name}`);
         }
       } else {
         results.set(configChannel.name, null);
@@ -196,8 +225,13 @@ export class WebTVChannelScanner {
         }
       }
 
-      // Sort by size (largest first) to prioritize larger documentaries
-      videos.sort((a, b) => b.size_gb - a.size_gb);
+      // Shuffle videos randomly for diverse selection instead of prioritizing large files
+      for (let i = videos.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = videos[i]!;
+        videos[i] = videos[j]!;
+        videos[j] = temp;
+      }
 
       return videos;
     } catch (error) {
