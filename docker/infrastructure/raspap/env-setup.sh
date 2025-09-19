@@ -22,6 +22,7 @@ function main() {
     update_webgui_auth $RASPAP_WEBGUI_USER $RASPAP_WEBGUI_PASS
     update_webgui_port $RASPAP_WEBGUI_PORT
     update_confs
+    configure_dhcp
 }
 
 function alias_env_vars() {
@@ -157,6 +158,52 @@ function replace_in_conf() {
     else
         # Value exists in conf
         sed -i "s/$old/$new/g" "$path" 2>/dev/null || echo "$new" >> "$path"
+    fi
+}
+
+# Configure DHCP settings for dnsmasq
+configure_dhcp() {
+    # Only configure DHCP if required environment variables are set
+    if [[ -n "${RASPAP_DHCP_START:-}" ]] && [[ -n "${RASPAP_DHCP_END:-}" ]]; then
+        echo "Configuring DHCP settings..."
+
+        local dhcp_conf="/etc/dnsmasq.d/092_dhcp.conf"
+        local interface="${RASPAP_WIFI_INTERFACE:-wlan0}"
+        local lease_time="${RASPAP_DHCP_LEASE:-24h}"
+        local gateway="${RASPAP_IP_ADDRESS:-192.168.120.1}"
+        local netmask="${RASPAP_NETMASK:-255.255.252.0}"
+
+        # Ensure directory exists
+        mkdir -p "$(dirname "$dhcp_conf")"
+
+        # Create DHCP configuration
+        cat > "$dhcp_conf" << EOF
+# DHCP Configuration for DangerPrep
+# Interface to serve DHCP on
+interface=${interface}
+
+# DHCP range and lease time
+dhcp-range=${RASPAP_DHCP_START},${RASPAP_DHCP_END},${netmask},${lease_time}
+
+# Gateway (option 3)
+dhcp-option=3,${gateway}
+
+# DNS servers (option 6) - point to this device
+dhcp-option=6,${gateway}
+
+# Enable DHCP authoritative mode
+dhcp-authoritative
+
+# Disable DNS for DHCP clients that don't provide a hostname
+dhcp-ignore-names
+
+# Log DHCP transactions
+log-dhcp
+EOF
+
+        echo "DHCP configured: ${RASPAP_DHCP_START} - ${RASPAP_DHCP_END} on ${interface}"
+    else
+        echo "DHCP environment variables not set, skipping DHCP configuration"
     fi
 }
 

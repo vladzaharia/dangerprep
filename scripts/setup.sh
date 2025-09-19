@@ -2719,7 +2719,7 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
         if [[ -n "${NVME_DEVICE:-}" ]]; then
             storage_config+=$'\n'"NVMe Device: ${NVME_DEVICE}"
         fi
-        storage_config+=$'\n'"NVMe Layout: 256GB /var/lib/docker + remaining /content"
+        storage_config+=$'\n'"NVMe Layout: /content"
     else
         storage_config+="Disabled"
     fi
@@ -6927,6 +6927,7 @@ setup_raspap() {
         if [[ $wait_count -ge $max_wait ]]; then
             log_warn "RaspAP container not ready after ${max_wait}s, skipping DNS configuration"
             log_warn "You can configure DNS manually later using: $PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh"
+            log_warn "DHCP configuration is handled automatically during container startup"
         else
             log_info "Configuring DNS forwarding for DangerPrep integration..."
             if "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh"; then
@@ -6934,6 +6935,7 @@ setup_raspap() {
             else
                 log_warn "RaspAP DNS configuration failed, can be configured manually later"
             fi
+            log_info "DHCP configuration applied automatically during container startup"
         fi
     fi
 
