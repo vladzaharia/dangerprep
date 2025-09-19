@@ -13,29 +13,10 @@ get_gum_cmd() {
     if command -v gum >/dev/null 2>&1; then
         echo "gum"
     else
-        # Check lib directory for platform-specific binary
-        local platform
-        case "$(uname -s)" in
-            Linux*)  platform="linux" ;;
-            Darwin*) platform="darwin" ;;
-            *)       platform="unknown" ;;
-        esac
-
-        case "$(uname -m)" in
-            x86_64|amd64)   platform="${platform}-x86_64" ;;
-            aarch64|arm64)  platform="${platform}-aarch64" ;;
-            armv7l)         platform="${platform}-armv7" ;;
-            arm*)           platform="${platform}-arm" ;;
-            *)              platform="unknown" ;;
-        esac
-
-        local gum_binary="${GUM_LIB_DIR}/gum-${platform}"
+        # Check lib directory for downloaded binary
+        local gum_binary="${GUM_LIB_DIR}/gum"
         if [[ -x "${gum_binary}" ]]; then
-            # Create symlink for easy access
-            if [[ ! -L "${GUM_LIB_DIR}/gum" ]] || [[ ! -e "${GUM_LIB_DIR}/gum" ]]; then
-                ln -sf "gum-${platform}" "${GUM_LIB_DIR}/gum" 2>/dev/null || true
-            fi
-            echo "${GUM_LIB_DIR}/gum"
+            echo "${gum_binary}"
         else
             echo "gum"  # Fallback to system command
         fi

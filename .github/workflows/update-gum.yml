@@ -21,24 +21,20 @@ jobs:
           latest=$(curl -s https://api.github.com/repos/charmbracelet/gum/releases/latest | jq -r '.tag_name')
           echo "version=$latest" >> $GITHUB_OUTPUT
 
-      - name: Download gum binaries
+      - name: Download gum binary for Linux x86_64
         run: |
           cd lib/gum
           ./download.sh --force --version ${{ steps.latest.outputs.version }}
 
-      - name: Upload gum binaries artifact
+      - name: Upload gum binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: gum-binaries
-          path: lib/gum/gum-*
+          path: lib/gum/gum
           retention-days: 1
 
       - name: Create summary
         run: |
-          echo "## Gum Binaries Downloaded" >> $GITHUB_STEP_SUMMARY
+          echo "## Gum Binary Downloaded" >> $GITHUB_STEP_SUMMARY
           echo "Version: ${{ steps.latest.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Available Platforms:" >> $GITHUB_STEP_SUMMARY
-          echo "- linux-x86_64, linux-aarch64, linux-armv7, linux-arm" >> $GITHUB_STEP_SUMMARY
-          echo "- darwin-x86_64, darwin-aarch64" >> $GITHUB_STEP_SUMMARY
-          echo "- windows-x86_64, windows-aarch64" >> $GITHUB_STEP_SUMMARY
+          echo "Platform: Linux x86_64 (GitHub Actions runner)" >> $GITHUB_STEP_SUMMARY
