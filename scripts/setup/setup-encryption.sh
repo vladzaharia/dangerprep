@@ -130,30 +130,44 @@ install_age_plugin_yubikey() {
 
 install_age_plugin_yubikey_from_github() {
     log_info "Installing age-plugin-yubikey from GitHub releases..."
-    
+
     local arch
     arch=$(uname -m)
     local os
     os=$(uname -s | tr '[:upper:]' '[:lower:]')
-    
-    # Map architecture names
+
+    # Map architecture names and construct download URL
+    local download_url=""
     case "$arch" in
-        x86_64) arch="amd64" ;;
-        aarch64|arm64) arch="arm64" ;;
-        *) log_error "Unsupported architecture for age-plugin-yubikey: $arch"; return 1 ;;
+        x86_64)
+            download_url="https://github.com/str4d/age-plugin-yubikey/releases/download/v${AGE_PLUGIN_YUBIKEY_VERSION}/age-plugin-yubikey-v${AGE_PLUGIN_YUBIKEY_VERSION}-x86_64-${os}.tar.gz"
+            ;;
+        aarch64|arm64)
+            if [[ "$os" == "darwin" ]]; then
+                download_url="https://github.com/str4d/age-plugin-yubikey/releases/download/v${AGE_PLUGIN_YUBIKEY_VERSION}/age-plugin-yubikey-v${AGE_PLUGIN_YUBIKEY_VERSION}-arm64-darwin.tar.gz"
+            else
+                # No ARM64 Linux binaries available, fall back to building from source
+                log_info "No pre-built ARM64 Linux binary available, building from source..."
+                return install_age_plugin_yubikey_from_source
+            fi
+            ;;
+        *)
+            log_error "Unsupported architecture for age-plugin-yubikey: $arch"
+            return 1
+            ;;
     esac
-    
-    local download_url="https://github.com/str4d/age-plugin-yubikey/releases/download/v${AGE_PLUGIN_YUBIKEY_VERSION}/age-plugin-yubikey-v${AGE_PLUGIN_YUBIKEY_VERSION}-${os}-${arch}.tar.gz"
+
     local temp_dir
     temp_dir=$(mktemp -d)
-    
+
     # Download and extract
     curl -fsSL "$download_url" | tar -xz -C "$temp_dir" || {
         log_error "Failed to download age-plugin-yubikey from: $download_url"
+        log_info "Falling back to building from source..."
         rm -rf "$temp_dir"
-        return 1
+        return install_age_plugin_yubikey_from_source
     }
-    
+
     # Install binary
     if [[ -f "$temp_dir/age-plugin-yubikey" ]]; then
         cp "$temp_dir/age-plugin-yubikey" /usr/local/bin/
@@ -163,9 +177,62 @@ install_age_plugin_yubikey_from_github() {
         rm -rf "$temp_dir"
         return 1
     fi
-    
+
     rm -rf "$temp_dir"
     log_debug "age-plugin-yubikey installed from GitHub releases"
+}
+
+install_age_plugin_yubikey_from_source() {
+    log_info "Building age-plugin-yubikey from source..."
+
+    # Check if Rust is installed
+    if ! command -v cargo >/dev/null 2>&1; then
+        log_info "Installing Rust toolchain..."
+        # Install Rust for the current user
+        if [[ $EUID -eq 0 ]]; then
+            # Running as root, install system-wide
+            export RUSTUP_HOME=/opt/rust
+            export CARGO_HOME=/opt/rust
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --no-modify-path
+            export PATH="/opt/rust/bin:$PATH"
+        else
+            # Running as regular user
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            # shellcheck source=/dev/null
+            source "$HOME/.cargo/env" || {
+                log_error "Failed to source Rust environment"
+                return 1
+            }
+        fi
+
+        # Verify Rust installation
+        if ! command -v cargo >/dev/null 2>&1; then
+            log_error "Rust installation failed"
+            return 1
+        fi
+    fi
+
+    # Install system dependencies for PC/SC support
+    if command -v apt-get >/dev/null 2>&1; then
+        apt-get update && apt-get install -y libpcsclite-dev pkg-config build-essential
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y pcsc-lite-devel pkgconfig gcc
+    elif command -v pacman >/dev/null 2>&1; then
+        pacman -S --noconfirm pcsclite pkg-config base-devel
+    else
+        log_warning "Could not install PC/SC dependencies automatically"
+        log_info "Please ensure libpcsclite-dev and build-essential (or equivalent) are installed"
+    fi
+
+    # Build and install age-plugin-yubikey
+    log_info "Building age-plugin-yubikey v${AGE_PLUGIN_YUBIKEY_VERSION}... (this may take several minutes)"
+    if cargo install age-plugin-yubikey --version "${AGE_PLUGIN_YUBIKEY_VERSION}" --root /usr/local; then
+        log_success "age-plugin-yubikey built and installed successfully"
+    else
+        log_error "Failed to build age-plugin-yubikey from source"
+        log_info "This may be due to missing system dependencies or network issues"
+        return 1
+    fi
 }
 
 install_yubikey_manager() {
