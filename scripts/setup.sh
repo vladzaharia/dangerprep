@@ -1690,6 +1690,8 @@ Complete system setup for emergency router and content hub"
 -f, --force             Force installation even if already installed
 --non-interactive       Run in non-interactive mode with default values
 --force-interactive     Force interactive mode even when piped
+--skip-configuration    Skip configuration collection (for internal use)
+--no-screen             Disable screen session management
 --batch                 Alias for --non-interactive
 -h, --help              Show this help message
 --version               Show version information"
@@ -1759,6 +1761,16 @@ parse_arguments() {
                 log_info "Force interactive mode enabled"
                 shift
                 ;;
+            --skip-configuration)
+                export SKIP_CONFIGURATION=true
+                log_info "Configuration collection will be skipped"
+                shift
+                ;;
+            --no-screen)
+                export NO_SCREEN=true
+                log_info "Screen session management disabled"
+                shift
+                ;;
             -h|--help)
                 show_help
                 exit 0
@@ -1779,6 +1791,130 @@ parse_arguments() {
                 ;;
         esac
     done
+}
+
+# =============================================================================
+# SCREEN SESSION MANAGEMENT
+# =============================================================================
+
+# Check if we're in a piped execution environment
+is_piped_execution() {
+    # Check for piped execution (stdin not terminal but stdout is)
+    # This is the case when running: curl ... | sudo bash
+    if [[ ! -t 0 && -t 1 ]]; then
+        return 0  # Piped execution
+    fi
+
+    # Check for truly non-interactive environments
+    if [[ ! -t 0 && ! -t 1 ]] || [[ "${TERM:-}" == "dumb" ]]; then
+        return 0  # Non-interactive
+    fi
+
+    return 1  # Interactive terminal
+}
+
+# Check if screen should be used
+should_use_screen() {
+    # Don't use screen if explicitly disabled
+    if [[ "${NO_SCREEN:-false}" == "true" ]]; then
+        log_debug "Screen disabled by --no-screen flag"
+        return 1
+    fi
+
+    # Don't use screen if not available
+    if ! command -v screen >/dev/null 2>&1; then
+        log_debug "Screen command not available"
+        return 1
+    fi
+
+    # Don't use screen if already in a screen session
+    if [[ -n "${STY:-}" ]]; then
+        log_debug "Already running inside screen session: $STY"
+        return 1
+    fi
+
+    # Don't use screen in dry-run mode
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        log_debug "Screen disabled in dry-run mode"
+        return 1
+    fi
+
+    # Use screen for installation phase
+    return 0
+}
+
+# Create screen session and re-execute setup
+create_screen_session_and_reexec() {
+    local session_name="dangerprep"
+
+    log_info "Creating screen session for installation phase..."
+    log_info "This allows the installation to survive SSH disconnections"
+
+    # Build arguments for re-execution
+    local -a reexec_args=("--skip-configuration")
+
+    # Preserve original arguments (except --skip-configuration which we add)
+    if [[ "${NON_INTERACTIVE:-false}" == "true" ]]; then
+        reexec_args+=("--non-interactive")
+    fi
+    if [[ "${FORCE_INTERACTIVE:-false}" == "true" ]]; then
+        reexec_args+=("--force-interactive")
+    fi
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        reexec_args+=("--dry-run")
+    fi
+    if [[ "${VERBOSE:-false}" == "true" ]]; then
+        reexec_args+=("--verbose")
+    fi
+    if [[ "${SKIP_UPDATES:-false}" == "true" ]]; then
+        reexec_args+=("--skip-updates")
+    fi
+    if [[ "${FORCE_INSTALL:-false}" == "true" ]]; then
+        reexec_args+=("--force")
+    fi
+    if [[ "${NO_SCREEN:-false}" == "true" ]]; then
+        reexec_args+=("--no-screen")
+    fi
+
+    # Handle piped execution - create detached session
+    if is_piped_execution; then
+        log_info "Piped execution detected - creating detached screen session"
+
+        # Create detached screen session
+        screen -dm -S "$session_name" bash -c "
+            cd '$SCRIPT_DIR'
+            bash '$0' $(printf '%q ' "${reexec_args[@]}")
+            echo -e '\\n\\033[32m[SUCCESS]\\033[0m DangerPrep setup completed successfully!'
+            echo -e '\\033[34m[INFO]\\033[0m Press any key to exit screen session...'
+            read -n 1
+        "
+
+        # Give the session a moment to start
+        sleep 2
+
+        log_success "Detached screen session '$session_name' created successfully!"
+        echo
+        log_info "📋 SCREEN SESSION INSTRUCTIONS:"
+        log_info "• To attach to the session: sudo screen -r $session_name"
+        log_info "• To detach from session: Ctrl+A, then D"
+        log_info "• To list sessions: sudo screen -ls"
+        log_info "• To kill session: sudo screen -X -S $session_name quit"
+
+        exit 0
+    else
+        # Interactive execution - attach to screen session
+        log_info "Creating interactive screen session: $session_name"
+        log_info "Use Ctrl+A, D to detach from the session"
+
+        # Create new screen session and run setup inside it
+        exec screen -S "$session_name" -c /dev/null bash -c "
+            cd '$SCRIPT_DIR'
+            bash '$0' $(printf '%q ' "${reexec_args[@]}")
+            echo -e '\\n\\033[32m[SUCCESS]\\033[0m DangerPrep setup completed successfully!'
+            echo -e '\\033[34m[INFO]\\033[0m Press any key to exit screen session...'
+            read -n 1
+        "
+    fi
 }
 
 # Load configuration utilities with error handling
@@ -8594,10 +8730,21 @@ main() {
     # Show system information and detect platform (needed for configuration)
     show_system_info
 
-    # Collect interactive configuration if gum is available
-    if ! collect_configuration; then
-        log_error "Configuration collection failed or was cancelled by user"
-        exit 1
+    # Collect interactive configuration if not skipped
+    if [[ "${SKIP_CONFIGURATION:-false}" != "true" ]]; then
+        if ! collect_configuration; then
+            log_error "Configuration collection failed or was cancelled by user"
+            exit 1
+        fi
+
+        # After configuration collection, check if we should use screen for installation
+        if should_use_screen; then
+            log_info "Configuration complete. Starting installation in screen session..."
+            create_screen_session_and_reexec
+            # This function will exit or exec, so we won't reach here
+        fi
+    else
+        log_info "Configuration collection skipped (running in screen session)"
     fi
 
     # Main installation phases with progress tracking
