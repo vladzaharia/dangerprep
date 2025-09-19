@@ -4,7 +4,7 @@ services:
     container_name: wishlist
     restart: unless-stopped
     ports:
-      - "22:22"
+      - "${WISHLIST_PORT:-3222}:22"
     volumes:
       - ./config:/config:ro
       - ./keys:/keys:ro

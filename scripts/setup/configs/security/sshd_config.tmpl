@@ -1,72 +1,20 @@
-# DangerPrep SSH Configuration
-# Port changed from default 22 for security
+# DangerPrep SSH Configuration - Basic Setup
+# SSH running on default port for easy access during setup
 Port {{SSH_PORT}}
 
-# Protocol and encryption (Ed25519 preferred)
-HostKey /etc/ssh/ssh_host_ed25519_key
-HostKey /etc/ssh/ssh_host_ecdsa_key
-# RSA keys deprecated for security, uncomment only if needed for legacy clients
-# HostKey /etc/ssh/ssh_host_rsa_key
-
-# Authentication
-PermitRootLogin no
+# Basic authentication settings
 PubkeyAuthentication yes
-AuthorizedKeysFile /home/%u/.ssh/authorized_keys
-PasswordAuthentication no
+PasswordAuthentication yes
 PermitEmptyPasswords no
-KbdInteractiveAuthentication no
-ChallengeResponseAuthentication no
-GSSAPIAuthentication no
 UsePAM yes
 
-# Modern public key algorithms
-PubkeyAcceptedAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
+# Allow root login for initial setup (can be changed later)
+PermitRootLogin yes
 
-# Security settings
-X11Forwarding no
-PrintMotd no
+# Basic security settings
+X11Forwarding yes
+PrintMotd yes
 PrintLastLog yes
-TCPKeepAlive no
-StrictModes yes
-IgnoreRhosts yes
-HostbasedAuthentication no
-PermitUserEnvironment no
-Compression no
-ClientAliveInterval 300
-ClientAliveCountMax 2
-LoginGraceTime 30
-MaxAuthTries 100
-MaxSessions 4
-MaxStartups 10:30:60
 
-# Modern ciphers and algorithms (AEAD ciphers only)
-Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
-MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
-KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256
-
-# Certificate authority signature algorithms
-CASignatureAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256
-
-# Logging
-SyslogFacility AUTH
-LogLevel VERBOSE
-
-# Banner
-Banner /etc/ssh/ssh_banner
-
-# Allow specific users only
-AllowUsers pi
-
-# Forwarding and tunneling (balanced security vs usability)
-AllowAgentForwarding no
-AllowTcpForwarding local
-GatewayPorts no
-PermitTunnel no
-
-# Additional security settings
-Protocol 2
-RequiredRSASize 2048
-
-# Additional security (conditional directives)
-# DebianBanner no
-# VersionAddendum none
+# Allow all users by default
+# AllowUsers can be configured later for specific restrictions

@@ -1,5 +1,5 @@
 # Wishlist SSH Directory Configuration
-# This configuration sets up Wishlist as an SSH frontdoor on port 22
+# This configuration sets up Wishlist as an SSH frontdoor on port {{WISHLIST_PORT}}
 # that provides access to the local SSH server on port {{SSH_PORT}}
 
 # Address and port for Wishlist to listen on

@@ -1817,7 +1817,8 @@ DHCP_START="192.168.120.100"
 DHCP_END="192.168.120.200"
 
 # Default system configuration (can be overridden by interactive setup)
-SSH_PORT="2222"
+SSH_PORT="22"
+WISHLIST_PORT="3222"
 FAIL2BAN_BANTIME="3600"
 FAIL2BAN_MAXRETRY="3"
 
@@ -1918,7 +1919,7 @@ GPIO/PWM access"
 
     # Export all variables for use in templates and other functions
     export WIFI_SSID WIFI_PASSWORD LAN_NETWORK LAN_IP DHCP_START DHCP_END
-    export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
+    export SSH_PORT WISHLIST_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
     export SELECTED_PACKAGE_CATEGORIES SELECTED_DOCKER_SERVICES
     export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
     export NEW_USERNAME NEW_USER_FULLNAME PI_USER_PASSWORD
@@ -1953,6 +1954,7 @@ DHCP_END="$DHCP_END"
 
 # Security Configuration
 SSH_PORT="$SSH_PORT"
+WISHLIST_PORT="$WISHLIST_PORT"
 FAIL2BAN_BANTIME="$FAIL2BAN_BANTIME"
 FAIL2BAN_MAXRETRY="$FAIL2BAN_MAXRETRY"
 
@@ -2235,6 +2237,15 @@ collect_configuration() {
         log_warn "Invalid port number, using default: ${SSH_PORT}"
     fi
 
+    # Wishlist port configuration
+    local new_wishlist_port
+    new_wishlist_port=$(enhanced_input "Wishlist SSH Directory Port" "${WISHLIST_PORT}" "Port for Wishlist SSH directory")
+    if [[ -n "${new_wishlist_port}" ]] && validate_port_number "${new_wishlist_port}"; then
+        WISHLIST_PORT="${new_wishlist_port}"
+    elif [[ -n "${new_wishlist_port}" ]]; then
+        log_warn "Invalid port number, using default: ${WISHLIST_PORT}"
+    fi
+
     # Fail2ban configuration
     local new_ban_time
     new_ban_time=$(enhanced_input "Fail2ban Ban Time (seconds)" "${FAIL2BAN_BANTIME}" "How long to ban IPs")
@@ -2291,7 +2302,7 @@ collect_configuration() {
 
     # Export all variables for use in templates and other functions
     export WIFI_SSID WIFI_PASSWORD LAN_NETWORK LAN_IP DHCP_START DHCP_END
-    export SSH_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
+    export SSH_PORT WISHLIST_PORT FAIL2BAN_BANTIME FAIL2BAN_MAXRETRY
     export SELECTED_PACKAGE_CATEGORIES SELECTED_DOCKER_SERVICES
     export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
     export NEW_USERNAME NEW_USER_FULLNAME PI_USER_PASSWORD
@@ -2832,6 +2843,7 @@ DHCP Range: ${DHCP_START} - ${DHCP_END}"
 
     # Security configuration
     local security_config="SSH Port: ${SSH_PORT}
+Wishlist Port: ${WISHLIST_PORT}
 Fail2ban Ban Time: ${FAIL2BAN_BANTIME}s
 Fail2ban Max Retry: ${FAIL2BAN_MAXRETRY}"
 
@@ -4656,9 +4668,9 @@ setup_automatic_updates() {
     log_success "Automatic updates configured"
 }
 
-# Configure SSH hardening
-configure_ssh_hardening() {
-    log_info "Configuring SSH hardening..."
+# Configure SSH (basic setup without hardening)
+configure_ssh_basic() {
+    log_info "Configuring SSH basic setup..."
 
     # Check if we have root privileges for SSH configuration
     if [[ $EUID -ne 0 ]]; then
@@ -4680,59 +4692,43 @@ configure_ssh_hardening() {
         log_debug "Created /run/sshd directory"
     fi
 
-    # Load SSH configuration with error handling
-    if ! load_ssh_config; then
-        log_error "Failed to load SSH configuration"
-        return 1
-    fi
-
-    # Set proper permissions on SSH files
-    if ! chmod 644 /etc/ssh/sshd_config 2>/dev/null; then
-        log_error "Failed to set permissions on sshd_config"
-        return 1
-    fi
-
-    # Set permissions on SSH banner if it exists
-    if [[ -f /etc/ssh/ssh_banner ]] && ! chmod 644 /etc/ssh/ssh_banner 2>/dev/null; then
-        log_warn "Failed to set permissions on ssh_banner, continuing anyway"
-    fi
-
-    # Test SSH configuration before applying
-    local ssh_test_output
-    if ! ssh_test_output=$(sshd -t 2>&1); then
-        log_error "SSH configuration is invalid, not applying changes"
-        log_error "SSH validation output: $ssh_test_output"
-
-        # Show the generated config for debugging
-        log_debug "Generated SSH config content:"
-        if [[ -f /etc/ssh/sshd_config ]]; then
-            head -20 /etc/ssh/sshd_config | while IFS= read -r line; do
-                log_debug "  $line"
-            done
-        fi
-        return 1
-    fi
-
-    # Check if we're running over SSH - if so, don't restart SSH service now
-    if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]] || [[ "${TERM:-}" == "screen"* ]]; then
-        log_warn "SSH session detected - SSH service will be restarted on reboot to avoid disconnection"
-        log_info "SSH configuration updated but not yet active"
-        enhanced_status_indicator "warning" "SSH restart deferred until reboot"
-    else
-        # Safe to restart SSH service immediately
-        if ! systemctl restart ssh; then
-            log_error "Failed to restart SSH service"
+    # Only modify SSH config if not using default port 22
+    if [[ "${SSH_PORT}" != "22" ]]; then
+        log_info "Configuring SSH to use port ${SSH_PORT}"
+        # Load SSH configuration with minimal changes
+        if ! load_ssh_config; then
+            log_error "Failed to load SSH configuration"
             return 1
         fi
-        log_success "SSH service restarted successfully"
+
+        # Test SSH configuration before applying
+        local ssh_test_output
+        if ! ssh_test_output=$(sshd -t 2>&1); then
+            log_error "SSH configuration is invalid, not applying changes"
+            log_error "SSH validation output: $ssh_test_output"
+            return 1
+        fi
+    else
+        log_info "Using default SSH port 22, keeping default configuration"
     fi
 
-    log_success "SSH configured on port ${SSH_PORT} with key-only authentication"
+    # Ensure SSH service is enabled and running
+    if ! systemctl is-enabled ssh >/dev/null 2>&1; then
+        systemctl enable ssh
+        log_info "SSH service enabled"
+    fi
+
+    if ! systemctl is-active ssh >/dev/null 2>&1; then
+        systemctl start ssh
+        log_info "SSH service started"
+    fi
+
+    log_success "SSH configured on port ${SSH_PORT} with default settings"
 }
 
 # Setup Wishlist SSH frontdoor
 setup_wishlist_ssh_frontdoor() {
-    enhanced_section "Wishlist SSH Frontdoor" "Setting up SSH directory on port 22" "🚪"
+    enhanced_section "Wishlist SSH Frontdoor" "Setting up SSH directory on port ${WISHLIST_PORT}" "🚪"
 
     local wishlist_dir="$PROJECT_ROOT/docker/infrastructure/wishlist"
     local config_dir="$wishlist_dir/config"
@@ -4761,6 +4757,7 @@ setup_wishlist_ssh_frontdoor() {
     # Generate Wishlist configuration from template
     if ! standard_process_template "$config_template" "$config_file" \
         "SSH_PORT=$SSH_PORT" \
+        "WISHLIST_PORT=$WISHLIST_PORT" \
         "NEW_USERNAME=${NEW_USERNAME:-dangerprep}"; then
         log_error "Failed to process Wishlist configuration template"
         return 1
@@ -4782,7 +4779,7 @@ setup_wishlist_ssh_frontdoor() {
     fi
 
     log_success "Wishlist SSH frontdoor configured successfully"
-    log_info "Wishlist will run on port 22 and provide access to SSH on port ${SSH_PORT}"
+    log_info "Wishlist will run on port ${WISHLIST_PORT} and provide access to SSH on port ${SSH_PORT}"
     return 0
 }
 
@@ -5225,9 +5222,9 @@ setup_hardware_monitoring() {
 setup_advanced_security_tools() {
     log_info "Setting up advanced security tools..."
 
-    # Configure SSH hardening first
-    if ! configure_ssh_hardening; then
-        log_error "Failed to configure SSH hardening"
+    # Configure SSH basic setup first
+    if ! configure_ssh_basic; then
+        log_error "Failed to configure SSH basic setup"
         return 1
     fi
 
@@ -8436,10 +8433,10 @@ verify_setup() {
         log_success "Wishlist SSH frontdoor is running"
 
         # Test SSH connectivity to Wishlist
-        if timeout 5 nc -z localhost 22 2>/dev/null; then
-            log_success "Wishlist SSH frontdoor is accessible on port 22"
+        if timeout 5 nc -z localhost "${WISHLIST_PORT}" 2>/dev/null; then
+            log_success "Wishlist SSH frontdoor is accessible on port ${WISHLIST_PORT}"
         else
-            log_warn "Wishlist SSH frontdoor is not accessible on port 22"
+            log_warn "Wishlist SSH frontdoor is not accessible on port ${WISHLIST_PORT}"
             failed_services+=("wishlist-connectivity")
         fi
     else
@@ -8496,7 +8493,7 @@ show_final_info() {
 ║  Network: $LAN_NETWORK                                                       ║
 ║  Gateway: $LAN_IP                                                            ║
 ║                                                                              ║
-║  SSH: Port 22 (Wishlist frontdoor) → Port $SSH_PORT (full access)           ║
+║  SSH: Port $SSH_PORT (direct) | Port $WISHLIST_PORT (Wishlist directory)    ║
 ║  Management: dangerprep --help                                               ║
 ║                                                                              ║
 ║  Services: http://portal.danger                                              ║
@@ -8764,7 +8761,7 @@ main() {
     log_success "DangerPrep setup completed successfully!"
     log_info "Next steps:"
     log_info "1. Reboot the system to complete setup and apply all configurations"
-    log_info "2. SSH access: Port 22 (Wishlist menu) → Port ${SSH_PORT} (full SSH)"
+    log_info "2. SSH access: Port ${SSH_PORT} (direct) | Port ${WISHLIST_PORT} (Wishlist menu)"
     log_info "3. Log in with your new user account: ${NEW_USERNAME}"
     log_info "4. Both pi and ${NEW_USERNAME} users are available for login"
 
