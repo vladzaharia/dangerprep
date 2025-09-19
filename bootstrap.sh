@@ -135,8 +135,8 @@ parse_args() {
     done
 }
 
-# Install screen if not available (only if screen management is enabled)
-install_screen() {
+# Install essential utilities if not available (screen, nfs-common, jq)
+install_essential_utilities() {
     # Skip screen installation if --no-screen flag is used
     if [[ "$NO_SCREEN" == "true" ]]; then
         return 0
@@ -155,29 +155,44 @@ install_screen() {
 
     # Try different package managers
     if command -v apt-get >/dev/null 2>&1; then
-        apt-get update && apt-get install -y screen
+        apt-get update && apt-get install -y screen nfs-common jq
     elif command -v yum >/dev/null 2>&1; then
-        yum install -y screen
+        yum install -y screen nfs-utils jq
     elif command -v dnf >/dev/null 2>&1; then
-        dnf install -y screen
+        dnf install -y screen nfs-utils jq
     elif command -v pacman >/dev/null 2>&1; then
-        pacman -S --noconfirm screen
+        pacman -S --noconfirm screen nfs-utils jq
     elif command -v apk >/dev/null 2>&1; then
-        apk add screen
+        apk add screen nfs-utils jq
     else
-        log_warn "Could not install screen - no supported package manager found"
+        log_warn "Could not install essential utilities - no supported package manager found"
         log_warn "Falling back to direct setup execution"
         NO_SCREEN=true
         return 0
     fi
 
+    # Verify essential utilities were installed
+    local missing_utils=()
     if ! command -v screen >/dev/null 2>&1; then
-        log_warn "Failed to install screen, falling back to direct setup execution"
-        NO_SCREEN=true
-        return 0
+        missing_utils+=("screen")
+    fi
+    if ! command -v showmount >/dev/null 2>&1; then
+        missing_utils+=("nfs-common/nfs-utils")
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        missing_utils+=("jq")
     fi
 
-    log_success "Screen installed successfully"
+    if [[ ${#missing_utils[@]} -gt 0 ]]; then
+        log_warn "Failed to install some essential utilities: ${missing_utils[*]}"
+        if [[ " ${missing_utils[*]} " =~ " screen " ]]; then
+            log_warn "Screen not available, falling back to direct setup execution"
+            NO_SCREEN=true
+            return 0
+        fi
+    fi
+
+    log_success "Essential utilities installed successfully"
 }
 
 # Check for required dependencies
@@ -205,8 +220,8 @@ check_dependencies() {
         exit 1
     fi
 
-    # Install screen if needed
-    install_screen
+    # Install essential utilities if needed
+    install_essential_utilities
 }
 
 # Get the latest release information from GitHub API
