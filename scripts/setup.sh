@@ -8186,6 +8186,7 @@ configure_nfs_client() {
     # Process selected shares
     local mounted_shares=0
     local failed_mounts=0
+    local configured_shares=0
 
     # Backup fstab before making changes
     cp /etc/fstab "/etc/fstab.backup-nfs-$(date +%Y%m%d-%H%M%S)"
@@ -8209,7 +8210,19 @@ configure_nfs_client() {
             continue
         fi
 
-        # Test mount the share
+        # Always add to fstab for persistent mounting (even if current mount fails)
+        local fstab_entry="$NFS_SERVER:$share_path $mount_point nfs4 rw,hard,intr,nofail 0 0"
+
+        # Check if entry already exists
+        if ! grep -q "$NFS_SERVER:$share_path" /etc/fstab; then
+            echo "$fstab_entry" >> /etc/fstab
+            log_info "Added to fstab: $fstab_entry"
+        else
+            log_debug "fstab entry already exists for $share_path"
+        fi
+        ((configured_shares++))
+
+        # Test mount the share (but don't fail if it doesn't work)
         log_info "Testing mount: $NFS_SERVER:$share_path -> $mount_point"
         if mount -t nfs4 -o rw,hard,intr,nofail "$NFS_SERVER:$share_path" "$mount_point" 2>/dev/null; then
             log_success "Successfully mounted $share_path"
@@ -8217,18 +8230,6 @@ configure_nfs_client() {
             # Test if mount is working properly
             if touch "$mount_point/.mount-test" 2>/dev/null && rm "$mount_point/.mount-test" 2>/dev/null; then
                 log_info "Mount verified as writable"
-
-                # Add to fstab for persistent mounting
-                local fstab_entry="$NFS_SERVER:$share_path $mount_point nfs4 rw,hard,intr,nofail 0 0"
-
-                # Check if entry already exists
-                if ! grep -q "$NFS_SERVER:$share_path" /etc/fstab; then
-                    echo "$fstab_entry" >> /etc/fstab
-                    log_info "Added to fstab: $fstab_entry"
-                else
-                    log_debug "fstab entry already exists for $share_path"
-                fi
-
                 ((mounted_shares++))
             else
                 log_warn "Mount is read-only or not accessible: $share_path"
@@ -8236,12 +8237,13 @@ configure_nfs_client() {
                 ((failed_mounts++))
             fi
         else
-            log_error "Failed to mount $share_path"
+            log_warn "Failed to mount $share_path (added to fstab for future mounting)"
             log_info "This could be due to:"
-            log_info "  - NFS server is not accessible"
+            log_info "  - NFS server is temporarily not accessible"
             log_info "  - Share does not exist or is not exported"
             log_info "  - Permission denied"
             log_info "  - Network connectivity issues"
+            log_info "  - Share will be available after reboot or manual mount"
             ((failed_mounts++))
         fi
 
@@ -8257,20 +8259,31 @@ configure_nfs_client() {
     fi
 
     # Summary
-    if [[ $mounted_shares -gt 0 ]]; then
+    if [[ $configured_shares -gt 0 ]]; then
         log_success "NFS client configured successfully"
-        log_info "Mounted $mounted_shares NFS share(s) to $INSTALL_ROOT/nfs/"
-        if [[ $failed_mounts -gt 0 ]]; then
-            log_warn "$failed_mounts share(s) failed to mount"
+        log_info "Configured $configured_shares NFS share(s) in fstab"
+
+        if [[ $mounted_shares -gt 0 ]]; then
+            log_info "Successfully mounted $mounted_shares share(s) to $INSTALL_ROOT/nfs/"
         fi
 
-        # Show mounted shares
-        log_info "Available NFS mounts:"
+        if [[ $failed_mounts -gt 0 ]]; then
+            log_warn "$failed_mounts share(s) failed to mount but are configured for future use"
+            log_info "Failed shares will be available after reboot or manual mounting"
+        fi
+
+        # Show all configured shares (mounted and unmounted)
+        log_info "Configured NFS mount points:"
         find "$INSTALL_ROOT/nfs" -maxdepth 1 -type d ! -path "$INSTALL_ROOT/nfs" -exec basename {} \; | while read -r mount_name; do
-            log_info "  - $INSTALL_ROOT/nfs/$mount_name"
+            local mount_path="$INSTALL_ROOT/nfs/$mount_name"
+            if mountpoint -q "$mount_path" 2>/dev/null; then
+                log_info "  - $mount_path (currently mounted)"
+            else
+                log_info "  - $mount_path (configured, not mounted)"
+            fi
         done
     else
-        log_error "No NFS shares were successfully mounted"
+        log_error "No NFS shares were configured"
         return 1
     fi
 }
