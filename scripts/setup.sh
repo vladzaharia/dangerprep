@@ -1898,6 +1898,14 @@ GPIO/PWM access"
         fi
     fi
 
+    # Set default NFS configuration (disabled by default in non-interactive mode)
+    if [[ -z "${NFS_ENABLED:-}" ]]; then
+        NFS_ENABLED="false"
+        NFS_SERVER=""
+        NFS_SELECTED_SHARES=""
+        log_info "NFS disabled by default in non-interactive mode"
+    fi
+
     # Process Docker environment configuration with defaults for non-interactive mode
     log_info "Processing Docker environment configuration with default values..."
     if command -v collect_docker_environment_configuration >/dev/null 2>&1; then
@@ -1916,6 +1924,7 @@ GPIO/PWM access"
     export NEW_USERNAME NEW_USER_FULLNAME PI_USER_PASSWORD
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
+    export NFS_ENABLED NFS_SERVER NFS_SELECTED_SHARES
     export SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM NOTIFICATION_EMAIL
 
     log_debug "Configuration values set and exported"
@@ -1979,6 +1988,11 @@ SMTP_USER="${SMTP_USER:-}"
 SMTP_PASSWORD="${SMTP_PASSWORD:-}"
 SMTP_FROM="${SMTP_FROM:-}"
 NOTIFICATION_EMAIL="${NOTIFICATION_EMAIL:-}"
+
+# NFS Configuration
+NFS_ENABLED="${NFS_ENABLED:-false}"
+NFS_SERVER="${NFS_SERVER:-}"
+NFS_SELECTED_SHARES="${NFS_SELECTED_SHARES:-}"
 
 # System Detection
 IS_FRIENDLYELEC="$IS_FRIENDLYELEC"
@@ -2263,6 +2277,9 @@ collect_configuration() {
     # Storage configuration (NVMe drive setup)
     collect_storage_configuration
 
+    # NFS configuration (external content storage)
+    collect_nfs_configuration
+
     # Show comprehensive configuration summary
     show_complete_configuration_summary
 
@@ -2282,6 +2299,7 @@ collect_configuration() {
     export NVME_PARTITION_CONFIRMED NVME_DEVICE
     export KIOSK_ENABLED KIOSK_URL KIOSK_VNC_ENABLED KIOSK_VNC_PASSWORD
     export SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM NOTIFICATION_EMAIL
+    export NFS_ENABLED NFS_SERVER NFS_SELECTED_SHARES
 
     # Save configuration for resumable installations
     save_configuration
@@ -2507,6 +2525,147 @@ collect_storage_configuration() {
 
     # Configure NVMe storage (existing functionality)
     configure_nvme_storage_options
+}
+
+# Collect NFS configuration upfront
+collect_nfs_configuration() {
+    echo
+    log_info "🗂️ NFS Configuration"
+    echo
+
+    # Check if NFS configuration is already set
+    if [[ -n "${NFS_SERVER:-}" ]] && [[ -n "${NFS_SELECTED_SHARES:-}" ]]; then
+        log_debug "NFS configuration already set"
+        return 0
+    fi
+
+    # Ask if user wants to configure NFS
+    if ! enhanced_confirm "Configure NFS mounts for external content storage?" "false"; then
+        export NFS_ENABLED="false"
+        export NFS_SERVER=""
+        export NFS_SELECTED_SHARES=""
+        log_info "NFS configuration skipped"
+        return 0
+    fi
+
+    export NFS_ENABLED="true"
+
+    # Get NFS server address
+    local nfs_server
+    while true; do
+        nfs_server=$(enhanced_input "NFS Server Address" "" "Enter IP address or hostname of your NFS server")
+        if [[ -z "$nfs_server" ]]; then
+            log_warn "NFS server address cannot be empty"
+            continue
+        fi
+
+        # Basic validation - check if it looks like an IP or hostname
+        if [[ "$nfs_server" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || [[ "$nfs_server" =~ ^[a-zA-Z0-9.-]+$ ]]; then
+            break
+        else
+            log_warn "Please enter a valid IP address or hostname"
+        fi
+    done
+
+    export NFS_SERVER="$nfs_server"
+    log_info "NFS server set to: $nfs_server"
+
+    # Query available NFS shares
+    log_info "Querying available NFS shares from $nfs_server..."
+    local available_shares=()
+    local showmount_output
+
+    # Try to get NFS exports with timeout
+    if showmount_output=$(timeout 10 showmount -e "$nfs_server" 2>/dev/null); then
+        # Parse showmount output to extract share paths
+        while IFS= read -r line; do
+            # Skip header line and empty lines
+            if [[ "$line" =~ ^Export\ list || -z "$line" ]]; then
+                continue
+            fi
+
+            # Extract the export path (first field)
+            local share_path
+            share_path=$(echo "$line" | awk '{print $1}')
+            if [[ -n "$share_path" && "$share_path" != "/" ]]; then
+                available_shares+=("$share_path")
+            fi
+        done <<< "$showmount_output"
+    else
+        log_warn "Could not query NFS exports from $nfs_server"
+        log_info "This could be due to:"
+        log_info "  - Server is not reachable"
+        log_info "  - Server does not allow showmount queries"
+        log_info "  - Firewall blocking NFS traffic"
+
+        if enhanced_confirm "Continue with manual share configuration?" "true"; then
+            # Allow manual entry of shares
+            log_info "Enter NFS shares manually (one per line, empty line to finish):"
+            local manual_share
+            while true; do
+                manual_share=$(enhanced_input "NFS Share Path" "" "Enter full path (e.g., /volume1/media) or press Enter to finish")
+                if [[ -z "$manual_share" ]]; then
+                    break
+                fi
+                if [[ "$manual_share" =~ ^/.+ ]]; then
+                    available_shares+=("$manual_share")
+                    log_info "Added share: $manual_share"
+                else
+                    log_warn "Share path must start with / - skipping: $manual_share"
+                fi
+            done
+        else
+            export NFS_ENABLED="false"
+            export NFS_SERVER=""
+            export NFS_SELECTED_SHARES=""
+            log_info "NFS configuration cancelled"
+            return 0
+        fi
+    fi
+
+    # Check if we have any shares
+    if [[ ${#available_shares[@]} -eq 0 ]]; then
+        log_warn "No NFS shares found or configured"
+        export NFS_ENABLED="false"
+        export NFS_SERVER=""
+        export NFS_SELECTED_SHARES=""
+        return 0
+    fi
+
+    # Present shares for selection (all pre-selected by default)
+    log_info "Available NFS shares:"
+    for share in "${available_shares[@]}"; do
+        log_info "  - $share"
+    done
+    echo
+
+    log_info "Select NFS shares to mount (all are pre-selected):"
+    log_info "Use SPACE to select/deselect, ENTER to confirm"
+    echo
+
+    # Use gum choose with --no-limit for multiple selection
+    local selected_shares
+    if selected_shares=$(gum choose --no-limit --selected "${available_shares[@]}" "${available_shares[@]}"); then
+        if [[ -n "$selected_shares" ]]; then
+            # Convert newline-separated output to space-separated
+            export NFS_SELECTED_SHARES="$selected_shares"
+
+            log_success "Selected NFS shares:"
+            while IFS= read -r share; do
+                [[ -n "$share" ]] && log_info "  - $share"
+            done <<< "$selected_shares"
+        else
+            log_info "No NFS shares selected"
+            export NFS_ENABLED="false"
+            export NFS_SELECTED_SHARES=""
+        fi
+    else
+        log_info "NFS share selection cancelled"
+        export NFS_ENABLED="false"
+        export NFS_SELECTED_SHARES=""
+    fi
+
+    enhanced_status_indicator "success" "NFS configuration completed"
 }
 
 # Configure NVMe storage options (existing functionality)
@@ -7991,17 +8150,125 @@ setup_system_monitoring() {
 configure_nfs_client() {
     log_info "Configuring NFS client..."
 
+    # Skip if NFS is not enabled
+    if [[ "${NFS_ENABLED:-false}" != "true" ]]; then
+        log_info "NFS not enabled, skipping NFS client configuration"
+        return 0
+    fi
+
+    # Validate required configuration
+    if [[ -z "${NFS_SERVER:-}" ]] || [[ -z "${NFS_SELECTED_SHARES:-}" ]]; then
+        log_warn "NFS configuration incomplete, skipping NFS client setup"
+        return 0
+    fi
+
+    enhanced_section "NFS Client Setup" "Installing and configuring NFS client" "🗂️"
+
     # Install NFS client if not already installed
     if ! dpkg -l nfs-common 2>/dev/null | grep -q "^ii"; then
-        env DEBIAN_FRONTEND=noninteractive apt install -y nfs-common
+        enhanced_spin "Installing NFS client packages" \
+            env DEBIAN_FRONTEND=noninteractive apt install -y nfs-common
+        log_success "NFS client packages installed"
     else
         log_debug "NFS client already installed"
     fi
 
-    # Create NFS mount points
-    mkdir -p "$INSTALL_ROOT/nfs"
+    # Create base NFS mount directory
+    if ! standard_create_directory "$INSTALL_ROOT/nfs" "755" "root" "root"; then
+        log_error "Failed to create NFS base directory"
+        return 1
+    fi
 
-    log_success "NFS client configured"
+    # Process selected shares
+    local mounted_shares=0
+    local failed_mounts=0
+
+    # Backup fstab before making changes
+    cp /etc/fstab "/etc/fstab.backup-nfs-$(date +%Y%m%d-%H%M%S)"
+
+    while IFS= read -r share_path; do
+        [[ -z "$share_path" ]] && continue
+
+        log_info "Configuring NFS share: $share_path"
+
+        # Create a safe mount point name from the share path
+        local mount_name
+        mount_name=$(echo "$share_path" | sed 's|^/||' | sed 's|/|_|g')
+        [[ -z "$mount_name" ]] && mount_name="root"
+
+        local mount_point="$INSTALL_ROOT/nfs/$mount_name"
+
+        # Create mount point directory
+        if ! standard_create_directory "$mount_point" "755" "root" "root"; then
+            log_error "Failed to create mount point: $mount_point"
+            ((failed_mounts++))
+            continue
+        fi
+
+        # Test mount the share
+        log_info "Testing mount: $NFS_SERVER:$share_path -> $mount_point"
+        if mount -t nfs4 -o rw,hard,intr,nofail "$NFS_SERVER:$share_path" "$mount_point" 2>/dev/null; then
+            log_success "Successfully mounted $share_path"
+
+            # Test if mount is working properly
+            if touch "$mount_point/.mount-test" 2>/dev/null && rm "$mount_point/.mount-test" 2>/dev/null; then
+                log_info "Mount verified as writable"
+
+                # Add to fstab for persistent mounting
+                local fstab_entry="$NFS_SERVER:$share_path $mount_point nfs4 rw,hard,intr,nofail 0 0"
+
+                # Check if entry already exists
+                if ! grep -q "$NFS_SERVER:$share_path" /etc/fstab; then
+                    echo "$fstab_entry" >> /etc/fstab
+                    log_info "Added to fstab: $fstab_entry"
+                else
+                    log_debug "fstab entry already exists for $share_path"
+                fi
+
+                ((mounted_shares++))
+            else
+                log_warn "Mount is read-only or not accessible: $share_path"
+                umount "$mount_point" 2>/dev/null || true
+                ((failed_mounts++))
+            fi
+        else
+            log_error "Failed to mount $share_path"
+            log_info "This could be due to:"
+            log_info "  - NFS server is not accessible"
+            log_info "  - Share does not exist or is not exported"
+            log_info "  - Permission denied"
+            log_info "  - Network connectivity issues"
+            ((failed_mounts++))
+        fi
+
+    done <<< "$NFS_SELECTED_SHARES"
+
+    # Verify fstab syntax
+    if mount -a --fake 2>/dev/null; then
+        log_success "fstab syntax verified"
+    else
+        log_error "fstab syntax error detected, restoring backup"
+        cp "/etc/fstab.backup-nfs-$(date +%Y%m%d-%H%M%S)" /etc/fstab
+        return 1
+    fi
+
+    # Summary
+    if [[ $mounted_shares -gt 0 ]]; then
+        log_success "NFS client configured successfully"
+        log_info "Mounted $mounted_shares NFS share(s) to $INSTALL_ROOT/nfs/"
+        if [[ $failed_mounts -gt 0 ]]; then
+            log_warn "$failed_mounts share(s) failed to mount"
+        fi
+
+        # Show mounted shares
+        log_info "Available NFS mounts:"
+        find "$INSTALL_ROOT/nfs" -maxdepth 1 -type d ! -path "$INSTALL_ROOT/nfs" -exec basename {} \; | while read -r mount_name; do
+            log_info "  - $INSTALL_ROOT/nfs/$mount_name"
+        done
+    else
+        log_error "No NFS shares were successfully mounted"
+        return 1
+    fi
 }
 
 # Install maintenance scripts
