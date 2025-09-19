@@ -1,0 +1,84 @@
+{
+  // Media Collection Configuration Example
+  // Copy this file to collection.jsonc and customize for your setup
+
+  // NFS Configuration
+  "nfs_paths": {
+    "base": "/nfs",
+    "movies": "/nfs/movies",
+    "tv": "/nfs/tv", 
+    "games": "/nfs/games",
+    "webtv": "/nfs/webtv"
+  },
+
+  // Drive Configuration
+  "drive_config": {
+    "size_gb": 2048, // 2TiB in GB - adjust for your drive size
+    "recommended_max_usage": 0.85, // 85% recommended maximum
+    "safe_usage_threshold": 0.95 // 95% warning threshold
+  },
+
+  // Output Configuration
+  "output_config": {
+    "default_csv_name": "media_collection.csv",
+    "default_rsync_script": "rsync_collection.sh",
+    "default_markdown_name": "collection_summary.md",
+    "default_destination": "/content"
+  },
+
+  // Rsync Configuration
+  "rsync_config": {
+    "options": [
+      "-avh",
+      "--progress",
+      "--partial",
+      "--partial-dir=.rsync-partial",
+      "--exclude=*.nfo",
+      "--exclude=*.srt",
+      "--exclude=*.jpg",
+      "--exclude=*.png",
+      "--exclude=Thumbs.db",
+      "--exclude=.DS_Store"
+    ]
+  },
+
+  // Media file extensions for counting
+  "media_extensions": [".mkv", ".mp4", ".avi", ".m4v", ".mov", ".wmv"],
+
+  // WebTV Selection Configuration (optional - for intelligent channel selection)
+  "webtv_selection_config": {
+    "reserved_space_gb": 100,
+    "selection_strategy": "fill_to_target",
+    "allow_partial_channels": true
+  },
+
+  // Collection Definition - Customize this for your content
+  "collection": {
+    "movies": [
+      // Example movies - replace with your actual collection
+      {"name": "The Matrix (1999)", "type": "Movie"},
+      {"name": "Inception (2010)", "type": "Movie"},
+      {"name": "Interstellar (2014)", "type": "Movie"}
+    ],
+
+    "tv_shows": [
+      // Example TV shows - replace with your actual collection
+      {"name": "Breaking Bad", "type": "TV"},
+      {"name": "Game of Thrones", "type": "TV", "seasons": [1, 2, 3, 4]}, // Specific seasons only
+      {"name": "The Office", "type": "TV"} // All seasons
+    ],
+
+    "webtv_channels": [
+      // Example WebTV channels - replace with your actual channels
+      {"name": "Wendover Productions", "type": "WebTV", "priority": "required"},
+      {"name": "Bright Sun Films", "type": "WebTV", "priority": "required"},
+      {"name": "The B1M", "type": "WebTV", "priority": "optional"},
+      {"name": "Business Insider", "type": "WebTV", "priority": "optional"}
+    ],
+
+    "other": [
+      // Example other content - replace with your actual collection
+      {"name": "Steam Games", "type": "Games", "episodes": 1, "reserved_space_gb": 100}
+    ]
+  }
+}

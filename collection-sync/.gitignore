@@ -1,0 +1,124 @@
+# Media Collection Manager (TypeScript) - .gitignore
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# TypeScript build output
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+.nyc_output
+
+# Vitest
+.vitest/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Generated output files
+out/
+*.csv
+*.sh
+*.md
+!README*.md
+!CHANGELOG.md
+!LICENSE.md
+
+# Cache files
+.media-collection-cache.json
+
+# Test directories and files
+test-nfs/
+test-out/
+*.test.ts
+*.spec.ts
+
+# Configuration files - Real configuration with actual collection data
+config/collection.jsonc
+
+# Collection files - User-generated collections
+my_collection.jsonc
+*_collection.jsonc
+custom_collection.jsonc
+test_collection.jsonc
+sample_collection.jsonc
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Media files (if accidentally added)
+*.mkv
+*.mp4
+*.avi
+*.m4v
+*.mov
+*.wmv
+*.iso
+
+# Archive files
+*.zip
+*.tar.gz
+*.tar.bz2
+*.rar
+*.7z
+
+# Rsync files
+.rsync-partial/
+*.rsync-*
+
+# Personal notes
+notes.txt
+TODO.txt
+NOTES.md
+
+# Configuration overrides
+config/local_collection.jsonc
+config/personal_collection.jsonc
