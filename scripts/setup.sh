@@ -8043,6 +8043,29 @@ setup_encrypted_backups() {
     log_success "Encrypted backup system configured"
 }
 
+# Setup hardware encryption system
+setup_encryption_system() {
+    log_info "Setting up hardware encryption system..."
+
+    # Check if encryption setup script exists
+    local encryption_setup_script="$SCRIPT_DIR/setup/setup-encryption.sh"
+    if [[ ! -f "$encryption_setup_script" ]]; then
+        log_warn "Encryption setup script not found, skipping encryption system setup"
+        return 0
+    fi
+
+    # Make sure the script is executable
+    chmod +x "$encryption_setup_script"
+
+    # Run the encryption setup script
+    if "$encryption_setup_script"; then
+        log_success "Hardware encryption system configured"
+    else
+        log_error "Failed to setup hardware encryption system"
+        return 1
+    fi
+}
+
 # Enable essential system services
 enable_essential_services() {
     enhanced_section "Essential Services" "Enabling critical system services" "⚙️"
@@ -8312,6 +8335,7 @@ main() {
         "configure_nfs_client:Configuring NFS client"
         "install_maintenance_scripts:Installing maintenance scripts"
         "setup_encrypted_backups:Setting up encrypted backups"
+        "setup_encryption_system:Setting up hardware encryption system"
         "configure_user_accounts:Configuring user accounts"
         "configure_screen_lock:Configuring screen lock settings"
         "setup_kiosk_mode:Setting up kiosk mode and VNC access"

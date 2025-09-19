@@ -1,0 +1,208 @@
+# DangerPrep File Encryption Configuration
+# Configuration for hardware-backed file encryption using YubiKey PIV keys
+# Uses age encryption with age-plugin-yubikey for secure file storage
+
+# Metadata
+metadata:
+  name: "dangerprep-encryption"
+  version: "1.0.0"
+  description: "Hardware-backed file encryption system"
+  created: "{{CURRENT_DATE}}"
+  last_modified: "{{CURRENT_DATE}}"
+
+# YubiKey Configuration
+yubikeys:
+  # Primary YubiKey configuration
+  primary:
+    # YubiKey serial number (auto-detected if not specified)
+    serial: null
+    # PIV slot to use for encryption key (9a, 9c, 9d, 9e, 82-95)
+    slot: "9a"
+    # Touch policy: never, always, cached
+    touch_policy: "always"
+    # PIN policy: never, once, always
+    pin_policy: "once"
+    # Key algorithm: ECCP256, ECCP384, RSA1024, RSA2048
+    algorithm: "ECCP256"
+    # Public key (auto-populated after key generation)
+    public_key: null
+    # Description for this key
+    description: "Primary encryption key"
+
+  # Additional YubiKeys (optional)
+  # secondary:
+  #   serial: null
+  #   slot: "9c"
+  #   touch_policy: "always"
+  #   pin_policy: "once"
+  #   algorithm: "ECCP256"
+  #   public_key: null
+  #   description: "Secondary encryption key"
+
+# Encryption Settings
+encryption:
+  # Chunk size for splitting large files/directories (in MB)
+  chunk_size: 100
+  
+  # Compression settings
+  compression:
+    # Enable compression before encryption
+    enabled: true
+    # Compression algorithm: gzip, bzip2, xz, lz4, zstd
+    algorithm: "zstd"
+    # Compression level (1-9 for most algorithms, 1-22 for zstd)
+    level: 3
+  
+  # Storage settings
+  storage:
+    # Base directory for encrypted bundles
+    base_path: "/data/encrypted"
+    # Use randomized filenames to prevent metadata leakage
+    randomize_filenames: true
+    # Filename prefix for encrypted chunks
+    chunk_prefix: "enc"
+    # Manifest file encryption
+    encrypt_manifest: true
+  
+  # Performance settings
+  performance:
+    # Number of parallel encryption/decryption processes
+    parallel_jobs: 4
+    # Buffer size for file operations (in KB)
+    buffer_size: 64
+    # Enable memory-mapped I/O for large files
+    use_mmap: true
+
+# Files and Directories to Encrypt
+targets:
+  # Example: Encrypt user documents
+  documents:
+    # Source path (absolute or relative to /)
+    source: "/home/{{USERNAME}}/Documents"
+    # Target type: file, directory
+    type: "directory"
+    # Include patterns (glob patterns)
+    include:
+      - "*.pdf"
+      - "*.doc*"
+      - "*.txt"
+      - "*.md"
+    # Exclude patterns (glob patterns)
+    exclude:
+      - "*.tmp"
+      - "*.log"
+      - ".DS_Store"
+    # Recursive directory processing
+    recursive: true
+    # Follow symbolic links
+    follow_symlinks: false
+    # Description
+    description: "User documents and files"
+    # Enable/disable this target
+    enabled: true
+
+  # Example: Encrypt configuration backups
+  # configs:
+  #   source: "/etc/dangerprep"
+  #   type: "directory"
+  #   include:
+  #     - "*.yaml"
+  #     - "*.conf"
+  #     - "*.json"
+  #   exclude:
+  #     - "*.tmp"
+  #   recursive: true
+  #   follow_symlinks: false
+  #   description: "DangerPrep configuration files"
+  #   enabled: false
+
+  # Example: Encrypt specific sensitive files
+  # secrets:
+  #   source: "/home/{{USERNAME}}/.ssh/id_rsa"
+  #   type: "file"
+  #   description: "SSH private key"
+  #   enabled: false
+
+# Logging Configuration
+logging:
+  # Log level: DEBUG, INFO, WARN, ERROR
+  level: "INFO"
+  # Log file path
+  file: "/var/log/dangerprep-encryption.log"
+  # Enable syslog logging
+  syslog: true
+  # Syslog facility
+  syslog_facility: "local0"
+  # Log rotation
+  rotation:
+    # Maximum log file size (in MB)
+    max_size: 10
+    # Number of rotated files to keep
+    max_files: 5
+
+# Notification Settings (optional)
+notifications:
+  # Enable notifications
+  enabled: false
+  # Notification methods: email, webhook, syslog
+  methods:
+    - "syslog"
+  # Events to notify about
+  events:
+    - "encryption_complete"
+    - "decryption_complete"
+    - "error"
+    - "yubikey_not_found"
+  
+  # Email notifications (if enabled)
+  email:
+    smtp_server: "localhost"
+    smtp_port: 587
+    from: "dangerprep@{{HOSTNAME}}"
+    to: "admin@{{HOSTNAME}}"
+    subject_prefix: "[DangerPrep Encryption]"
+  
+  # Webhook notifications (if enabled)
+  webhook:
+    url: "https://hooks.example.com/dangerprep"
+    timeout: 30
+    retry_count: 3
+
+# Security Settings
+security:
+  # Require YubiKey presence for all operations
+  require_yubikey: true
+  # Maximum time to cache PIN (in seconds, 0 to disable caching)
+  pin_cache_timeout: 300
+  # Verify file integrity after encryption/decryption
+  verify_integrity: true
+  # Use secure memory for sensitive operations
+  use_secure_memory: true
+  # Clear temporary files securely
+  secure_delete_temp: true
+
+# Backup and Recovery
+backup:
+  # Create backup of original files before encryption
+  create_backup: true
+  # Backup directory
+  backup_path: "/data/backup/pre-encryption"
+  # Backup retention (in days)
+  retention_days: 30
+  # Compress backups
+  compress_backups: true
+
+# Advanced Settings
+advanced:
+  # Age encryption armor output (ASCII instead of binary)
+  armor_output: false
+  # Custom age binary path (auto-detected if not specified)
+  age_binary: null
+  # Custom age-plugin-yubikey binary path
+  age_plugin_yubikey_binary: null
+  # Temporary directory for operations
+  temp_directory: "/tmp/dangerprep-encryption"
+  # Enable debug mode
+  debug: false
+  # Dry run mode (don't actually encrypt/decrypt)
+  dry_run: false

@@ -1,0 +1,30 @@
+#!/bin/bash
+# DangerPrep Decrypt Command
+# Decrypts files and directories using YubiKey hardware keys
+#
+# Usage: dp-decrypt [options]
+#
+# This is a wrapper script that calls the main encryption system
+
+set -euo pipefail
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Path to the main encryption script
+ENCRYPTION_SCRIPT="${SCRIPT_DIR}/dangerprep-encryption.sh"
+
+# Check if main script exists
+if [[ ! -f "$ENCRYPTION_SCRIPT" ]]; then
+    echo "Error: Main encryption script not found: $ENCRYPTION_SCRIPT" >&2
+    exit 1
+fi
+
+# Check if script is executable
+if [[ ! -x "$ENCRYPTION_SCRIPT" ]]; then
+    echo "Error: Main encryption script is not executable: $ENCRYPTION_SCRIPT" >&2
+    exit 1
+fi
+
+# Pass all arguments to the main script with 'decrypt' command
+exec "$ENCRYPTION_SCRIPT" decrypt "$@"
