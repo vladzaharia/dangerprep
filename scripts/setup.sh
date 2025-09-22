@@ -5948,168 +5948,11 @@ setup_docker_services() {
     else
         enhanced_status_indicator "info" "No Docker configurations to copy"
     fi
-
-    # Deploy all selected Docker services
-    deploy_selected_docker_services
-
-    log_success "Docker services configuration completed"
 }
 
-# Deploy all selected Docker services
-deploy_selected_docker_services() {
-    # Check if any services were selected
-    if [[ -z "${SELECTED_DOCKER_SERVICES:-}" ]]; then
-        enhanced_status_indicator "info" "No Docker services selected for deployment"
-        return 0
-    fi
 
-    # BOOT FIX: Check disk space before Docker operations
-    if ! check_disk_space 3 "Docker service deployment"; then
-        enhanced_status_indicator "warning" "Insufficient disk space, skipping Docker deployment"
-        return 0
-    fi
 
-    # Ensure Docker is running
-    if ! systemctl is-active docker >/dev/null 2>&1; then
-        if ! standard_service_operation "docker" "start"; then
-            enhanced_status_indicator "failure" "Failed to start Docker service"
-            return 1
-        fi
-        sleep 5  # Give Docker a moment to fully start
-    fi
 
-    # Ensure shared Docker infrastructure exists for service deployment
-    if ! docker network ls --format "{{.Name}}" | grep -q "^traefik$" 2>/dev/null; then
-        log_warn "Shared traefik network not found, attempting to create shared infrastructure..."
-        if ! setup_shared_docker_infrastructure; then
-            enhanced_status_indicator "warning" "Failed to create shared infrastructure - services may not work properly"
-        fi
-    fi
-
-    # Parse selected services and deploy them
-    local services_deployed=0
-    local services_failed=0
-
-    while IFS= read -r service_line; do
-        [[ -z "$service_line" ]] && continue
-
-        local service_name="${service_line%%:*}"  # Extract service name before first colon
-        service_name="${service_name// /}"        # Remove any spaces
-
-        # Convert to lowercase for consistency
-        service_name="${service_name,,}"
-
-        if [[ -n "$service_name" ]]; then
-            if deploy_docker_service "$service_name"; then
-                ((services_deployed++))
-                enhanced_status_indicator "success" "Deployed $service_name"
-            else
-                ((services_failed++))
-                enhanced_status_indicator "warning" "Failed: $service_name (can start manually)"
-            fi
-        fi
-    done <<< "${SELECTED_DOCKER_SERVICES}"
-
-    # Summary
-    if [[ $services_deployed -gt 0 ]]; then
-        enhanced_status_indicator "success" "Deployed $services_deployed Docker services"
-    fi
-
-    if [[ $services_failed -gt 0 ]]; then
-        enhanced_status_indicator "warning" "$services_failed services failed (start manually with docker compose)"
-    fi
-}
-
-# Deploy a single Docker service
-deploy_docker_service() {
-    local service_name="$1"
-
-    # Determine service directory structure
-    local service_dir
-    case "${service_name}" in
-        "traefik"|"komodo"|"raspap"|"step-ca"|"watchtower"|"dns"|"cdn")
-            service_dir="${PROJECT_ROOT}/docker/infrastructure/${service_name}"
-            ;;
-        "jellyfin"|"komga"|"romm")
-            service_dir="${PROJECT_ROOT}/docker/media/${service_name}"
-            ;;
-        "docmost"|"onedev")
-            service_dir="${PROJECT_ROOT}/docker/services/${service_name}"
-            ;;
-        "kiwix-sync"|"nfs-sync"|"offline-sync")
-            service_dir="${PROJECT_ROOT}/docker/sync/${service_name}"
-            ;;
-        # Handle legacy service names that might still be in configuration
-        "adguardhome"|"adguard")
-            service_dir="${PROJECT_ROOT}/docker/infrastructure/dns"
-            ;;
-        "kiwix")
-            service_dir="${PROJECT_ROOT}/docker/sync/kiwix-sync"
-            ;;
-        *)
-            log_warn "Unknown service directory structure for: ${service_name}"
-            return 1
-            ;;
-    esac
-
-    local compose_file="${service_dir}/compose.yml"
-
-    # Check if service directory and compose file exist
-    if [[ ! -d "${service_dir}" ]]; then
-        log_warn "Service directory not found: ${service_dir}"
-        return 1
-    fi
-
-    if [[ ! -f "${compose_file}" ]]; then
-        log_warn "Compose file not found: ${compose_file}"
-        return 1
-    fi
-
-    # Load environment variables if available
-    local env_file="${service_dir}/compose.env"
-    if [[ -f "${env_file}" ]]; then
-        load_and_export_env_file "${env_file}"
-    fi
-
-    # Special handling for services that need building or have special requirements
-    case "${service_name}" in
-        "raspap")
-            # RaspAP needs build arguments and longer timeout
-            log_info "Building and starting RaspAP (may take 10-15 minutes)..."
-            if timeout 1200 docker compose -f "${compose_file}" up -d --build; then
-                return 0
-            else
-                local exit_code=$?
-                if [[ $exit_code -eq 124 ]]; then
-                    log_warn "RaspAP build timed out after 20 minutes"
-                else
-                    log_warn "RaspAP deployment failed"
-                fi
-                return 1
-            fi
-            ;;
-        "traefik")
-            # Traefik should be started first and given time to initialize
-            log_info "Starting Traefik (reverse proxy)..."
-
-            if docker compose -f "${compose_file}" up -d; then
-                sleep 5  # Give Traefik time to initialize
-                return 0
-            else
-                return 1
-            fi
-            ;;
-        *)
-            # Standard deployment for most services
-            log_debug "Starting ${service_name} with standard deployment..."
-            if docker compose -f "${compose_file}" up -d; then
-                return 0
-            else
-                return 1
-            fi
-            ;;
-    esac
-}
 
 # Setup container health monitoring using standardized patterns
 setup_container_health_monitoring() {
@@ -7395,8 +7238,8 @@ setup_raspap() {
         log_info "GitHub credentials found - RaspAP Insiders features will be available"
     fi
 
-    # Note: RaspAP container deployment is now handled by deploy_selected_docker_services()
-    # This function now only handles configuration that needs to happen after deployment
+    # Note: RaspAP container deployment is handled manually by the user
+    # This function only handles host-level configuration
 
     # Apply firewall rules on the host (required for RaspAP WiFi routing)
     log_info "Applying firewall rules for WiFi routing..."
@@ -8296,54 +8139,6 @@ setup_tailscale() {
     log_info "Run 'tailscale up --advertise-routes=$LAN_NETWORK --advertise-exit-node' to connect"
 }
 
-# Setup advanced DNS (via Docker containers)
-setup_advanced_dns() {
-    log_info "Setting up advanced DNS..."
-
-    # Note: DNS container deployment is now handled by deploy_selected_docker_services()
-    # This function now only handles configuration that needs to happen after deployment
-
-    log_success "Advanced DNS configured via Docker containers"
-}
-
-# Setup certificate management (via Docker containers)
-setup_certificate_management() {
-    log_info "Setting up certificate management..."
-
-    # Note: Certificate management container deployment is now handled by deploy_selected_docker_services()
-    # This function now only handles configuration that needs to happen after deployment
-
-    log_success "Certificate management configured via Docker containers"
-}
-
-# Install management scripts
-install_management_scripts() {
-    log_info "Installing management scripts..."
-
-    # Management functionality is available through setup.sh and cleanup.sh scripts
-    log_info "Management scripts configured"
-
-    log_success "Management scripts configured"
-}
-
-# Create routing scenarios
-create_routing_scenarios() {
-    log_info "Creating routing scenarios..."
-
-    # Routing scenarios would be configured here if network scripts were available
-    log_info "Routing scenarios configured"
-
-    log_success "Routing scenarios configured"
-}
-
-# Setup system monitoring
-setup_system_monitoring() {
-    log_info "Setting up system monitoring..."
-
-    # Monitoring functionality configured through system services
-
-    log_success "System monitoring configured"
-}
 
 # Configure NFS client
 configure_nfs_client() {
@@ -8481,16 +8276,6 @@ configure_nfs_client() {
         log_error "No NFS shares were configured"
         return 1
     fi
-}
-
-# Install maintenance scripts
-install_maintenance_scripts() {
-    log_info "Installing maintenance scripts..."
-
-    # Maintenance functionality available through Docker and system commands
-    log_info "Maintenance scripts configured"
-
-    log_success "Maintenance scripts configured"
 }
 
 # Setup encrypted backups
@@ -8817,13 +8602,7 @@ main() {
         "configure_rk3588_performance:Applying hardware optimizations"
         "generate_sync_configs:Generating sync configurations"
         "setup_tailscale:Setting up Tailscale"
-        "setup_advanced_dns:Setting up advanced DNS"
-        "setup_certificate_management:Setting up certificate management"
-        "install_management_scripts:Installing management scripts"
-        "create_routing_scenarios:Creating routing scenarios"
-        "setup_system_monitoring:Setting up system monitoring"
         "configure_nfs_client:Configuring NFS client"
-        "install_maintenance_scripts:Installing maintenance scripts"
         "setup_encrypted_backups:Setting up encrypted backups"
         "setup_encryption_system:Setting up hardware encryption system"
         "configure_user_accounts:Configuring user accounts"
