@@ -5,6 +5,8 @@ import { readdir } from 'fs/promises';
 import { join, resolve } from 'path';
 import fg from 'fast-glob';
 import { getConfig } from '../config/loader.js';
+import { PerformanceManager, createOptimizedOperation, processBatch, ProgressInfo } from '../utils/performance.js';
+import { countFilesStreaming, getDirectorySizeStreaming } from '../utils/streaming.js';
 
 const execAsync = promisify(exec);
 
@@ -17,25 +19,72 @@ export interface DirectoryInfo {
   isEmpty: boolean;
 }
 
+export interface FileSystemOptions {
+  onProgress?: (progress: ProgressInfo) => void;
+  abortSignal?: AbortSignal;
+  useStreaming?: boolean; // Enable streaming for large operations
+}
+
 export class FileSystemManager {
   private config = getConfig();
+  private perfManager = PerformanceManager.getInstance();
 
   /**
    * Get directory size in GB using the system 'du' command for accuracy
+   * Now with retry logic, performance tracking, and streaming support
    */
-  async getDirectorySize(path: string): Promise<number> {
+  async getDirectorySize(path: string, options?: FileSystemOptions): Promise<number> {
     if (!existsSync(path)) {
       return 0;
     }
 
+    // Use streaming for large directories if enabled (fallback to du if streaming fails)
+    if (options?.useStreaming) {
+      try {
+        return await this.getDirectorySizeStreaming(path, options);
+      } catch (error) {
+        console.warn(`⚠️  Streaming size calculation failed for ${path}, falling back to du:`, error);
+      }
+    }
+
+    const operation = createOptimizedOperation(
+      'getDirectorySize',
+      async () => {
+        const { stdout } = await execAsync(`du -sb "${path}"`);
+        const sizeBytes = parseInt(stdout.split('\t')[0] || '0', 10);
+        return sizeBytes / (1024 ** 3); // Convert to GB
+      },
+      {
+        retries: 3,
+        timeout: 30000, // 30 second timeout for large directories
+      }
+    );
+
     try {
-      const { stdout } = await execAsync(`du -sb "${path}"`);
-      const sizeBytes = parseInt(stdout.split('\t')[0] || '0', 10);
-      return sizeBytes / (1024 ** 3); // Convert to GB
+      return await operation();
     } catch (error) {
       console.warn(`⚠️  Warning: Could not calculate size for ${path}:`, error);
       return 0;
     }
+  }
+
+  /**
+   * Get directory size using streaming (memory efficient for large directories)
+   */
+  private async getDirectorySizeStreaming(path: string, options?: FileSystemOptions): Promise<number> {
+    const operation = createOptimizedOperation(
+      'getDirectorySizeStreaming',
+      async () => {
+        const sizeBytes = await getDirectorySizeStreaming(path);
+        return sizeBytes / (1024 ** 3); // Convert to GB
+      },
+      {
+        retries: 2,
+        timeout: 60000, // Longer timeout for streaming large directories
+      }
+    );
+
+    return await operation();
   }
 
   /**
@@ -113,26 +162,44 @@ export class FileSystemManager {
 
   /**
    * Count media files in a directory using configured extensions
+   * Now with performance optimization, retry logic, and streaming support
    */
-  async countMediaFiles(path: string): Promise<number> {
+  async countMediaFiles(path: string, options?: FileSystemOptions): Promise<number> {
     if (!existsSync(path)) {
       return 0;
     }
 
+    // Use streaming for large directories if enabled
+    if (options?.useStreaming) {
+      return this.countMediaFilesStreaming(path, options);
+    }
+
+    const operation = createOptimizedOperation(
+      'countMediaFiles',
+      async () => {
+        const extensions = this.config.media_extensions.map(ext =>
+          ext.startsWith('.') ? ext.slice(1) : ext
+        );
+
+        const escapedPath = this.escapeGlobPath(path);
+        const pattern = `${escapedPath}/**/*.{${extensions.join(',')}}`;
+        const files = await fg(pattern, {
+          caseSensitiveMatch: false,
+          onlyFiles: true,
+          followSymbolicLinks: false,
+          signal: options?.abortSignal,
+        });
+
+        return files.length;
+      },
+      {
+        retries: 2,
+        timeout: 20000, // 20 second timeout
+      }
+    );
+
     try {
-      const extensions = this.config.media_extensions.map(ext =>
-        ext.startsWith('.') ? ext.slice(1) : ext
-      );
-
-      const escapedPath = this.escapeGlobPath(path);
-      const pattern = `${escapedPath}/**/*.{${extensions.join(',')}}`;
-      const files = await fg(pattern, {
-        caseSensitiveMatch: false,
-        onlyFiles: true,
-        followSymbolicLinks: false,
-      });
-
-      return files.length;
+      return await operation();
     } catch (error) {
       console.warn(`⚠️  Warning: Could not count media files in ${path}:`, error);
       return 0;
@@ -140,21 +207,63 @@ export class FileSystemManager {
   }
 
   /**
-   * Count all files in a directory
+   * Count media files using streaming (memory efficient for large directories)
    */
-  async countAllFiles(path: string): Promise<number> {
+  private async countMediaFilesStreaming(path: string, options?: FileSystemOptions): Promise<number> {
+    const operation = createOptimizedOperation(
+      'countMediaFilesStreaming',
+      async () => {
+        const result = await countFilesStreaming(path, this.config.media_extensions);
+        return result.mediaFiles;
+      },
+      {
+        retries: 2,
+        timeout: 30000, // Longer timeout for streaming
+      }
+    );
+
+    try {
+      return await operation();
+    } catch (error) {
+      console.warn(`⚠️  Warning: Could not count media files (streaming) in ${path}:`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Count all files in a directory
+   * Now with performance optimization, retry logic, and streaming support
+   */
+  async countAllFiles(path: string, options?: FileSystemOptions): Promise<number> {
     if (!existsSync(path)) {
       return 0;
     }
 
-    try {
-      const escapedPath = this.escapeGlobPath(path);
-      const files = await fg(`${escapedPath}/**/*`, {
-        onlyFiles: true,
-        followSymbolicLinks: false,
-      });
+    // Use streaming for large directories if enabled
+    if (options?.useStreaming) {
+      return this.countAllFilesStreaming(path, options);
+    }
 
-      return files.length;
+    const operation = createOptimizedOperation(
+      'countAllFiles',
+      async () => {
+        const escapedPath = this.escapeGlobPath(path);
+        const files = await fg(`${escapedPath}/**/*`, {
+          onlyFiles: true,
+          followSymbolicLinks: false,
+          signal: options?.abortSignal,
+        });
+
+        return files.length;
+      },
+      {
+        retries: 2,
+        timeout: 20000, // 20 second timeout
+      }
+    );
+
+    try {
+      return await operation();
     } catch (error) {
       console.warn(`⚠️  Warning: Could not count files in ${path}:`, error);
       return 0;
@@ -162,11 +271,36 @@ export class FileSystemManager {
   }
 
   /**
-   * Get comprehensive directory information
+   * Count all files using streaming (memory efficient for large directories)
    */
-  async getDirectoryInfo(path: string): Promise<DirectoryInfo> {
+  private async countAllFilesStreaming(path: string, options?: FileSystemOptions): Promise<number> {
+    const operation = createOptimizedOperation(
+      'countAllFilesStreaming',
+      async () => {
+        const result = await countFilesStreaming(path, this.config.media_extensions);
+        return result.totalFiles;
+      },
+      {
+        retries: 2,
+        timeout: 30000, // Longer timeout for streaming
+      }
+    );
+
+    try {
+      return await operation();
+    } catch (error) {
+      console.warn(`⚠️  Warning: Could not count files (streaming) in ${path}:`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get comprehensive directory information
+   * Now with parallel processing, performance optimization, and intelligent streaming
+   */
+  async getDirectoryInfo(path: string, options?: FileSystemOptions): Promise<DirectoryInfo> {
     const exists = existsSync(path);
-    
+
     if (!exists) {
       return {
         path,
@@ -178,11 +312,42 @@ export class FileSystemManager {
       };
     }
 
-    const [sizeGB, fileCount, mediaFileCount] = await Promise.all([
-      this.getDirectorySize(path),
-      this.countAllFiles(path),
-      this.countMediaFiles(path),
-    ]);
+    // Automatically enable streaming for potentially large directories
+    const enhancedOptions = { ...options };
+    if (!enhancedOptions.useStreaming) {
+      // Enable streaming if directory appears large (heuristic: check if it has many immediate subdirectories)
+      try {
+        const entries = await readdir(path);
+        if (entries.length > 100) { // Threshold for enabling streaming
+          enhancedOptions.useStreaming = true;
+          console.log(`🔄 Enabling streaming for large directory: ${path} (${entries.length} entries)`);
+        }
+      } catch (error) {
+        // If we can't read the directory, proceed without streaming
+      }
+    }
+
+    // Use performance manager for parallel execution with proper error handling
+    const operations = [
+      { name: 'size', op: () => this.getDirectorySize(path, enhancedOptions) },
+      { name: 'fileCount', op: () => this.countAllFiles(path, enhancedOptions) },
+      { name: 'mediaCount', op: () => this.countMediaFiles(path, enhancedOptions) },
+    ];
+
+    const results = await this.perfManager.executeParallel(
+      operations,
+      async (operation) => operation.op(),
+      {
+        concurrency: 3, // All three operations can run in parallel
+        operationName: 'getDirectoryInfo',
+        onProgress: options?.onProgress,
+      }
+    );
+
+    // Extract results, defaulting to 0 on failure
+    const sizeGB = results[0]?.success ? results[0].data! : 0;
+    const fileCount = results[1]?.success ? results[1].data! : 0;
+    const mediaFileCount = results[2]?.success ? results[2].data! : 0;
 
     return {
       path,
@@ -196,18 +361,30 @@ export class FileSystemManager {
 
   /**
    * List all directories in a given path
+   * Now with performance optimization and retry logic
    */
-  async listDirectories(basePath: string): Promise<string[]> {
+  async listDirectories(basePath: string, options?: FileSystemOptions): Promise<string[]> {
     if (!existsSync(basePath)) {
       return [];
     }
 
+    const operation = createOptimizedOperation(
+      'listDirectories',
+      async () => {
+        const entries = await readdir(basePath, { withFileTypes: true });
+        return entries
+          .filter(entry => entry.isDirectory())
+          .map(entry => entry.name)
+          .sort();
+      },
+      {
+        retries: 2,
+        timeout: 10000, // 10 second timeout
+      }
+    );
+
     try {
-      const entries = await readdir(basePath, { withFileTypes: true });
-      return entries
-        .filter(entry => entry.isDirectory())
-        .map(entry => entry.name)
-        .sort();
+      return await operation();
     } catch (error) {
       console.warn(`⚠️  Warning: Could not list directories in ${basePath}:`, error);
       return [];
@@ -390,20 +567,44 @@ export class FileSystemManager {
     const missingSeasons = selectedSeasons.filter(s => !availableSeasons.includes(s));
     const hasAllSeasons = missingSeasons.length === 0;
 
-    // Calculate size for each requested season that exists
-    for (const seasonNumber of selectedSeasons) {
-      const seasonDir = seasonDirs.find(s => s.seasonNumber === seasonNumber);
-      if (seasonDir) {
-        const seasonSize = await this.getDirectorySize(seasonDir.path);
-        seasonSizes.push({
-          season: seasonNumber,
-          size: seasonSize,
-          path: seasonDir.path
-        });
-        totalSize += seasonSize;
-      } else {
-        console.warn(`⚠️  Warning: Season ${seasonNumber} not found in ${showPath}`);
+    // Calculate size for each requested season that exists - now in parallel
+    const validSeasonDirs = selectedSeasons
+      .map(seasonNumber => ({
+        seasonNumber,
+        seasonDir: seasonDirs.find(s => s.seasonNumber === seasonNumber)
+      }))
+      .filter(item => item.seasonDir !== undefined);
+
+    if (validSeasonDirs.length > 0) {
+      const results = await this.perfManager.executeParallel(
+        validSeasonDirs,
+        async (item) => {
+          const size = await this.getDirectorySize(item.seasonDir!.path);
+          return {
+            season: item.seasonNumber,
+            size,
+            path: item.seasonDir!.path
+          };
+        },
+        {
+          concurrency: 3, // Process up to 3 seasons in parallel
+          operationName: 'getSeasonSizes',
+        }
+      );
+
+      // Collect successful results
+      for (const result of results) {
+        if (result.success && result.data) {
+          seasonSizes.push(result.data);
+          totalSize += result.data.size;
+        }
       }
+    }
+
+    // Warn about missing seasons
+    const missingSeasons = selectedSeasons.filter(s => !availableSeasons.includes(s));
+    for (const seasonNumber of missingSeasons) {
+      console.warn(`⚠️  Warning: Season ${seasonNumber} not found in ${showPath}`);
     }
 
     return {
@@ -415,20 +616,49 @@ export class FileSystemManager {
 
   /**
    * Get available directories for each content type
+   * Now with performance optimization and progress tracking
    */
-  async getAvailableContent(): Promise<{
+  async getAvailableContent(options?: FileSystemOptions): Promise<{
     movies: string[];
     tv: string[];
     games: string[];
     webtv: string[];
   }> {
-    const [movies, tv, games, webtv] = await Promise.all([
-      this.listDirectories(this.config.nfs_paths.movies),
-      this.listDirectories(this.config.nfs_paths.tv),
-      this.listDirectories(this.config.nfs_paths.games),
-      this.listDirectories(this.config.nfs_paths.webtv),
-    ]);
+    const contentTypes = [
+      { name: 'movies', path: this.config.nfs_paths.movies },
+      { name: 'tv', path: this.config.nfs_paths.tv },
+      { name: 'games', path: this.config.nfs_paths.games },
+      { name: 'webtv', path: this.config.nfs_paths.webtv },
+    ];
 
-    return { movies, tv, games, webtv };
+    const results = await this.perfManager.executeParallel(
+      contentTypes,
+      async (contentType) => ({
+        type: contentType.name,
+        directories: await this.listDirectories(contentType.path, options),
+      }),
+      {
+        concurrency: 4, // All content types can be scanned in parallel
+        operationName: 'getAvailableContent',
+        onProgress: options?.onProgress,
+      }
+    );
+
+    // Build result object from successful operations
+    const content = { movies: [], tv: [], games: [], webtv: [] } as {
+      movies: string[];
+      tv: string[];
+      games: string[];
+      webtv: string[];
+    };
+
+    for (const result of results) {
+      if (result.success && result.data) {
+        const { type, directories } = result.data;
+        (content as any)[type] = directories;
+      }
+    }
+
+    return content;
   }
 }

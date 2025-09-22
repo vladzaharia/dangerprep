@@ -5,6 +5,7 @@ import { MetadataCache } from './cache.js';
 import { getConfig } from '../config/loader.js';
 import { WebTVSpaceManager, type WebTVSelectionResult } from './webtv-space-manager.js';
 import { KiwixAnalyzer } from './kiwix-analyzer.js';
+import { PerformanceManager, processBatch, ProgressInfo } from '../utils/performance.js';
 import type { MediaItem, WebTVConfig } from '../config/schema.js';
 
 export interface ContentAnalysis {
@@ -89,6 +90,7 @@ export class CollectionAnalyzer {
   private cache: MetadataCache;
   private webtvManager: WebTVSpaceManager;
   private kiwixAnalyzer: KiwixAnalyzer;
+  private perfManager: PerformanceManager;
   private config = getConfig();
   private webtvSelectionResult?: WebTVSelectionResult;
 
@@ -98,6 +100,7 @@ export class CollectionAnalyzer {
     this.cache = new MetadataCache(cacheDir);
     this.webtvManager = new WebTVSpaceManager();
     this.kiwixAnalyzer = new KiwixAnalyzer();
+    this.perfManager = PerformanceManager.getInstance();
   }
 
   /**
@@ -117,8 +120,13 @@ export class CollectionAnalyzer {
   }> {
     console.log('🔍 Starting collection analysis...');
 
-    // Get available content from NFS
-    const availableContent = await this.fs.getAvailableContent();
+    // Get available content from NFS with progress tracking
+    console.log('📁 Scanning NFS directories...');
+    const availableContent = await this.fs.getAvailableContent({
+      onProgress: (progress) => {
+        console.log(`📂 Directory scan progress: ${progress.percentage}% (${progress.completed}/${progress.total})`);
+      }
+    });
     console.log(`📁 Found content: ${availableContent.movies.length} movies, ${availableContent.tv.length} TV shows, ${availableContent.games.length} games, ${availableContent.webtv.length} WebTV`);
 
     // Perform WebTV smart selection if configured
@@ -163,43 +171,52 @@ export class CollectionAnalyzer {
     // Find matches for all items
     const matches = this.matcher.findBatchMatches(allItems, availableContent);
 
-    // Analyze each item
-    const analyses: ContentAnalysis[] = [];
-    for (const item of allItems) {
-      const match = matches.get(item.name) ?? null;
-      const analysis = await this.analyzeItem(item, match);
+    // Analyze items in parallel batches for better performance
+    const analyses = await processBatch(
+      allItems,
+      async (item, index) => {
+        const match = matches.get(item.name) ?? null;
+        const analysis = await this.analyzeItem(item, match);
 
-      // Add WebTV selection info to WebTV channel analyses
-      if (item.type.toLowerCase() === 'webtv' && this.webtvSelectionResult) {
-        analysis.webtv_selection = this.webtvSelectionResult;
+        // Add WebTV selection info to WebTV channel analyses
+        if (item.type.toLowerCase() === 'webtv' && this.webtvSelectionResult) {
+          analysis.webtv_selection = this.webtvSelectionResult;
 
-        // Find the specific channel info from the selection result
-        const selectedChannel = this.webtvSelectionResult.selected_channels.find(c => c.name === item.name);
-        if (selectedChannel) {
-          analysis.webtv_channel_info = {
-            copy_mode: selectedChannel.copy_mode || 'entire',
-            is_required: selectedChannel.is_required || false,
-            selected_videos: selectedChannel.selected_videos?.map(v => ({
-              name: v.name,
-              path: v.path,
-              size_gb: v.size_gb
-            })),
-            total_channel_size_gb: selectedChannel.size_gb,
-            selected_size_gb: selectedChannel.selected_size_gb || selectedChannel.size_gb
-          };
+          // Find the specific channel info from the selection result
+          const selectedChannel = this.webtvSelectionResult.selected_channels.find(c => c.name === item.name);
+          if (selectedChannel) {
+            analysis.webtv_channel_info = {
+              copy_mode: selectedChannel.copy_mode || 'entire',
+              is_required: selectedChannel.is_required || false,
+              selected_videos: selectedChannel.selected_videos?.map(v => ({
+                name: v.name,
+                path: v.path,
+                size_gb: v.size_gb
+              })),
+              total_channel_size_gb: selectedChannel.size_gb,
+              selected_size_gb: selectedChannel.selected_size_gb || selectedChannel.size_gb
+            };
 
-          // Update the analysis size to reflect only selected content
-          analysis.size_gb = selectedChannel.selected_size_gb || selectedChannel.size_gb;
+            // Update the analysis size to reflect only selected content
+            analysis.size_gb = selectedChannel.selected_size_gb || selectedChannel.size_gb;
 
-          // Update episode count for partial selections
-          if (selectedChannel.copy_mode === 'partial' && selectedChannel.selected_videos) {
-            analysis.episodes = selectedChannel.selected_videos.length;
+            // Update episode count for partial selections
+            if (selectedChannel.copy_mode === 'partial' && selectedChannel.selected_videos) {
+              analysis.episodes = selectedChannel.selected_videos.length;
+            }
           }
         }
-      }
 
-      analyses.push(analysis);
-    }
+        return analysis;
+      },
+      {
+        batchSize: 10, // Process 10 items at a time
+        operationName: 'analyzeItems',
+        onProgress: (progress) => {
+          console.log(`📊 Analysis progress: ${progress.percentage}% (${progress.completed}/${progress.total})`);
+        },
+      }
+    );
 
     // Add Kiwix analyses to the main analyses array
     analyses.push(...kiwixAnalyses);

@@ -5,6 +5,7 @@ import { CSVExporter } from '../exports/csv.js';
 import { RsyncScriptExporter } from '../exports/rsync.js';
 import { MarkdownExporter } from '../exports/markdown.js';
 import { FileSystemManager } from '../core/filesystem.js';
+import { PerformanceManager, ProgressInfo } from '../utils/performance.js';
 import { resolve } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import chalk from 'chalk';
@@ -69,11 +70,32 @@ export class CLICommands {
       await analyzer.initialize();
       spinner.succeed('Analyzer initialized');
 
-      // Perform analysis
-      spinner.text = 'Analyzing collection...';
+      // Perform analysis with enhanced progress tracking
+      const perfManager = PerformanceManager.getInstance();
+      let currentOperation = 'Analyzing collection';
+
+      // Enhanced progress tracking
+      const updateProgress = (progress: ProgressInfo) => {
+        const eta = progress.estimatedTimeRemaining
+          ? ` (ETA: ${Math.round(progress.estimatedTimeRemaining / 1000)}s)`
+          : '';
+        spinner.text = `${currentOperation}: ${progress.percentage}% (${progress.completed}/${progress.total})${eta}`;
+      };
+
+      // Listen to performance manager events
+      perfManager.on('progress', updateProgress);
+
+      spinner.text = currentOperation;
       spinner.start();
+
+      const startTime = Date.now();
       const { analyses, stats } = await analyzer.analyzeCollection();
-      spinner.succeed(`Analysis complete - Found ${stats.found_items}/${stats.total_items} items`);
+      const duration = Date.now() - startTime;
+
+      // Remove progress listener
+      perfManager.removeListener('progress', updateProgress);
+
+      spinner.succeed(`Analysis complete - Found ${stats.found_items}/${stats.total_items} items (${Math.round(duration / 1000)}s)`);
 
       // Generate exports
       const csvName = options.csvName || config.output_config.default_csv_name;
@@ -128,6 +150,28 @@ export class CLICommands {
       }
 
       console.log(chalk.gray(`\nOutput files saved to: ${outputDir}`));
+
+      // Display enhanced performance statistics
+      const perfReport = perfManager.getPerformanceReport();
+      if (perfReport.summary.totalOperations > 0) {
+        console.log('\n' + chalk.bold.blue('⚡ Performance Report'));
+        console.log(chalk.cyan(`Total Operations: ${perfReport.summary.totalOperations}`));
+        console.log(chalk.yellow(`Average Response Time: ${perfReport.summary.averageResponseTime}ms`));
+        console.log(chalk.red(`Error Rate: ${perfReport.summary.overallErrorRate}%`));
+        console.log(chalk.green(`Peak Memory: ${Math.round(perfReport.summary.peakMemoryUsage / 1024 / 1024)}MB`));
+
+        // Show top 3 slowest operations
+        const sortedOps = Object.entries(perfReport.operations)
+          .sort(([,a], [,b]) => b.avgTime - a.avgTime)
+          .slice(0, 3);
+
+        if (sortedOps.length > 0) {
+          console.log(chalk.gray('\nSlowest Operations:'));
+          for (const [operation, stats] of sortedOps) {
+            console.log(chalk.gray(`  ${operation}: ${stats.avgTime}ms avg (P95: ${stats.p95Time}ms)`));
+          }
+        }
+      }
 
     } catch (error) {
       spinner.fail('Analysis failed');
@@ -440,6 +484,72 @@ export class CLICommands {
       } else {
         console.error(chalk.red('Unknown error occurred'));
       }
+      process.exit(1);
+    }
+  }
+
+  /**
+   * Performance command - Display detailed performance metrics
+   */
+  static async performance(): Promise<void> {
+    const perfManager = PerformanceManager.getInstance();
+    const report = perfManager.getPerformanceReport();
+
+    if (report.summary.totalOperations === 0) {
+      console.log(chalk.yellow('No performance data available. Run some operations first.'));
+      return;
+    }
+
+    console.log(chalk.bold.blue('📊 Detailed Performance Report'));
+    console.log('='.repeat(60));
+
+    // Summary
+    console.log(chalk.bold.green('\n📈 Summary'));
+    console.log(`Total Operations: ${chalk.cyan(report.summary.totalOperations.toString())}`);
+    console.log(`Total Errors: ${chalk.red(report.summary.totalErrors.toString())} (${report.summary.overallErrorRate}%)`);
+    console.log(`Average Response Time: ${chalk.yellow(report.summary.averageResponseTime.toString())}ms`);
+    console.log(`Peak Memory Usage: ${chalk.magenta(Math.round(report.summary.peakMemoryUsage / 1024 / 1024).toString())}MB`);
+    console.log(`Uptime: ${chalk.gray(Math.round(report.systemMetrics.uptime / 1000).toString())}s`);
+
+    // Current Memory Usage
+    const currentMem = report.systemMetrics.memoryUsage;
+    console.log(chalk.bold.green('\n💾 Current Memory Usage'));
+    console.log(`Heap Used: ${chalk.cyan(Math.round(currentMem.heapUsed / 1024 / 1024).toString())}MB`);
+    console.log(`Heap Total: ${chalk.yellow(Math.round(currentMem.heapTotal / 1024 / 1024).toString())}MB`);
+    console.log(`External: ${chalk.magenta(Math.round(currentMem.external / 1024 / 1024).toString())}MB`);
+
+    // Operation Details
+    console.log(chalk.bold.green('\n⚡ Operation Performance'));
+    const operations = Object.entries(report.operations)
+      .sort(([,a], [,b]) => b.count - a.count); // Sort by frequency
+
+    for (const [operation, stats] of operations) {
+      console.log(chalk.bold(`\n${operation}:`));
+      console.log(`  Count: ${chalk.cyan(stats.count.toString())}`);
+      console.log(`  Average: ${chalk.yellow(stats.avgTime.toString())}ms`);
+      console.log(`  Min/Max: ${chalk.green(stats.minTime.toString())}ms / ${chalk.red(stats.maxTime.toString())}ms`);
+      console.log(`  P95/P99: ${chalk.blue(stats.p95Time.toString())}ms / ${chalk.magenta(stats.p99Time.toString())}ms`);
+      console.log(`  Throughput: ${chalk.cyan(stats.throughput.toString())} ops/s`);
+      console.log(`  Error Rate: ${chalk.red(stats.errorRate.toString())}%`);
+      console.log(`  Last Executed: ${chalk.gray(new Date(stats.lastExecuted).toLocaleString())}`);
+    }
+
+    console.log(chalk.gray('\n💡 Tip: Use --export-perf to save detailed performance data to a file'));
+  }
+
+  /**
+   * Export performance data to file
+   */
+  static async exportPerformance(outputPath: string = './performance-report.json'): Promise<void> {
+    const perfManager = PerformanceManager.getInstance();
+    const data = perfManager.exportPerformanceData();
+
+    try {
+      const fs = await import('fs/promises');
+      await fs.writeFile(outputPath, data, 'utf-8');
+      console.log(chalk.green(`📊 Performance data exported to: ${outputPath}`));
+    } catch (error) {
+      console.error(chalk.red(`Failed to export performance data: ${error}`));
       process.exit(1);
     }
   }
