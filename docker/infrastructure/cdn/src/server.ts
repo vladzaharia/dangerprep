@@ -7,7 +7,11 @@ import helmet from 'helmet';
 import NodeCache from 'node-cache';
 
 // Import local template utilities
-import { TemplateRenderer, createTemplateData, type TemplateData } from './utils/template-renderer.js';
+import {
+  TemplateRenderer,
+  createTemplateData,
+  type TemplateData,
+} from './utils/template-renderer.js';
 import { AppDiscoveryService, type AppMetadata } from './utils/app-discovery.js';
 
 // Simple logger to replace console statements
@@ -296,10 +300,14 @@ function calculateTotalSize(libraries: LibraryConfig[]): string {
     if (isNaN(numValue)) return sum;
 
     switch (unit) {
-      case 'GB': return sum + (numValue * 1024 * 1024 * 1024);
-      case 'MB': return sum + (numValue * 1024 * 1024);
-      case 'KB': return sum + (numValue * 1024);
-      default: return sum + numValue;
+      case 'GB':
+        return sum + numValue * 1024 * 1024 * 1024;
+      case 'MB':
+        return sum + numValue * 1024 * 1024;
+      case 'KB':
+        return sum + numValue * 1024;
+      default:
+        return sum + numValue;
     }
   }, 0);
 
@@ -316,18 +324,15 @@ app.get('/', async (_req: Request, res: Response) => {
       libraries,
       libraryCount: libraries.length,
       totalFiles: libraries.reduce((sum, lib) => sum + (lib.file_count || 0), 0),
-      totalSize: calculateTotalSize(libraries)
+      totalSize: calculateTotalSize(libraries),
     };
 
     const cdnAppContent = await templateRenderer.render('cdn-app', cdnAppData);
 
     // Prepare base template data
-    const templateData = createTemplateData(
-      'CDN Manager',
-      cdnAppContent,
-      {
-        appTitle: 'CDN Manager',
-        headerActions: `
+    const templateData = createTemplateData('CDN Manager', cdnAppContent, {
+      appTitle: 'CDN Manager',
+      headerActions: `
           <wa-button appearance="outlined" variant="neutral" size="small" href="/api/libraries">
             <wa-icon slot="start" name="code" variant="regular"></wa-icon>
             API
@@ -336,9 +341,8 @@ app.get('/', async (_req: Request, res: Response) => {
             <wa-icon slot="start" name="heart-pulse" variant="regular"></wa-icon>
             Status
           </wa-button>
-        `
-      }
-    );
+        `,
+    });
 
     const html = await templateRenderer.render('base', { ...templateData });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -348,9 +352,6 @@ app.get('/', async (_req: Request, res: Response) => {
     res.status(500).send('Internal Server Error');
   }
 });
-
-
-
 
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

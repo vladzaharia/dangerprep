@@ -12,7 +12,32 @@ DNS_CONFIG_DIR="/dns-config"
 DNS_DB_FILE="${DNS_CONFIG_DIR}/db.${DOMAIN_NAME}"
 EXTERNAL_DNS_DB_FILE="${DNS_CONFIG_DIR}/db.${EXTERNAL_DOMAIN_NAME}"
 UPDATE_INTERVAL="${DNS_UPDATE_INTERVAL:-30}"
-TRAEFIK_IP="172.21.0.3"  # Traefik container IP in dns network
+
+# Detect host IP where Traefik is exposed on ports 80/443
+detect_host_ip() {
+    # Try environment variables first
+    if [ -n "${HOST_IP:-}" ]; then
+        echo "$HOST_IP"
+        return
+    fi
+    if [ -n "${LAN_IP:-}" ]; then
+        echo "$LAN_IP"
+        return
+    fi
+
+    # Try to detect the default gateway (likely the host)
+    local gateway_ip
+    gateway_ip=$(ip route show default 2>/dev/null | awk '/default/ {print $3}' | head -1)
+    if [ -n "$gateway_ip" ]; then
+        echo "$gateway_ip"
+        return
+    fi
+
+    # Fallback to common DangerPrep default
+    echo "192.168.120.1"
+}
+
+HOST_IP=$(detect_host_ip)
 
 # Install required packages
 apk add --no-cache docker-cli jq curl
@@ -33,13 +58,19 @@ get_dns_registrations() {
         dns_domain=$(echo "$labels" | grep -o 'dns\.register=[^,]*' | cut -d'=' -f2)
         if [ -n "$dns_domain" ]; then
             # Get container IP in traefik network
-            container_ip=$(docker inspect "$name" --format '{{range .NetworkSettings.Networks}}{{if eq .NetworkID "traefik"}}{{.IPAddress}}{{end}}{{end}}' 2>/dev/null || echo "")
-            
-            # If no traefik network IP, use traefik IP (for services behind traefik)
+            # Check if container is connected to traefik network and get its IP
+            # For most services behind Traefik, this will be empty and we'll use Traefik's IP
+            container_ip=$(docker inspect "$name" --format '{{with index .NetworkSettings.Networks "traefik"}}{{.IPAddress}}{{end}}' 2>/dev/null || echo "")
+
+            # If no traefik network IP, use host IP (where Traefik is exposed on ports 80/443)
+            # This is the correct behavior - DNS should point to the host where Traefik is running
             if [ -z "$container_ip" ]; then
-                container_ip="$TRAEFIK_IP"
+                container_ip="$HOST_IP"
+                log "Container $name not in traefik network, using host IP: $HOST_IP"
+            else
+                log "Container $name found in traefik network with IP: $container_ip"
             fi
-            
+
             echo "$dns_domain $container_ip"
         fi
     done
@@ -66,8 +97,8 @@ generate_dns_zone_for_domain() {
 ns1     IN      A       172.21.0.4
 
 ; Default records
-@       IN      A       ${TRAEFIK_IP}
-*       IN      A       ${TRAEFIK_IP}
+@       IN      A       ${HOST_IP}
+*       IN      A       ${HOST_IP}
 
 EOF
 
@@ -116,6 +147,7 @@ main() {
     log "DNS Registrar starting..."
     log "Internal domain: ${DOMAIN_NAME}"
     log "External domain: ${EXTERNAL_DOMAIN_NAME}"
+    log "Host IP (where Traefik is exposed): ${HOST_IP}"
     log "Update interval: ${UPDATE_INTERVAL}s"
 
     while true; do

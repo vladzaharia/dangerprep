@@ -14,7 +14,7 @@ const defaultApps = [
     icon: 'rocket',
     url: 'https://cdn.danger',
     category: 'Infrastructure',
-    status: 'healthy'
+    status: 'healthy',
   },
   {
     name: 'Certificate Authority',
@@ -22,8 +22,8 @@ const defaultApps = [
     icon: 'shield-check',
     url: 'https://root.danger',
     category: 'Security',
-    status: 'healthy'
-  }
+    status: 'healthy',
+  },
 ];
 
 // Simple logger to replace console statements
@@ -167,18 +167,15 @@ app.get('/', async (_req: Request, res: Response): Promise<void> => {
       caUrl: CA_URL,
       rootCertExists,
       acmeEnabled: true, // Assume ACME is enabled
-      certExpiry: rootCertExists ? getCertificateExpiry() : null
+      certExpiry: rootCertExists ? getCertificateExpiry() : null,
     };
 
     const caAppContent = await templateRenderer.render('ca-app', caAppData);
 
     // Prepare base template data
-    const templateData = createTemplateData(
-      'Certificate Authority',
-      caAppContent,
-      {
-        appTitle: 'Certificate Authority',
-        headerActions: `
+    const templateData = createTemplateData('Certificate Authority', caAppContent, {
+      appTitle: 'Certificate Authority',
+      headerActions: `
           <wa-button appearance="outlined" variant="success" size="small" href="/root-ca.crt">
             <wa-icon slot="start" name="download" variant="regular"></wa-icon>
             Download CA
@@ -187,9 +184,8 @@ app.get('/', async (_req: Request, res: Response): Promise<void> => {
             <wa-icon slot="start" name="heart-pulse" variant="regular"></wa-icon>
             Status
           </wa-button>
-        `
-      }
-    );
+        `,
+    });
 
     const html = await templateRenderer.render('base', { ...templateData });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -207,7 +203,7 @@ function getCertificateExpiry(): string | null {
     // you would parse the certificate to get the actual expiry date
     const stats = fs.statSync(ROOT_CERT_PATH);
     const created = new Date(stats.birthtime);
-    const expiry = new Date(created.getTime() + (365 * 24 * 60 * 60 * 1000)); // 1 year from creation
+    const expiry = new Date(created.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year from creation
     return expiry.toLocaleDateString();
   } catch (error) {
     logger.warn('Failed to get certificate expiry:', error);

@@ -13,7 +13,7 @@ export interface TemplateData {
   pageTitle: string;
   appTitle?: string;
   bodyClass?: string;
-  
+
   // Content sections
   content: string;
   headerActions?: string;
@@ -21,13 +21,13 @@ export interface TemplateData {
   navigation?: string;
   mainHeader?: string;
   mainFooter?: string;
-  
+
   // Navigation
   breadcrumbs?: Array<{
     text: string;
     href?: string;
   }>;
-  
+
   // Custom styles and scripts
   customStyles?: string;
   additionalHead?: string;
@@ -62,13 +62,15 @@ export class TemplateRenderer {
     }
 
     const templatePath = path.join(this.templateDir, `${templateName}.html`);
-    
+
     try {
       const template = await fs.readFile(templatePath, 'utf8');
       this.templateCache.set(templateName, template);
       return template;
     } catch (error) {
-      throw new Error(`Failed to load template '${templateName}': ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to load template '${templateName}': ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -81,38 +83,38 @@ export class TemplateRenderer {
     // Handle {{variable}} replacements
     result = result.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
       const trimmedKey = key.trim();
-      
+
       // Handle conditionals: {{#if variable}}
       if (trimmedKey.startsWith('#if ')) {
         const varName = trimmedKey.substring(4).trim();
         const value = this.getNestedValue(data, varName);
         return value ? '' : '<!--IF_FALSE-->';
       }
-      
+
       // Handle end conditionals: {{/if}}
       if (trimmedKey === '/if') {
         return '<!--END_IF-->';
       }
-      
+
       // Handle each loops: {{#each array}}
       if (trimmedKey.startsWith('#each ')) {
         const arrayName = trimmedKey.substring(6).trim();
         const array = this.getNestedValue(data, arrayName) as unknown[];
         return Array.isArray(array) ? '<!--EACH_START-->' : '<!--EACH_SKIP-->';
       }
-      
+
       // Handle end each: {{/each}}
       if (trimmedKey === '/each') {
         return '<!--EACH_END-->';
       }
-      
+
       // Handle triple braces for unescaped HTML: {{{variable}}}
       if (match.startsWith('{{{') && match.endsWith('}}}')) {
         const varName = trimmedKey;
         const value = this.getNestedValue(data, varName);
         return value != null ? String(value) : '';
       }
-      
+
       // Regular variable replacement
       const value = this.getNestedValue(data, trimmedKey);
       return value != null ? this.escapeHtml(String(value)) : '';
@@ -120,7 +122,7 @@ export class TemplateRenderer {
 
     // Process conditionals
     result = this.processConditionals(result);
-    
+
     // Process each loops
     result = this.processEachLoops(result, data);
 
@@ -132,7 +134,9 @@ export class TemplateRenderer {
    */
   private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
     return path.split('.').reduce((current: unknown, key: string) => {
-      return current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined;
+      return current && typeof current === 'object'
+        ? (current as Record<string, unknown>)[key]
+        : undefined;
     }, obj as unknown);
   }
 
@@ -141,13 +145,13 @@ export class TemplateRenderer {
    */
   private processConditionals(template: string): string {
     let result = template;
-    
+
     // Remove false conditional blocks
     result = result.replace(/<!--IF_FALSE-->[\s\S]*?<!--END_IF-->/g, '');
-    
+
     // Clean up true conditional markers
     result = result.replace(/<!--IF_TRUE-->|<!--END_IF-->/g, '');
-    
+
     return result;
   }
 
@@ -156,46 +160,51 @@ export class TemplateRenderer {
    */
   private processEachLoops(template: string, data: Record<string, unknown>): string {
     let result = template;
-    
+
     // Find each blocks
     const eachRegex = /\{\{#each\s+([^}]+)\}\}([\s\S]*?)\{\{\/each\}\}/g;
-    
+
     result = result.replace(eachRegex, (match, arrayName, blockContent) => {
       const array = this.getNestedValue(data, arrayName.trim()) as unknown[];
-      
+
       if (!Array.isArray(array)) {
         return '';
       }
-      
-      return array.map((item, index) => {
-        let itemContent = blockContent;
-        
-        // Replace {{this}} with current item
-        itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
-        
-        // Replace {{@index}} with current index
-        itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
-        
-        // Replace {{@last}} with boolean indicating if this is the last item
-        itemContent = itemContent.replace(/\{\{@last\}\}/g, String(index === array.length - 1));
-        
-        // Handle object properties if item is an object
-        if (typeof item === 'object' && item !== null) {
-          const itemObj = item as Record<string, unknown>;
-          itemContent = itemContent.replace(/\{\{([^}]+)\}\}/g, (propMatch: string, propKey: string) => {
-            const trimmedPropKey = propKey.trim();
-            if (trimmedPropKey in itemObj) {
-              const value = itemObj[trimmedPropKey];
-              return value != null ? this.escapeHtml(String(value)) : '';
-            }
-            return propMatch;
-          });
-        }
-        
-        return itemContent;
-      }).join('');
+
+      return array
+        .map((item, index) => {
+          let itemContent = blockContent;
+
+          // Replace {{this}} with current item
+          itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
+
+          // Replace {{@index}} with current index
+          itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+
+          // Replace {{@last}} with boolean indicating if this is the last item
+          itemContent = itemContent.replace(/\{\{@last\}\}/g, String(index === array.length - 1));
+
+          // Handle object properties if item is an object
+          if (typeof item === 'object' && item !== null) {
+            const itemObj = item as Record<string, unknown>;
+            itemContent = itemContent.replace(
+              /\{\{([^}]+)\}\}/g,
+              (propMatch: string, propKey: string) => {
+                const trimmedPropKey = propKey.trim();
+                if (trimmedPropKey in itemObj) {
+                  const value = itemObj[trimmedPropKey];
+                  return value != null ? this.escapeHtml(String(value)) : '';
+                }
+                return propMatch;
+              }
+            );
+          }
+
+          return itemContent;
+        })
+        .join('');
     });
-    
+
     return result;
   }
 
@@ -208,10 +217,10 @@ export class TemplateRenderer {
       '<': '&lt;',
       '>': '&gt;',
       '"': '&quot;',
-      "'": '&#39;'
+      "'": '&#39;',
     };
-    
-    return text.replace(/[&<>"']/g, (char) => htmlEscapes[char] || char);
+
+    return text.replace(/[&<>"']/g, char => htmlEscapes[char] || char);
   }
 
   /**
@@ -233,6 +242,6 @@ export function createTemplateData(
   return {
     pageTitle,
     content,
-    ...options
+    ...options,
   };
 }

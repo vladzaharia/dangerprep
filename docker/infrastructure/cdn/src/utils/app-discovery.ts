@@ -130,7 +130,7 @@ export class AppDiscoveryService {
             name: name || '',
             status: status || '',
             ports: ports ? ports.split(',') : [],
-            labels
+            labels,
           };
         });
     } catch (error) {
@@ -175,7 +175,7 @@ export class AppDiscoveryService {
       icon,
       url,
       category,
-      status
+      status,
     };
 
     if (labels['app.version']) {
@@ -196,7 +196,7 @@ export class AppDiscoveryService {
         icon: 'rocket',
         url: 'https://cdn.danger',
         category: 'Infrastructure',
-        status: 'healthy'
+        status: 'healthy',
       },
       {
         name: 'Certificate Authority',
@@ -204,7 +204,7 @@ export class AppDiscoveryService {
         icon: 'shield-check',
         url: 'https://ca.danger',
         category: 'Security',
-        status: 'healthy'
+        status: 'healthy',
       },
       {
         name: 'Media Server',
@@ -212,7 +212,7 @@ export class AppDiscoveryService {
         icon: 'play-circle',
         url: 'https://media.danger',
         category: 'Media',
-        status: 'healthy'
+        status: 'healthy',
       },
       {
         name: 'Knowledge Base',
@@ -220,7 +220,7 @@ export class AppDiscoveryService {
         icon: 'book',
         url: 'https://kiwix.danger',
         category: 'Content',
-        status: 'healthy'
+        status: 'healthy',
       },
       {
         name: 'Comics & Books',
@@ -228,7 +228,7 @@ export class AppDiscoveryService {
         icon: 'book-open',
         url: 'https://komga.danger',
         category: 'Content',
-        status: 'healthy'
+        status: 'healthy',
       },
       {
         name: 'Game Library',
@@ -236,7 +236,7 @@ export class AppDiscoveryService {
         icon: 'gamepad',
         url: 'https://romm.danger',
         category: 'Games',
-        status: 'healthy'
+        status: 'healthy',
       },
       {
         name: 'DNS Manager',
@@ -244,7 +244,7 @@ export class AppDiscoveryService {
         icon: 'globe',
         url: 'https://dns.danger',
         category: 'Infrastructure',
-        status: 'healthy'
+        status: 'healthy',
       },
       {
         name: 'Documentation',
@@ -252,7 +252,7 @@ export class AppDiscoveryService {
         icon: 'file-text',
         url: 'https://docs.danger',
         category: 'Documentation',
-        status: 'healthy'
+        status: 'healthy',
       },
       {
         name: 'Development',
@@ -260,8 +260,8 @@ export class AppDiscoveryService {
         icon: 'code-branch',
         url: 'https://dev.danger',
         category: 'Development',
-        status: 'healthy'
-      }
+        status: 'healthy',
+      },
     ];
   }
 
@@ -270,7 +270,7 @@ export class AppDiscoveryService {
    */
   registerApp(app: AppMetadata): void {
     const existingIndex = this.apps.findIndex(existing => existing.name === app.name);
-    
+
     if (existingIndex >= 0) {
       this.apps[existingIndex] = app;
     } else {
