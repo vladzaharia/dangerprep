@@ -1019,16 +1019,23 @@ import_github_ssh_keys() {
             # Additional validation: check key length
             local key_parts
             read -ra key_parts <<< "$ssh_key"
-            local key_type="${key_parts[0]}"
-            local key_data="${key_parts[1]}"
 
-            # Validate key data length (basic check)
-            if [[ ${#key_data} -gt 50 ]]; then
-                echo "$ssh_key" >> "$temp_auth_keys"
-                ((key_count++))
-                log_debug "Added $key_type SSH key: ${ssh_key:0:60}..."
+            # Check if we have at least 2 parts (key type and key data)
+            if [[ ${#key_parts[@]} -ge 2 ]]; then
+                local key_type="${key_parts[0]}"
+                local key_data="${key_parts[1]}"
+
+                # Validate key data length (basic check)
+                if [[ ${#key_data} -gt 50 ]]; then
+                    echo "$ssh_key" >> "$temp_auth_keys"
+                    ((key_count++))
+                    log_debug "Added $key_type SSH key: ${ssh_key:0:60}..."
+                else
+                    log_warn "Skipped short SSH key: ${ssh_key:0:50}..."
+                    ((skipped_count++))
+                fi
             else
-                log_warn "Skipped short SSH key: ${ssh_key:0:50}..."
+                log_warn "Skipped malformed SSH key (insufficient parts): ${ssh_key:0:50}..."
                 ((skipped_count++))
             fi
         else
