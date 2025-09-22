@@ -8604,7 +8604,7 @@ main() {
         "setup_tailscale:Setting up Tailscale"
         "configure_nfs_client:Configuring NFS client"
         "setup_encrypted_backups:Setting up encrypted backups"
-        "setup_encryption_system:Setting up hardware encryption system"
+        # "setup_encryption_system:Setting up hardware encryption system"
         "configure_user_accounts:Configuring user accounts"
         "configure_screen_lock:Configuring screen lock settings"
         "setup_kiosk_mode:Setting up kiosk mode and VNC access"
