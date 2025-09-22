@@ -1,0 +1,8 @@
+dist
+build
+node_modules
+.yarn
+*.log
+.env*
+coverage
+public/env-config.js

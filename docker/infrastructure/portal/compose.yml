@@ -1,0 +1,57 @@
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - compose.env
+    environment:
+      # Runtime environment variables for the React app
+      - VITE_WIFI_SSID=${WIFI_SSID}
+      - VITE_WIFI_PASSWORD=${WIFI_PASSWORD}
+      - VITE_JELLYFIN_URL=${JELLYFIN_URL}
+      - VITE_KIWIX_URL=${KIWIX_URL}
+      - VITE_ROMM_URL=${ROMM_URL}
+    labels:
+      - "traefik.enable=true"
+
+      # Portal - Internal (.danger domain with step-ca)
+      - "traefik.http.routers.portal-internal.rule=Host(`portal.danger`)"
+      - "traefik.http.routers.portal-internal.entrypoints=websecure"
+      - "traefik.http.routers.portal-internal.tls.certresolver=step-ca"
+      - "traefik.http.routers.portal-internal.service=portal"
+
+      # Portal - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.portal-external.rule=Host(`portal.danger.diy`)"
+      - "traefik.http.routers.portal-external.entrypoints=websecure"
+      - "traefik.http.routers.portal-external.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.portal-external.service=portal"
+
+      # Service definition (shared by both routers)
+      - "traefik.http.services.portal.loadbalancer.server.port=3000"
+
+      # DNS registration
+      - "dns.register=portal"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  traefik:
+    external: true
+    name: traefik

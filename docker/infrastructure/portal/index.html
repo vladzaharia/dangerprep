@@ -1,0 +1,47 @@
+<!doctype html>
+<html class="wa-theme-tailspin wa-palette-vogue wa-brand-blue wa-neutral-gray wa-success-green wa-warning-yellow wa-danger-red wa-dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="DangerPrep Portal - Your portable hotspot services" />
+    <meta name="theme-color" content="#1a1a1a" />
+    
+  <link rel="stylesheet" href="https://early.webawesome.com/webawesome@3.0.0-beta.6/dist/styles/webawesome.css">
+  <link rel="stylesheet" href="https://early.webawesome.com/webawesome@3.0.0-beta.6/dist/styles/themes/tailspin.css">
+  <link rel="stylesheet" href="https://early.webawesome.com/webawesome@3.0.0-beta.6/dist/styles/color/palettes/vogue.css">
+    <style>
+  @import url('https://fonts.bunny.net/css2?family=Aleo:ital,wght@0,100..900;1,100..900&family=Geist+Mono:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+      :root {
+        --wa-border-radius-scale: 1;
+        --wa-border-width-scale: 1;
+        --wa-space-scale: 0.875;
+      }
+    </style>
+  <script type="module" src="https://early.webawesome.com/webawesome@3.0.0-beta.6/dist/webawesome.loader.js"></script>
+  <script type="module" data-fa-kit-code="">
+    import { setDefaultIconFamily } from 'https://early.webawesome.com/webawesome@3.0.0-beta.6/dist/webawesome.js';
+    setDefaultIconFamily('duotone');
+  </script>
+    
+    <!-- Force dark mode -->
+    <script>
+      // Ensure dark mode is always enabled
+      document.documentElement.classList.add('wa-dark');
+
+      // Prevent light mode from being enabled
+      const observer = new MutationObserver(() => {
+        if (!document.documentElement.classList.contains('wa-dark')) {
+          document.documentElement.classList.add('wa-dark');
+        }
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    </script>
+
+    <title>DangerPrep Portal</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
