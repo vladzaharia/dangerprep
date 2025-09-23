@@ -4726,6 +4726,264 @@ EOF
     fi
 }
 
+# Detect available NVMe partitions for mounting to /content
+detect_nvme_partition() {
+    log_info "Detecting NVMe partitions for /content mounting..."
+
+    # Initialize variables
+    local nvme_device=""
+    local nvme_partition=""
+    local partition_size=""
+    local filesystem_type=""
+
+    # Check if NVMe devices exist
+    if [[ ! -d /sys/class/nvme ]]; then
+        log_info "No NVMe devices detected on this system"
+        return 1
+    fi
+
+    # Find NVMe devices
+    local nvme_devices=()
+    while IFS= read -r device; do
+        if [[ -n "$device" ]]; then
+            nvme_devices+=("$device")
+        fi
+    done < <(ls /dev/nvme*n* 2>/dev/null | grep -E 'nvme[0-9]+n[0-9]+$' || true)
+
+    if [[ ${#nvme_devices[@]} -eq 0 ]]; then
+        log_info "No NVMe block devices found"
+        return 1
+    fi
+
+    log_info "Found ${#nvme_devices[@]} NVMe device(s): ${nvme_devices[*]}"
+
+    # Look for the largest available partition on any NVMe device
+    local best_partition=""
+    local best_size=0
+    local best_device=""
+
+    for device in "${nvme_devices[@]}"; do
+        log_debug "Examining NVMe device: $device"
+
+        # Check if device exists and is readable
+        if [[ ! -b "$device" ]]; then
+            log_debug "Device $device is not a block device, skipping"
+            continue
+        fi
+
+        # Get device size
+        local device_size
+        if device_size=$(blockdev --getsize64 "$device" 2>/dev/null); then
+            local device_size_gb=$((device_size / 1024 / 1024 / 1024))
+            log_debug "Device $device size: ${device_size_gb}GB"
+        else
+            log_debug "Could not determine size of $device, skipping"
+            continue
+        fi
+
+        # Look for partitions on this device
+        local partitions=()
+        while IFS= read -r partition; do
+            if [[ -n "$partition" ]]; then
+                partitions+=("$partition")
+            fi
+        done < <(ls "${device}"p* 2>/dev/null || true)
+
+        if [[ ${#partitions[@]} -eq 0 ]]; then
+            log_debug "No partitions found on $device"
+            # Consider using the whole device if it's not mounted and large enough
+            if ! mountpoint -q "$device" 2>/dev/null && [[ $device_size_gb -gt 10 ]]; then
+                log_debug "Considering whole device $device for /content"
+                if [[ $device_size -gt $best_size ]]; then
+                    best_partition="$device"
+                    best_size=$device_size
+                    best_device="$device"
+                fi
+            fi
+            continue
+        fi
+
+        # Examine each partition
+        for partition in "${partitions[@]}"; do
+            log_debug "Examining partition: $partition"
+
+            # Skip if partition is already mounted
+            if mountpoint -q "$partition" 2>/dev/null; then
+                log_debug "Partition $partition is already mounted, skipping"
+                continue
+            fi
+
+            # Get partition size
+            local part_size
+            if part_size=$(blockdev --getsize64 "$partition" 2>/dev/null); then
+                local part_size_gb=$((part_size / 1024 / 1024 / 1024))
+                log_debug "Partition $partition size: ${part_size_gb}GB"
+
+                # Consider partitions larger than 10GB
+                if [[ $part_size_gb -gt 10 ]] && [[ $part_size -gt $best_size ]]; then
+                    best_partition="$partition"
+                    best_size=$part_size
+                    best_device="$device"
+                fi
+            else
+                log_debug "Could not determine size of partition $partition"
+            fi
+        done
+    done
+
+    if [[ -z "$best_partition" ]]; then
+        log_info "No suitable NVMe partition found for /content mounting"
+        log_info "Requirements: >10GB, not currently mounted"
+        return 1
+    fi
+
+    # Export the best partition found
+    export NVME_CONTENT_PARTITION="$best_partition"
+    export NVME_CONTENT_DEVICE="$best_device"
+    export NVME_CONTENT_SIZE="$best_size"
+
+    local size_gb=$((best_size / 1024 / 1024 / 1024))
+    log_success "Selected NVMe partition for /content: $best_partition (${size_gb}GB)"
+
+    # Detect filesystem type
+    if filesystem_type=$(blkid -o value -s TYPE "$best_partition" 2>/dev/null); then
+        export NVME_CONTENT_FSTYPE="$filesystem_type"
+        log_info "Detected filesystem: $filesystem_type"
+    else
+        log_info "No filesystem detected on $best_partition - will need formatting"
+        export NVME_CONTENT_FSTYPE=""
+    fi
+
+    return 0
+}
+
+# Mount detected NVMe partition to /content with proper error handling and fstab integration
+mount_nvme_to_content() {
+    enhanced_section "NVMe Storage Setup" "Mounting NVMe partition to /content" "💾"
+
+    # Check if NVMe partition was detected
+    if [[ -z "${NVME_CONTENT_PARTITION:-}" ]]; then
+        log_info "No NVMe partition detected, running detection..."
+        if ! detect_nvme_partition; then
+            enhanced_status_indicator "info" "No suitable NVMe partition found - using fallback storage"
+            return 0
+        fi
+    fi
+
+    local partition="${NVME_CONTENT_PARTITION}"
+    local filesystem="${NVME_CONTENT_FSTYPE:-}"
+    local size_gb=$((NVME_CONTENT_SIZE / 1024 / 1024 / 1024))
+
+    log_info "Setting up NVMe partition: $partition (${size_gb}GB)"
+
+    # Create /content mount point
+    if ! standard_create_directory "/content" "755" "root" "root"; then
+        log_error "Failed to create /content directory"
+        return 1
+    fi
+
+    # Check if partition is already mounted to /content
+    if mountpoint -q /content 2>/dev/null; then
+        local current_device
+        current_device=$(findmnt -n -o SOURCE /content 2>/dev/null || echo "unknown")
+        if [[ "$current_device" == "$partition" ]]; then
+            enhanced_status_indicator "success" "/content already mounted from $partition"
+            return 0
+        else
+            log_warn "/content is mounted from different device: $current_device"
+            log_info "Unmounting /content to remount from NVMe partition"
+            if ! umount /content 2>/dev/null; then
+                log_error "Failed to unmount /content"
+                return 1
+            fi
+        fi
+    fi
+
+    # Format partition if no filesystem detected
+    if [[ -z "$filesystem" ]]; then
+        log_info "No filesystem detected on $partition, formatting as ext4..."
+
+        # Use enhanced_spin for the formatting operation
+        if enhanced_spin "Formatting $partition as ext4" \
+            mkfs.ext4 -F -L "content" "$partition"; then
+            enhanced_status_indicator "success" "Formatted $partition as ext4"
+            filesystem="ext4"
+            export NVME_CONTENT_FSTYPE="ext4"
+        else
+            enhanced_status_indicator "failure" "Failed to format $partition"
+            return 1
+        fi
+    else
+        log_info "Using existing $filesystem filesystem on $partition"
+    fi
+
+    # Backup fstab before making changes
+    cp /etc/fstab "/etc/fstab.backup-nvme-$(date +%Y%m%d-%H%M%S)"
+
+    # Remove any existing /content entries from fstab
+    if grep -q "/content" /etc/fstab 2>/dev/null; then
+        log_info "Removing existing /content entries from fstab"
+        sed -i '\|/content|d' /etc/fstab
+    fi
+
+    # Get UUID of the partition for stable mounting
+    local partition_uuid
+    if partition_uuid=$(blkid -o value -s UUID "$partition" 2>/dev/null); then
+        log_info "Using UUID for stable mounting: $partition_uuid"
+        local fstab_device="UUID=$partition_uuid"
+    else
+        log_warn "Could not get UUID, using device path (less stable)"
+        local fstab_device="$partition"
+    fi
+
+    # Add new fstab entry for /content
+    local fstab_entry="$fstab_device /content $filesystem defaults,nofail 0 2"
+    echo "$fstab_entry" >> /etc/fstab
+    log_info "Added to fstab: $fstab_entry"
+
+    # Test mount the partition
+    log_info "Mounting $partition to /content..."
+    if mount "$partition" /content 2>/dev/null; then
+        enhanced_status_indicator "success" "Successfully mounted $partition to /content"
+
+        # Test if mount is working properly
+        if touch /content/.mount-test 2>/dev/null && rm /content/.mount-test 2>/dev/null; then
+            enhanced_status_indicator "success" "Mount verified as writable"
+        else
+            enhanced_status_indicator "warning" "Mount appears to be read-only"
+        fi
+
+        # Set proper ownership for content directories
+        chown root:root /content
+        chmod 755 /content
+
+        # Show mount information
+        local mount_info
+        mount_info=$(findmnt -n -o SOURCE,FSTYPE,SIZE,USED,AVAIL,USE% /content 2>/dev/null || echo "Mount info unavailable")
+        log_info "Mount details: $mount_info"
+
+    else
+        enhanced_status_indicator "failure" "Failed to mount $partition to /content"
+        log_error "Mount command failed, removing fstab entry"
+        sed -i '\|/content|d' /etc/fstab
+        return 1
+    fi
+
+    # Verify fstab syntax
+    if mount -a --fake 2>/dev/null; then
+        enhanced_status_indicator "success" "fstab syntax verified"
+    else
+        log_error "fstab syntax error detected, restoring backup"
+        cp "/etc/fstab.backup-nvme-$(date +%Y%m%d-%H%M%S)" /etc/fstab
+        return 1
+    fi
+
+    enhanced_status_indicator "success" "NVMe partition successfully mounted to /content"
+    log_info "Available space: $(df -h /content | tail -1 | awk '{print $4}')"
+
+    return 0
+}
+
 # Setup automatic updates
 setup_automatic_updates() {
     log_info "Setting up automatic updates..."
@@ -5848,7 +6106,7 @@ setup_container_health_monitoring() {
     log_success "Container health monitoring configured"
 }
 
-# Enhanced network interface detection and enumeration (RaspAP handles management)
+# Enhanced network interface detection and enumeration
 detect_network_interfaces() {
     log_info "Detecting and enumerating network interfaces..."
 
@@ -5873,7 +6131,7 @@ detect_network_interfaces() {
     log_debug "Detected ethernet interfaces: ${ethernet_interfaces[*]:-none}"
     log_debug "Detected WiFi interfaces: ${wifi_interfaces[*]:-none}"
 
-    # Automatic interface selection (RaspAP will handle the actual management)
+    # Automatic interface selection
     # FriendlyElec-specific interface selection
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
         select_friendlyelec_interfaces "${ethernet_interfaces[@]}" -- "${wifi_interfaces[@]}"
@@ -5899,15 +6157,13 @@ detect_network_interfaces() {
 
     log_info "Primary WAN Interface: $WAN_INTERFACE"
     log_info "Primary WiFi Interface: $WIFI_INTERFACE"
-    log_info "Note: RaspAP will manage all network interface configuration"
-
     # Log additional interface information for FriendlyElec
     if [[ "$IS_FRIENDLYELEC" == true ]]; then
         log_friendlyelec_interface_details
     fi
 
     # Show interface summary
-    enhanced_section "Network Interfaces" "Detected interfaces for RaspAP configuration" "🌐"
+    enhanced_section "Network Interfaces" "Detected network interfaces" "🌐"
 
     enhanced_status_indicator "info" "Ethernet interfaces: ${#ethernet_interfaces[@]} (${ethernet_interfaces[*]:-none})"
     enhanced_status_indicator "info" "WiFi interfaces: ${#wifi_interfaces[@]} (${wifi_interfaces[*]:-none})"
@@ -5916,12 +6172,12 @@ detect_network_interfaces() {
 
     enhanced_status_indicator "info" "All detected interfaces will be available for configuration."
 
-    # Export for use in templates and RaspAP configuration
+    # Export for use in templates and configuration
     export WAN_INTERFACE WIFI_INTERFACE
     export ETHERNET_INTERFACES="${ethernet_interfaces[*]}"
     export WIFI_INTERFACES="${wifi_interfaces[*]}"
 
-    log_success "Network interfaces enumerated (RaspAP will handle configuration)"
+    log_success "Network interfaces enumerated successfully"
 }
 
 # Load and export environment variables from a file, respecting script-defined variables
@@ -5993,7 +6249,6 @@ enumerate_docker_services() {
         "wishlist:SSH directory and frontdoor"
         "watchtower:Automatic container updates"
         "step-ca:Internal certificate authority"
-        "raspap:Network management interface"
         "komodo:Docker management platform"
         "cdn:Local content delivery network"
         "dns:DNS server (CoreDNS)"
@@ -6624,85 +6879,7 @@ EOF
 # These functions have been removed to avoid conflicts with RaspAP's networking management
 
 
-# Setup RaspAP for WiFi management and networking
-setup_raspap() {
-    log_info "Setting up RaspAP for WiFi management..."
-
-    # Verify environment file exists (should have been created by Docker environment configuration)
-    local raspap_env="$PROJECT_ROOT/docker/infrastructure/raspap/compose.env"
-    if [[ ! -f "$raspap_env" ]]; then
-        log_warn "RaspAP environment file not found, creating from example..."
-        cp "$PROJECT_ROOT/docker/infrastructure/raspap/compose.env.example" "$raspap_env"
-    fi
-
-    # Load environment variables from compose.env file for Docker build
-    if [[ -f "$raspap_env" ]]; then
-        load_and_export_env_file "$raspap_env"
-    fi
-
-    # Verify GitHub credentials are available for Docker build
-    if [[ -z "${GITHUB_USERNAME:-}" ]] || [[ -z "${GITHUB_TOKEN:-}" ]]; then
-        log_warn "GitHub credentials not found in environment"
-        log_warn "RaspAP Insiders features may not be available"
-        log_info "You can set these later by editing $raspap_env and rebuilding"
-    else
-        log_info "GitHub credentials found - RaspAP Insiders features will be available"
-    fi
-
-    # Note: RaspAP container deployment is handled manually by the user
-    # This function only handles host-level configuration
-
-    # Apply firewall rules on the host (required for RaspAP WiFi routing)
-    log_info "Applying firewall rules for WiFi routing..."
-    local firewall_script="$PROJECT_ROOT/docker/infrastructure/raspap/firewall-rules.sh"
-    if [[ -f "$firewall_script" ]]; then
-        if bash "$firewall_script"; then
-            log_success "Firewall rules applied successfully"
-        else
-            log_warn "Failed to apply firewall rules - WiFi routing may not work properly"
-            log_warn "You can apply them manually later: sudo bash $firewall_script"
-        fi
-    else
-        log_warn "Firewall rules script not found at $firewall_script"
-    fi
-
-    # Wait for RaspAP container to be fully started before configuring DNS
-    if [[ -f "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh" ]]; then
-        log_info "Waiting for RaspAP container to be ready..."
-
-        # Wait up to 60 seconds for RaspAP container to be running and healthy
-        local wait_count=0
-        local max_wait=60
-        while [[ $wait_count -lt $max_wait ]]; do
-            if docker ps --format "{{.Names}}" | grep -q "^raspap$" && \
-               docker exec raspap test -f /var/run/lighttpd.pid 2>/dev/null; then
-                log_info "RaspAP container is ready"
-                break
-            fi
-            sleep 1
-            ((wait_count++))
-        done
-
-        if [[ $wait_count -ge $max_wait ]]; then
-            log_warn "RaspAP container not ready after ${max_wait}s, skipping DNS configuration"
-            log_warn "You can configure DNS manually later using: $PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh"
-            log_warn "DHCP configuration is handled automatically during container startup"
-        else
-            log_info "Configuring DNS forwarding for DangerPrep integration..."
-            if "$PROJECT_ROOT/docker/infrastructure/raspap/configure-dns.sh"; then
-                log_success "RaspAP DNS configuration completed"
-            else
-                log_warn "RaspAP DNS configuration failed, can be configured manually later"
-            fi
-            log_info "DHCP configuration applied automatically during container startup"
-        fi
-    fi
-
-    log_success "RaspAP configured for WiFi management"
-}
-
-# Note: WiFi routing and firewall rules are handled by RaspAP
-# This function has been removed to avoid conflicts with RaspAP's networking management
+# Note: RaspAP setup removed - network management will be handled differently
 
 # Configure user accounts (replace default pi user with custom user)
 configure_user_accounts() {
@@ -7811,9 +7988,8 @@ setup_tailscale() {
         enhanced_status_indicator "warning" "Failed to start Tailscale service"
     fi
 
-    # Note: Tailscale firewall rules should be configured in RaspAP
-    # RaspAP manages iptables, so Tailscale rules need to be added through RaspAP interface
-    log_info "Configure Tailscale firewall rules in RaspAP:"
+    # Note: Tailscale firewall rules may need manual configuration
+    log_info "Configure Tailscale firewall rules if needed:"
     log_info "  - Allow UDP port 41641 (Tailscale)"
     log_info "  - Allow traffic on tailscale0 interface"
 
@@ -8109,13 +8285,7 @@ verify_setup() {
         failed_services+=("wishlist")
     fi
 
-    # Check if RaspAP container is running
-    if docker ps --format "{{.Names}}" | grep -q "^raspap$"; then
-        log_success "RaspAP container is running"
-    else
-        log_warn "RaspAP container is not running"
-        failed_services+=("raspap")
-    fi
+    # Note: RaspAP health check removed
 
     for service in "${critical_services[@]}"; do
         if ! systemctl is-active "$service" >/dev/null 2>&1; then
@@ -8272,6 +8442,7 @@ main() {
         "load_motd_config:Loading MOTD configuration"
         "configure_kernel_hardening:Configuring kernel hardening"
         "setup_hardware_monitoring:Setting up hardware monitoring"
+        "mount_nvme_to_content:Setting up NVMe storage"
         "setup_advanced_security_tools:Setting up advanced security tools"
         "setup_wishlist_ssh_frontdoor:Setting up Wishlist SSH frontdoor"
         "configure_rootless_docker:Configuring rootless Docker"
@@ -8279,7 +8450,6 @@ main() {
         "setup_docker_services:Setting up Docker services"
         "setup_container_health_monitoring:Setting up container health monitoring"
         "detect_network_interfaces:Detecting network interfaces"
-        "setup_raspap:Setting up RaspAP"
         "configure_rk3588_performance:Applying hardware optimizations"
         "generate_sync_configs:Generating sync configurations"
         "setup_tailscale:Setting up Tailscale"
@@ -8457,7 +8627,7 @@ cleanup_on_error() {
             if [[ -d "$BACKUP_DIR" ]]; then
                 [[ -f "$BACKUP_DIR/sshd_config" ]] && cp "$BACKUP_DIR/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
                 [[ -f "$BACKUP_DIR/sysctl.conf" ]] && cp "$BACKUP_DIR/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
-                # Note: hostapd and dnsmasq configs are managed by RaspAP
+                # Note: hostapd and dnsmasq configs not managed by this script
             fi
         }
 
@@ -8473,7 +8643,7 @@ cleanup_on_error() {
         if [[ -d "$BACKUP_DIR" ]]; then
             [[ -f "$BACKUP_DIR/sshd_config" ]] && cp "$BACKUP_DIR/sshd_config" /etc/ssh/sshd_config 2>/dev/null || true
             [[ -f "$BACKUP_DIR/sysctl.conf" ]] && cp "$BACKUP_DIR/sysctl.conf" /etc/sysctl.conf 2>/dev/null || true
-            # Note: hostapd and dnsmasq configs are managed by RaspAP
+            # Note: hostapd and dnsmasq configs not managed by this script
         fi
     fi
 
