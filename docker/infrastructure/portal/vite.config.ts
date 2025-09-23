@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { apiPlugin } from './src/server/vite-plugin-api'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -9,6 +10,8 @@ export default defineConfig({
       // Enable React 19 features
       jsxRuntime: 'automatic',
     }),
+    // Add API middleware for development
+    apiPlugin(),
   ],
   resolve: {
     alias: {

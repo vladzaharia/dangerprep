@@ -8,8 +8,11 @@ import { QRCodePage, ServicesPage, MaintenanceServicesPage, PowerPage } from './
 export interface Service {
   name: string;
   icon: string;
-  url: string;
+  url?: string;
   description: string;
+  type?: 'public' | 'private' | 'maintenance';
+  status?: 'healthy' | 'warning' | 'error';
+  version?: string;
 }
 
 const App: React.FC = () => {

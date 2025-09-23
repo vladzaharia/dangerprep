@@ -4,6 +4,8 @@ services:
       context: ../../..
       dockerfile: docker/infrastructure/portal/Dockerfile
     restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     env_file:
       - compose.env
     environment:
@@ -23,6 +25,7 @@ services:
       - VITE_DOCMOST_SUBDOMAIN=${DOCMOST_SUBDOMAIN}
       - VITE_ONEDEV_SUBDOMAIN=${ONEDEV_SUBDOMAIN}
       - VITE_TRAEFIK_SUBDOMAIN=${TRAEFIK_SUBDOMAIN}
+      - VITE_KOMODO_SUBDOMAIN=${KOMODO_SUBDOMAIN}
       - VITE_PORTAINER_SUBDOMAIN=${PORTAINER_SUBDOMAIN}
     labels:
       - "traefik.enable=true"

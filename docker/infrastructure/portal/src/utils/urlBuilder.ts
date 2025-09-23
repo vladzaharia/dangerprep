@@ -48,12 +48,12 @@ export function getMaintenanceServiceUrls() {
   const docmostSubdomain = import.meta.env.VITE_DOCMOST_SUBDOMAIN || 'docmost';
   const onedevSubdomain = import.meta.env.VITE_ONEDEV_SUBDOMAIN || 'onedev';
   const traefikSubdomain = import.meta.env.VITE_TRAEFIK_SUBDOMAIN || 'traefik';
-  const portainerSubdomain = import.meta.env.VITE_PORTAINER_SUBDOMAIN || 'portainer';
+  const komodoSubdomain = import.meta.env.VITE_KOMODO_SUBDOMAIN || 'komodo';
 
   return {
     docmost: buildServiceUrl(baseDomain, docmostSubdomain),
     onedev: buildServiceUrl(baseDomain, onedevSubdomain),
     traefik: buildServiceUrl(baseDomain, traefikSubdomain),
-    portainer: buildServiceUrl(baseDomain, portainerSubdomain),
+    komodo: buildServiceUrl(baseDomain, komodoSubdomain),
   };
 }

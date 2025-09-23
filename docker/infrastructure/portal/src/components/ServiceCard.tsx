@@ -1,30 +1,19 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import * as solidIcons from '@fortawesome/free-solid-svg-icons';
 
 import type { Service } from '../App';
+import { getIcon } from '../utils/iconCache';
 
 interface ServiceCardProps {
   service: Service;
 }
 
 export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
-  // Map icon names to FontAwesome icons
-  const getIcon = (iconName: string) => {
-    const iconMap: Record<string, any> = {
-      'film': solidIcons.faFilm,
-      'book': solidIcons.faBook,
-      'gamepad': solidIcons.faGamepad,
-      'file-text': solidIcons.faFileAlt,
-      'git-branch': solidIcons.faCodeBranch,
-      'activity': solidIcons.faChartLine,
-      'box': solidIcons.faBox,
-    };
-    return iconMap[iconName] || solidIcons.faQuestionCircle;
-  };
 
   const handleClick = () => {
-    window.open(service.url, '_blank', 'noopener,noreferrer');
+    if (service.url) {
+      window.open(service.url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
@@ -34,15 +23,18 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
     }
   };
 
+  // Don't make card clickable if there's no URL
+  const isClickable = Boolean(service.url);
+
   return (
     <wa-card appearance='outlined'>
       <div
-        className="wa-stack service-card service-card--clickable"
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        role="button"
-        tabIndex={0}
-        aria-label={`Open ${service.name} - ${service.description}`}
+        className={`wa-stack service-card ${isClickable ? 'service-card--clickable' : ''}`}
+        onClick={isClickable ? handleClick : undefined}
+        onKeyDown={isClickable ? handleKeyDown : undefined}
+        role={isClickable ? "button" : undefined}
+        tabIndex={isClickable ? 0 : undefined}
+        aria-label={isClickable ? `Open ${service.name} - ${service.description}` : `${service.name} - ${service.description}`}
       >
         <div className='service-card-header'>
           <div className='service-icon'>
@@ -58,19 +50,21 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
           </div>
         </div>
 
-        {/* Service URL at the bottom */}
-        <div className='service-card-footer'>
-          <div className='service-url-display'>
-            <div className='service-url service-url--split'>
-              <span className='service-url-text'>{service.url}</span>
-              <FontAwesomeIcon
-                icon={solidIcons.faExternalLinkAlt}
-                size="sm"
-                className='service-url-icon'
-              />
+        {/* Service URL at the bottom - only show if URL exists */}
+        {service.url && (
+          <div className='service-card-footer'>
+            <div className='service-url-display'>
+              <div className='service-url service-url--split'>
+                <span className='service-url-text'>{service.url}</span>
+                <FontAwesomeIcon
+                  icon={getIcon('external-link')}
+                  size="sm"
+                  className='service-url-icon'
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </wa-card>
   );

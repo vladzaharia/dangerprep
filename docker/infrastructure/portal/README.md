@@ -33,7 +33,7 @@ The portal uses dynamic URL construction based on a base domain and service subd
 - `DOCMOST_SUBDOMAIN`: Docmost documentation subdomain (default: `docmost`)
 - `ONEDEV_SUBDOMAIN`: OneDev git management subdomain (default: `onedev`)
 - `TRAEFIK_SUBDOMAIN`: Traefik dashboard subdomain (default: `traefik`)
-- `PORTAINER_SUBDOMAIN`: Portainer container management subdomain (default: `portainer`)
+- `KOMODO_SUBDOMAIN`: Komodo container management subdomain (default: `docker`)
 
 ### Example Configuration
 ```bash

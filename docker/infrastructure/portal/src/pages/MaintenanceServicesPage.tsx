@@ -1,47 +1,37 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 
-import type { Service } from '../App';
 import { ServiceGrid } from '../components/ServiceGrid';
-import { getMaintenanceServiceUrls } from '../utils/urlBuilder';
+import { useServicesWithFallback } from '../hooks/useServiceDiscovery';
 
 export const MaintenanceServicesPage: React.FC = () => {
+  const { services, loading, error } = useServicesWithFallback('maintenance');
 
-  // Maintenance services configuration with dynamic URL construction
-  const maintenanceServices: Service[] = useMemo(() => {
-    const serviceUrls = getMaintenanceServiceUrls();
+  if (loading) {
+    return (
+      <div className="wa-stack wa-gap-xl">
+        <h2>Maintenance Services</h2>
+        <p>Loading services...</p>
+      </div>
+    );
+  }
 
-    return [
-      {
-        name: 'Docmost',
-        icon: 'file-text',
-        url: serviceUrls.docmost,
-        description: 'Documentation and knowledge management',
-      },
-      {
-        name: 'OneDev',
-        icon: 'git-branch',
-        url: serviceUrls.onedev,
-        description: 'Git repository management and CI/CD',
-      },
-      {
-        name: 'Traefik Dashboard',
-        icon: 'activity',
-        url: serviceUrls.traefik,
-        description: 'Reverse proxy and load balancer dashboard',
-      },
-      {
-        name: 'Portainer',
-        icon: 'box',
-        url: serviceUrls.portainer,
-        description: 'Docker container management',
-      },
-    ];
-  }, []);
+  if (error) {
+    return (
+      <div className="wa-stack wa-gap-xl">
+        <h2>Maintenance Services</h2>
+        <wa-callout variant="danger">
+          <wa-icon name="exclamation-triangle" slot="icon"></wa-icon>
+          <strong>Error loading services:</strong> {error}
+        </wa-callout>
+        <ServiceGrid services={services} />
+      </div>
+    );
+  }
 
   return (
     <div className="wa-stack wa-gap-xl">
       <h2>Maintenance Services</h2>
-      <ServiceGrid services={maintenanceServices} />
+      <ServiceGrid services={services} />
     </div>
   );
 };

@@ -9,7 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_DOCMOST_URL: string;
   readonly VITE_ONEDEV_URL: string;
   readonly VITE_TRAEFIK_URL: string;
-  readonly VITE_PORTAINER_URL: string;
+  readonly VITE_KOMODO_URL: string;
 }
 
 interface ImportMeta {
