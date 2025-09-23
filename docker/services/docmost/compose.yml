@@ -39,6 +39,12 @@ services:
       # DNS registration
       - "dns.register=docs"
 
+      # Service discovery
+      - "service.type=private"
+      - "service.name=Documentation"
+      - "service.description=Team documentation and knowledge base"
+      - "service.icon=file-text"
+
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
     networks:

@@ -8,6 +8,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     env_file:
       - compose.env
+    ports:
+      - "3000:3000"
+    user: root
     environment:
       # Runtime environment variables for the React app
       - VITE_WIFI_SSID=${WIFI_SSID}
@@ -53,6 +56,12 @@ services:
 
       # DNS registration
       - "dns.register=portal"
+
+      # Service discovery
+      - "service.type=public"
+      - "service.name=Portal"
+      - "service.description=This portal! Come back anytime to see all the services"
+      - "service.icon=home"
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"

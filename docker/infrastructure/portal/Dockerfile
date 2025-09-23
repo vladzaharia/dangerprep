@@ -52,9 +52,11 @@ RUN apk add --no-cache \
     curl \
     bash
 
-# Create non-root user with consistent UID/GID
-RUN addgroup -g 1001 -S appuser && \
-    adduser -S appuser -u 1001 -G appuser
+# Create docker group and non-root user with consistent UID/GID
+RUN addgroup -g 999 -S docker && \
+    addgroup -g 1001 -S appuser && \
+    adduser -S appuser -u 1001 -G appuser && \
+    adduser appuser docker
 
 # Copy the entire workspace structure to maintain Yarn workspace functionality
 COPY --from=installer /app ./

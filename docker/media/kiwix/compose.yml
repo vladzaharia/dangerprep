@@ -32,6 +32,12 @@ services:
       # DNS registration
       - "dns.register=kiwix"
 
+      # Service discovery
+      - "service.type=public"
+      - "service.name=Wikipedia"
+      - "service.description=Offline Wikipedia and educational content"
+      - "service.icon=book"
+
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
     networks:

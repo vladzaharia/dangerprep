@@ -46,6 +46,12 @@ services:
       # DNS registration
       - "dns.register=dev"
 
+      # Service discovery
+      - "service.type=private"
+      - "service.name=Development"
+      - "service.description=Development server and CI/CD platform"
+      - "service.icon=code-branch"
+
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
     networks:

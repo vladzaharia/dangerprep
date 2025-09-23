@@ -1,7 +1,4 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import Docker from 'dockerode';
 
 /**
  * Service metadata for portal display
@@ -41,8 +38,11 @@ export class ServiceDiscoveryService {
   private services: ServiceMetadata[] = [];
   private lastScan = 0;
   private readonly scanInterval = 30000; // 30 seconds
+  private docker: Docker;
 
   constructor() {
+    // Initialize Docker client with socket path
+    this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
     this.scanServices();
   }
 
@@ -110,39 +110,27 @@ export class ServiceDiscoveryService {
   }
 
   /**
-   * Get Docker containers with labels
+   * Get Docker containers with labels using Docker API
    */
   private async getDockerContainers(): Promise<DockerContainer[]> {
     try {
-      const { stdout } = await execAsync(
-        'docker ps --format "{{.Names}}|{{.Status}}|{{.Ports}}|{{.Labels}}"'
-      );
+      const containers = await this.docker.listContainers();
 
-      return stdout
-        .trim()
-        .split('\n')
-        .filter(line => line.trim())
-        .map(line => {
-          const [name, status, ports, labelsStr] = line.split('|');
-          const labels: Record<string, string> = {};
+      return containers.map(container => {
+        const name = container.Names?.[0]?.replace(/^\//, '') || '';
+        const status = container.Status || '';
+        const ports = container.Ports?.map(port =>
+          port.PublicPort ? `${port.PublicPort}:${port.PrivatePort}` : `${port.PrivatePort}`
+        ) || [];
+        const labels = container.Labels || {};
 
-          // Parse labels
-          if (labelsStr) {
-            labelsStr.split(',').forEach(label => {
-              const [key, value] = label.split('=', 2);
-              if (key && value) {
-                labels[key] = value;
-              }
-            });
-          }
-
-          return {
-            name: name || '',
-            status: status || '',
-            ports: ports ? ports.split(',') : [],
-            labels,
-          };
-        });
+        return {
+          name,
+          status,
+          ports,
+          labels,
+        };
+      });
     } catch (error) {
       console.warn('Failed to get Docker containers:', error);
       return [];

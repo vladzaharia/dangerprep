@@ -1,9 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ServiceDiscoveryService = void 0;
-const child_process_1 = require("child_process");
-const util_1 = require("util");
-const execAsync = (0, util_1.promisify)(child_process_1.exec);
+const dockerode_1 = __importDefault(require("dockerode"));
 /**
  * Service discovery service for finding available DangerPrep services
  */
@@ -12,6 +13,8 @@ class ServiceDiscoveryService {
         this.services = [];
         this.lastScan = 0;
         this.scanInterval = 30000; // 30 seconds
+        // Initialize Docker client with socket path
+        this.docker = new dockerode_1.default({ socketPath: '/var/run/docker.sock' });
         this.scanServices();
     }
     /**
@@ -70,31 +73,20 @@ class ServiceDiscoveryService {
         }
     }
     /**
-     * Get Docker containers with labels
+     * Get Docker containers with labels using Docker API
      */
     async getDockerContainers() {
         try {
-            const { stdout } = await execAsync('docker ps --format "{{.Names}}|{{.Status}}|{{.Ports}}|{{.Labels}}"');
-            return stdout
-                .trim()
-                .split('\n')
-                .filter(line => line.trim())
-                .map(line => {
-                const [name, status, ports, labelsStr] = line.split('|');
-                const labels = {};
-                // Parse labels
-                if (labelsStr) {
-                    labelsStr.split(',').forEach(label => {
-                        const [key, value] = label.split('=', 2);
-                        if (key && value) {
-                            labels[key] = value;
-                        }
-                    });
-                }
+            const containers = await this.docker.listContainers();
+            return containers.map(container => {
+                const name = container.Names?.[0]?.replace(/^\//, '') || '';
+                const status = container.Status || '';
+                const ports = container.Ports?.map(port => port.PublicPort ? `${port.PublicPort}:${port.PrivatePort}` : `${port.PrivatePort}`) || [];
+                const labels = container.Labels || {};
                 return {
-                    name: name || '',
-                    status: status || '',
-                    ports: ports ? ports.split(',') : [],
+                    name,
+                    status,
+                    ports,
                     labels,
                 };
             });

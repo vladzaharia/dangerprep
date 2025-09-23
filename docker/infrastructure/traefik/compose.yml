@@ -44,6 +44,12 @@ services:
       # DNS registration
       - "dns.register=traefik"
 
+      # Service discovery
+      - "service.type=maintenance"
+      - "service.name=Traefik Dashboard"
+      - "service.description=Reverse proxy and load balancer dashboard"
+      - "service.icon=activity"
+
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
     networks:

@@ -44,6 +44,12 @@ services:
       # DNS registration
       - "dns.register=jellyfin"
 
+      # Service discovery
+      - "service.type=public"
+      - "service.name=Entertainment at Sea"
+      - "service.description=Stream movies, TV shows, and more"
+      - "service.icon=film"
+
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
     networks:

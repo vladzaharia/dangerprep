@@ -74,6 +74,12 @@ services:
       # DNS registration
       - "dns.register=docker"
 
+      # Service discovery
+      - "service.type=maintenance"
+      - "service.name=Komodo"
+      - "service.description=Docker container management"
+      - "service.icon=box"
+
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
     networks:

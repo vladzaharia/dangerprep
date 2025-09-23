@@ -29,7 +29,7 @@ export function apiPlugin(): Plugin {
     name: 'api-plugin',
     configureServer(server) {
       // Add API middleware directly to Vite's connect server
-      server.middlewares.use('/api', async (req, res, next) => {
+      server.middlewares.use('/api', async (req, res, _next) => {
         // Set CORS headers for development
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
