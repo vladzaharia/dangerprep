@@ -24,6 +24,12 @@ services:
       - "traefik.http.routers.komga-external.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.komga-external.service=komga"
 
+      # Komga - External (.argos.surf domain with Let's Encrypt)
+      - "traefik.http.routers.komga-argos.rule=Host(`komga.argos.surf`)"
+      - "traefik.http.routers.komga-argos.entrypoints=websecure"
+      - "traefik.http.routers.komga-argos.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.komga-argos.service=komga"
+
       # Service definition (shared by both routers)
       - "traefik.http.services.komga.loadbalancer.server.port=8080"
 

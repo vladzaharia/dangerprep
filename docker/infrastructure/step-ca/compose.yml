@@ -21,12 +21,6 @@ services:
       - "traefik.http.routers.step-ca-internal.tls.certresolver=step-ca"
       - "traefik.http.routers.step-ca-internal.service=step-ca"
 
-      # CA API - External (.danger.diy domain with Let's Encrypt)
-      - "traefik.http.routers.step-ca-external.rule=Host(`ca.danger.diy`)"
-      - "traefik.http.routers.step-ca-external.entrypoints=websecure"
-      - "traefik.http.routers.step-ca-external.tls.certresolver=letsencrypt-cloudflare"
-      - "traefik.http.routers.step-ca-external.service=step-ca"
-
       # Service definition (shared by both routers)
       - "traefik.http.services.step-ca.loadbalancer.server.port=9000"
       - "traefik.http.services.step-ca.loadbalancer.server.scheme=https"

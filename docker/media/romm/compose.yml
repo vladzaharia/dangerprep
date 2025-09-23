@@ -34,6 +34,12 @@ services:
       - "traefik.http.routers.romm-external.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.romm-external.service=romm"
 
+      # RomM - External (.argos.surf domain with Let's Encrypt)
+      - "traefik.http.routers.romm-argos.rule=Host(`romm.argos.surf`)"
+      - "traefik.http.routers.romm-argos.entrypoints=websecure"
+      - "traefik.http.routers.romm-argos.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.romm-argos.service=romm"
+
       # Service definition (shared by both routers)
       - "traefik.http.services.romm.loadbalancer.server.port=8080"
 
