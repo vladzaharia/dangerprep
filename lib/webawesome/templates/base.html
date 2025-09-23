@@ -70,15 +70,15 @@
         .app-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: var(--wa-space-sm);
-            padding: var(--wa-space-md);
+            gap: var(--wa-space-s);
+            padding: var(--wa-space-m);
         }
 
         .app-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: var(--wa-space-sm);
+            padding: var(--wa-space-s);
             border-radius: var(--wa-border-radius-m);
             text-decoration: none;
             color: var(--wa-color-text-normal);
@@ -201,7 +201,7 @@
         <!-- Main Content -->
         <main>
             {{#if breadcrumbs}}
-            <wa-breadcrumb style="margin-bottom: var(--wa-space-lg);">
+            <wa-breadcrumb style="margin-bottom: var(--wa-space-l);">
                 {{#each breadcrumbs}}
                 <wa-breadcrumb-item {{#if @last}}aria-current="page"{{/if}}>
                     {{#if href}}<a href="{{href}}">{{/if}}
@@ -223,7 +223,7 @@
         {{/if}}
 
         <!-- Global Footer -->
-        <footer slot="footer" class="wa-cluster wa-gap-lg" style="padding: var(--wa-space-md); background: var(--wa-color-surface-lowered); border-top: 1px solid var(--wa-color-surface-border);">
+        <footer slot="footer" class="wa-cluster wa-gap-lg" style="padding: var(--wa-space-m); background: var(--wa-color-surface-lowered); border-top: 1px solid var(--wa-color-surface-border);">
             <div class="wa-cluster wa-gap-xs">
                 <wa-icon name="shield-exclamation" class="dangerprep-logo" aria-hidden="true"></wa-icon>
                 <span class="wa-body-s dangerprep-brand">DangerPrep</span>

@@ -8,8 +8,8 @@
     text-align: center;
     margin: calc(var(--wa-space-xl) * -1) calc(var(--wa-space-xl) * -1) var(--wa-space-xl);
 ">
-    <div class="hero-title" style="font-size: var(--wa-font-size-3xl); font-weight: var(--wa-font-weight-bold); margin-bottom: var(--wa-space-md);">
-        <wa-icon name="shield-check" style="margin-right: var(--wa-space-sm);"></wa-icon>
+    <div class="hero-title" style="font-size: var(--wa-font-size-3xl); font-weight: var(--wa-font-weight-bold); margin-bottom: var(--wa-space-m);">
+        <wa-icon name="shield-check" style="margin-right: var(--wa-space-s);"></wa-icon>
         DangerPrep Certificate Authority
     </div>
     <div class="hero-subtitle" style="font-size: var(--wa-font-size-lg); opacity: 0.9;">
@@ -21,7 +21,7 @@
 <div class="quick-actions" style="
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: var(--wa-space-lg);
+    gap: var(--wa-space-l);
     margin-bottom: var(--wa-space-2xl);
 ">
     <wa-card>
@@ -81,9 +81,9 @@
 
 <!-- Certificate Authority Information -->
 <div class="ca-info-section">
-    <h2 class="wa-heading-l" style="margin-bottom: var(--wa-space-lg);">Certificate Authority Information</h2>
+    <h2 class="wa-heading-l" style="margin-bottom: var(--wa-space-l);">Certificate Authority Information</h2>
     
-    <div class="wa-grid" style="--wa-grid-columns: 1fr 1fr; gap: var(--wa-space-lg); margin-bottom: var(--wa-space-2xl);">
+    <div class="wa-grid" style="--wa-grid-columns: 1fr 1fr; gap: var(--wa-space-l); margin-bottom: var(--wa-space-2xl);">
         <wa-card>
             <div class="wa-stack wa-gap-md">
                 <h3 class="wa-heading-m">
@@ -150,7 +150,7 @@
 
 <!-- Installation Instructions -->
 <div class="installation-section">
-    <h2 class="wa-heading-l" style="margin-bottom: var(--wa-space-lg);">Installation Instructions</h2>
+    <h2 class="wa-heading-l" style="margin-bottom: var(--wa-space-l);">Installation Instructions</h2>
     
     <wa-tab-group>
         <wa-tab slot="nav" panel="manual">Manual Installation</wa-tab>
@@ -161,7 +161,7 @@
             <div class="wa-stack wa-gap-lg">
                 <wa-card>
                     <h4 class="wa-heading-s">Linux/macOS</h4>
-                    <pre class="wa-body-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-md); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code># Download and install root certificate
+                    <pre class="wa-body-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-m); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code># Download and install root certificate
 curl -o dangerprep-ca.crt https://ca.danger/root-ca.crt
 
 # Add to system trust store (Ubuntu/Debian)
@@ -174,7 +174,7 @@ sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keyc
                 
                 <wa-card>
                     <h4 class="wa-heading-s">Windows</h4>
-                    <pre class="wa-body-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-md); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code># Download certificate and import to Trusted Root Certification Authorities
+                    <pre class="wa-body-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-m); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code># Download certificate and import to Trusted Root Certification Authorities
 # 1. Download https://ca.danger/root-ca.crt
 # 2. Right-click the .crt file and select "Install Certificate"
 # 3. Choose "Local Machine" and "Trusted Root Certification Authorities"</code></pre>
@@ -211,7 +211,7 @@ sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keyc
             <div class="wa-stack wa-gap-lg">
                 <wa-card>
                     <h4 class="wa-heading-s">Traefik Configuration</h4>
-                    <pre class="wa-body-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-md); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code># traefik.yml
+                    <pre class="wa-body-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-m); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code># traefik.yml
 certificatesResolvers:
   step-ca:
     acme:
@@ -224,7 +224,7 @@ certificatesResolvers:
                 
                 <wa-card>
                     <h4 class="wa-heading-s">Certbot</h4>
-                    <pre class="wa-body-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-md); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code># Request certificate using certbot
+                    <pre class="wa-body-s" style="background: var(--wa-color-neutral-100); padding: var(--wa-space-m); border-radius: var(--wa-border-radius-s); overflow-x: auto;"><code># Request certificate using certbot
 certbot certonly \
   --server {{caUrl}}/acme/acme/directory \
   --standalone \
@@ -237,9 +237,9 @@ certbot certonly \
 
 <!-- API Endpoints -->
 <div class="api-section" style="margin-top: var(--wa-space-2xl);">
-    <h2 class="wa-heading-l" style="margin-bottom: var(--wa-space-lg);">API Endpoints</h2>
+    <h2 class="wa-heading-l" style="margin-bottom: var(--wa-space-l);">API Endpoints</h2>
     
-    <div class="wa-grid" style="--wa-grid-columns: 1; gap: var(--wa-space-md);">
+    <div class="wa-grid" style="--wa-grid-columns: 1; gap: var(--wa-space-m);">
         <wa-card appearance="outlined">
             <div class="wa-stack wa-gap-sm">
                 <div class="wa-flank wa-gap-sm">
