@@ -1,8 +1,8 @@
 services:
   portal:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../../..
+      dockerfile: docker/infrastructure/portal/Dockerfile
     restart: unless-stopped
     env_file:
       - compose.env

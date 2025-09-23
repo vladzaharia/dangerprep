@@ -1,25 +1,73 @@
 # =============================================================================
 # DANGERPREP PORTAL - DEVELOPMENT SERVER
 # =============================================================================
-# Single-stage build running Vite dev server for development
+# Multi-stage build with monorepo support for workspace dependencies
 # =============================================================================
 
-FROM node:20-alpine
+# syntax=docker/dockerfile:1
+FROM --platform=$BUILDPLATFORM node:22-alpine AS base
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
 
-# Set working directory
-WORKDIR /app
-
-# Enable Yarn v4 (Berry)
+# Enable Corepack for proper Yarn version management
 RUN corepack enable
 
-# Copy package files and Yarn configuration
-COPY package.json ./
+# Install turbo globally
+RUN yarn global add turbo@^2
 
-# Install dependencies with Yarn v4
-RUN yarn install --immutable && yarn cache clean
+FROM --platform=$BUILDPLATFORM base AS builder
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
 
-# Copy source code
+# Copy the entire monorepo
 COPY . .
+
+# Generate a partial monorepo with a pruned lockfile for portal
+RUN turbo prune @dangerprep/portal --docker
+
+FROM base AS installer
+RUN apk update && apk add --no-cache \
+    libc6-compat \
+    wget \
+    curl \
+    bash
+
+WORKDIR /app
+
+# First install dependencies (as they change less often)
+COPY --from=builder /app/out/json/ .
+RUN yarn install --immutable
+
+# Copy source code for development
+COPY --from=builder /app/out/full/ .
+
+FROM base AS runner
+WORKDIR /app
+
+# Install runtime system dependencies
+RUN apk add --no-cache \
+    wget \
+    curl \
+    bash
+
+# Create non-root user with consistent UID/GID
+RUN addgroup -g 1001 -S appuser && \
+    adduser -S appuser -u 1001 -G appuser
+
+# Copy the entire workspace structure to maintain Yarn workspace functionality
+COPY --from=installer /app ./
+
+# Set permissions
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Set working directory to the portal service
+WORKDIR /app/docker/infrastructure/portal
 
 # Expose port 3000 (Vite dev server default)
 EXPOSE 3000
