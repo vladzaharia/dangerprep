@@ -1,127 +1,169 @@
 /* =============================================================================
-   DANGERPREP PORTAL - MINIMAL LAYOUT STYLES
+   DANGERPREP PORTAL - MINIMAL STYLES USING WEBAWESOME UTILITIES
    ============================================================================= */
 
-/* Let WebAwesome handle all styling - just provide essential layout */
-* {
-  box-sizing: border-box;
-}
-
+/* Reset for WebAwesome */
+html,
 body {
+  height: 100%;
+  width: 100%;
   margin: 0;
   padding: 0;
-  min-height: 100vh;
 }
 
 #root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
 }
 
 /* =============================================================================
-   APP LAYOUT - MINIMAL STRUCTURE ONLY
+   MAIN LAYOUT - FULL PAGE WITH RAISED CONTENT
    ============================================================================= */
 
-.app {
-  min-height: 100vh;
+/* Main layout container */
+.app-layout {
+  --flank-size: 80px; /* Narrower sidebar for icon-only navigation */
+  height: 100vh;
+  width: 100vw;
+  gap: 0;
+}
+
+/* Navigation sidebar - Background layer */
+.app-navigation {
+  height: 100%;
   display: flex;
   flex-direction: column;
+  padding-top: var(--wa-space-l);
+  padding-bottom: var(--wa-space-l);
 }
 
-.app-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1rem;
-  width: 100%;
-  min-height: 100vh;
+.app-navigation-list {
+  gap: var(--wa-space-xl);
 }
 
-.app-header {
-  text-align: center;
+/* Main content area - Raised layer */
+.app-content {
+  height: 100%;
+  padding: var(--wa-space-2xl);
+  overflow: auto;
 }
 
-.app-title {
-  font-size: 2.5rem;
-  margin: 0 0 0.5rem 0;
-}
-
-.app-subtitle {
-  font-size: 1.125rem;
-  margin: 0;
-}
-
-.app-main {
-  flex: 1;
-}
-
-.app-footer {
-  text-align: center;
-  padding-top: 1rem;
+.app-content-inner {
+  height: 100%;
+  background-color: var(--wa-color-neutral-fill-quiet);
+  border: solid var(--wa-border-width-s) var(--wa-color-neutral-border-normal);
+  border-radius: var(--wa-border-radius-l);
+  padding: var(--wa-space-l);
+  overflow: auto;
 }
 
 /* =============================================================================
-   WIFI SECTION - LAYOUT ONLY
+   WIFI QR CODE PAGE - CENTERED LAYOUT
    ============================================================================= */
 
-.wifi-section {
+.qr-code-page {
+  height: 100%;
   display: flex;
+  align-items: center;
   justify-content: center;
 }
 
-.qr-section {
-  width: 100%;
-  text-align: center;
-  padding: 1rem;
-}
-
-.qr-section--clickable {
-  cursor: pointer;
-}
-
-.qr-code-info {
-  max-width: 400px;
-}
-
-.qr-code-title {
-  font-size: 1.5rem;
-  margin: 0;
-}
-
-.qr-code-description {
-  margin: 0;
-}
-
-.qr-code-hint {
-  margin: 0;
-  font-style: italic;
-}
-
-.manual-connection {
-  max-width: 500px;
-  margin: 0 auto;
-}
-
-.manual-title {
-  font-size: 1.5rem;
-  margin: 0;
-}
-
-.detail-item {
+.wifi-connection-container {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  padding: 0.75rem;
+  gap: var(--wa-space-xl);
+  max-width: 600px;
+  width: 100%;
 }
 
-.detail-value {
+.wifi-connection-content {
+  display: flex;
+  align-items: center;
+  gap: var(--wa-space-2xl);
+  width: 100%;
+}
+
+.wifi-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-m);
+}
+
+.wifi-details-title {
+  font-size: 1.5rem;
+  margin: 0 0 var(--wa-space-m) 0;
+  color: var(--wa-color-neutral-text-normal);
+}
+
+.wifi-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-xs);
+}
+
+.wifi-detail-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--wa-color-neutral-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wifi-detail-value {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  padding: 0.25rem 0.5rem;
+  font-size: 1.125rem;
+  padding: var(--wa-space-s) var(--wa-space-m);
+  background-color: var(--wa-color-neutral-fill-normal);
+  border: solid var(--wa-border-width-s) var(--wa-color-neutral-border-normal);
+  border-radius: var(--wa-border-radius-m);
+  color: var(--wa-color-neutral-text-normal);
+  text-align: center;
 }
 
-.manual-hint {
+.wifi-qr {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wifi-instructions {
+  text-align: center;
+  max-width: 500px;
+}
+
+.wifi-instructions p {
   margin: 0;
-  font-style: italic;
+  color: var(--wa-color-neutral-text-subtle);
+  line-height: 1.5;
+}
+
+/* =============================================================================
+   NAVIGATION - ICON-ONLY LAYOUT
+   ============================================================================= */
+
+.navigation-item {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.navigation-item wa-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.navigation-item--active wa-button {
+  background-color: var(--wa-color-primary-fill-normal) !important;
+  color: var(--wa-color-primary-text-normal) !important;
+  border: solid var(--wa-border-width-s) var(--wa-color-primary-border-normal) !important;
+}
+
+.navigation-item--active wa-button:hover {
+  background-color: var(--wa-color-primary-fill-hover) !important;
+  color: var(--wa-color-primary-text-hover) !important;
 }
 
 /* =============================================================================
@@ -145,9 +187,13 @@ body {
 
 .service-card-header {
   display: flex;
-  align-items: flex-start;
-  gap: 1rem;
+  align-items: center;
   flex: 1;
+  gap: var(--wa-space-l);
+}
+
+.service-grid {
+  --min-column-size: 28rem;
 }
 
 .service-icon {
@@ -163,6 +209,7 @@ body {
 .service-info {
   flex: 1;
   min-width: 0;
+  gap: var(--wa-space-3xs);
 }
 
 .service-name {
@@ -202,50 +249,72 @@ body {
    ============================================================================= */
 
 @media (max-width: 767px) {
-  .app-container {
-    padding: 0.75rem;
-  }
-
-  .app-title {
-    font-size: 2rem;
-  }
-
-  .app-subtitle {
-    font-size: 1rem;
-  }
-
-  .detail-item {
+  /* Stack layout on mobile */
+  .app-layout {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
+    --flank-size: auto;
+  }
+
+  .app-navigation {
+    order: 2; /* Navigation at bottom on mobile */
+    height: auto;
+    padding: var(--wa-space-s);
+    flex-direction: row;
+  }
+
+  .app-navigation .wa-split\:column {
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+  }
+
+  .app-navigation .wa-stack {
+    flex-direction: row;
+    gap: var(--wa-space-s);
+  }
+
+  .app-content {
+    order: 1; /* Content at top on mobile */
+    height: calc(100vh - 80px); /* Account for navigation height */
+    width: 100%;
+  }
+
+  /* Service card responsive adjustments */
+  .service-card {
+    padding: var(--wa-space-2xs);
   }
 
   .service-card-header {
     flex-direction: column;
     text-align: center;
-    gap: 0.75rem;
   }
 
   .service-icon {
     align-self: center;
   }
+
+  .wifi-details, .wifi-detail-value {
+    width: 100%;
+  }
 }
 
-@media (min-width: 768px) {
-  .qr-code-container {
-    flex-direction: row;
+/* Responsive adjustments for WiFi connection page */
+@media (max-width: 767px) {
+  .wifi-connection-content {
+    flex-direction: column;
+    gap: var(--wa-space-xl);
+    text-align: center;
+  }
+
+  .wifi-details {
+    order: 2;
+  }
+
+  .wifi-qr {
+    order: 1;
+  }
+
+  .wifi-detail-item {
     align-items: center;
-    justify-content: center;
-    gap: 2rem;
-  }
-
-  .qr-code-info {
-    text-align: left;
-  }
-}
-
-@media (min-width: 1024px) {
-  .app-container {
-    padding: 2rem;
   }
 }

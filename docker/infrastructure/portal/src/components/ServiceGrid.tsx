@@ -6,21 +6,13 @@ import { ServiceCard } from './ServiceCard';
 
 interface ServiceGridProps {
   services: Service[];
-  isMobile: boolean;
-  isKioskMode: boolean;
 }
 
-export const ServiceGrid: React.FC<ServiceGridProps> = ({ services, isMobile, isKioskMode }) => {
-  // Use different minimum column sizes for mobile vs desktop
-  const minColumnSize = isMobile ? '100%' : '300px';
-
+export const ServiceGrid: React.FC<ServiceGridProps> = ({ services }) => {
   return (
-    <div
-      className='wa-grid wa-gap-m'
-      style={{ '--min-column-size': minColumnSize } as React.CSSProperties}
-    >
+    <div className='wa-grid wa-gap-m service-grid'>
       {services.map(service => (
-        <ServiceCard key={service.name} service={service} isKioskMode={isKioskMode} />
+        <ServiceCard key={service.name} service={service} />
       ))}
     </div>
   );
