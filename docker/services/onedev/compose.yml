@@ -28,11 +28,11 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # OneDev - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.onedev-internal.rule=Host(`dev.danger`)"
-      - "traefik.http.routers.onedev-internal.entrypoints=websecure"
-      - "traefik.http.routers.onedev-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.onedev-internal.service=onedev"
+      # # OneDev - Internal (.danger domain with step-ca)
+      # - "traefik.http.routers.onedev-internal.rule=Host(`dev.danger`)"
+      # - "traefik.http.routers.onedev-internal.entrypoints=websecure"
+      # - "traefik.http.routers.onedev-internal.tls.certresolver=step-ca"
+      # - "traefik.http.routers.onedev-internal.service=onedev"
 
       # OneDev - External (.danger.diy domain with Let's Encrypt)
       - "traefik.http.routers.onedev-external.rule=Host(`dev.danger.diy`)"

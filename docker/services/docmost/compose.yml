@@ -21,11 +21,11 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Docmost - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.docmost-internal.rule=Host(`docs.danger`)"
-      - "traefik.http.routers.docmost-internal.entrypoints=websecure"
-      - "traefik.http.routers.docmost-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.docmost-internal.service=docmost"
+      # # Docmost - Internal (.danger domain with step-ca)
+      # - "traefik.http.routers.docmost-internal.rule=Host(`docs.danger`)"
+      # - "traefik.http.routers.docmost-internal.entrypoints=websecure"
+      # - "traefik.http.routers.docmost-internal.tls.certresolver=step-ca"
+      # - "traefik.http.routers.docmost-internal.service=docmost"
 
       # Docmost - External (.danger.diy domain with Let's Encrypt)
       - "traefik.http.routers.docmost-external.rule=Host(`docs.danger.diy`)"

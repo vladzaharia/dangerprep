@@ -20,11 +20,11 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Jellyfin - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.jellyfin-internal.rule=Host(`media.danger`)"
-      - "traefik.http.routers.jellyfin-internal.entrypoints=websecure"
-      - "traefik.http.routers.jellyfin-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.jellyfin-internal.service=jellyfin"
+      # # Jellyfin - Internal (.danger domain with step-ca)
+      # - "traefik.http.routers.jellyfin-internal.rule=Host(`media.danger`)"
+      # - "traefik.http.routers.jellyfin-internal.entrypoints=websecure"
+      # - "traefik.http.routers.jellyfin-internal.tls.certresolver=step-ca"
+      # - "traefik.http.routers.jellyfin-internal.service=jellyfin"
 
       # Jellyfin - External (.danger.diy domain with Let's Encrypt)
       - "traefik.http.routers.jellyfin-external.rule=Host(`media.danger.diy`)"

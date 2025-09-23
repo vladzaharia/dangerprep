@@ -12,11 +12,11 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Komga - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.komga-internal.rule=Host(`komga.danger`)"
-      - "traefik.http.routers.komga-internal.entrypoints=websecure"
-      - "traefik.http.routers.komga-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.komga-internal.service=komga"
+      # # Komga - Internal (.danger domain with step-ca)
+      # - "traefik.http.routers.komga-internal.rule=Host(`komga.danger`)"
+      # - "traefik.http.routers.komga-internal.entrypoints=websecure"
+      # - "traefik.http.routers.komga-internal.tls.certresolver=step-ca"
+      # - "traefik.http.routers.komga-internal.service=komga"
 
       # Komga - External (.danger.diy domain with Let's Encrypt)
       - "traefik.http.routers.komga-external.rule=Host(`komga.danger.diy`)"

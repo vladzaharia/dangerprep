@@ -33,11 +33,11 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Portal - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.portal-internal.rule=Host(`portal.danger`)"
-      - "traefik.http.routers.portal-internal.entrypoints=websecure"
-      - "traefik.http.routers.portal-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.portal-internal.service=portal"
+      # # Portal - Internal (.danger domain with step-ca)
+      # - "traefik.http.routers.portal-internal.rule=Host(`portal.danger`)"
+      # - "traefik.http.routers.portal-internal.entrypoints=websecure"
+      # - "traefik.http.routers.portal-internal.tls.certresolver=step-ca"
+      # - "traefik.http.routers.portal-internal.service=portal"
 
       # Portal - External (.danger.diy domain with Let's Encrypt)
       - "traefik.http.routers.portal-external.rule=Host(`portal.danger.diy`)"

@@ -22,11 +22,11 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # RomM - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.romm-internal.rule=Host(`retro.danger`)"
-      - "traefik.http.routers.romm-internal.entrypoints=websecure"
-      - "traefik.http.routers.romm-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.romm-internal.service=romm"
+      # # RomM - Internal (.danger domain with step-ca)
+      # - "traefik.http.routers.romm-internal.rule=Host(`retro.danger`)"
+      # - "traefik.http.routers.romm-internal.entrypoints=websecure"
+      # - "traefik.http.routers.romm-internal.tls.certresolver=step-ca"
+      # - "traefik.http.routers.romm-internal.service=romm"
 
       # RomM - External (.danger.diy domain with Let's Encrypt)
       - "traefik.http.routers.romm-external.rule=Host(`retro.danger.diy`)"

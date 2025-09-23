@@ -17,12 +17,12 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Dashboard - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.dashboard-internal.rule=Host(`traefik.danger`)"
-      - "traefik.http.routers.dashboard-internal.entrypoints=websecure"
-      - "traefik.http.routers.dashboard-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.dashboard-internal.service=api@internal"
-      - "traefik.http.routers.dashboard-internal.middlewares=auth"
+      # # Dashboard - Internal (.danger domain with step-ca)
+      # - "traefik.http.routers.dashboard-internal.rule=Host(`traefik.danger`)"
+      # - "traefik.http.routers.dashboard-internal.entrypoints=websecure"
+      # - "traefik.http.routers.dashboard-internal.tls.certresolver=step-ca"
+      # - "traefik.http.routers.dashboard-internal.service=api@internal"
+      # - "traefik.http.routers.dashboard-internal.middlewares=auth"
 
       # Dashboard - External (.danger.diy domain with Let's Encrypt)
       - "traefik.http.routers.dashboard-external.rule=Host(`traefik.danger.diy`)"

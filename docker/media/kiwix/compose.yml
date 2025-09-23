@@ -8,11 +8,11 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Kiwix - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.kiwix-internal.rule=Host(`kiwix.danger`)"
-      - "traefik.http.routers.kiwix-internal.entrypoints=websecure"
-      - "traefik.http.routers.kiwix-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.kiwix-internal.service=kiwix"
+      # # Kiwix - Internal (.danger domain with step-ca)
+      # - "traefik.http.routers.kiwix-internal.rule=Host(`kiwix.danger`)"
+      # - "traefik.http.routers.kiwix-internal.entrypoints=websecure"
+      # - "traefik.http.routers.kiwix-internal.tls.certresolver=step-ca"
+      # - "traefik.http.routers.kiwix-internal.service=kiwix"
 
       # Kiwix - External (.danger.diy domain with Let's Encrypt)
       - "traefik.http.routers.kiwix-external.rule=Host(`kiwix.danger.diy`)"

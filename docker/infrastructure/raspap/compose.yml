@@ -21,11 +21,11 @@ services:
       # Traefik Configuration
       - "traefik.enable=true"
 
-      # RaspAP - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.raspap-internal.rule=Host(`router.danger`)"
-      - "traefik.http.routers.raspap-internal.entrypoints=websecure"
-      - "traefik.http.routers.raspap-internal.tls.certresolver=step-ca"
-      - "traefik.http.routers.raspap-internal.service=raspap"
+      # # RaspAP - Internal (.danger domain with step-ca)
+      # - "traefik.http.routers.raspap-internal.rule=Host(`router.danger`)"
+      # - "traefik.http.routers.raspap-internal.entrypoints=websecure"
+      # - "traefik.http.routers.raspap-internal.tls.certresolver=step-ca"
+      # - "traefik.http.routers.raspap-internal.service=raspap"
 
       # RaspAP - External (.danger.diy domain with Let's Encrypt)
       - "traefik.http.routers.raspap-external.rule=Host(`router.danger.diy`)"
