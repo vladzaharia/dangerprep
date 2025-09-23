@@ -21,7 +21,7 @@ services:
       - "traefik.http.routers.kiwix-external.service=kiwix"
 
       # Kiwix - External (.argos.surf domain with Let's Encrypt)
-      - "traefik.http.routers.kiwix-argos.rule=Host(`kiwix.argos.diy`)"
+      - "traefik.http.routers.kiwix-argos.rule=Host(`kiwix.argos.surf`)"
       - "traefik.http.routers.kiwix-argos.entrypoints=websecure"
       - "traefik.http.routers.kiwix-argos.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.kiwix-argos.service=kiwix"

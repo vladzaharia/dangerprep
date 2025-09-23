@@ -34,7 +34,7 @@ export const QRCodeSection: React.FC = () => {
           <wa-qr-code
             value={wifiQRString}
             size={200}
-            fill="rgb(255, 255, 255)"
+            fill="rgba(199, 213, 237, 1)"
             background="oklab(0.234827 -0.00406564 -0.0311428 / 0.9)"
             label="WiFi Connection QR Code"
           />

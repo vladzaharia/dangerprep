@@ -42,14 +42,18 @@ configure_dns_forwarding() {
 
     cat > "$dns_config" << 'EOF'
 # DangerPrep DNS Integration Configuration
-# Forward .danger domains to CoreDNS on port 5353
+# Forward local domains to CoreDNS on port 5353
 server=/danger/127.0.0.1#5353
+server=/danger.diy/127.0.0.1#5353
+server=/argos.surf/127.0.0.1#5353
 
 # Forward all other domains to AdGuard for filtering
 server=127.0.0.1#3000
 
 # Local domain settings
 local=/danger/
+local=/danger.diy/
+local=/argos.surf/
 domain=danger
 expand-hosts
 
@@ -90,6 +94,8 @@ show_configuration_summary() {
     echo
     echo "DNS Forwarding Rules:"
     echo "  • .danger domains → CoreDNS (127.0.0.1:5353)"
+    echo "  • .danger.diy domains → CoreDNS (127.0.0.1:5353)"
+    echo "  • .argos.surf domains → CoreDNS (127.0.0.1:5353)"
     echo "  • Other domains → AdGuard (127.0.0.1:3000)"
     echo
     echo "Configuration file: /etc/dnsmasq.d/99-dangerprep-dns.conf"

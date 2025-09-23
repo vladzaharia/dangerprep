@@ -8,9 +8,11 @@ set -e
 # Configuration
 DOMAIN_NAME="${DOMAIN_NAME:-danger}"
 EXTERNAL_DOMAIN_NAME="${EXTERNAL_DOMAIN_NAME:-danger.diy}"
+ARGOS_DOMAIN_NAME="${ARGOS_DOMAIN_NAME:-argos.surf}"
 DNS_CONFIG_DIR="/dns-config"
 DNS_DB_FILE="${DNS_CONFIG_DIR}/db.${DOMAIN_NAME}"
 EXTERNAL_DNS_DB_FILE="${DNS_CONFIG_DIR}/db.${EXTERNAL_DOMAIN_NAME}"
+ARGOS_DNS_DB_FILE="${DNS_CONFIG_DIR}/db.${ARGOS_DOMAIN_NAME}"
 UPDATE_INTERVAL="${DNS_UPDATE_INTERVAL:-30}"
 
 # Detect host IP where Traefik is exposed on ports 80/443
@@ -109,7 +111,7 @@ EOF
             # Handle both full domain (subdomain.danger) and subdomain-only formats
             if echo "$domain" | grep -q "\."; then
                 # Full domain format - extract subdomain
-                hostname=$(echo "$domain" | sed "s/\.${DOMAIN_NAME}$//" | sed "s/\.${EXTERNAL_DOMAIN_NAME}$//")
+                hostname=$(echo "$domain" | sed "s/\.${DOMAIN_NAME}$//" | sed "s/\.${EXTERNAL_DOMAIN_NAME}$//" | sed "s/\.${ARGOS_DOMAIN_NAME}$//")
             else
                 # Subdomain-only format - use as-is
                 hostname="$domain"
@@ -125,11 +127,12 @@ EOF
     mv "$temp_file" "$zone_file"
 }
 
-# Generate both DNS zone files
+# Generate all DNS zone files
 generate_dns_zones() {
-    log "Generating DNS zones for both domains..."
+    log "Generating DNS zones for all domains..."
     generate_dns_zone_for_domain "$DNS_DB_FILE" "$DOMAIN_NAME"
     generate_dns_zone_for_domain "$EXTERNAL_DNS_DB_FILE" "$EXTERNAL_DOMAIN_NAME"
+    generate_dns_zone_for_domain "$ARGOS_DNS_DB_FILE" "$ARGOS_DOMAIN_NAME"
 }
 
 # Reload CoreDNS configuration
@@ -147,13 +150,14 @@ main() {
     log "DNS Registrar starting..."
     log "Internal domain: ${DOMAIN_NAME}"
     log "External domain: ${EXTERNAL_DOMAIN_NAME}"
+    log "Argos domain: ${ARGOS_DOMAIN_NAME}"
     log "Host IP (where Traefik is exposed): ${HOST_IP}"
     log "Update interval: ${UPDATE_INTERVAL}s"
 
     while true; do
         log "Updating DNS registrations..."
 
-        # Generate new zone files for both domains
+        # Generate new zone files for all domains
         generate_dns_zones
 
         # Reload CoreDNS

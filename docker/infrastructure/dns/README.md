@@ -48,7 +48,7 @@ Creates DNS record: `myservice.yourdomain.com → service-ip`
 ```
 Client Request → CoreDNS (172.21.0.4:5353) → NextDNS (3ca9ab.dns.nextdns.io) via DNS-over-TLS
                      ↓
-               Local DNS Zone Files (.danger/.danger.diy domains)
+               Local DNS Zone Files (.danger/.danger.diy/.argos.surf domains)
                      ↓
                DNS Registrar (Auto-registration from Docker labels)
 ```

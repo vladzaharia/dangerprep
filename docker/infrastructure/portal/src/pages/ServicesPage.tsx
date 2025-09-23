@@ -2,33 +2,35 @@ import React, { useMemo } from 'react';
 
 import type { Service } from '../App';
 import { ServiceGrid } from '../components/ServiceGrid';
+import { getServiceUrls } from '../utils/urlBuilder';
 
 export const ServicesPage: React.FC = () => {
 
-  // Main services configuration
-  const services: Service[] = useMemo(
-    () => [
+  // Main services configuration with dynamic URL construction
+  const services: Service[] = useMemo(() => {
+    const serviceUrls = getServiceUrls();
+
+    return [
       {
         name: 'Entertainment at Sea',
         icon: 'film',
-        url: import.meta.env.VITE_JELLYFIN_URL || 'https://jellyfin.danger',
+        url: serviceUrls.jellyfin,
         description: 'Stream movies, TV shows, and more',
       },
       {
         name: 'Games at Sea',
         icon: 'gamepad',
-        url: import.meta.env.VITE_ROMM_URL || 'https://romm.danger',
+        url: serviceUrls.romm,
         description: 'Retro gaming library and emulation',
       },
       {
         name: 'Wikipedia',
         icon: 'book',
-        url: import.meta.env.VITE_KIWIX_URL || 'https://kiwix.danger',
+        url: serviceUrls.kiwix,
         description: 'Offline Wikipedia and educational content',
       },
-    ],
-    []
-  );
+    ];
+  }, []);
 
   return (
     <div className="wa-stack wa-gap-xl">

@@ -23,19 +23,19 @@ services:
       - "traefik.enable=true"
 
       # RomM - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.romm-internal.rule=Host(`romm.danger`)"
+      - "traefik.http.routers.romm-internal.rule=Host(`retro.danger`)"
       - "traefik.http.routers.romm-internal.entrypoints=websecure"
       - "traefik.http.routers.romm-internal.tls.certresolver=step-ca"
       - "traefik.http.routers.romm-internal.service=romm"
 
       # RomM - External (.danger.diy domain with Let's Encrypt)
-      - "traefik.http.routers.romm-external.rule=Host(`romm.danger.diy`)"
+      - "traefik.http.routers.romm-external.rule=Host(`retro.danger.diy`)"
       - "traefik.http.routers.romm-external.entrypoints=websecure"
       - "traefik.http.routers.romm-external.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.romm-external.service=romm"
 
       # RomM - External (.argos.surf domain with Let's Encrypt)
-      - "traefik.http.routers.romm-argos.rule=Host(`romm.argos.surf`)"
+      - "traefik.http.routers.romm-argos.rule=Host(`retro.argos.surf`)"
       - "traefik.http.routers.romm-argos.entrypoints=websecure"
       - "traefik.http.routers.romm-argos.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.romm-argos.service=romm"

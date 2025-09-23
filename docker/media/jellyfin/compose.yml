@@ -21,19 +21,19 @@ services:
       - "traefik.enable=true"
 
       # Jellyfin - Internal (.danger domain with step-ca)
-      - "traefik.http.routers.jellyfin-internal.rule=Host(`jellyfin.danger`)"
+      - "traefik.http.routers.jellyfin-internal.rule=Host(`media.danger`)"
       - "traefik.http.routers.jellyfin-internal.entrypoints=websecure"
       - "traefik.http.routers.jellyfin-internal.tls.certresolver=step-ca"
       - "traefik.http.routers.jellyfin-internal.service=jellyfin"
 
       # Jellyfin - External (.danger.diy domain with Let's Encrypt)
-      - "traefik.http.routers.jellyfin-external.rule=Host(`jellyfin.danger.diy`)"
+      - "traefik.http.routers.jellyfin-external.rule=Host(`media.danger.diy`)"
       - "traefik.http.routers.jellyfin-external.entrypoints=websecure"
       - "traefik.http.routers.jellyfin-external.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.jellyfin-external.service=jellyfin"
 
       # Jellyfin - External (.argos.surf domain with Let's Encrypt)
-      - "traefik.http.routers.jellyfin-argos.rule=Host(`jellyfin.argos.surf`)"
+      - "traefik.http.routers.jellyfin-argos.rule=Host(`media.argos.surf`)"
       - "traefik.http.routers.jellyfin-argos.entrypoints=websecure"
       - "traefik.http.routers.jellyfin-argos.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.jellyfin-argos.service=jellyfin"

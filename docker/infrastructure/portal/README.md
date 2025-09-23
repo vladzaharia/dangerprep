@@ -15,11 +15,32 @@ Modern React 19 portal for DangerPrep hotspot services, built with TypeScript, V
 
 Configure these in `compose.env`:
 
+### WiFi Configuration
 - `WIFI_SSID`: WiFi network name
-- `WIFI_PASSWORD`: WiFi network password  
-- `JELLYFIN_URL`: Jellyfin media server URL
-- `KIWIX_URL`: Kiwix offline content URL
-- `ROMM_URL`: Romm game library URL
+- `WIFI_PASSWORD`: WiFi network password
+
+### Service URL Configuration
+The portal uses dynamic URL construction based on a base domain and service subdomains:
+
+- `BASE_DOMAIN`: Base domain for all services (e.g., `argos.surf`, `danger.diy`)
+
+#### Main Services
+- `JELLYFIN_SUBDOMAIN`: Jellyfin media server subdomain (default: `media`)
+- `KIWIX_SUBDOMAIN`: Kiwix offline content subdomain (default: `kiwix`)
+- `ROMM_SUBDOMAIN`: Romm game library subdomain (default: `retro`)
+
+#### Maintenance Services
+- `DOCMOST_SUBDOMAIN`: Docmost documentation subdomain (default: `docmost`)
+- `ONEDEV_SUBDOMAIN`: OneDev git management subdomain (default: `onedev`)
+- `TRAEFIK_SUBDOMAIN`: Traefik dashboard subdomain (default: `traefik`)
+- `PORTAINER_SUBDOMAIN`: Portainer container management subdomain (default: `portainer`)
+
+### Example Configuration
+```bash
+BASE_DOMAIN=argos.surf
+JELLYFIN_SUBDOMAIN=media
+# Results in: https://media.argos.surf
+```
 
 ## Development
 

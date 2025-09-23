@@ -10,9 +10,20 @@ services:
       # Runtime environment variables for the React app
       - VITE_WIFI_SSID=${WIFI_SSID}
       - VITE_WIFI_PASSWORD=${WIFI_PASSWORD}
-      - VITE_JELLYFIN_URL=${JELLYFIN_URL}
-      - VITE_KIWIX_URL=${KIWIX_URL}
-      - VITE_ROMM_URL=${ROMM_URL}
+
+      # Base domain and service subdomains for dynamic URL construction
+      - VITE_BASE_DOMAIN=${BASE_DOMAIN}
+
+      # Main services
+      - VITE_JELLYFIN_SUBDOMAIN=${JELLYFIN_SUBDOMAIN}
+      - VITE_KIWIX_SUBDOMAIN=${KIWIX_SUBDOMAIN}
+      - VITE_ROMM_SUBDOMAIN=${ROMM_SUBDOMAIN}
+
+      # Maintenance services
+      - VITE_DOCMOST_SUBDOMAIN=${DOCMOST_SUBDOMAIN}
+      - VITE_ONEDEV_SUBDOMAIN=${ONEDEV_SUBDOMAIN}
+      - VITE_TRAEFIK_SUBDOMAIN=${TRAEFIK_SUBDOMAIN}
+      - VITE_PORTAINER_SUBDOMAIN=${PORTAINER_SUBDOMAIN}
     labels:
       - "traefik.enable=true"
 

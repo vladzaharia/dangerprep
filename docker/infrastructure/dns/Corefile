@@ -15,12 +15,19 @@ danger.diy {
     errors
 }
 
+# Local domain resolution - External (.argos.surf)
+argos.surf {
+    file /etc/coredns/db.argos.surf
+    log
+    errors
+}
+
 # Fallback to upstream DNS (NextDNS directly)
 # Using NextDNS endpoints for secure DNS resolution with redundancy
 . {
     # Forward to NextDNS servers (using standard DNS, not DoT for simplicity)
     forward . 45.90.28.0 45.90.30.0 {
-        except danger danger.diy
+        except danger danger.diy argos.surf
     }
 
     log

@@ -57,6 +57,20 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
             <p className='service-description'>{service.description}</p>
           </div>
         </div>
+
+        {/* Service URL at the bottom */}
+        <div className='service-card-footer'>
+          <div className='service-url-display'>
+            <div className='service-url service-url--split'>
+              <span className='service-url-text'>{service.url}</span>
+              <FontAwesomeIcon
+                icon={solidIcons.faExternalLinkAlt}
+                size="sm"
+                className='service-url-icon'
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </wa-card>
   );

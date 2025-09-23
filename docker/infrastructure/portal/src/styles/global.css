@@ -224,19 +224,44 @@ body {
 
 .service-card-footer {
   margin-top: auto;
-  padding-top: 1rem;
+  padding-top: var(--wa-space-m);
+  width: 100%;
 }
 
 .service-url-display {
-  text-align: center;
+  width: 100%;
 }
 
 .service-url {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 0.875rem;
-  padding: 0.5rem;
-  display: inline-block;
+  padding: var(--wa-space-s) var(--wa-space-m);
+  background-color: var(--wa-color-neutral-fill-normal);
+  border: solid var(--wa-border-width-s) var(--wa-color-neutral-border-normal);
+  border-radius: var(--wa-border-radius-m);
+  color: var(--wa-color-neutral-text-normal);
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.service-url--split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wa-space-m);
+}
+
+.service-url-text {
+  flex: 1;
   word-break: break-all;
+  overflow-wrap: break-word;
+  text-align: left;
+}
+
+.service-url-icon {
+  flex-shrink: 0;
+  color: var(--wa-color-neutral-text-subtle);
 }
 
 .service-action {
@@ -281,7 +306,7 @@ body {
 
   /* Service card responsive adjustments */
   .service-card {
-    padding: var(--wa-space-2xs);
+    padding: var(--wa-space-m);
   }
 
   .service-card-header {
@@ -291,6 +316,19 @@ body {
 
   .service-icon {
     align-self: center;
+  }
+
+  .service-url {
+    font-size: 0.75rem;
+    padding: var(--wa-space-xs) var(--wa-space-s);
+  }
+
+  .service-url--split {
+    gap: var(--wa-space-s);
+  }
+
+  .service-url-text {
+    font-size: 0.75rem;
   }
 
   .wifi-details, .wifi-detail-value {

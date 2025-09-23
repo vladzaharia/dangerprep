@@ -1,0 +1,18 @@
+$ORIGIN argos.surf.
+$TTL 300
+
+@   IN  SOA ns1.argos.surf. admin.argos.surf. (
+    2024091801  ; Serial
+    3600        ; Refresh
+    1800        ; Retry
+    604800      ; Expire
+    300         ; Minimum TTL
+)
+
+@   IN  NS  ns1.argos.surf.
+
+; Default A record pointing to Traefik
+@   IN  A   172.21.0.3
+
+; Wildcard record for all subdomains
+*   IN  A   172.21.0.3

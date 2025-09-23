@@ -2,39 +2,41 @@ import React, { useMemo } from 'react';
 
 import type { Service } from '../App';
 import { ServiceGrid } from '../components/ServiceGrid';
+import { getMaintenanceServiceUrls } from '../utils/urlBuilder';
 
 export const MaintenanceServicesPage: React.FC = () => {
 
-  // Maintenance services configuration
-  const maintenanceServices: Service[] = useMemo(
-    () => [
+  // Maintenance services configuration with dynamic URL construction
+  const maintenanceServices: Service[] = useMemo(() => {
+    const serviceUrls = getMaintenanceServiceUrls();
+
+    return [
       {
         name: 'Docmost',
         icon: 'file-text',
-        url: import.meta.env.VITE_DOCMOST_URL || 'https://docmost.danger',
+        url: serviceUrls.docmost,
         description: 'Documentation and knowledge management',
       },
       {
         name: 'OneDev',
         icon: 'git-branch',
-        url: import.meta.env.VITE_ONEDEV_URL || 'https://onedev.danger',
+        url: serviceUrls.onedev,
         description: 'Git repository management and CI/CD',
       },
       {
         name: 'Traefik Dashboard',
         icon: 'activity',
-        url: import.meta.env.VITE_TRAEFIK_URL || 'https://traefik.danger',
+        url: serviceUrls.traefik,
         description: 'Reverse proxy and load balancer dashboard',
       },
       {
         name: 'Portainer',
         icon: 'box',
-        url: import.meta.env.VITE_PORTAINER_URL || 'https://portainer.danger',
+        url: serviceUrls.portainer,
         description: 'Docker container management',
       },
-    ],
-    []
-  );
+    ];
+  }, []);
 
   return (
     <div className="wa-stack wa-gap-xl">
