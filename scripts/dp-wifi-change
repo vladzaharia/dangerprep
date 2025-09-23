@@ -1,0 +1,464 @@
+#!/bin/bash
+# DangerPrep WiFi Connection Manager
+# Changes WiFi connection to a new SSID with interactive prompts
+# 
+# Usage:
+#   dp-wifi-change [OPTIONS]
+#
+# Options:
+#   -h, --help       Show this help message
+#   -v, --verbose    Enable verbose output
+#   -i, --interface  Specify WiFi interface (optional)
+#   -s, --ssid       Specify SSID (optional, will prompt if not provided)
+#   -p, --password   Specify password (optional, will prompt if not provided)
+#   --non-interactive  Run without prompts (requires --interface, --ssid, --password)
+#
+# Dependencies:
+#   - nmcli (NetworkManager command line interface)
+#   - gum (for enhanced UI, optional)
+
+set -euo pipefail
+
+# Script configuration
+readonly SCRIPT_NAME="dp-wifi-change"
+readonly SCRIPT_VERSION="1.0.0"
+readonly LOG_FILE="/var/log/dp-wifi-change.log"
+LOCK_FILE="/var/run/dp-wifi-change.lock"
+
+# Default options
+VERBOSE=false
+NON_INTERACTIVE=false
+INTERFACE=""
+SSID=""
+PASSWORD=""
+
+# Colors for output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly NC='\033[0m' # No Color
+
+# Source shared utilities if available
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHARED_DIR="${SCRIPT_DIR}/shared"
+
+if [[ -f "${SHARED_DIR}/gum-utils.sh" ]]; then
+    source "${SHARED_DIR}/gum-utils.sh"
+    HAS_GUM_UTILS=true
+else
+    HAS_GUM_UTILS=false
+fi
+
+if [[ -f "${SHARED_DIR}/banner.sh" ]]; then
+    source "${SHARED_DIR}/banner.sh"
+    HAS_BANNER=true
+else
+    HAS_BANNER=false
+fi
+
+# Logging functions
+log() {
+    local level="$1"
+    shift
+    local message="$*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    # Log to file (with fallback for permission issues)
+    {
+        if mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null && echo "[$timestamp] [$level] $message" >> "$LOG_FILE" 2>/dev/null; then
+            : # Successfully logged to system log
+        else
+            # Fallback to user log directory
+            local user_log_dir="$HOME/.local/share/dangerprep/logs"
+            local user_log_file="$user_log_dir/$(basename "$LOG_FILE")"
+            mkdir -p "$user_log_dir" 2>/dev/null || true
+            echo "[$timestamp] [$level] $message" >> "$user_log_file" 2>/dev/null || true
+        fi
+    } 2>/dev/null
+    
+    # Log to console with colors
+    case "$level" in
+        "ERROR")
+            echo -e "${RED}[ERROR]${NC} $message" >&2
+            ;;
+        "WARN")
+            echo -e "${YELLOW}[WARN]${NC} $message" >&2
+            ;;
+        "INFO")
+            echo -e "${GREEN}[INFO]${NC} $message"
+            ;;
+        "DEBUG")
+            [[ "$VERBOSE" == "true" ]] && echo -e "${BLUE}[DEBUG]${NC} $message"
+            ;;
+    esac
+}
+
+log_info() { log "INFO" "$@"; }
+log_warn() { log "WARN" "$@"; }
+log_error() { log "ERROR" "$@"; }
+log_debug() { log "DEBUG" "$@"; }
+
+# Error handling
+error_exit() {
+    log_error "$@"
+    cleanup
+    exit 1
+}
+
+# Cleanup function
+cleanup() {
+    [[ -f "$LOCK_FILE" ]] && rm -f "$LOCK_FILE"
+}
+
+# Trap cleanup on exit
+trap cleanup EXIT
+
+# Show help
+show_help() {
+    cat << EOF
+DangerPrep WiFi Connection Manager v${SCRIPT_VERSION}
+
+DESCRIPTION:
+    Interactive tool to change WiFi connection to a new SSID. Automatically
+    detects available WiFi interfaces and networks, then connects to the
+    specified network with the provided credentials.
+
+USAGE:
+    $SCRIPT_NAME [OPTIONS]
+
+OPTIONS:
+    -h, --help           Show this help message and exit
+    -v, --verbose        Enable verbose output and debugging
+    -i, --interface      Specify WiFi interface (e.g., wlan0, wlp2s0)
+    -s, --ssid           Specify SSID to connect to
+    -p, --password       Specify WiFi password
+    --non-interactive    Run without prompts (requires all parameters)
+
+EXAMPLES:
+    $SCRIPT_NAME                                    # Interactive mode
+    $SCRIPT_NAME --interface wlan0                 # Pre-select interface
+    $SCRIPT_NAME --ssid "MyNetwork" --password "pass123"  # Pre-fill credentials
+    $SCRIPT_NAME --non-interactive -i wlan0 -s "MyNetwork" -p "pass123"  # Fully automated
+
+DEPENDENCIES:
+    - nmcli (NetworkManager command line interface)
+    - gum (for enhanced UI, optional)
+
+LOGS:
+    Operations are logged to: $LOG_FILE
+
+EOF
+}
+
+# Check dependencies
+check_dependencies() {
+    local deps=("nmcli")
+    local missing_deps=()
+    
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" >/dev/null 2>&1; then
+            missing_deps+=("$dep")
+        fi
+    done
+    
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        log_warn "Missing dependencies: ${missing_deps[*]}"
+        log_info "Installing missing packages..."
+        
+        # Install missing packages
+        if command -v apt-get >/dev/null 2>&1; then
+            apt-get update
+            for dep in "${missing_deps[@]}"; do
+                case "$dep" in
+                    "nmcli")
+                        apt-get install -y network-manager
+                        ;;
+                    *)
+                        apt-get install -y "$dep"
+                        ;;
+                esac
+            done
+        else
+            error_exit "Package manager not found. Please install: ${missing_deps[*]}"
+        fi
+    fi
+    
+    # Check if NetworkManager is running
+    if ! systemctl is-active --quiet NetworkManager; then
+        log_warn "NetworkManager is not running. Starting it..."
+        systemctl start NetworkManager
+    fi
+    
+    log_debug "All dependencies satisfied"
+}
+
+# Create lock file
+create_lock() {
+    local lock_file="$LOCK_FILE"
+    
+    # Try to create lock file, fallback to user directory if needed
+    if ! echo $$ > "$lock_file" 2>/dev/null; then
+        local user_lock_dir="$HOME/.local/share/dangerprep/locks"
+        mkdir -p "$user_lock_dir" 2>/dev/null || true
+        lock_file="$user_lock_dir/$(basename "$LOCK_FILE")"
+    fi
+    
+    if [[ -f "$lock_file" ]]; then
+        local pid
+        pid=$(cat "$lock_file" 2>/dev/null || echo "")
+        if [[ -n "$pid" ]] && [[ "$pid" != "$$" ]] && kill -0 "$pid" 2>/dev/null; then
+            error_exit "Another instance is already running (PID: $pid)"
+        else
+            [[ "$pid" != "$$" ]] && log_warn "Removing stale lock file"
+            rm -f "$lock_file" 2>/dev/null || true
+        fi
+    fi
+    
+    if echo $$ > "$lock_file" 2>/dev/null; then
+        # Update LOCK_FILE variable to point to the actual lock file used
+        LOCK_FILE="$lock_file"
+        log_debug "Created lock file: $LOCK_FILE"
+    else
+        log_warn "Could not create lock file, continuing without lock"
+    fi
+}
+
+# Get available WiFi interfaces
+get_wifi_interfaces() {
+    local interfaces=()
+    
+    # Get WiFi interfaces from nmcli
+    while IFS= read -r interface; do
+        [[ -n "$interface" ]] && interfaces+=("$interface")
+    done < <(nmcli -t -f DEVICE,TYPE device status | grep ":wifi$" | cut -d: -f1)
+    
+    if [[ ${#interfaces[@]} -eq 0 ]]; then
+        error_exit "No WiFi interfaces found"
+    fi
+    
+    printf '%s\n' "${interfaces[@]}"
+}
+
+# Scan for available networks
+scan_networks() {
+    local interface="$1"
+    
+    log_info "Scanning for available networks on $interface..."
+    
+    # Rescan for networks
+    nmcli device wifi rescan ifname "$interface" 2>/dev/null || true
+    sleep 2
+    
+    # Get available networks
+    local networks=()
+    while IFS= read -r network; do
+        [[ -n "$network" ]] && networks+=("$network")
+    done < <(nmcli -t -f SSID device wifi list ifname "$interface" | grep -v "^$" | sort -u)
+    
+    if [[ ${#networks[@]} -eq 0 ]]; then
+        log_warn "No networks found on $interface"
+        return 1
+    fi
+    
+    log_info "Found ${#networks[@]} networks"
+    printf '%s\n' "${networks[@]}"
+}
+
+# Connect to WiFi network
+connect_wifi() {
+    local interface="$1"
+    local ssid="$2"
+    local password="$3"
+    
+    log_info "Connecting to '$ssid' on interface '$interface'..."
+    
+    # Disconnect from current network first
+    nmcli device disconnect "$interface" 2>/dev/null || true
+    
+    # Connect to WiFi network
+    if nmcli device wifi connect "$ssid" password "$password" ifname "$interface" 2>&1; then
+        log_info "Successfully connected to '$ssid'"
+        return 0
+    else
+        log_error "Failed to connect to '$ssid'"
+        return 1
+    fi
+}
+
+# Verify connection
+verify_connection() {
+    local interface="$1"
+    local expected_ssid="$2"
+    
+    log_info "Verifying connection..."
+    
+    # Wait a moment for connection to establish
+    sleep 3
+    
+    # Check connection status
+    local current_ssid
+    current_ssid=$(nmcli -t -f active,ssid dev wifi | grep "^yes:" | cut -d: -f2)
+    
+    if [[ "$current_ssid" == "$expected_ssid" ]]; then
+        log_info "✓ Successfully connected to '$expected_ssid'"
+        
+        # Get IP address
+        local ip_address
+        ip_address=$(nmcli -t -f IP4.ADDRESS dev show "$interface" | cut -d: -f2 | cut -d/ -f1)
+        [[ -n "$ip_address" ]] && log_info "IP Address: $ip_address"
+        
+        return 0
+    else
+        log_error "✗ Connection verification failed"
+        [[ -n "$current_ssid" ]] && log_error "Currently connected to: $current_ssid"
+        return 1
+    fi
+}
+
+# Main execution function
+main() {
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -v|--verbose)
+                VERBOSE=true
+                shift
+                ;;
+            -i|--interface)
+                INTERFACE="$2"
+                shift 2
+                ;;
+            -s|--ssid)
+                SSID="$2"
+                shift 2
+                ;;
+            -p|--password)
+                PASSWORD="$2"
+                shift 2
+                ;;
+            --non-interactive)
+                NON_INTERACTIVE=true
+                shift
+                ;;
+            *)
+                error_exit "Unknown option: $1. Use --help for usage information."
+                ;;
+        esac
+    done
+
+    # Show banner if available
+    if [[ "$HAS_BANNER" == "true" ]]; then
+        show_banner "$SCRIPT_NAME" "$SCRIPT_VERSION"
+    else
+        echo "DangerPrep WiFi Connection Manager v${SCRIPT_VERSION}"
+        echo "================================================="
+    fi
+
+    # Check dependencies
+    check_dependencies
+
+    # Create lock file
+    create_lock
+
+    # Get WiFi interfaces if not specified
+    if [[ -z "$INTERFACE" ]]; then
+        local interfaces
+        if ! interfaces=$(get_wifi_interfaces); then
+            error_exit "Failed to get WiFi interfaces"
+        fi
+
+        local interfaces_array=()
+        while IFS= read -r line; do
+            interfaces_array+=("$line")
+        done <<< "$interfaces"
+
+        if [[ ${#interfaces_array[@]} -eq 1 ]]; then
+            INTERFACE="${interfaces_array[0]}"
+            log_info "Using WiFi interface: $INTERFACE"
+        else
+            if [[ "$NON_INTERACTIVE" == "true" ]]; then
+                error_exit "Multiple WiFi interfaces found. Please specify one with --interface"
+            fi
+
+            if [[ "$HAS_GUM_UTILS" == "true" ]]; then
+                INTERFACE=$(printf '%s\n' "${interfaces_array[@]}" | gum choose --header "Select WiFi interface:")
+            else
+                echo "Available WiFi interfaces:"
+                for i in "${!interfaces_array[@]}"; do
+                    echo "$((i+1)). ${interfaces_array[i]}"
+                done
+                read -p "Select interface (1-${#interfaces_array[@]}): " choice
+                INTERFACE="${interfaces_array[$((choice-1))]}"
+            fi
+
+            [[ -z "$INTERFACE" ]] && error_exit "No interface selected"
+        fi
+    fi
+
+    # Scan for networks and get SSID if not specified
+    if [[ -z "$SSID" ]]; then
+        if [[ "$NON_INTERACTIVE" == "true" ]]; then
+            error_exit "SSID not specified. Use --ssid in non-interactive mode"
+        fi
+
+        local networks
+        if ! networks=$(scan_networks "$INTERFACE"); then
+            error_exit "Failed to scan for networks"
+        fi
+
+        local networks_array=()
+        while IFS= read -r line; do
+            networks_array+=("$line")
+        done <<< "$networks"
+
+        if [[ "$HAS_GUM_UTILS" == "true" ]]; then
+            SSID=$(printf '%s\n' "${networks_array[@]}" | gum choose --header "Select network to connect to:")
+        else
+            echo "Available networks:"
+            for i in "${!networks_array[@]}"; do
+                echo "$((i+1)). ${networks_array[i]}"
+            done
+            read -p "Select network (1-${#networks_array[@]}): " choice
+            SSID="${networks_array[$((choice-1))]}"
+        fi
+
+        [[ -z "$SSID" ]] && error_exit "No network selected"
+    fi
+
+    # Get password if not specified
+    if [[ -z "$PASSWORD" ]]; then
+        if [[ "$NON_INTERACTIVE" == "true" ]]; then
+            error_exit "Password not specified. Use --password in non-interactive mode"
+        fi
+
+        if [[ "$HAS_GUM_UTILS" == "true" ]]; then
+            PASSWORD=$(gum input --password --placeholder "Enter WiFi password for '$SSID'")
+        else
+            read -s -p "Enter WiFi password for '$SSID': " PASSWORD
+            echo
+        fi
+
+        [[ -z "$PASSWORD" ]] && error_exit "No password provided"
+    fi
+
+    # Connect to WiFi
+    if connect_wifi "$INTERFACE" "$SSID" "$PASSWORD"; then
+        if verify_connection "$INTERFACE" "$SSID"; then
+            log_info "WiFi connection change completed successfully!"
+        else
+            error_exit "Connection verification failed"
+        fi
+    else
+        error_exit "Failed to connect to WiFi network"
+    fi
+}
+
+# Run main function if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
