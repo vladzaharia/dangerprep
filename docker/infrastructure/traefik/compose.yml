@@ -31,6 +31,13 @@ services:
       - "traefik.http.routers.dashboard-external.service=api@internal"
       - "traefik.http.routers.dashboard-external.middlewares=auth"
 
+      # Dashboard - External (.argos.surf domain with Let's Encrypt)
+      - "traefik.http.routers.dashboard-argos.rule=Host(`traefik.argos.surf`)"
+      - "traefik.http.routers.dashboard-argos.entrypoints=websecure"
+      - "traefik.http.routers.dashboard-argos.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.dashboard-argos.service=api@internal"
+      - "traefik.http.routers.dashboard-argos.middlewares=auth"
+
       # Basic auth middleware for dashboard
       - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH_USERS}"
 
@@ -41,8 +48,6 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
       traefik: {}
-      dns:
-        ipv4_address: 172.21.0.3
 
 volumes:
   traefik-data:
@@ -50,8 +55,13 @@ volumes:
 
 networks:
   traefik:
-    external: true
     name: traefik
-  dns:
-    external: true
-    name: dns
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+    labels:
+      - "dangerprep.network=shared"
+      - "dangerprep.description=Shared network for Traefik reverse proxy"
+

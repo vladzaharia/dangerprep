@@ -62,6 +62,12 @@ services:
       - "traefik.http.routers.komodo-external.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.komodo-external.service=komodo"
 
+      # Komodo - External (.danger.diy domain with Let's Encrypt)
+      - "traefik.http.routers.komodo-argos.rule=Host(`docker.argos.surf`)"
+      - "traefik.http.routers.komodo-argos.entrypoints=websecure"
+      - "traefik.http.routers.komodo-argos.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.komodo-argos.service=komodo"
+
       # Service definition (shared by both routers)
       - "traefik.http.services.komodo.loadbalancer.server.port=9120"
 

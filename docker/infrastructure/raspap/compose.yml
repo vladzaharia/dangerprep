@@ -33,6 +33,12 @@ services:
       - "traefik.http.routers.raspap-external.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.raspap-external.service=raspap"
 
+      # RaspAP - External (.argos.surf domain with Let's Encrypt)
+      - "traefik.http.routers.raspap-argos.rule=Host(`router.argos.surf`)"
+      - "traefik.http.routers.raspap-argos.entrypoints=websecure"
+      - "traefik.http.routers.raspap-argos.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.raspap-argos.service=raspap"
+
       # Service definition (shared by both routers)
       - "traefik.http.services.raspap.loadbalancer.server.port=8080"
 

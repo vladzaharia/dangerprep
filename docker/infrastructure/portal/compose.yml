@@ -28,6 +28,12 @@ services:
       - "traefik.http.routers.portal-external.tls.certresolver=letsencrypt-cloudflare"
       - "traefik.http.routers.portal-external.service=portal"
 
+      # Portal - External (.argos.surf domain with Let's Encrypt)
+      - "traefik.http.routers.portal-argos.rule=Host(`portal.argos.surf`)"
+      - "traefik.http.routers.portal-argos.entrypoints=websecure"
+      - "traefik.http.routers.portal-argos.tls.certresolver=letsencrypt-cloudflare"
+      - "traefik.http.routers.portal-argos.service=portal"
+
       # Service definition (shared by both routers)
       - "traefik.http.services.portal.loadbalancer.server.port=3000"
 

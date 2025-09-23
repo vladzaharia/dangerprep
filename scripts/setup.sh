@@ -2010,31 +2010,12 @@ set_default_configuration_values() {
         ADMIN_EMAIL="admin@danger"
     fi
 
-    # Set default storage configuration with auto-detection
-    if [[ -z "${NVME_PARTITION_CONFIRMED:-}" ]]; then
-        # Auto-detect NVMe devices and enable partitioning if found
-        local nvme_devices=()
-        while IFS= read -r device; do
-            if [[ -n "$device" ]]; then
-                nvme_devices+=("$device")
-            fi
-        done < <(lsblk -d -n -o NAME 2>/dev/null | grep '^nvme' || true)
-
-        if [[ ${#nvme_devices[@]} -gt 0 ]]; then
-            log_info "Auto-detected NVMe devices: ${nvme_devices[*]}"
-            log_info "Enabling NVMe partitioning for non-interactive mode"
-            NVME_PARTITION_CONFIRMED="true"
-            NVME_DEVICE="/dev/${nvme_devices[0]}"
-        else
-            NVME_PARTITION_CONFIRMED="false"
-            NVME_DEVICE=""
-        fi
-    fi
+    # NVMe storage configuration removed for Armbian/KDE setup
 
     # Set default package selection (all categories for non-interactive mode)
     if [[ -z "${SELECTED_PACKAGE_CATEGORIES:-}" ]]; then
         SELECTED_PACKAGE_CATEGORIES="Convenience packages (vim, nano, htop, pv, gzip, exfatprogs, etc.)
-Network packages (netplan, tc, iperf3, tailscale, etc.)
+Network packages (iproute2, iperf3, tailscale, systemd-resolved, etc.)
 Security packages (fail2ban, clamav, etc.)
 Monitoring packages (sensors, collectd, etc.)
 Backup packages (borgbackup, restic)
@@ -2087,7 +2068,7 @@ GPIO/PWM access"
     export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
     export NEW_USERNAME NEW_USER_FULLNAME PI_USER_PASSWORD
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
-    export NVME_PARTITION_CONFIRMED NVME_DEVICE
+    # NVMe configuration removed
     export NFS_ENABLED NFS_SERVER NFS_SELECTED_SHARES
     export SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM NOTIFICATION_EMAIL
 
@@ -2136,9 +2117,7 @@ SELECTED_DOCKER_SERVICES="${SELECTED_DOCKER_SERVICES:-}"
 FRIENDLYELEC_INSTALL_PACKAGES="$FRIENDLYELEC_INSTALL_PACKAGES"
 FRIENDLYELEC_ENABLE_FEATURES="$FRIENDLYELEC_ENABLE_FEATURES"
 
-# Storage Configuration
-NVME_PARTITION_CONFIRMED="${NVME_PARTITION_CONFIRMED:-false}"
-NVME_DEVICE="${NVME_DEVICE:-}"
+# Storage Configuration - NVMe support removed for Armbian/KDE setup
 
 # Kiosk Configuration (NanoPi M6)
 KIOSK_ENABLED="${KIOSK_ENABLED:-false}"
@@ -2450,9 +2429,6 @@ collect_configuration() {
     # User account configuration
     collect_user_account_configuration
 
-    # Storage configuration (NVMe drive setup)
-    collect_storage_configuration
-
     # NFS configuration (external content storage)
     collect_nfs_configuration
 
@@ -2475,7 +2451,7 @@ collect_configuration() {
     export FRIENDLYELEC_INSTALL_PACKAGES FRIENDLYELEC_ENABLE_FEATURES
     export NEW_USERNAME NEW_USER_FULLNAME PI_USER_PASSWORD
     export IMPORT_GITHUB_KEYS GITHUB_USERNAME
-    export NVME_PARTITION_CONFIRMED NVME_DEVICE
+    # NVMe configuration removed
     export KIOSK_ENABLED KIOSK_URL KIOSK_VNC_ENABLED KIOSK_VNC_PASSWORD
     export SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM NOTIFICATION_EMAIL ADMIN_EMAIL
     export TZ DOCKER_ENV_CONFIGURED
@@ -2505,7 +2481,7 @@ collect_package_configuration() {
     # Define package categories (same as in install_essential_packages)
     local package_categories=(
         "Convenience packages (vim, nano, htop, pv, gzip, exfatprogs, etc.)"
-        "Network packages (netplan, tc, iperf3, tailscale, etc.)"
+        "Network packages (iproute2, iperf3, tailscale, systemd-resolved, etc.)"
         "Security packages (fail2ban, clamav, etc.)"
         "Monitoring packages (sensors, collectd, etc.)"
         "Backup packages (borgbackup, restic)"
@@ -2697,16 +2673,6 @@ collect_kiosk_configuration() {
     enhanced_status_indicator "success" "Kiosk configuration completed"
 }
 
-# Collect storage configuration upfront
-collect_storage_configuration() {
-    echo
-    log_info "💾 Storage Configuration"
-    echo
-
-    # Configure NVMe storage (existing functionality)
-    configure_nvme_storage_options
-}
-
 # Collect NFS configuration upfront
 collect_nfs_configuration() {
     echo
@@ -2850,82 +2816,6 @@ collect_nfs_configuration() {
     enhanced_status_indicator "success" "NFS configuration completed"
 }
 
-# Configure NVMe storage options (existing functionality)
-configure_nvme_storage_options() {
-    # Check if NVMe devices exist
-    local nvme_devices=()
-    while IFS= read -r device; do
-        if [[ -n "$device" ]]; then
-            nvme_devices+=("$device")
-        fi
-    done < <(lsblk -d -n -o NAME 2>/dev/null | grep '^nvme' || true)
-
-    if [[ ${#nvme_devices[@]} -eq 0 ]]; then
-        log_info "No NVMe devices detected, skipping NVMe storage configuration"
-        export NVME_PARTITION_CONFIRMED="false"
-        export NVME_DEVICE=""
-        return 0
-    fi
-
-    # Use the first NVMe device (typically nvme0n1)
-    local nvme_device="/dev/${nvme_devices[0]}"
-    log_info "Found NVMe device: ${nvme_device}"
-
-    # Get device information
-    local device_size
-    device_size=$(lsblk -b -d -n -o SIZE "${nvme_device}" 2>/dev/null || echo "0")
-    local device_size_gb=$((device_size / 1024 / 1024 / 1024))
-
-    log_info "NVMe device size: ${device_size_gb}GB"
-
-    if [[ ${device_size_gb} -lt 100 ]]; then
-        log_warn "NVMe device is smaller than expected (${device_size_gb}GB), skipping partitioning"
-        export NVME_PARTITION_CONFIRMED="false"
-        return 0
-    fi
-
-    # Check for existing partitions
-    local existing_partitions
-    existing_partitions=$(lsblk -n -o NAME "${nvme_device}" 2>/dev/null | grep -c -v "^${nvme_devices[0]}$" || echo "0")
-
-    if [[ ${existing_partitions} -gt 0 ]]; then
-        log_warn "Existing partitions detected on ${nvme_device}"
-
-        # Show current partitions
-        echo
-        log_info "Current partition layout:"
-        lsblk "${nvme_device}" 2>/dev/null || true
-        echo
-
-        enhanced_warning_box "DESTRUCTIVE OPERATION WARNING" \
-            "⚠️  REPARTITIONING WILL PERMANENTLY DESTROY ALL EXISTING DATA!\n\n• All files and partitions on ${nvme_device} will be erased\n• This action cannot be undone\n• Make sure you have backups of any important data\n\nNew partition layout will be:\n• Single partition for /content using entire drive (media and files)" \
-            "danger"
-
-        if enhanced_confirm "I understand the risks and want to proceed with repartitioning ${nvme_device}" "false"; then
-            export NVME_PARTITION_CONFIRMED="true"
-            export NVME_DEVICE="${nvme_device}"
-            log_info "NVMe partitioning confirmed for ${nvme_device}"
-        else
-            export NVME_PARTITION_CONFIRMED="false"
-            export NVME_DEVICE=""
-            log_info "NVMe partitioning declined - will skip storage setup"
-        fi
-    else
-        # No existing partitions, safe to proceed
-        if enhanced_confirm "Set up NVMe storage with entire drive allocated to /content?" "true"; then
-            export NVME_PARTITION_CONFIRMED="true"
-            export NVME_DEVICE="${nvme_device}"
-            log_info "NVMe partitioning confirmed for ${nvme_device}"
-        else
-            export NVME_PARTITION_CONFIRMED="false"
-            export NVME_DEVICE=""
-            log_info "NVMe partitioning declined - will skip storage setup"
-        fi
-    fi
-}
-
-
-
 # Collect user account configuration upfront
 collect_user_account_configuration() {
     echo
@@ -3056,20 +2946,6 @@ Full Name: ${NEW_USER_FULLNAME:-"Not specified"}"
         user_config+=$'\n'"Pi User Password: Unchanged (security risk)"
     fi
 
-    # Storage configuration
-    local storage_config="NVMe Partitioning: "
-    if [[ "${NVME_PARTITION_CONFIRMED:-false}" == "true" ]]; then
-        storage_config+="Enabled"
-        if [[ -n "${NVME_DEVICE:-}" ]]; then
-            storage_config+=$'\n'"NVMe Device: ${NVME_DEVICE}"
-        fi
-        storage_config+=$'\n'"NVMe Layout: /content"
-    else
-        storage_config+="Disabled"
-    fi
-
-
-
     # SMTP/Notification configuration
     local smtp_config="SMTP Host: ${SMTP_HOST:-"Not configured"}
 Notification Email: ${NOTIFICATION_EMAIL:-"Not configured"}"
@@ -3101,7 +2977,6 @@ Environment Configured: ${DOCKER_ENV_CONFIGURED:-"false"}"
     enhanced_card "🐳 Docker Configuration" "$docker_config" "34" "34"
     enhanced_card "⚙️ Docker Environment" "$docker_env_config" "36" "36"
     enhanced_card "👤 User Configuration" "$user_config" "35" "35"
-    enhanced_card "💾 Storage Configuration" "$storage_config" "93" "93"
     enhanced_card "🗂️ NFS Configuration" "$nfs_config" "37" "37"
     enhanced_card "📧 SMTP/Notification Configuration" "$smtp_config" "214" "214"
 
@@ -3524,11 +3399,6 @@ detect_friendlyelec_features() {
         fi
     fi
 
-    # Check for M.2 interfaces
-    if [[ -d /sys/class/nvme ]]; then
-        features+=("M.2 NVMe")
-    fi
-
     # Log detected features
     if [[ ${#features[@]} -gt 0 ]]; then
         enhanced_status_indicator "info" "Hardware features: ${features[*]}"
@@ -3587,7 +3457,8 @@ backup_original_configs() {
         ""
         "/etc/sensors3.conf"
         "/etc/fstab"
-        "/etc/lightdm/lightdm.conf"
+        "        "/etc/lightdm/lightdm.conf"
+        "/etc/sddm.conf""
         "/etc/systemd/logind.conf"
         "/boot/config.txt"
 
@@ -3607,6 +3478,7 @@ backup_original_configs() {
         "/etc/environment.d"
         "/etc/gstreamer-1.0"
         "/etc/systemd/system/getty@tty1.service.d"
+        "/etc/sddm.conf.d"
         "/home/pi"
         "/etc/dangerprep"  # In case it already exists
     )
@@ -3684,7 +3556,7 @@ backup_original_configs() {
             while IFS= read -r -d '' file; do
                 local filename=$(basename "$file")
                 # Only backup files that might be modified by DangerPrep or are important system files
-                if [[ "$filename" =~ (dangerprep|docker|tailscale|rk3588|nanopi|mali|gpio|pwm|nvme|usb) ]] ||
+                if [[ "$filename" =~ (dangerprep|docker|tailscale|rk3588|nanopi|mali|gpio|pwm|usb) ]] ||
                    [[ "$dir" == "/etc/systemd/system" && "$filename" =~ \.(service|timer|socket)$ ]] ||
                    [[ "$dir" == "/usr/share/keyrings" && "$filename" =~ \.(gpg|asc)$ ]]; then
                     ((files_found++))
@@ -3901,6 +3773,8 @@ while IFS= read -r -d '' backup_file; do
             original_path="/etc/$original_name"
         elif [[ "$original_name" =~ ^(lightdm\.conf)$ ]]; then
             original_path="/etc/lightdm/$original_name"
+        elif [[ "$original_name" =~ ^(sddm\.conf)$ ]]; then
+            original_path="/etc/$original_name"
         elif [[ "$original_name" =~ ^(config\.txt)$ ]]; then
             original_path="/boot/$original_name"
         elif [[ "$original_name" =~ ^(pi)$ ]]; then
@@ -4475,7 +4349,7 @@ EOF
 
 # Configure NanoPi M6 M.2 interfaces
 configure_nanopi_m6_m2_interfaces() {
-    log_info "Configuring NanoPi M6 M.2 interfaces..."
+    log_info "Configuring NanoPi M6 M.2 interfaces (NVMe support removed)..."
 
     # The NanoPi M6 has:
     # - M.2 M-Key for NVMe SSD (PCIe 3.0 x4)
@@ -4623,38 +4497,42 @@ EOF
 configure_nanopi_m6_touchscreen_power() {
     log_info "Configuring NanoPi M6 touchscreen power management..."
 
-    # Configure GNOME/Ubuntu Desktop screen timeout (60 seconds)
-    if command -v gsettings >/dev/null 2>&1; then
-        log_info "Configuring GNOME desktop screen timeout..."
+    # Configure KDE Plasma Desktop screen timeout (60 seconds)
+    if command -v kwriteconfig5 >/dev/null 2>&1; then
+        log_info "Configuring KDE Plasma desktop screen timeout..."
 
-        # Set screen blank timeout to 60 seconds
-        gsettings set org.gnome.desktop.session idle-delay 60 2>/dev/null || true
+        # Disable screen lock
+        kwriteconfig5 --file ~/.config/kscreenlockerrc --group Daemon --key Autolock false 2>/dev/null || true
+        kwriteconfig5 --file ~/.config/kscreenlockerrc --group Daemon --key LockOnResume false 2>/dev/null || true
 
-        # Disable automatic screen lock (wake on touch without password)
-        gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null || true
-        gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null || true
+        # Configure power management - disable suspend and screen dimming
+        kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group DimDisplay --key idleTime 60000 2>/dev/null || true
+        kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group DPMSControl --key idleTime 60000 2>/dev/null || true
+        kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group SuspendSession --key idleTime 0 2>/dev/null || true
+        kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group SuspendSession --key suspendType 0 2>/dev/null || true
 
-        # Configure power settings to not suspend on idle
-        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
-        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
+        # Configure battery power management similarly
+        kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group DimDisplay --key idleTime 60000 2>/dev/null || true
+        kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group DPMSControl --key idleTime 60000 2>/dev/null || true
+        kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group SuspendSession --key idleTime 0 2>/dev/null || true
+        kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group SuspendSession --key suspendType 0 2>/dev/null || true
 
-        # CRITICAL: Disable screen dimming (this was missing and causes premature screen blanking)
-        gsettings set org.gnome.settings-daemon.plugins.power idle-dim false 2>/dev/null || true
-
-        log_info "GNOME desktop screen timeout configured"
+        log_info "KDE Plasma desktop screen timeout configured"
     fi
 
-    # Configure GNOME settings for GDM (login screen) - Ubuntu 24.04 specific
-    log_info "Configuring GDM login screen power management..."
-    if command -v sudo >/dev/null 2>&1 && id -u gdm >/dev/null 2>&1; then
-        # Configure GDM user settings to prevent login screen from blanking too quickly
-        sudo -u gdm dbus-run-session gsettings set org.gnome.desktop.session idle-delay 60 2>/dev/null || true
-        sudo -u gdm dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power idle-dim false 2>/dev/null || true
-        sudo -u gdm dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
-        sudo -u gdm dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
-        log_info "GDM login screen power management configured"
+    # Configure SDDM (KDE display manager) login screen power management
+    log_info "Configuring SDDM login screen power management..."
+    if [[ -f /etc/sddm.conf ]] || [[ -d /etc/sddm.conf.d ]]; then
+        # Create SDDM configuration for power management
+        mkdir -p /etc/sddm.conf.d
+        cat > /etc/sddm.conf.d/dangerprep-power.conf << 'EOF'
+[General]
+# Disable screen timeout on login screen
+DisplayStopTime=0
+EOF
+        log_info "SDDM login screen power management configured"
     else
-        log_warn "Could not configure GDM settings - gdm user not found or sudo not available"
+        log_warn "SDDM not found - display manager power management not configured"
     fi
 
     # Configure X11 DPMS settings for X11 sessions (fallback for non-Wayland)
@@ -4681,8 +4559,8 @@ if [[ "${XDG_SESSION_TYPE:-}" == "x11" ]] && [[ -n "${DISPLAY:-}" ]]; then
     # Log configuration
     logger "DangerPrep: Configured X11 touchscreen power management - 60s timeout"
 else
-    # Log that we're using Wayland (expected for Ubuntu 24.04)
-    logger "DangerPrep: Wayland session detected - using GNOME power management instead of X11 DPMS"
+    # Log that we're using Wayland (expected for KDE Plasma)
+    logger "DangerPrep: Wayland session detected - using KDE Plasma power management instead of X11 DPMS"
 fi
 EOF
 
@@ -4746,23 +4624,25 @@ EOF
 # DangerPrep User-level Touchscreen Power Management Configuration
 # This script configures user-specific settings for touchscreen power management
 
-# Configure GNOME settings for current user
-if command -v gsettings >/dev/null 2>&1; then
-    # Set screen blank timeout to 60 seconds
-    gsettings set org.gnome.desktop.session idle-delay 60 2>/dev/null || true
-
+# Configure KDE Plasma settings for current user
+if command -v kwriteconfig5 >/dev/null 2>&1; then
     # Disable screen lock
-    gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null || true
-    gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null || true
+    kwriteconfig5 --file ~/.config/kscreenlockerrc --group Daemon --key Autolock false 2>/dev/null || true
+    kwriteconfig5 --file ~/.config/kscreenlockerrc --group Daemon --key LockOnResume false 2>/dev/null || true
 
-    # Configure power settings
-    gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
-    gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
+    # Configure power management - 60 second timeout for screen dimming/blanking
+    kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group DimDisplay --key idleTime 60000 2>/dev/null || true
+    kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group DPMSControl --key idleTime 60000 2>/dev/null || true
+    kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group SuspendSession --key idleTime 0 2>/dev/null || true
+    kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group SuspendSession --key suspendType 0 2>/dev/null || true
 
-    # CRITICAL: Disable screen dimming (prevents premature screen blanking)
-    gsettings set org.gnome.settings-daemon.plugins.power idle-dim false 2>/dev/null || true
+    # Configure battery power management similarly
+    kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group DimDisplay --key idleTime 60000 2>/dev/null || true
+    kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group DPMSControl --key idleTime 60000 2>/dev/null || true
+    kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group SuspendSession --key idleTime 0 2>/dev/null || true
+    kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group SuspendSession --key suspendType 0 2>/dev/null || true
 
-    echo "Configured GNOME touchscreen power management for user: $(whoami)"
+    echo "Configured KDE Plasma touchscreen power management for user: $(whoami)"
 fi
 
 # Configure X11 settings for current session (only if running X11, not Wayland)
@@ -4774,7 +4654,7 @@ if [[ "${XDG_SESSION_TYPE:-}" == "x11" ]] && [[ -n "${DISPLAY:-}" ]] && command 
 
     echo "Configured X11 touchscreen power management for user: $(whoami)"
 elif [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
-    echo "Wayland session detected - using GNOME power management for user: $(whoami)"
+    echo "Wayland session detected - using KDE Plasma power management for user: $(whoami)"
 fi
 EOF
 
@@ -4784,7 +4664,7 @@ EOF
     log_info "Screen will automatically turn off after 60 seconds of inactivity"
     log_info "Touch, mouse, or keyboard input will wake the screen immediately"
     log_info "Configured for both Wayland (default) and X11 sessions"
-    log_info "Applied settings to both user sessions and GDM login screen"
+    log_info "Applied settings to both user sessions and SDDM login screen"
 }
 
 # Configure RK3588/RK3588S GPU settings
@@ -5892,8 +5772,6 @@ setup_docker_services() {
     done
     enhanced_status_indicator "success" "Created $created_base base directories"
 
-
-
     # Create content directories on /content partition (if mounted)
     if mountpoint -q /content 2>/dev/null; then
         local created_content=0
@@ -5956,10 +5834,6 @@ setup_docker_services() {
         enhanced_status_indicator "info" "No Docker configurations to copy"
     fi
 }
-
-
-
-
 
 # Setup container health monitoring using standardized patterns
 setup_container_health_monitoring() {
@@ -6048,474 +5922,6 @@ detect_network_interfaces() {
     export WIFI_INTERFACES="${wifi_interfaces[*]}"
 
     log_success "Network interfaces enumerated (RaspAP will handle configuration)"
-}
-
-# Detect and configure NVMe storage
-detect_and_configure_nvme_storage() {
-    # Allow users to skip NVMe configuration entirely
-    if [[ "${SKIP_NVME_CONFIG:-false}" == "true" ]]; then
-        log_info "Skipping NVMe configuration (SKIP_NVME_CONFIG=true)"
-        return 0
-    fi
-
-    log_info "Detecting NVMe storage devices..."
-
-    # Find NVMe devices
-    local nvme_devices=()
-    while IFS= read -r device; do
-        if [[ -n "$device" ]]; then
-            nvme_devices+=("$device")
-        fi
-    done < <(lsblk -d -n -o NAME | grep '^nvme')
-
-    if [[ ${#nvme_devices[@]} -eq 0 ]]; then
-        log_info "No NVMe devices detected, skipping NVMe configuration"
-        return 0
-    fi
-
-    log_info "Found NVMe devices: ${nvme_devices[*]}"
-
-    # Use the first NVMe device (typically nvme0n1)
-    local nvme_device="/dev/${nvme_devices[0]}"
-    log_info "Using NVMe device: ${nvme_device}"
-
-    # Get device information
-    local device_size
-    device_size=$(lsblk -b -d -n -o SIZE "${nvme_device}" 2>/dev/null || echo "0")
-    local device_size_gb=$((device_size / 1024 / 1024 / 1024))
-
-    log_info "NVMe device size: ${device_size_gb}GB"
-
-    if [[ ${device_size_gb} -lt 100 ]]; then
-        log_warn "NVMe device is smaller than expected (${device_size_gb}GB), skipping partitioning"
-        return 0
-    fi
-
-    # Check for existing partitions
-    local existing_partitions
-    existing_partitions=$(lsblk -n -o NAME "${nvme_device}" | grep -c -v "^${nvme_devices[0]}$")
-
-    # Check if partitioning was confirmed during configuration
-    if [[ "${NVME_PARTITION_CONFIRMED:-false}" != "true" ]]; then
-        # Check if there is exactly 1 partition that we can try to mount
-        if [[ ${existing_partitions} -eq 1 ]]; then
-            log_info "Partitioning was declined, but found exactly 1 partition. Attempting to mount existing partition..."
-            mount_existing_nvme_partitions "${nvme_device}"
-            return $?
-        else
-            log_info "NVMe partitioning was not confirmed during configuration, skipping"
-            return 0
-        fi
-    fi
-
-    if [[ ${existing_partitions} -gt 0 ]]; then
-        log_info "Existing partitions detected on ${nvme_device} - proceeding with repartitioning as confirmed during configuration"
-        lsblk "${nvme_device}"
-
-        # Aggressively unmount any mounted partitions
-        log_info "Unmounting existing partitions..."
-
-        # First, get all mounted partitions for this device
-        local mounted_partitions=()
-        while IFS= read -r line; do
-            if [[ -n "$line" ]]; then
-                local partition_name mountpoint
-                read -r partition_name _ _ mountpoint <<< "$line"
-                if [[ -n "$mountpoint" && "$mountpoint" != "" && "$mountpoint" != "[SWAP]" ]]; then
-                    mounted_partitions+=("${partition_name}:${mountpoint}")
-                fi
-            fi
-        done < <(lsblk -n -o NAME,SIZE,FSTYPE,MOUNTPOINT "${nvme_device}" | grep -v "^${nvme_devices[0]} ")
-
-        # Unmount each partition with multiple attempts and better process handling
-        for partition_info in "${mounted_partitions[@]}"; do
-            local partition_name="${partition_info%%:*}"
-            local mountpoint="${partition_info##*:}"
-            local partition_path="/dev/${partition_name}"
-
-            log_info "Unmounting ${partition_path} from ${mountpoint}..."
-
-            # Stop any systemd services that might be using the mountpoint
-            if command -v systemctl >/dev/null 2>&1; then
-                # Stop Docker services that might be using the mount
-                systemctl stop docker 2>/dev/null || true
-                # Stop any mount-related services
-                systemctl stop "$(systemd-escape --path "${mountpoint}").mount" 2>/dev/null || true
-                sleep 2
-            fi
-
-            # Kill any processes using the mountpoint with more aggressive approach
-            if command -v fuser >/dev/null 2>&1; then
-                # First try to identify what's using the mount
-                log_debug "Processes using ${mountpoint}:"
-                fuser -v "${mountpoint}" 2>/dev/null || true
-
-                # Kill processes using the mountpoint (SIGTERM first, then SIGKILL)
-                fuser -m "${mountpoint}" -TERM 2>/dev/null || true
-                sleep 3
-                fuser -m "${mountpoint}" -KILL 2>/dev/null || true
-                sleep 2
-            fi
-
-            # Also try lsof if available
-            if command -v lsof >/dev/null 2>&1; then
-                log_debug "Files open in ${mountpoint}:"
-                lsof +D "${mountpoint}" 2>/dev/null || true
-                # Kill processes with open files in the mountpoint
-                lsof +D "${mountpoint}" 2>/dev/null | awk 'NR>1 {print $2}' | xargs -r kill -TERM 2>/dev/null || true
-                sleep 2
-                lsof +D "${mountpoint}" 2>/dev/null | awk 'NR>1 {print $2}' | xargs -r kill -KILL 2>/dev/null || true
-                sleep 1
-            fi
-
-            # Try multiple unmount methods with retries
-            local unmount_success=false
-            local max_attempts=3
-
-            for attempt in $(seq 1 $max_attempts); do
-                log_debug "Unmount attempt $attempt/$max_attempts for ${mountpoint}"
-
-                # Method 1: Normal unmount
-                if umount "${mountpoint}" 2>/dev/null; then
-                    unmount_success=true
-                    log_info "Successfully unmounted ${mountpoint} (attempt $attempt)"
-                    break
-                # Method 2: Force unmount
-                elif umount -f "${mountpoint}" 2>/dev/null; then
-                    unmount_success=true
-                    log_info "Force unmounted ${mountpoint} (attempt $attempt)"
-                    break
-                # Method 3: Lazy unmount (only on last attempt)
-                elif [[ $attempt -eq $max_attempts ]] && umount -l "${mountpoint}" 2>/dev/null; then
-                    unmount_success=true
-                    log_warn "Lazy unmounted ${mountpoint} (will complete when no longer busy)"
-                    break
-                fi
-
-                # Wait before next attempt
-                if [[ $attempt -lt $max_attempts ]]; then
-                    sleep 2
-                fi
-            done
-
-            if ! $unmount_success; then
-                log_warn "Failed to unmount ${mountpoint} after $max_attempts attempts"
-                log_warn "This may require manual intervention or a system reboot"
-            fi
-        done
-
-        # Restart Docker if we stopped it
-        if command -v systemctl >/dev/null 2>&1; then
-            systemctl start docker 2>/dev/null || true
-        fi
-
-        # Wait for lazy unmounts to complete and sync
-        sync
-        sleep 5
-
-        # Final check - if any partitions are still mounted, provide recovery options
-        local still_mounted_partitions=()
-        while IFS= read -r line; do
-            if [[ -n "$line" && "$line" != "" ]]; then
-                still_mounted_partitions+=("$line")
-            fi
-        done < <(lsblk -n -o NAME,MOUNTPOINT "${nvme_device}" | grep -v "^${nvme_devices[0]} " | awk '$2 != "" {print $1 ":" $2}')
-
-        if [[ ${#still_mounted_partitions[@]} -gt 0 ]]; then
-            log_error "Some partitions are still mounted after unmount attempts:"
-            lsblk "${nvme_device}"
-
-            log_info "Still mounted partitions:"
-            for partition in "${still_mounted_partitions[@]}"; do
-                log_info "  - ${partition}"
-            done
-
-            log_warn "Recovery options:"
-            log_warn "1. Reboot the system and run the setup script again"
-            log_warn "2. Manually unmount the partitions and run the script again"
-            log_warn "3. Skip NVMe partitioning by setting NVME_PARTITION_CONFIRMED=false"
-            log_warn "4. Skip NVMe configuration entirely by setting SKIP_NVME_CONFIG=true"
-
-            # Offer to continue without repartitioning if the existing partitions look correct
-            if [[ ${#still_mounted_partitions[@]} -eq 2 ]]; then
-                log_info "Found exactly 2 mounted partitions - attempting to use existing layout..."
-                if mount_existing_nvme_partitions "${nvme_device}"; then
-                    log_success "Successfully configured existing NVMe partitions"
-                    return 0
-                fi
-            fi
-
-            return 1
-        fi
-    fi
-
-    # Create new partition layout
-    create_nvme_partitions "${nvme_device}"
-
-    log_success "NVMe storage configuration completed"
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Create NVMe partitions (entire drive for /content)
-create_nvme_partitions() {
-    local nvme_device="$1"
-
-    log_info "Creating new partition layout on ${nvme_device}..."
-
-    # Ensure device is not busy and wipe existing partition table
-    sync
-    sleep 1
-
-    # Force kernel to re-read partition table
-    partprobe "${nvme_device}" 2>/dev/null || true
-    sleep 1
-
-    # Wipe existing partition table and filesystem signatures
-    wipefs -a "${nvme_device}" 2>/dev/null || true
-    dd if=/dev/zero of="${nvme_device}" bs=1M count=10 2>/dev/null || true
-    sync
-    sleep 1
-
-    # Create GPT partition table and partitions using parted
-    log_info "Creating GPT partition table..."
-    parted -s "${nvme_device}" mklabel gpt
-
-    # Create single partition for /content using entire drive
-    log_info "Creating /content partition using entire drive..."
-    parted -s "${nvme_device}" mkpart primary ext4 1MiB 100%
-
-    # Wait for kernel to recognize new partitions
-    sleep 2
-    partprobe "${nvme_device}"
-    sleep 2
-
-    # Format partition
-    local content_partition="${nvme_device}p1"
-
-    log_info "Formatting /content partition (${content_partition})..."
-    mkfs.ext4 -F -L "danger-content" "${content_partition}"
-
-    # Create mount point using standardized directory creation
-    if ! standard_create_directory "/content" "755" "root" "root"; then
-        log_error "Failed to create /content mount point"
-        return 1
-    fi
-
-    # BOOT FIX: Mount partition with comprehensive error handling
-    log_info "Mounting partition with boot safety checks..."
-
-    # Create mount point if it doesn't exist
-    mkdir -p /content
-
-    # Backup fstab before making changes
-    cp /etc/fstab /etc/fstab.backup-$(date +%Y%m%d-%H%M%S)
-
-    # Test mount content partition
-    if mount "${content_partition}" /content 2>/dev/null; then
-        log_success "Successfully mounted content partition"
-
-        # Test if mount is working properly
-        if touch /content/.mount-test 2>/dev/null && rm /content/.mount-test 2>/dev/null; then
-            log_info "Content partition mount verified"
-        else
-            log_warn "Content partition mounted but not writable"
-            umount /content 2>/dev/null || true
-            content_partition=""
-        fi
-    else
-        log_warn "Failed to mount content partition"
-        log_error "Content partition mount failed - this is critical for the setup"
-        return 1
-    fi
-
-    # BOOT FIX: Only add to fstab if mount was successful
-    log_info "Adding successfully mounted partition to /etc/fstab..."
-
-    # Remove any existing entries for these mount points
-    sed -i '\|/var/lib/docker|d' /etc/fstab
-    sed -i '\|/content|d' /etc/fstab
-
-    # Add new entry for successfully mounted partition
-    if [[ -n "${content_partition}" ]] && mountpoint -q /content; then
-        echo "LABEL=danger-content /content ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
-        log_info "Added content partition to fstab with nofail option"
-    fi
-
-    # Verify fstab syntax
-    if mount -a --fake 2>/dev/null; then
-        log_success "fstab syntax verified"
-    else
-        log_error "fstab syntax error detected, restoring backup"
-        cp /etc/fstab.backup-$(date +%Y%m%d-%H%M%S) /etc/fstab
-    fi
-
-    # Create content subdirectories on /content partition
-    local content_subdirs=(
-        "/content/movies" "/content/tv" "/content/webtv" "/content/music"
-        "/content/audiobooks" "/content/books" "/content/comics" "/content/magazines"
-        "/content/games/roms" "/content/kiwix" "/content/media" "/content/documents"
-        "/content/downloads" "/content/sync"
-    )
-
-    log_info "Creating content subdirectories on /content partition with dockerapp ownership..."
-    for subdir in "${content_subdirs[@]}"; do
-        if ! standard_create_directory "$subdir" "755" "dockerapp" "dockerapp"; then
-            log_error "Failed to create directory: $subdir"
-            return 1
-        fi
-    done
-
-    log_info "NVMe partition layout:"
-    log_info "  ${content_partition} -> /content (entire drive)"
-
-    # Show final layout
-    if gum_available; then
-        log_info "📋 Final NVMe Partition Layout"
-        enhanced_table "Partition,Mount,Size,Filesystem,Label" \
-            "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}" || echo "Unknown"),ext4,danger-content"
-    fi
-
-    log_success "NVMe partitions created and mounted successfully"
-}
-
-# Mount existing NVMe partition without formatting
-mount_existing_nvme_partitions() {
-    local nvme_device="$1"
-
-    log_info "Attempting to mount existing partition on ${nvme_device}..."
-
-    # Get the partition name (single partition layout)
-    local content_partition="${nvme_device}p1"
-
-    # Verify partition exists
-    if [[ ! -b "${content_partition}" ]]; then
-        log_error "Expected partition ${content_partition} does not exist"
-        return 1
-    fi
-
-    log_info "Found partition: ${content_partition}"
-
-    # Show current partition information
-    log_info "Current partition layout:"
-    lsblk "${nvme_device}" 2>/dev/null || true
-
-    # Create mount point using standardized directory creation
-    if ! standard_create_directory "/content" "755" "root" "root"; then
-        log_error "Failed to create /content mount point"
-        return 1
-    fi
-
-    # Create mount point if it doesn't exist (fallback)
-    mkdir -p /content
-
-    # Check if partition is already mounted
-    local content_already_mounted=""
-
-    if mountpoint -q /content 2>/dev/null; then
-        content_already_mounted=$(findmnt -n -o SOURCE /content 2>/dev/null || echo "")
-        log_info "/content is already mounted from: ${content_already_mounted}"
-    fi
-
-    # Backup fstab before making changes
-    cp /etc/fstab /etc/fstab.backup-$(date +%Y%m%d-%H%M%S)
-
-    # Mount content partition
-    local content_mount_success=false
-    if [[ "${content_already_mounted}" == "${content_partition}" ]]; then
-        log_info "Content partition already correctly mounted"
-        content_mount_success=true
-    elif [[ -n "${content_already_mounted}" ]]; then
-        log_warn "/content is mounted from different device (${content_already_mounted}), unmounting first"
-        umount /content 2>/dev/null || true
-    fi
-
-    if [[ "${content_mount_success}" != "true" ]]; then
-        log_info "Attempting to mount ${content_partition} to /content..."
-        if mount "${content_partition}" /content 2>/dev/null; then
-            log_success "Successfully mounted content partition"
-
-            # Test if mount is working properly
-            if touch /content/.mount-test 2>/dev/null && rm /content/.mount-test 2>/dev/null; then
-                log_info "Content partition mount verified"
-                content_mount_success=true
-            else
-                log_warn "Content partition mounted but not writable"
-                umount /content 2>/dev/null || true
-            fi
-        else
-            log_error "Failed to mount content partition: ${content_partition}"
-            return 1
-        fi
-    fi
-
-    # Update fstab for persistent mounting (only for successfully mounted partition)
-    local fstab_updated=false
-
-    if [[ "${content_mount_success}" == "true" ]]; then
-        # Get UUID for content partition
-        local content_uuid
-        content_uuid=$(blkid -s UUID -o value "${content_partition}" 2>/dev/null || echo "")
-
-        if [[ -n "${content_uuid}" ]]; then
-            # Remove any existing entries for /content and /var/lib/docker
-            sed -i '\|/var/lib/docker|d' /etc/fstab
-            sed -i '\|/content|d' /etc/fstab
-
-            # Add new entry using UUID
-            echo "UUID=${content_uuid} /content ext4 defaults,noatime 0 2" >> /etc/fstab
-            log_info "Added /content to fstab with UUID=${content_uuid}"
-            fstab_updated=true
-        else
-            log_warn "Could not get UUID for content partition, using device path in fstab"
-            sed -i '\|/var/lib/docker|d' /etc/fstab
-            sed -i '\|/content|d' /etc/fstab
-            echo "${content_partition} /content ext4 defaults,noatime 0 2" >> /etc/fstab
-            fstab_updated=true
-        fi
-    fi
-
-    # Test fstab entries if we updated it
-    if [[ "${fstab_updated}" == "true" ]]; then
-        log_info "Testing fstab entries..."
-        if mount -a 2>/dev/null; then
-            log_success "fstab entries validated successfully"
-        else
-            log_warn "fstab validation failed, but continuing (entries may still work on reboot)"
-        fi
-    fi
-
-    # Report results
-    if [[ "${content_mount_success}" == "true" ]]; then
-        log_success "Existing partition mounted successfully"
-
-        # Show final layout
-        if gum_available; then
-            log_info "📋 Mounted NVMe Partition Layout"
-            enhanced_table "Partition,Mount,Size,Filesystem" \
-                "${content_partition},/content,$(lsblk -n -o SIZE "${content_partition}" || echo "Unknown"),$(lsblk -n -o FSTYPE "${content_partition}" || echo "Unknown")"
-        fi
-
-        log_info "NVMe partition layout:"
-        log_info "  ${content_partition} -> /content ($(lsblk -n -o SIZE "${content_partition}" || echo "Unknown"))"
-
-        return 0
-    else
-        log_error "Failed to mount existing partition"
-        return 1
-    fi
 }
 
 # Load and export environment variables from a file, respecting script-defined variables
@@ -7124,7 +6530,7 @@ net.ipv4.tcp_wmem = 4096 65536 16777216
 net.ipv4.tcp_congestion_control = bbr
 
 # I/O scheduler optimizations
-# These will be applied via udev rules for NVMe and eMMC
+# NVMe optimizations removed for Armbian/KDE setup
 EOF
 
     # Create udev rules for I/O scheduler optimization
@@ -7133,8 +6539,6 @@ EOF
 
 # NVMe drives - use mq-deadline for better performance
 ACTION=="add|change", KERNEL=="nvme[0-9]*", ATTR{queue/scheduler}="mq-deadline"
-
-
 
 # Set read-ahead for storage devices
 ACTION=="add|change", KERNEL=="nvme[0-9]*", ATTR{bdi/read_ahead_kb}="512"
@@ -7600,7 +7004,7 @@ Comment=Configure touchscreen power management settings
 Exec=/usr/local/bin/configure-touchscreen-power-user
 Hidden=false
 NoDisplay=true
-X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel
 StartupNotify=false
 EOF
 
@@ -7646,9 +7050,22 @@ update_user_references() {
         fi
     fi
 
-    # Keep lightdm autologin enabled for pi user
-    if [[ -f "/etc/lightdm/lightdm.conf" ]]; then
-        log_info "Keeping lightdm autologin enabled for pi user"
+    # Configure SDDM autologin for pi user (KDE display manager)
+    if [[ -f "/etc/sddm.conf" ]] || [[ -d "/etc/sddm.conf.d" ]]; then
+        log_info "Configuring SDDM autologin for pi user"
+        # Create SDDM configuration directory if it doesn't exist
+        mkdir -p /etc/sddm.conf.d
+
+        # Create autologin configuration
+        cat > /etc/sddm.conf.d/dangerprep-autologin.conf << 'EOF'
+[Autologin]
+User=pi
+Session=plasma
+EOF
+        log_success "SDDM autologin configured for pi user"
+    elif [[ -f "/etc/lightdm/lightdm.conf" ]]; then
+        # Fallback to lightdm if SDDM is not available
+        log_info "SDDM not found, configuring lightdm autologin for pi user"
         # Backup original configuration
         cp /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup-$(date +%Y%m%d-%H%M%S)
 
@@ -7661,6 +7078,8 @@ update_user_references() {
         else
             log_info "Lightdm autologin already configured for pi user"
         fi
+    else
+        log_warn "Neither SDDM nor lightdm configuration found"
     fi
 
     # Transfer cron jobs using standardized file operations
@@ -7728,8 +7147,15 @@ ResultAny=yes'
         return 1
     fi
 
-    # Also configure lightdm if present
-    if [[ -f "/etc/lightdm/lightdm.conf" ]]; then
+    # Configure display manager screen lock settings
+    if [[ -f "/etc/sddm.conf" ]] || [[ -d "/etc/sddm.conf.d" ]]; then
+        log_debug "Configuring SDDM screen lock settings"
+        mkdir -p /etc/sddm.conf.d
+
+        # SDDM screen lock configuration already handled in power management section
+        log_debug "SDDM screen lock settings configured via power management"
+    elif [[ -f "/etc/lightdm/lightdm.conf" ]]; then
+        # Fallback to lightdm configuration
         log_debug "Configuring lightdm screen lock settings"
 
         # Backup original config
@@ -7745,39 +7171,39 @@ ResultAny=yes'
         fi
     fi
 
-    # Configure gsettings for GNOME/Ubuntu desktop if present
+    # Configure KDE Plasma desktop settings if present
     local new_user_home="/home/$NEW_USERNAME"
     if [[ -n "${NEW_USERNAME:-}" ]] && [[ -d "$new_user_home" ]]; then
-        log_debug "Configuring desktop screen lock settings for $NEW_USERNAME"
+        log_debug "Configuring KDE desktop screen lock settings for $NEW_USERNAME"
 
-        # Create script to configure desktop settings for new user
-        cat > "/tmp/configure-desktop-settings.sh" << EOF
+        # Create script to configure KDE desktop settings for new user
+        cat > "/tmp/configure-kde-desktop-settings.sh" << EOF
 #!/bin/bash
 export DISPLAY=:0
-export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/\$(id -u)/bus"
 
 # Disable screen lock
-gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null || true
-gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null || true
-gsettings set org.gnome.desktop.session idle-delay 0 2>/dev/null || true
+kwriteconfig5 --file ~/.config/kscreenlockerrc --group Daemon --key Autolock false 2>/dev/null || true
+kwriteconfig5 --file ~/.config/kscreenlockerrc --group Daemon --key LockOnResume false 2>/dev/null || true
 
-# Disable automatic suspend
-gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null || true
-gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null || true
+# Configure power management - disable suspend
+kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group SuspendSession --key idleTime 0 2>/dev/null || true
+kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group AC --group SuspendSession --key suspendType 0 2>/dev/null || true
+kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group SuspendSession --key idleTime 0 2>/dev/null || true
+kwriteconfig5 --file ~/.config/powermanagementprofilesrc --group Battery --group SuspendSession --key suspendType 0 2>/dev/null || true
 EOF
 
-        chmod +x "/tmp/configure-desktop-settings.sh"
+        chmod +x "/tmp/configure-kde-desktop-settings.sh"
 
         # Schedule to run when user logs in
         mkdir -p "$new_user_home/.config/autostart"
         cat > "$new_user_home/.config/autostart/configure-dangerprep-desktop.desktop" << EOF
 [Desktop Entry]
 Type=Application
-Name=Configure DangerPrep Desktop
-Exec=/tmp/configure-desktop-settings.sh
+Name=Configure DangerPrep KDE Desktop
+Exec=/tmp/configure-kde-desktop-settings.sh
 Hidden=false
 NoDisplay=true
-X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel
 EOF
 
         chown -R "$NEW_USERNAME:$NEW_USERNAME" "$new_user_home/.config" 2>/dev/null || true
@@ -7804,9 +7230,11 @@ setup_kiosk_mode() {
     # Install required packages
     log_info "Installing kiosk mode packages..."
     local kiosk_packages=(
-        "gnome-kiosk"
-        "gnome-kiosk-script-session"
         "firefox"
+        "openbox"
+        "xorg"
+        "kde-config-kiosk"
+        "kwriteconfig5"
     )
 
     if [[ "${KIOSK_VNC_ENABLED:-false}" == "true" ]]; then
@@ -7846,7 +7274,7 @@ setup_kiosk_mode() {
     enhanced_status_indicator "success" "Installed ${total_packages} kiosk packages"
 
     # Configure kiosk mode for the pi user
-    configure_gnome_kiosk "pi"
+    configure_kde_kiosk "pi"
 
     if [[ "${KIOSK_VNC_ENABLED:-false}" == "true" ]]; then
         setup_vnc_server "pi"
@@ -7866,51 +7294,297 @@ setup_kiosk_mode() {
     log_info "Switch modes: dp-kiosk / dp-desktop"
 }
 
-# Configure GNOME kiosk session for user
-configure_gnome_kiosk() {
+# Configure KDE kiosk session for user with comprehensive lockdown
+configure_kde_kiosk() {
     local username="$1"
     local user_home="/home/$username"
 
-    log_info "Configuring GNOME kiosk for user: $username"
+    log_info "Configuring secure KDE kiosk for user: $username"
 
-    # Create kiosk script directory
-    if ! standard_create_directory "$user_home/.local/bin" "755" "$username" "$username"; then
-        log_error "Failed to create kiosk script directory"
+    # Only apply kiosk restrictions to the pi user
+    if [[ "$username" == "pi" ]]; then
+        log_info "Applying KDE kiosk restrictions to pi user only"
+        setup_user_kde_kiosk_restrictions "$username" "$user_home"
+    else
+        log_info "Skipping kiosk restrictions for user $username (normal desktop experience)"
+    fi
+
+    # Create autostart directory
+    if ! standard_create_directory "$user_home/.config/autostart" "755" "$username" "$username"; then
+        log_error "Failed to create autostart directory"
         return 1
     fi
 
-    # Create GNOME kiosk script
-    local kiosk_script="$user_home/.local/bin/gnome-kiosk-script"
-    cat > "$kiosk_script" << EOF
-#!/bin/bash
-# DangerPrep GNOME Kiosk Script
-# This script runs the kiosk application in fullscreen mode
-
-# Set display
-export DISPLAY=:0
-
-# Clear any crash flags from previous Firefox sessions
-if [[ -f "$user_home/.mozilla/firefox/*/prefs.js" ]]; then
-    find "$user_home/.mozilla/firefox" -name "prefs.js" -exec sed -i 's/user_pref("toolkit.startup.max_resumed_crashes", [0-9]*);/user_pref("toolkit.startup.max_resumed_crashes", -1);/' {} \; 2>/dev/null || true
-fi
-
-# Launch Firefox in kiosk mode
-firefox --kiosk --no-first-run --disable-restore-session-state "${KIOSK_URL:-https://google.com}" &
-
-# Keep the script running and restart Firefox if it crashes
-while true; do
-    sleep 10
-    if ! pgrep -f "firefox.*kiosk" >/dev/null; then
-        log_info "Firefox kiosk crashed, restarting..."
-        firefox --kiosk --no-first-run --disable-restore-session-state "${KIOSK_URL:-https://google.com}" &
-    fi
-done
+    # Create Firefox kiosk autostart entry (only for pi user)
+    if [[ "$username" == "pi" ]]; then
+        cat > "$user_home/.config/autostart/firefox-kiosk.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=DangerPrep Kiosk
+Comment=Launch Firefox in kiosk mode for DangerPrep dashboard
+Exec=firefox --kiosk --new-instance --no-first-run --disable-restore-session-state "${KIOSK_URL:-http://localhost:8080}"
+Hidden=false
+NoDisplay=false
+X-KDE-autostart-after=panel
+StartupNotify=false
 EOF
 
-    chmod +x "$kiosk_script"
-    chown "$username:$username" "$kiosk_script"
+        chown "$username:$username" "$user_home/.config/autostart/firefox-kiosk.desktop"
+        log_info "Firefox kiosk autostart configured for pi user"
+    else
+        log_info "Skipping Firefox kiosk autostart for user $username (normal desktop experience)"
+    fi
 
-    enhanced_status_indicator "success" "GNOME kiosk script created"
+    # User-specific KDE configuration is handled above based on username
+
+    # Create openbox configuration for minimal window manager (fallback)
+    if ! standard_create_directory "$user_home/.config/openbox" "755" "$username" "$username"; then
+        log_error "Failed to create openbox config directory"
+        return 1
+    fi
+
+    cat > "$user_home/.config/openbox/autostart" << EOF
+#!/bin/bash
+# DangerPrep Openbox Kiosk Autostart
+# Launch Firefox in kiosk mode
+firefox --kiosk --new-instance --no-first-run --disable-restore-session-state "${KIOSK_URL:-http://localhost:8080}" &
+EOF
+
+    chmod +x "$user_home/.config/openbox/autostart"
+    chown "$username:$username" "$user_home/.config/openbox/autostart"
+
+    enhanced_status_indicator "success" "Secure KDE kiosk configuration created"
+}
+
+# Setup user-specific KDE kiosk restrictions (only for pi user)
+setup_user_kde_kiosk_restrictions() {
+    local username="$1"
+    local user_home="$2"
+
+    log_info "Setting up user-specific KDE kiosk restrictions for $username..."
+
+    # Create user config directory
+    if ! standard_create_directory "$user_home/.config" "755" "$username" "$username"; then
+        log_error "Failed to create user config directory"
+        return 1
+    fi
+
+    # Create user-specific kdeglobals with action restrictions
+    cat > "$user_home/.config/kdeglobals" << EOF
+# DangerPrep KDE Kiosk Configuration - User-specific restrictions for $username
+
+[KDE Action Restrictions][\$i]
+# Disable shell access and command execution
+shell_access=false
+run_command=false
+action/file_open=false
+action/file_save_as=false
+action/file_print=false
+action/edit_cut=false
+action/edit_copy=false
+action/edit_paste=false
+action/options_configure=false
+action/options_configure_toolbars=false
+action/help_contents=false
+action/help_whats_this=false
+
+# Disable logout and screen lock controls
+logout=false
+lock_screen=false
+
+# Disable toolbar modifications
+movable_toolbars=false
+action/options_show_toolbar=false
+
+# Disable desktop modifications
+plasma/plasmashell/unlockedDesktop=false
+
+# Disable text completion (security)
+lineedit_text_completion=false
+
+[KDE Control Module Restrictions][\$i]
+# Disable most system settings modules
+mouse.desktop=false
+keyboard.desktop=false
+displayconfiguration.desktop=false
+powerdevilprofilesconfig.desktop=false
+screenlocker.desktop=false
+autostart.desktop=false
+desktoptheme.desktop=false
+colors.desktop=false
+fonts.desktop=false
+icons.desktop=false
+style.desktop=false
+wallpaper.desktop=false
+workspaceoptions.desktop=false
+shortcuts.desktop=false
+kwineffects.desktop=false
+kwincompositing.desktop=false
+kwinscreenedges.desktop=false
+kwintabbox.desktop=false
+kwindesktop.desktop=false
+
+[KDE][\$i]
+SingleClick=true
+widgetStyle=breeze
+
+[General][\$i]
+ColorScheme=Breeze
+
+[Icons][\$i]
+Theme=breeze
+
+[Toolbar style][\$i]
+ToolButtonStyle=TextBesideIcon
+EOF
+
+    # Create user-specific URL restrictions to limit file system access
+    cat > "$user_home/.config/kioslaverc" << EOF
+# DangerPrep KDE URL Restrictions for $username
+
+[KDE URL Restrictions][\$i]
+rule_count=8
+# Block access to most of the filesystem
+rule_1=open,,,,file,,,false
+rule_2=list,,,,file,,,false
+# Allow access to home directory
+rule_3=open,,,,file,,\$HOME,true
+rule_4=list,,,,file,,\$HOME,true
+# Allow access to temp directory
+rule_5=open,,,,file,,\$TMP,true
+rule_6=list,,,,file,,\$TMP,true
+# Allow access to media directories
+rule_7=open,,,,file,,/media,true
+rule_8=list,,,,file,,/media,true
+EOF
+
+    # Lock down Plasma desktop configuration
+    cat > "$user_home/.config/plasma-org.kde.plasma.desktop-appletsrc" << EOF
+# DangerPrep Plasma Desktop Configuration - Minimal locked desktop for $username
+
+[ActionPlugins][0][\$i]
+RightButton;NoModifier=org.kde.contextmenu
+
+[Containments][1][\$i]
+activityId=
+formfactor=0
+immutability=1
+lastScreen=0
+location=0
+plugin=org.kde.plasma.folder
+wallpaperplugin=org.kde.image
+
+[Containments][1][Wallpaper][org.kde.image][General][\$i]
+Image=file:///usr/share/wallpapers/Next/contents/images/1920x1080.jpg
+EOF
+
+    # Lock down power management
+    cat > "$user_home/.config/powermanagementprofilesrc" << EOF
+# DangerPrep Power Management - Locked configuration for $username
+
+[AC][DimDisplay][\$i]
+idleTime=60000
+
+[AC][DPMSControl][\$i]
+idleTime=60000
+
+[AC][SuspendSession][\$i]
+idleTime=0
+suspendType=0
+
+[Battery][DimDisplay][\$i]
+idleTime=60000
+
+[Battery][DPMSControl][\$i]
+idleTime=60000
+
+[Battery][SuspendSession][\$i]
+idleTime=0
+suspendType=0
+EOF
+
+    # Lock down screen locker
+    cat > "$user_home/.config/kscreenlockerrc" << EOF
+# DangerPrep Screen Locker - Disabled for $username
+
+[Daemon][\$i]
+Autolock=false
+LockOnResume=false
+EOF
+
+    # Set proper ownership
+    chown -R "$username:$username" "$user_home/.config"
+
+    log_info "User-specific KDE kiosk restrictions configured for $username"
+}
+
+# Function removed - integrated into setup_user_kde_kiosk_restrictions
+
+# Detect current desktop environment
+detect_desktop_environment() {
+    local desktop_env="unknown"
+
+    # Check XDG_CURRENT_DESKTOP first (most reliable)
+    if [[ -n "${XDG_CURRENT_DESKTOP:-}" ]]; then
+        case "${XDG_CURRENT_DESKTOP,,}" in
+            *kde*|*plasma*)
+                desktop_env="kde"
+                ;;
+            *gnome*)
+                desktop_env="gnome"
+                ;;
+            *xfce*)
+                desktop_env="xfce"
+                ;;
+            *lxde*|*lxqt*)
+                desktop_env="lxde"
+                ;;
+            *)
+                desktop_env="${XDG_CURRENT_DESKTOP,,}"
+                ;;
+        esac
+    # Fallback to DESKTOP_SESSION
+    elif [[ -n "${DESKTOP_SESSION:-}" ]]; then
+        case "${DESKTOP_SESSION,,}" in
+            *kde*|*plasma*)
+                desktop_env="kde"
+                ;;
+            *gnome*)
+                desktop_env="gnome"
+                ;;
+            *xfce*)
+                desktop_env="xfce"
+                ;;
+            *)
+                desktop_env="${DESKTOP_SESSION,,}"
+                ;;
+        esac
+    # Check for running processes
+    elif pgrep -x "plasmashell" >/dev/null 2>&1; then
+        desktop_env="kde"
+    elif pgrep -x "gnome-shell" >/dev/null 2>&1; then
+        desktop_env="gnome"
+    elif pgrep -x "xfce4-panel" >/dev/null 2>&1; then
+        desktop_env="xfce"
+    fi
+
+    echo "$desktop_env"
+}
+
+# Get session type (X11 or Wayland)
+get_session_type() {
+    local session_type="${XDG_SESSION_TYPE:-unknown}"
+
+    # Fallback detection if XDG_SESSION_TYPE is not set
+    if [[ "$session_type" == "unknown" ]]; then
+        if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+            session_type="wayland"
+        elif [[ -n "${DISPLAY:-}" ]]; then
+            session_type="x11"
+        fi
+    fi
+
+    echo "$session_type"
 }
 
 # Setup VNC server for remote access
@@ -7983,20 +7657,21 @@ if [[ ! -f "\$ACCOUNTS_SERVICE_FILE" ]]; then
 fi
 
 echo "Switching to kiosk mode for user: \$USERNAME"
+echo "Note: Kiosk restrictions only apply to the 'pi' user"
 
 # Backup current session configuration
 cp "\$ACCOUNTS_SERVICE_FILE" "\$ACCOUNTS_SERVICE_FILE.backup-\$(date +%Y%m%d-%H%M%S)"
 
-# Update session to kiosk mode
-sed -i 's/^Session=.*/Session=gnome-kiosk-script-wayland/' "\$ACCOUNTS_SERVICE_FILE"
+# Update session to KDE Plasma (kiosk restrictions applied via system config)
+sed -i 's/^Session=.*/Session=plasma/' "\$ACCOUNTS_SERVICE_FILE"
 
 # Ensure the session line exists
 if ! grep -q "^Session=" "\$ACCOUNTS_SERVICE_FILE"; then
-    echo "Session=gnome-kiosk-script-wayland" >> "\$ACCOUNTS_SERVICE_FILE"
+    echo "Session=plasma" >> "\$ACCOUNTS_SERVICE_FILE"
 fi
 
 echo "Kiosk mode enabled. Restart the display manager or reboot to take effect."
-echo "To restart display manager: sudo systemctl restart gdm3"
+echo "To restart display manager: sudo systemctl restart sddm"
 EOF
 
     # Create desktop mode switcher script
@@ -8027,7 +7702,7 @@ if ! grep -q "^Session=" "\$ACCOUNTS_SERVICE_FILE"; then
 fi
 
 echo "Desktop mode enabled. Restart the display manager or reboot to take effect."
-echo "To restart display manager: sudo systemctl restart gdm3"
+echo "To restart display manager: sudo systemctl restart sddm"
 EOF
 
     # Make scripts executable
@@ -8055,18 +7730,18 @@ set_kiosk_mode_default() {
         # Backup existing configuration
         cp "$accounts_service_file" "$accounts_service_file.backup-$(date +%Y%m%d-%H%M%S)"
 
-        # Update session to kiosk mode
-        sed -i 's/^Session=.*/Session=gnome-kiosk-script-wayland/' "$accounts_service_file"
+        # Update session to KDE Plasma (kiosk restrictions applied via system config)
+        sed -i 's/^Session=.*/Session=plasma/' "$accounts_service_file"
 
         # Add session line if it doesn't exist
         if ! grep -q "^Session=" "$accounts_service_file"; then
-            echo "Session=gnome-kiosk-script-wayland" >> "$accounts_service_file"
+            echo "Session=plasma" >> "$accounts_service_file"
         fi
     else
         # Create new configuration file
         cat > "$accounts_service_file" << EOF
 [User]
-Session=gnome-kiosk-script-wayland
+Session=plasma
 SystemAccount=false
 EOF
     fi
@@ -8590,7 +8265,6 @@ main() {
     # Main installation phases with progress tracking
     local -a installation_phases=(
         "backup_original_configs:Backing up original configurations"
-        "detect_and_configure_nvme_storage:Detecting and configuring NVMe storage"
         "update_system_packages:Updating system packages"
         "install_essential_packages:Installing essential packages"
         "checkpoint_after_packages:Package installation checkpoint"
