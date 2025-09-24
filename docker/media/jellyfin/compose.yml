@@ -11,9 +11,9 @@ services:
       - /content/movies:/media/movies:ro
       - /content/tv:/media/tv:ro
       - /content/webtv:/media/webtv:ro
-      - /overflow/movies:/mnt/overflow/movies:ro
-      - /overflow/tv:/mnt/overflow/tv:ro
-      - /overflow/webtv:/mnt/overflow/webtv:ro
+      - /mnt/overflow/movies:/overflow/movies:ro
+      - /mnt/overflow/tv:/overflow/tv:ro
+      - /mnt/overflow/webtv:/overflow/webtv:ro
       - /content/music:/media/music:ro
       - /content/audiobooks:/media/audiobooks:ro
     env_file:
