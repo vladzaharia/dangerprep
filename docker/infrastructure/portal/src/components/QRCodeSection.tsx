@@ -2,8 +2,8 @@ import React, { useMemo } from 'react';
 
 export const QRCodeSection: React.FC = () => {
   // Environment variables (build-time)
-  const ssid = import.meta.env.VITE_WIFI_SSID || 'DangerPrep-Hotspot';
-  const password = import.meta.env.VITE_WIFI_PASSWORD || 'changeme';
+  const ssid = import.meta.env.VITE_WIFI_SSID || 'ArgonautWiFi';
+  const password = import.meta.env.VITE_WIFI_PASSWORD || 'Arg0sCubEh!';
 
   // Generate WiFi QR code string
   const wifiQRString = useMemo(() => {
