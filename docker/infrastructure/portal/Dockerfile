@@ -53,7 +53,8 @@ RUN apk add --no-cache \
     bash
 
 # Create docker group and non-root user with consistent UID/GID
-RUN addgroup -g 999 -S docker && \
+# Use a different GID for docker group to avoid conflicts
+RUN addgroup -g 998 -S docker && \
     addgroup -g 1001 -S appuser && \
     adduser -S appuser -u 1001 -G appuser && \
     adduser appuser docker
