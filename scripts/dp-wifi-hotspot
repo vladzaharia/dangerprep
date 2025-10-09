@@ -72,45 +72,55 @@ else
     HAS_BANNER=false
 fi
 
-# Logging functions
-log() {
-    local level="$1"
-    shift
-    local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+# Use enhanced logging from gum-utils if available, fallback to basic logging
+if [[ "$HAS_GUM_UTILS" == "true" ]]; then
+    # Set DEBUG environment variable for gum-utils debug logging
+    [[ "$VERBOSE" == "true" ]] && export DEBUG=true
 
-    # Log to file (with fallback for permission issues)
-    if mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null && echo "[$timestamp] [$level] $message" >> "$LOG_FILE" 2>/dev/null; then
-        : # Successfully logged to system log
-    else
-        # Fallback to user log directory
-        local user_log_dir="$HOME/.local/share/dangerprep/logs"
-        local user_log_file="$user_log_dir/$(basename "$LOG_FILE")"
-        mkdir -p "$user_log_dir" 2>/dev/null || true
-        echo "[$timestamp] [$level] $message" >> "$user_log_file" 2>/dev/null || true
-    fi
-    
-    # Log to console with colors
-    case "$level" in
-        "ERROR")
-            echo -e "${RED}[ERROR]${NC} $message" >&2
-            ;;
-        "WARN")
-            echo -e "${YELLOW}[WARN]${NC} $message" >&2
-            ;;
-        "INFO")
-            echo -e "${GREEN}[INFO]${NC} $message"
-            ;;
-        "DEBUG")
-            [[ "$VERBOSE" == "true" ]] && echo -e "${BLUE}[DEBUG]${NC} $message"
-            ;;
-    esac
-}
+    # Use enhanced logging functions from gum-utils.sh
+    # These are already defined in gum-utils.sh: log_info, log_warn, log_error, log_debug, log_success
+    :
+else
+    # Fallback logging functions when gum-utils is not available
+    log() {
+        local level="$1"
+        shift
+        local message="$*"
+        local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
 
-log_info() { log "INFO" "$@"; }
-log_warn() { log "WARN" "$@"; }
-log_error() { log "ERROR" "$@"; }
-log_debug() { log "DEBUG" "$@"; }
+        # Log to file (with fallback for permission issues)
+        if mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null && echo "[$timestamp] [$level] $message" >> "$LOG_FILE" 2>/dev/null; then
+            : # Successfully logged to system log
+        else
+            # Fallback to user log directory
+            local user_log_dir="$HOME/.local/share/dangerprep/logs"
+            local user_log_file="$user_log_dir/$(basename "$LOG_FILE")"
+            mkdir -p "$user_log_dir" 2>/dev/null || true
+            echo "[$timestamp] [$level] $message" >> "$user_log_file" 2>/dev/null || true
+        fi
+
+        # Log to console with colors
+        case "$level" in
+            "ERROR")
+                echo -e "${RED}[ERROR]${NC} $message" >&2
+                ;;
+            "WARN")
+                echo -e "${YELLOW}[WARN]${NC} $message" >&2
+                ;;
+            "INFO")
+                echo -e "${GREEN}[INFO]${NC} $message"
+                ;;
+            "DEBUG")
+                [[ "$VERBOSE" == "true" ]] && echo -e "${BLUE}[DEBUG]${NC} $message"
+                ;;
+        esac
+    }
+
+    log_info() { log "INFO" "$@"; }
+    log_warn() { log "WARN" "$@"; }
+    log_error() { log "ERROR" "$@"; }
+    log_debug() { log "DEBUG" "$@"; }
+fi
 
 # Error handling
 error_exit() {
@@ -270,17 +280,58 @@ get_wifi_interfaces() {
 # Get hotspot configuration
 get_hotspot_config() {
     local config=()
-    
+
+    # Check for existing hotspot configuration
+    local existing_ssid=""
+    local existing_interface=""
+    local existing_channel=""
+    local existing_ip=""
+    local has_existing_config=false
+
+    if [[ -f "$HOSTAPD_CONF" ]]; then
+        existing_ssid=$(grep "^ssid=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+        existing_interface=$(grep "^interface=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+        existing_channel=$(grep "^channel=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+
+        if [[ -n "$existing_ssid" ]] && [[ -n "$existing_interface" ]]; then
+            has_existing_config=true
+            log_info "Found existing hotspot configuration:"
+            log_info "  SSID: $existing_ssid"
+            log_info "  Interface: $existing_interface"
+            log_info "  Channel: $existing_channel"
+
+            # Check if hotspot is currently running
+            if systemctl is-active --quiet hostapd; then
+                log_info "  Status: ${GREEN}Running${NC}"
+            else
+                log_info "  Status: ${YELLOW}Stopped${NC}"
+            fi
+        fi
+    fi
+
     if [[ "$NON_INTERACTIVE" == "true" ]]; then
-        config=(
-            "$DEFAULT_INTERFACE"
-            "$DEFAULT_SSID"
-            "$DEFAULT_PASSWORD"
-            "$DEFAULT_IP"
-            "$DEFAULT_DHCP_START"
-            "$DEFAULT_DHCP_END"
-            "$DEFAULT_CHANNEL"
-        )
+        # Use existing config if available, otherwise use defaults
+        if [[ "$has_existing_config" == "true" ]]; then
+            config=(
+                "$existing_interface"
+                "$existing_ssid"
+                "$DEFAULT_PASSWORD"  # Can't retrieve password from config
+                "${existing_ip:-$DEFAULT_IP}"
+                "$DEFAULT_DHCP_START"
+                "$DEFAULT_DHCP_END"
+                "${existing_channel:-$DEFAULT_CHANNEL}"
+            )
+        else
+            config=(
+                "$DEFAULT_INTERFACE"
+                "$DEFAULT_SSID"
+                "$DEFAULT_PASSWORD"
+                "$DEFAULT_IP"
+                "$DEFAULT_DHCP_START"
+                "$DEFAULT_DHCP_END"
+                "$DEFAULT_CHANNEL"
+            )
+        fi
     else
         # Get WiFi interface
         local interfaces
@@ -296,7 +347,11 @@ get_hotspot_config() {
         fi
         
         local selected_interface
-        if [[ ${#interfaces_array[@]} -eq 1 ]]; then
+        # Use existing interface if available and valid
+        if [[ -n "$existing_interface" ]] && [[ " ${interfaces_array[*]} " =~ " ${existing_interface} " ]]; then
+            selected_interface="$existing_interface"
+            log_info "Using existing WiFi interface: $selected_interface"
+        elif [[ ${#interfaces_array[@]} -eq 1 ]]; then
             selected_interface="${interfaces_array[0]}"
             log_info "Using WiFi interface: $selected_interface"
         else
@@ -319,39 +374,44 @@ get_hotspot_config() {
         
         # Get other configuration
         local ssid password ip_address dhcp_start dhcp_end channel
-        
+
+        # Use existing config as defaults if available
+        local default_ssid="${existing_ssid:-$DEFAULT_SSID}"
+        local default_channel="${existing_channel:-$DEFAULT_CHANNEL}"
+        local default_ip="${existing_ip:-$DEFAULT_IP}"
+
         if [[ "$HAS_GUM_UTILS" == "true" ]]; then
-            ssid=$(enhanced_input "Enter hotspot SSID:" "$DEFAULT_SSID")
+            ssid=$(enhanced_input "Enter hotspot SSID:" "$default_ssid")
             password=$(enhanced_password "Enter hotspot password (min 8 chars):")
-            ip_address=$(enhanced_input "Enter hotspot IP address:" "$DEFAULT_IP")
+            ip_address=$(enhanced_input "Enter hotspot IP address:" "$default_ip")
             dhcp_start=$(enhanced_input "Enter DHCP range start:" "$DEFAULT_DHCP_START")
             dhcp_end=$(enhanced_input "Enter DHCP range end:" "$DEFAULT_DHCP_END")
-            channel=$(enhanced_input "Enter WiFi channel (1-11):" "$DEFAULT_CHANNEL")
+            channel=$(enhanced_input "Enter WiFi channel (1-11):" "$default_channel")
         else
-            echo -n "Enter hotspot SSID [$DEFAULT_SSID]: "
+            echo -n "Enter hotspot SSID [$default_ssid]: "
             read -r ssid
-            [[ -z "$ssid" ]] && ssid="$DEFAULT_SSID"
-            
+            [[ -z "$ssid" ]] && ssid="$default_ssid"
+
             echo -n "Enter hotspot password (min 8 chars): "
             read -rs password
             echo
             [[ -z "$password" ]] && password="$DEFAULT_PASSWORD"
-            
-            echo -n "Enter hotspot IP address [$DEFAULT_IP]: "
+
+            echo -n "Enter hotspot IP address [$default_ip]: "
             read -r ip_address
-            [[ -z "$ip_address" ]] && ip_address="$DEFAULT_IP"
-            
+            [[ -z "$ip_address" ]] && ip_address="$default_ip"
+
             echo -n "Enter DHCP range start [$DEFAULT_DHCP_START]: "
             read -r dhcp_start
             [[ -z "$dhcp_start" ]] && dhcp_start="$DEFAULT_DHCP_START"
-            
+
             echo -n "Enter DHCP range end [$DEFAULT_DHCP_END]: "
             read -r dhcp_end
             [[ -z "$dhcp_end" ]] && dhcp_end="$DEFAULT_DHCP_END"
-            
-            echo -n "Enter WiFi channel (1-11) [$DEFAULT_CHANNEL]: "
+
+            echo -n "Enter WiFi channel (1-11) [$default_channel]: "
             read -r channel
-            [[ -z "$channel" ]] && channel="$DEFAULT_CHANNEL"
+            [[ -z "$channel" ]] && channel="$default_channel"
         fi
         
         # Validate password length
