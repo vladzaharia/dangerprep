@@ -197,14 +197,30 @@ NOTES:
 EOF
 }
 
-# Check if running as root
+#######################################
+# Check if script is running with root privileges
+# Globals:
+#   EUID
+# Arguments:
+#   None
+# Returns:
+#   Exits with error if not running as root
+#######################################
 check_root() {
     if [[ ${EUID} -ne 0 ]]; then
         error_exit "This script must be run as root. Use: sudo ${0}"
     fi
 }
 
-# Check dependencies
+#######################################
+# Check for required system dependencies
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   Exits with error if dependencies are missing and cannot be installed
+#######################################
 check_dependencies() {
     local deps=("hostapd" "dnsmasq" "iptables" "systemctl")
     local missing_deps=()
@@ -272,7 +288,17 @@ create_lock() {
     fi
 }
 
-# Get available WiFi interfaces
+#######################################
+# Get available WiFi interfaces that support AP mode
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Writes list of WiFi interfaces to stdout, one per line
+# Returns:
+#   0 on success, 1 if no interfaces found
+#######################################
 get_wifi_interfaces() {
     local interfaces=()
     
@@ -298,7 +324,20 @@ get_wifi_interfaces() {
     printf '%s\n' "${interfaces[@]}"
 }
 
-# Get hotspot configuration
+#######################################
+# Get hotspot configuration from user or use existing/defaults
+# Globals:
+#   HOSTAPD_CONF
+#   DEFAULT_SSID, DEFAULT_PASSWORD, DEFAULT_INTERFACE, DEFAULT_IP
+#   DEFAULT_DHCP_START, DEFAULT_DHCP_END, DEFAULT_CHANNEL
+#   NON_INTERACTIVE, HAS_GUM_UTILS
+# Arguments:
+#   None
+# Outputs:
+#   Writes configuration values to stdout in format: ssid password interface ip dhcp_start dhcp_end channel
+# Returns:
+#   0 on success
+#######################################
 get_hotspot_config() {
     local config=()
 
@@ -455,7 +494,15 @@ get_hotspot_config() {
     printf '%s\n' "${config[@]}"
 }
 
-# Configure systemd-resolved to avoid port 53 conflicts
+#######################################
+# Configure systemd-resolved to avoid port 53 conflicts with dnsmasq
+# Globals:
+#   SYSTEMD_RESOLVED_CONF
+# Arguments:
+#   None
+# Returns:
+#   0 on success
+#######################################
 configure_systemd_resolved() {
     log_info "Configuring systemd-resolved to avoid port conflicts..."
     
@@ -491,13 +538,24 @@ EOF
     log_info "systemd-resolved configured and restarted"
 }
 
-# Configure hostapd
+#######################################
+# Configure hostapd for WiFi access point
+# Globals:
+#   HOSTAPD_CONF
+# Arguments:
+#   $1 - WiFi interface name
+#   $2 - SSID for the hotspot
+#   $3 - WPA2 password (min 8 characters)
+#   $4 - WiFi channel number
+# Returns:
+#   0 on success
+#######################################
 configure_hostapd() {
     local interface="$1"
     local ssid="$2"
     local password="$3"
     local channel="$4"
-    
+
     log_info "Configuring hostapd..."
     
     # Create hostapd configuration directory
@@ -609,7 +667,16 @@ EOF
     log_info "IP forwarding enabled"
 }
 
-# Configure firewall rules
+#######################################
+# Configure firewall rules for hotspot NAT and forwarding
+# Globals:
+#   None
+# Arguments:
+#   $1 - Hotspot WiFi interface name
+#   $2 - Hotspot IP address (currently unused but kept for future use)
+# Returns:
+#   0 on success
+#######################################
 configure_firewall() {
     local interface="$1"
     local ip_address="$2"
@@ -626,6 +693,17 @@ configure_firewall() {
     fi
 
     log_debug "Using WAN interface: $wan_interface"
+
+    # Flush existing rules to avoid duplication
+    log_debug "Flushing existing iptables rules..."
+    iptables -F 2>/dev/null || true
+    iptables -t nat -F 2>/dev/null || true
+    iptables -X 2>/dev/null || true
+
+    # Set default policies
+    iptables -P INPUT ACCEPT
+    iptables -P FORWARD ACCEPT
+    iptables -P OUTPUT ACCEPT
 
     # Configure iptables rules for NAT and forwarding
 

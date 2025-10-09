@@ -169,7 +169,15 @@ LOGS:
 EOF
 }
 
-# Check dependencies
+#######################################
+# Check for required system dependencies
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   Exits with error if dependencies are missing and cannot be installed
+#######################################
 check_dependencies() {
     local deps=("nmcli")
     local missing_deps=()
@@ -242,7 +250,17 @@ create_lock() {
     fi
 }
 
-# Get available WiFi interfaces
+#######################################
+# Get available WiFi interfaces from NetworkManager
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Writes list of WiFi interfaces to stdout, one per line
+# Returns:
+#   0 on success
+#######################################
 get_wifi_interfaces() {
     local interfaces=()
     
@@ -258,10 +276,20 @@ get_wifi_interfaces() {
     printf '%s\n' "${interfaces[@]}"
 }
 
-# Scan for available networks
+#######################################
+# Scan for available WiFi networks on an interface
+# Globals:
+#   None
+# Arguments:
+#   $1 - WiFi interface name
+# Outputs:
+#   Writes list of SSIDs to stdout, one per line
+# Returns:
+#   0 on success, 1 if no networks found
+#######################################
 scan_networks() {
     local interface="$1"
-    
+
     log_info "Scanning for available networks on $interface..."
     
     # Rescan for networks
@@ -283,12 +311,22 @@ scan_networks() {
     printf '%s\n' "${networks[@]}"
 }
 
-# Connect to WiFi network
+#######################################
+# Connect to a WiFi network using NetworkManager
+# Globals:
+#   None
+# Arguments:
+#   $1 - WiFi interface name
+#   $2 - SSID to connect to
+#   $3 - WiFi password
+# Returns:
+#   0 on success, 1 on failure
+#######################################
 connect_wifi() {
     local interface="$1"
     local ssid="$2"
     local password="$3"
-    
+
     log_info "Connecting to '$ssid' on interface '$interface'..."
     
     # Disconnect from current network first
