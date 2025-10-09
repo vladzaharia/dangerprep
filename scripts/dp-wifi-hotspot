@@ -322,7 +322,7 @@ get_hotspot_config() {
         
         if [[ "$HAS_GUM_UTILS" == "true" ]]; then
             ssid=$(enhanced_input "Enter hotspot SSID:" "$DEFAULT_SSID")
-            password=$(enhanced_input_password "Enter hotspot password (min 8 chars):")
+            password=$(enhanced_password "Enter hotspot password (min 8 chars):")
             ip_address=$(enhanced_input "Enter hotspot IP address:" "$DEFAULT_IP")
             dhcp_start=$(enhanced_input "Enter DHCP range start:" "$DEFAULT_DHCP_START")
             dhcp_end=$(enhanced_input "Enter DHCP range end:" "$DEFAULT_DHCP_END")
