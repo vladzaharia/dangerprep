@@ -5,6 +5,10 @@ const { createApiMiddleware } = require('./middleware.cjs');
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
+// Trust proxy settings for reverse proxy (Traefik)
+// This is required when running behind a reverse proxy to properly handle X-Forwarded-For headers
+app.set('trust proxy', true);
+
 // API routes
 app.use('/api', createApiMiddleware());
 

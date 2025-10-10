@@ -27,6 +27,33 @@ function loadEnvFile(): Record<string, string> {
   }
 }
 
+// Function to read WiFi configuration from hostapd.conf
+function readHostapdConfig(): { ssid?: string; password?: string } {
+  try {
+    const hostapdPath = '/etc/hostapd/hostapd.conf';
+    const hostapdContent = readFileSync(hostapdPath, 'utf8');
+
+    const config: { ssid?: string; password?: string } = {};
+
+    // Parse SSID
+    const ssidMatch = hostapdContent.match(/^ssid=(.+)$/m);
+    if (ssidMatch) {
+      config.ssid = ssidMatch[1].trim();
+    }
+
+    // Parse password
+    const passwordMatch = hostapdContent.match(/^wpa_passphrase=(.+)$/m);
+    if (passwordMatch) {
+      config.password = passwordMatch[1].trim();
+    }
+
+    return config;
+  } catch (error) {
+    console.warn('Could not read hostapd configuration:', error);
+    return {};
+  }
+}
+
 // Load environment variables
 const envVars = loadEnvFile();
 
@@ -97,13 +124,15 @@ export function apiPlugin(): Plugin {
               return process.env[key] || envVars[key] || fallback;
             };
 
-
+            // Read WiFi configuration from system hostapd config with fallback to env vars
+            const hostapdConfig = readHostapdConfig();
+            const wifiConfig = {
+              ssid: hostapdConfig.ssid || getEnvVar('WIFI_SSID', 'DangerPrep'),
+              password: hostapdConfig.password || getEnvVar('WIFI_PASSWORD', 'change_me'),
+            };
 
             const configData = {
-              wifi: {
-                ssid: getEnvVar('WIFI_SSID', 'DangerPrep'),
-                password: getEnvVar('WIFI_PASSWORD', 'change_me'),
-              },
+              wifi: wifiConfig,
               services: {
                 baseDomain: getEnvVar('BASE_DOMAIN', 'danger.diy'),
                 jellyfin: getEnvVar('JELLYFIN_SUBDOMAIN', 'media'),

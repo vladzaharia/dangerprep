@@ -21,8 +21,9 @@ The portal supports both build-time and runtime configuration. Runtime configura
 The portal fetches configuration from `/api/config` at runtime, allowing dynamic updates:
 
 #### WiFi Configuration
-- `WIFI_SSID`: WiFi network name
-- `WIFI_PASSWORD`: WiFi network password
+The portal automatically reads WiFi configuration from the system's hostapd configuration (`/etc/hostapd/hostapd.conf`) with fallback to environment variables:
+- `WIFI_SSID`: WiFi network name (fallback only)
+- `WIFI_PASSWORD`: WiFi network password (fallback only)
 
 #### Service URL Configuration
 The portal uses dynamic URL construction based on a base domain and service subdomains:
