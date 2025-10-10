@@ -590,6 +590,63 @@ main() {
                 error_exit "Multiple WiFi interfaces found. Please specify one with --interface"
             fi
 
+            # Show connection information for all interfaces before selection
+            echo
+            echo "WiFi Interface Information:"
+            echo "============================"
+            for iface in "${interfaces_array[@]}"; do
+                echo
+                echo "Interface: ${iface}"
+
+                # Get interface state
+                local state
+                state=$(nmcli -t -f DEVICE,STATE device status | grep "^${iface}:" | cut -d: -f2)
+
+                # Color code the state
+                case "$state" in
+                    "connected")
+                        echo -e "  State: ${GREEN}${state}${NC}"
+                        ;;
+                    "disconnected")
+                        echo -e "  State: ${YELLOW}${state}${NC}"
+                        ;;
+                    "unavailable")
+                        echo -e "  State: ${RED}${state}${NC}"
+                        ;;
+                    *)
+                        echo "  State: ${state}"
+                        ;;
+                esac
+
+                # Get current connection if connected
+                if [[ "$state" == "connected" ]]; then
+                    local iface_ssid
+                    iface_ssid=$(nmcli -t -f DEVICE,CONNECTION device status | grep "^${iface}:" | cut -d: -f2)
+                    [[ -n "$iface_ssid" ]] && echo "  Connected to: ${iface_ssid}"
+
+                    # Get IP address
+                    local ip_address
+                    ip_address=$(nmcli -t -f IP4.ADDRESS dev show "${iface}" 2>/dev/null | cut -d: -f2 | cut -d/ -f1)
+                    [[ -n "$ip_address" ]] && echo "  IP Address: ${ip_address}"
+
+                    # Get signal strength
+                    local signal
+                    signal=$(nmcli -t -f IN-USE,SIGNAL dev wifi | grep "^\*:" | cut -d: -f2)
+                    if [[ -n "$signal" ]]; then
+                        if [[ "$signal" -ge 70 ]]; then
+                            echo -e "  Signal: ${GREEN}${signal}%${NC}"
+                        elif [[ "$signal" -ge 50 ]]; then
+                            echo -e "  Signal: ${YELLOW}${signal}%${NC}"
+                        else
+                            echo -e "  Signal: ${RED}${signal}%${NC}"
+                        fi
+                    fi
+                fi
+            done
+            echo
+            echo "============================"
+            echo
+
             if [[ "$HAS_GUM_UTILS" == "true" ]]; then
                 INTERFACE=$(enhanced_choose "Select WiFi interface:" "${interfaces_array[@]}")
             else

@@ -345,12 +345,12 @@ setup_encryption_config() {
 
 install_encryption_scripts() {
     log_info "Installing encryption scripts..."
-    
+
     # Copy main encryption script
-    local main_script="$SCRIPT_DIR/../dangerprep-encryption.sh"
+    local main_script="$SCRIPT_DIR/../shared/encryption-utils.sh"
     if [[ -f "$main_script" ]]; then
         cp "$main_script" /usr/local/bin/
-        chmod +x /usr/local/bin/dangerprep-encryption.sh
+        chmod +x /usr/local/bin/encryption-utils.sh
     else
         log_error "Main encryption script not found: $main_script"
         return 1

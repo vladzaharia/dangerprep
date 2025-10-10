@@ -129,8 +129,17 @@ cleanup() {
     fi
 }
 
-# Trap cleanup on exit
+# Handle interrupt signal (Ctrl-C)
+handle_interrupt() {
+    echo
+    log_info "Received interrupt signal. Exiting..."
+    cleanup
+    exit 130
+}
+
+# Trap cleanup on exit and interrupt
 trap cleanup EXIT
+trap handle_interrupt INT
 
 # Show help
 show_help() {
