@@ -365,37 +365,24 @@ get_hotspot_config() {
 
     if [[ -n "$existing_ssid" ]] && [[ -n "$existing_interface" ]]; then
         has_existing_config=true
-        echo
-        echo "Found existing hotspot configuration:"
-        echo
-        echo "Interface: ${existing_interface}"
+        log_info "Found existing hotspot configuration:"
+        log_info "  SSID: ${existing_ssid}"
+        log_info "  Interface: ${existing_interface}"
+        log_info "  IP Address: ${existing_ip:-$DEFAULT_IP}"
+        log_info "  DHCP Range: ${existing_dhcp_start:-$DEFAULT_DHCP_START} - ${existing_dhcp_end:-$DEFAULT_DHCP_END}"
+        log_info "  Channel: ${existing_channel}"
 
         # Check if hotspot is currently running
-        local state
+        local status_color status_text
         if systemctl is-active --quiet hostapd; then
-            state="running"
+            status_color="${GREEN}"
+            status_text="Running"
         else
-            state="stopped"
+            status_color="${YELLOW}"
+            status_text="Stopped"
         fi
-
-        # Color code the state
-        case "$state" in
-            "running")
-                echo -e "  State: ${GREEN}${state}${NC}"
-                ;;
-            "stopped")
-                echo -e "  State: ${YELLOW}${state}${NC}"
-                ;;
-            *)
-                echo "  State: ${state}"
-                ;;
-        esac
-
-        echo "  SSID: ${existing_ssid}"
-        [[ -n "${existing_ip}" ]] && echo "  IP Address: ${existing_ip}"
-        [[ -n "${existing_dhcp_start}" && -n "${existing_dhcp_end}" ]] && echo "  DHCP Range: ${existing_dhcp_start} - ${existing_dhcp_end}"
-        [[ -n "${existing_channel}" ]] && echo "  Channel: ${existing_channel}"
-        echo
+        # Use echo -e to interpret color codes
+        echo -e "$(date '+%Y-%m-%dT%H:%M:%SZ') INFO   Status: ${status_color}${status_text}${NC}"
     fi
 
     if [[ "$NON_INTERACTIVE" == "true" ]]; then
