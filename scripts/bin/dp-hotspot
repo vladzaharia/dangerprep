@@ -328,6 +328,56 @@ get_wifi_interfaces() {
 }
 
 #######################################
+# Get actual values from running hotspot system
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Writes actual values to stdout in format: interface ssid channel ip
+# Returns:
+#   0 if hotspot is running, 1 otherwise
+#######################################
+get_actual_hotspot_values() {
+    # Check if hotspot is running
+    if ! systemctl is-active --quiet hostapd; then
+        return 1
+    fi
+
+    local actual_interface=""
+    local actual_ssid=""
+    local actual_channel=""
+    local actual_ip=""
+
+    # Get interface from running hostapd process
+    actual_interface=$(ps aux | grep '[h]ostapd' | grep -oP '\-i\s+\K\w+' 2>/dev/null || echo "")
+    if [[ -z "$actual_interface" ]]; then
+        # Try alternative method: check hostapd config being used
+        actual_interface=$(ps aux | grep '[h]ostapd' | grep -oP '/etc/hostapd/\S+' | head -1 | xargs grep "^interface=" 2>/dev/null | cut -d= -f2 || echo "")
+    fi
+
+    # Get values from interface if we found it
+    if [[ -n "$actual_interface" ]] && ip link show "$actual_interface" &>/dev/null 2>&1; then
+        # Get SSID
+        actual_ssid=$(iw dev "$actual_interface" info 2>/dev/null | grep ssid | awk '{$1=""; print $0}' | xargs || echo "")
+
+        # Get channel
+        actual_channel=$(iw dev "$actual_interface" info 2>/dev/null | grep channel | awk '{print $2}' || echo "")
+
+        # Get IP address
+        actual_ip=$(ip addr show "$actual_interface" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1 || echo "")
+    fi
+
+    # Return values
+    echo "$actual_interface"
+    echo "$actual_ssid"
+    echo "$actual_channel"
+    echo "$actual_ip"
+
+    return 0
+}
+
+#######################################
 # Get hotspot configuration from user or use existing/defaults
 # Globals:
 #   HOSTAPD_CONF
@@ -344,7 +394,23 @@ get_wifi_interfaces() {
 get_hotspot_config() {
     local config=()
 
-    # Check for existing hotspot configuration
+    # Try to get actual values from running system first
+    local actual_values=()
+    local has_actual_values=false
+
+    if systemctl is-active --quiet hostapd; then
+        log_debug "Hotspot is running, reading actual values from system..."
+        while IFS= read -r line; do
+            actual_values+=("$line")
+        done < <(get_actual_hotspot_values)
+
+        if [[ ${#actual_values[@]} -eq 4 ]]; then
+            has_actual_values=true
+            log_debug "Successfully read actual values from running system"
+        fi
+    fi
+
+    # Check for existing hotspot configuration from files
     local existing_ssid=""
     local existing_interface=""
     local existing_channel=""
@@ -372,84 +438,119 @@ get_hotspot_config() {
         fi
     fi
 
-    # Validate existing configuration values
-    local config_valid=true
+    # If we have actual values, use them and check if config needs updating
+    if [[ "$has_actual_values" == "true" ]]; then
+        local actual_interface="${actual_values[0]}"
+        local actual_ssid="${actual_values[1]}"
+        local actual_channel="${actual_values[2]}"
+        local actual_ip="${actual_values[3]}"
 
-    # Validate interface: should not contain spaces or brackets
-    if [[ -n "$existing_interface" ]] && [[ "$existing_interface" =~ [[:space:]\[\]] ]]; then
-        log_warn "Invalid interface in config: ${existing_interface}"
-        # Try to get actual interface from system
-        if ip link show "$existing_interface" &>/dev/null 2>&1; then
-            : # Interface exists, keep it
-        else
+        local config_needs_update=false
+
+        # Compare actual vs config values and log discrepancies
+        if [[ -n "$actual_interface" ]] && [[ "$actual_interface" != "$existing_interface" ]]; then
+            log_warn "Config interface mismatch: config='${existing_interface}' actual='${actual_interface}'"
+            existing_interface="$actual_interface"
+            config_needs_update=true
+        fi
+
+        if [[ -n "$actual_ssid" ]] && [[ "$actual_ssid" != "$existing_ssid" ]]; then
+            log_warn "Config SSID mismatch: config='${existing_ssid}' actual='${actual_ssid}'"
+            existing_ssid="$actual_ssid"
+            config_needs_update=true
+        fi
+
+        if [[ -n "$actual_channel" ]] && [[ "$actual_channel" != "$existing_channel" ]]; then
+            log_warn "Config channel mismatch: config='${existing_channel}' actual='${actual_channel}'"
+            existing_channel="$actual_channel"
+            config_needs_update=true
+        fi
+
+        if [[ -n "$actual_ip" ]] && [[ "$actual_ip" != "$existing_ip" ]]; then
+            log_warn "Config IP mismatch: config='${existing_ip}' actual='${actual_ip}'"
+            existing_ip="$actual_ip"
+            config_needs_update=true
+        fi
+
+        # Update config files if there are discrepancies
+        if [[ "$config_needs_update" == "true" ]]; then
+            log_info "Updating config files to match running system..."
+
+            # Get password from existing config (can't retrieve from running system)
+            local existing_password
+            existing_password=$(grep "^wpa_passphrase=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "$DEFAULT_PASSWORD")
+
+            # Update hostapd config
+            if [[ -n "$actual_interface" ]] && [[ -n "$actual_ssid" ]] && [[ -n "$actual_channel" ]]; then
+                configure_hostapd "$actual_interface" "$actual_ssid" "$existing_password" "$actual_channel" 2>/dev/null || true
+            fi
+
+            # Update dnsmasq config
+            if [[ -n "$actual_interface" ]] && [[ -n "$actual_ip" ]]; then
+                # Keep existing DHCP range if valid, otherwise use defaults
+                if [[ -z "$existing_dhcp_start" ]] || ! validate_ipv4 "$existing_dhcp_start" 2>/dev/null; then
+                    existing_dhcp_start="$DEFAULT_DHCP_START"
+                fi
+                if [[ -z "$existing_dhcp_end" ]] || ! validate_ipv4 "$existing_dhcp_end" 2>/dev/null; then
+                    existing_dhcp_end="$DEFAULT_DHCP_END"
+                fi
+                configure_dnsmasq "$actual_interface" "$actual_ip" "$existing_dhcp_start" "$existing_dhcp_end" 2>/dev/null || true
+            fi
+
+            log_success "Config files updated to match running system"
+        fi
+    fi
+
+    # Validate existing configuration values (only if we don't have actual values)
+    if [[ "$has_actual_values" == "false" ]]; then
+        local config_valid=true
+
+        # Validate interface: should not contain spaces or brackets
+        if [[ -n "$existing_interface" ]] && [[ "$existing_interface" =~ [[:space:]\[\]] ]]; then
+            log_warn "Invalid interface in config: ${existing_interface}"
             existing_interface=""
             config_valid=false
         fi
-    fi
 
-    # Validate SSID: should not be empty, same as interface, or look like an interface name
-    if [[ -n "$existing_ssid" ]]; then
-        # Check if SSID matches common interface name patterns
-        if [[ "$existing_ssid" =~ ^(wlan|eth|wlp|enp|eno|ens|wlo)[0-9]+$ ]] || \
-           [[ "$existing_ssid" == "$existing_interface" ]]; then
-            log_warn "Invalid SSID in config (looks like interface name): ${existing_ssid}"
-            existing_ssid=""
+        # Validate SSID: should not be empty, same as interface, or look like an interface name
+        if [[ -n "$existing_ssid" ]]; then
+            # Check if SSID matches common interface name patterns
+            if [[ "$existing_ssid" =~ ^(wlan|eth|wlp|enp|eno|ens|wlo)[0-9]+$ ]] || \
+               [[ "$existing_ssid" == "$existing_interface" ]]; then
+                log_warn "Invalid SSID in config (looks like interface name): ${existing_ssid}"
+                existing_ssid=""
+                config_valid=false
+            fi
+        fi
+
+        # Validate channel: should be a number between 1 and 14
+        if [[ -n "$existing_channel" ]] && ! [[ "$existing_channel" =~ ^[0-9]+$ ]]; then
+            log_warn "Invalid channel in config: ${existing_channel}"
+            existing_channel=""
+            config_valid=false
+        elif [[ -n "$existing_channel" ]] && { [[ "$existing_channel" -lt 1 ]] || [[ "$existing_channel" -gt 14 ]]; }; then
+            log_warn "Invalid channel in config: ${existing_channel}"
+            existing_channel=""
             config_valid=false
         fi
-    fi
 
-    # Validate channel: should be a number between 1 and 14
-    if [[ -n "$existing_channel" ]] && ! [[ "$existing_channel" =~ ^[0-9]+$ ]]; then
-        log_warn "Invalid channel in config: ${existing_channel}"
-        existing_channel=""
-        config_valid=false
-    elif [[ -n "$existing_channel" ]] && { [[ "$existing_channel" -lt 1 ]] || [[ "$existing_channel" -gt 14 ]]; }; then
-        log_warn "Invalid channel in config: ${existing_channel}"
-        existing_channel=""
-        config_valid=false
-    fi
-
-    # Validate IP: should be a valid IPv4 address
-    if [[ -n "$existing_ip" ]] && ! validate_ipv4 "$existing_ip" 2>/dev/null; then
-        log_warn "Invalid IP in config: ${existing_ip}"
-        existing_ip=""
-        config_valid=false
-    fi
-
-    # Validate DHCP range: should be valid IPs
-    if [[ -n "$existing_dhcp_start" ]] && ! validate_ipv4 "$existing_dhcp_start" 2>/dev/null; then
-        log_warn "Invalid DHCP start in config: ${existing_dhcp_start}"
-        existing_dhcp_start=""
-        config_valid=false
-    fi
-    if [[ -n "$existing_dhcp_end" ]] && ! validate_ipv4 "$existing_dhcp_end" 2>/dev/null; then
-        log_warn "Invalid DHCP end in config: ${existing_dhcp_end}"
-        existing_dhcp_end=""
-        config_valid=false
-    fi
-
-    # Try to get actual values from running system if config is invalid
-    if [[ "$config_valid" == "false" ]] && systemctl is-active --quiet hostapd; then
-        log_info "Attempting to read actual values from running system..."
-
-        # Get actual interface from running hostapd process
-        if [[ -z "$existing_interface" ]]; then
-            existing_interface=$(ps aux | grep '[h]ostapd' | grep -oP '\-i\s+\K\w+' || echo "")
+        # Validate IP: should be a valid IPv4 address
+        if [[ -n "$existing_ip" ]] && ! validate_ipv4 "$existing_ip" 2>/dev/null; then
+            log_warn "Invalid IP in config: ${existing_ip}"
+            existing_ip=""
+            config_valid=false
         fi
 
-        # Get actual IP from interface
-        if [[ -n "$existing_interface" ]] && [[ -z "$existing_ip" ]]; then
-            existing_ip=$(ip addr show "$existing_interface" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1 || echo "")
+        # Validate DHCP range: should be valid IPs
+        if [[ -n "$existing_dhcp_start" ]] && ! validate_ipv4 "$existing_dhcp_start" 2>/dev/null; then
+            log_warn "Invalid DHCP start in config: ${existing_dhcp_start}"
+            existing_dhcp_start=""
+            config_valid=false
         fi
-
-        # Get actual channel from interface
-        if [[ -n "$existing_interface" ]] && [[ -z "$existing_channel" ]]; then
-            existing_channel=$(iw dev "$existing_interface" info 2>/dev/null | grep channel | awk '{print $2}' || echo "")
-        fi
-
-        # Get actual SSID from interface
-        if [[ -n "$existing_interface" ]] && [[ -z "$existing_ssid" ]]; then
-            existing_ssid=$(iw dev "$existing_interface" info 2>/dev/null | grep ssid | awk '{$1=""; print $0}' | xargs || echo "")
+        if [[ -n "$existing_dhcp_end" ]] && ! validate_ipv4 "$existing_dhcp_end" 2>/dev/null; then
+            log_warn "Invalid DHCP end in config: ${existing_dhcp_end}"
+            existing_dhcp_end=""
+            config_valid=false
         fi
     fi
 
@@ -977,60 +1078,62 @@ show_status() {
 
     echo
 
-    # Show configuration if config files exist
+    # Show configuration - prefer actual values from running system
     if [[ -f "$HOSTAPD_CONF" ]]; then
         echo "Hotspot Configuration:"
-        local ssid interface channel country_code
-        ssid=$(grep "^ssid=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
-        interface=$(grep "^interface=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
-        channel=$(grep "^channel=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+
+        local ssid interface channel country_code ip_addr
+
+        # Try to get actual values from running system first
+        if systemctl is-active --quiet hostapd; then
+            local actual_values=()
+            while IFS= read -r line; do
+                actual_values+=("$line")
+            done < <(get_actual_hotspot_values)
+
+            if [[ ${#actual_values[@]} -eq 4 ]]; then
+                interface="${actual_values[0]}"
+                ssid="${actual_values[1]}"
+                channel="${actual_values[2]}"
+                ip_addr="${actual_values[3]}"
+            fi
+        fi
+
+        # Fall back to config values if actual values not available
+        if [[ -z "$interface" ]]; then
+            interface=$(grep "^interface=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+        fi
+        if [[ -z "$ssid" ]]; then
+            ssid=$(grep "^ssid=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+        fi
+        if [[ -z "$channel" ]]; then
+            channel=$(grep "^channel=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+        fi
         country_code=$(grep "^country_code=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
-
-        # Validate and get actual values if config is invalid
-        if [[ "$interface" =~ [[:space:]\[\]] ]] || ! ip link show "$interface" &>/dev/null 2>&1; then
-            # Try to get actual interface from running hostapd
-            interface=$(ps aux | grep '[h]ostapd' | grep -oP '\-i\s+\K\w+' || echo "Unknown")
-        fi
-
-        # Validate SSID: should not look like an interface name
-        if [[ "$ssid" =~ ^(wlan|eth|wlp|enp|eno|ens|wlo)[0-9]+$ ]] || \
-           [[ "$ssid" == "$interface" ]] || [[ "$ssid" == "Unknown" ]]; then
-            # Try to get actual SSID from interface
-            if [[ "$interface" != "Unknown" ]]; then
-                ssid=$(iw dev "$interface" info 2>/dev/null | grep ssid | awk '{$1=""; print $0}' | xargs || echo "Unknown")
-            fi
-        fi
-
-        if ! [[ "$channel" =~ ^[0-9]+$ ]] || [[ "$channel" -lt 1 ]] || [[ "$channel" -gt 14 ]]; then
-            # Try to get actual channel from interface
-            if [[ "$interface" != "Unknown" ]]; then
-                channel=$(iw dev "$interface" info 2>/dev/null | grep channel | awk '{print $2}' || echo "Unknown")
-            fi
-        fi
 
         echo "  SSID: ${ssid}"
         echo "  Interface: ${interface}"
         echo "  Channel: ${channel}"
         echo "  Country Code: ${country_code}"
 
-        # Show interface IP and DHCP range from dnsmasq
-        if [[ -f "$DNSMASQ_CONF" ]]; then
-            local ip_addr dhcp_range
+        # Show IP and DHCP range
+        if [[ -z "$ip_addr" ]] && [[ -f "$DNSMASQ_CONF" ]]; then
             ip_addr=$(grep "^listen-address=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+        fi
+
+        # If still no IP, try to get from interface
+        if [[ -z "$ip_addr" ]] && [[ "$interface" != "Unknown" ]]; then
+            ip_addr=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1 || echo "Unknown")
+        fi
+
+        echo "  IP Address: ${ip_addr:-Unknown}"
+
+        # Show DHCP range from dnsmasq config
+        if [[ -f "$DNSMASQ_CONF" ]]; then
+            local dhcp_range
             dhcp_range=$(grep "^dhcp-range=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "")
 
-            # If IP not in config or invalid, get from interface
-            if [[ -z "$ip_addr" ]] || ! validate_ipv4 "$ip_addr" 2>/dev/null; then
-                if [[ "$interface" != "Unknown" ]]; then
-                    ip_addr=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1 || echo "Unknown")
-                else
-                    ip_addr="Unknown"
-                fi
-            fi
-
-            echo "  IP Address: ${ip_addr}"
-
-            if [[ -n "$dhcp_range" ]] && [[ "$dhcp_range" != "Unknown" ]]; then
+            if [[ -n "$dhcp_range" ]]; then
                 local dhcp_start dhcp_end
                 dhcp_start=$(echo "$dhcp_range" | cut -d, -f1)
                 dhcp_end=$(echo "$dhcp_range" | cut -d, -f2)
@@ -1046,15 +1149,9 @@ show_status() {
             fi
         fi
 
-        # Show actual interface status
+        # Show interface status
         if [[ "$interface" != "Unknown" ]] && ip link show "$interface" &>/dev/null 2>&1; then
-            local actual_ip
-            actual_ip=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1 || echo "")
-            if [[ -n "$actual_ip" ]]; then
-                echo -e "  Interface Status: ${GREEN}UP${NC} (Actual IP: ${actual_ip})"
-            else
-                echo -e "  Interface Status: ${YELLOW}UP (no IP)${NC}"
-            fi
+            echo -e "  Interface Status: ${GREEN}UP${NC}"
         else
             echo -e "  Interface Status: ${RED}DOWN${NC}"
         fi
