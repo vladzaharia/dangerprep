@@ -19,49 +19,29 @@ set -euo pipefail
 readonly SCRIPT_NAME="dangerprep-encryption"
 readonly SCRIPT_VERSION="1.0.0"
 readonly CONFIG_FILE="/etc/dangerprep/encryption.yaml"
-readonly LOG_FILE="/var/log/dangerprep-encryption.log"
 readonly LOCK_FILE="/var/run/dangerprep-encryption.lock"
 
-# Colors for output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m' # No Color
+# Get script directory for sourcing shared utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SHARED_DIR="${SCRIPT_DIR}/shared"
 
-# Logging functions
-log() {
-    local level="$1"
-    shift
-    local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    
-    # Log to file
-    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
-    
-    # Log to console with colors
-    case "$level" in
-        "ERROR")
-            echo -e "${RED}[ERROR]${NC} $message" >&2
-            ;;
-        "WARN")
-            echo -e "${YELLOW}[WARN]${NC} $message" >&2
-            ;;
-        "INFO")
-            echo -e "${GREEN}[INFO]${NC} $message"
-            ;;
-        "DEBUG")
-            if [[ "${DEBUG:-false}" == "true" ]]; then
-                echo -e "${BLUE}[DEBUG]${NC} $message"
-            fi
-            ;;
-    esac
-}
+# Source shared utilities
+HAS_GUM_UTILS=false
+if [[ -f "${SHARED_DIR}/gum-utils.sh" ]]; then
+    # shellcheck source=scripts/shared/gum-utils.sh
+    source "${SHARED_DIR}/gum-utils.sh"
+    HAS_GUM_UTILS=true
+fi
 
-log_error() { log "ERROR" "$@"; }
-log_warn() { log "WARN" "$@"; }
-log_info() { log "INFO" "$@"; }
-log_debug() { log "DEBUG" "$@"; }
+# Source lock utilities
+if [[ -f "${SHARED_DIR}/lock-utils.sh" ]]; then
+    # shellcheck source=scripts/shared/lock-utils.sh
+    source "${SHARED_DIR}/lock-utils.sh"
+fi
+
+# Setup logging with gum-utils
+readonly LOG_FILE=$(get_log_file_path "encryption")
+export LOG_FILE
 
 # Error handling
 error_exit() {
@@ -73,10 +53,12 @@ error_exit() {
 # Cleanup function
 cleanup() {
     log_debug "Performing cleanup..."
-    
-    # Remove lock file
-    [[ -f "$LOCK_FILE" ]] && rm -f "$LOCK_FILE"
-    
+
+    # Release lock file if using lock-utils
+    if [[ -n "${LOCK_FD:-}" ]]; then
+        release_lock "${LOCK_FD}"
+    fi
+
     # Clean up temporary files
     if [[ -n "${TEMP_DIR:-}" && -d "$TEMP_DIR" ]]; then
         log_debug "Cleaning up temporary directory: $TEMP_DIR"
@@ -112,21 +94,13 @@ check_dependencies() {
     log_debug "All dependencies satisfied"
 }
 
-# Create lock file
+# Create lock file using lock-utils
 create_lock() {
-    if [[ -f "$LOCK_FILE" ]]; then
-        local pid
-        pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-        if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-            error_exit "Another instance is already running (PID: $pid)"
-        else
-            log_warn "Removing stale lock file"
-            rm -f "$LOCK_FILE"
-        fi
+    LOCK_FD=""
+    if ! acquire_lock "${LOCK_FILE}" "LOCK_FD"; then
+        error_exit "Another instance is already running or failed to acquire lock"
     fi
-    
-    echo $$ > "$LOCK_FILE"
-    log_debug "Created lock file: $LOCK_FILE"
+    log_debug "Acquired lock: ${LOCK_FILE} (FD: ${LOCK_FD})"
 }
 
 # Load configuration
