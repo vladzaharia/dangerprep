@@ -1,15 +1,23 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_WIFI_SSID: string;
-  readonly VITE_WIFI_PASSWORD: string;
-  readonly VITE_JELLYFIN_URL: string;
-  readonly VITE_KIWIX_URL: string;
-  readonly VITE_ROMM_URL: string;
-  readonly VITE_DOCMOST_URL: string;
-  readonly VITE_ONEDEV_URL: string;
-  readonly VITE_TRAEFIK_URL: string;
-  readonly VITE_KOMODO_URL: string;
+  // WiFi Configuration (fallback only - prefer runtime API)
+  readonly VITE_WIFI_SSID?: string;
+  readonly VITE_WIFI_PASSWORD?: string;
+
+  // Service Configuration (fallback only - prefer runtime API)
+  readonly VITE_BASE_DOMAIN?: string;
+  readonly VITE_JELLYFIN_SUBDOMAIN?: string;
+  readonly VITE_KIWIX_SUBDOMAIN?: string;
+  readonly VITE_ROMM_SUBDOMAIN?: string;
+  readonly VITE_DOCMOST_SUBDOMAIN?: string;
+  readonly VITE_ONEDEV_SUBDOMAIN?: string;
+  readonly VITE_TRAEFIK_SUBDOMAIN?: string;
+  readonly VITE_KOMODO_SUBDOMAIN?: string;
+
+  // App Configuration (fallback only - prefer runtime API)
+  readonly VITE_APP_TITLE?: string;
+  readonly VITE_APP_DESCRIPTION?: string;
 }
 
 interface ImportMeta {

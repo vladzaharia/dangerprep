@@ -23,7 +23,42 @@ export function buildServiceUrl(baseDomain: string, subdomain: string): string {
 }
 
 /**
+ * Constructs main service URLs from service configuration
+ */
+export function buildServiceUrls(services: {
+  baseDomain: string;
+  jellyfin: string;
+  kiwix: string;
+  romm: string;
+}) {
+  return {
+    jellyfin: buildServiceUrl(services.baseDomain, services.jellyfin),
+    kiwix: buildServiceUrl(services.baseDomain, services.kiwix),
+    romm: buildServiceUrl(services.baseDomain, services.romm),
+  };
+}
+
+/**
+ * Constructs maintenance service URLs from service configuration
+ */
+export function buildMaintenanceServiceUrls(services: {
+  baseDomain: string;
+  docmost: string;
+  onedev: string;
+  traefik: string;
+  komodo: string;
+}) {
+  return {
+    docmost: buildServiceUrl(services.baseDomain, services.docmost),
+    onedev: buildServiceUrl(services.baseDomain, services.onedev),
+    traefik: buildServiceUrl(services.baseDomain, services.traefik),
+    komodo: buildServiceUrl(services.baseDomain, services.komodo),
+  };
+}
+
+/**
  * Gets environment variables with fallbacks and constructs main service URLs
+ * @deprecated Use buildServiceUrls with useServiceConfig hook instead
  */
 export function getServiceUrls() {
   const baseDomain = import.meta.env.VITE_BASE_DOMAIN || 'danger';
@@ -41,6 +76,7 @@ export function getServiceUrls() {
 
 /**
  * Gets environment variables with fallbacks and constructs maintenance service URLs
+ * @deprecated Use buildMaintenanceServiceUrls with useServiceConfig hook instead
  */
 export function getMaintenanceServiceUrls() {
   const baseDomain = import.meta.env.VITE_BASE_DOMAIN || 'danger';

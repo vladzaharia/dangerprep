@@ -61,6 +61,39 @@ export function apiPlugin(): Plugin {
             return;
           }
 
+          // Environment variables endpoint
+          if (pathname === '/config') {
+            const configData = {
+              wifi: {
+                ssid: process.env.WIFI_SSID || 'DangerPrep',
+                password: process.env.WIFI_PASSWORD || 'change_me',
+              },
+              services: {
+                baseDomain: process.env.BASE_DOMAIN || 'danger.diy',
+                jellyfin: process.env.JELLYFIN_SUBDOMAIN || 'media',
+                kiwix: process.env.KIWIX_SUBDOMAIN || 'kiwix',
+                romm: process.env.ROMM_SUBDOMAIN || 'retro',
+                docmost: process.env.DOCMOST_SUBDOMAIN || 'docmost',
+                onedev: process.env.ONEDEV_SUBDOMAIN || 'onedev',
+                traefik: process.env.TRAEFIK_SUBDOMAIN || 'traefik',
+                komodo: process.env.KOMODO_SUBDOMAIN || 'docker',
+              },
+              app: {
+                title: process.env.VITE_APP_TITLE || 'DangerPrep Portal',
+                description: process.env.VITE_APP_DESCRIPTION || 'Your portable hotspot services portal',
+              },
+              metadata: {
+                lastUpdated: new Date().toISOString(),
+                nodeEnv: process.env.NODE_ENV || 'production',
+              },
+            };
+
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            res.end(JSON.stringify(configData));
+            return;
+          }
+
           // Service discovery endpoint
           if (pathname === '/services') {
             const domain = url.searchParams.get('domain');

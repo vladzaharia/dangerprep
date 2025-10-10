@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useServiceConfig } from './useConfig';
 
 /**
  * Service metadata from the API
@@ -104,15 +105,19 @@ export function useServiceDiscovery(serviceType?: 'public' | 'private' | 'mainte
  */
 export function useServicesWithFallback(serviceType: 'public' | 'private' | 'maintenance') {
   const { services, loading, error, ...rest } = useServiceDiscovery(serviceType);
+  const { services: serviceConfig } = useServiceConfig();
 
-  // Fallback services if API fails
+  // Get the base domain from config or domain override
+  const baseDomain = rest.domainOverride || serviceConfig.baseDomain;
+
+  // Fallback services if API fails - now using dynamic configuration
   const fallbackServices: Record<string, ServiceMetadata[]> = {
     public: [
       {
         name: 'Entertainment at Sea',
         description: 'Stream movies, TV shows, and more',
         icon: 'film',
-        url: `https://media.${rest.domainOverride || 'danger'}`,
+        url: `https://${serviceConfig.jellyfin}.${baseDomain}`,
         type: 'public',
         status: 'healthy',
       },
@@ -120,7 +125,7 @@ export function useServicesWithFallback(serviceType: 'public' | 'private' | 'mai
         name: 'Games at Sea',
         description: 'Retro gaming library and emulation',
         icon: 'gamepad',
-        url: `https://retro.${rest.domainOverride || 'danger'}`,
+        url: `https://${serviceConfig.romm}.${baseDomain}`,
         type: 'public',
         status: 'healthy',
       },
@@ -128,7 +133,7 @@ export function useServicesWithFallback(serviceType: 'public' | 'private' | 'mai
         name: 'Wikipedia',
         description: 'Offline Wikipedia and educational content',
         icon: 'book',
-        url: `https://kiwix.${rest.domainOverride || 'danger'}`,
+        url: `https://${serviceConfig.kiwix}.${baseDomain}`,
         type: 'public',
         status: 'healthy',
       },
@@ -138,7 +143,7 @@ export function useServicesWithFallback(serviceType: 'public' | 'private' | 'mai
         name: 'Docmost',
         description: 'Documentation and knowledge management',
         icon: 'file-text',
-        url: `https://docs.${rest.domainOverride || 'danger'}`,
+        url: `https://${serviceConfig.docmost}.${baseDomain}`,
         type: 'private',
         status: 'healthy',
       },
@@ -146,7 +151,7 @@ export function useServicesWithFallback(serviceType: 'public' | 'private' | 'mai
         name: 'OneDev',
         description: 'Git repository management and CI/CD',
         icon: 'git-branch',
-        url: `https://dev.${rest.domainOverride || 'danger'}`,
+        url: `https://${serviceConfig.onedev}.${baseDomain}`,
         type: 'private',
         status: 'healthy',
       },
@@ -156,7 +161,7 @@ export function useServicesWithFallback(serviceType: 'public' | 'private' | 'mai
         name: 'Traefik Dashboard',
         description: 'Reverse proxy and load balancer dashboard',
         icon: 'activity',
-        url: `https://traefik.${rest.domainOverride || 'danger'}`,
+        url: `https://${serviceConfig.traefik}.${baseDomain}`,
         type: 'maintenance',
         status: 'healthy',
       },
@@ -164,7 +169,7 @@ export function useServicesWithFallback(serviceType: 'public' | 'private' | 'mai
         name: 'Komodo',
         description: 'Docker container management',
         icon: 'box',
-        url: `https://docker.${rest.domainOverride || 'danger'}`,
+        url: `https://${serviceConfig.komodo}.${baseDomain}`,
         type: 'maintenance',
         status: 'healthy',
       },

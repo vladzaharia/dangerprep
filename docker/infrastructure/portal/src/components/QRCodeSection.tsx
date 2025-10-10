@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
+import { useWiFiConfig } from '../hooks/useConfig';
 
 export const QRCodeSection: React.FC = () => {
-  // Environment variables (build-time)
-  const ssid = import.meta.env.VITE_WIFI_SSID || 'ArgonautWiFi';
-  const password = import.meta.env.VITE_WIFI_PASSWORD || 'Arg0sCubEh!';
+  // Get WiFi configuration from API (runtime)
+  const { wifi, loading, error } = useWiFiConfig();
+  const { ssid, password } = wifi;
 
   // Generate WiFi QR code string
   const wifiQRString = useMemo(() => {
@@ -12,6 +13,25 @@ export const QRCodeSection: React.FC = () => {
     const escapedPassword = password.replace(/[\\;,":]/g, '\\$&');
     return `WIFI:T:WPA;S:${escapedSSID};P:${escapedPassword};H:false;;`;
   }, [ssid, password]);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="wifi-connection-container">
+        <div className="wifi-connection-content">
+          <div className="wifi-details">
+            <p>Loading WiFi configuration...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state with fallback
+  if (error) {
+    console.warn('WiFi config error:', error);
+    // Continue with fallback values from the hook
+  }
 
   return (
     <div className="wifi-connection-container">

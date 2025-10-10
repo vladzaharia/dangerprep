@@ -6,41 +6,63 @@ Modern React 19 portal for DangerPrep hotspot services, built with TypeScript, V
 
 - **WiFi Connection**: QR code generation for automatic WiFi connection with manual details toggle
 - **Service Discovery**: Cards for Jellyfin, Kiwix, and Romm services
+- **Dynamic Configuration**: Runtime environment variable loading via API endpoints
 - **Responsive Design**: Optimized for both mobile (800x480 touchscreen) and desktop
 - **Kiosk Mode**: URL parameter `?kiosk=true` disables clicks for touchscreen display
 - **Dark Theme**: WebAwesome Awesome theme with dark mode only
 - **Modern Stack**: React 19, TypeScript, Vite, Yarn v4
 
-## Environment Variables
+## Configuration
 
-Configure these in `compose.env`:
+The portal supports both build-time and runtime configuration. Runtime configuration is preferred as it allows updating settings without rebuilding the application.
 
-### WiFi Configuration
+### Runtime Configuration (Recommended)
+
+The portal fetches configuration from `/api/config` at runtime, allowing dynamic updates:
+
+#### WiFi Configuration
 - `WIFI_SSID`: WiFi network name
 - `WIFI_PASSWORD`: WiFi network password
 
-### Service URL Configuration
+#### Service URL Configuration
 The portal uses dynamic URL construction based on a base domain and service subdomains:
 
 - `BASE_DOMAIN`: Base domain for all services (e.g., `argos.surf`, `danger.diy`)
 
-#### Main Services
+##### Main Services
 - `JELLYFIN_SUBDOMAIN`: Jellyfin media server subdomain (default: `media`)
 - `KIWIX_SUBDOMAIN`: Kiwix offline content subdomain (default: `kiwix`)
 - `ROMM_SUBDOMAIN`: Romm game library subdomain (default: `retro`)
 
-#### Maintenance Services
+##### Maintenance Services
 - `DOCMOST_SUBDOMAIN`: Docmost documentation subdomain (default: `docmost`)
 - `ONEDEV_SUBDOMAIN`: OneDev git management subdomain (default: `onedev`)
 - `TRAEFIK_SUBDOMAIN`: Traefik dashboard subdomain (default: `traefik`)
 - `KOMODO_SUBDOMAIN`: Komodo container management subdomain (default: `docker`)
 
+#### App Configuration
+- `VITE_APP_TITLE`: Application title (default: `DangerPrep Portal`)
+- `VITE_APP_DESCRIPTION`: Application description
+
+### Build-time Configuration (Fallback)
+
+If the runtime API fails, the portal falls back to build-time environment variables with `VITE_` prefix.
+
 ### Example Configuration
 ```bash
+# In compose.env
 BASE_DOMAIN=argos.surf
 JELLYFIN_SUBDOMAIN=media
 # Results in: https://media.argos.surf
 ```
+
+## API Endpoints
+
+The portal provides several API endpoints for dynamic functionality:
+
+- `GET /api/config` - Runtime configuration (WiFi, services, app settings)
+- `GET /api/services` - Service discovery with health checks
+- `GET /api/health` - Application health status
 
 ## Development
 
