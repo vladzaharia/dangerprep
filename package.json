@@ -10,6 +10,8 @@
     "@dangerprep/eslint": "workspace:*",
     "@dangerprep/prettier": "workspace:*",
     "@dangerprep/typescript": "workspace:*",
+    "@fontsource/aleo": "^5.2.7",
+    "@fontsource/geist-mono": "^5.2.7",
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
