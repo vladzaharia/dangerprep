@@ -84,23 +84,32 @@ generate_dns_zone_for_domain() {
     local domain_name="$2"
     local temp_file="${zone_file}.tmp"
 
+    # Validate HOST_IP is set
+    if [ -z "${HOST_IP:-}" ]; then
+        log "ERROR: HOST_IP not set, cannot generate zone file for ${domain_name}"
+        return 1
+    fi
+
     # DNS zone header
     cat > "$temp_file" << EOF
+\$ORIGIN ${domain_name}.
 \$TTL 300
-@       IN      SOA     ns1.${domain_name}. admin.${domain_name}. (
-                        $(date +%Y%m%d%H)  ; Serial
-                        3600               ; Refresh
-                        1800               ; Retry
-                        604800             ; Expire
-                        300 )              ; Minimum TTL
 
-; Name servers
-@       IN      NS      ns1.${domain_name}.
-ns1     IN      A       172.21.0.4
+@   IN  SOA ns1.${domain_name}. admin.${domain_name}. (
+    $(date +%Y%m%d%H)  ; Serial
+    3600        ; Refresh
+    1800        ; Retry
+    604800      ; Expire
+    300         ; Minimum TTL
+)
 
-; Default records
-@       IN      A       ${HOST_IP}
-*       IN      A       ${HOST_IP}
+@   IN  NS  ns1.${domain_name}.
+
+; Default A record pointing to Traefik
+@   IN  A   ${HOST_IP}
+
+; Wildcard record for all subdomains
+*   IN  A   ${HOST_IP}
 
 EOF
 
@@ -118,7 +127,7 @@ EOF
             fi
 
             # Create DNS record for this domain
-            echo "${hostname}    IN      A       ${ip}" >> "$temp_file"
+            echo "${hostname}   IN  A   ${ip}" >> "$temp_file"
             log "Registered: ${hostname}.${domain_name} -> ${ip}"
         fi
     done
@@ -130,9 +139,24 @@ EOF
 # Generate all DNS zone files
 generate_dns_zones() {
     log "Generating DNS zones for all domains..."
-    generate_dns_zone_for_domain "$DNS_DB_FILE" "$DOMAIN_NAME"
-    generate_dns_zone_for_domain "$EXTERNAL_DNS_DB_FILE" "$EXTERNAL_DOMAIN_NAME"
-    generate_dns_zone_for_domain "$ARGOS_DNS_DB_FILE" "$ARGOS_DOMAIN_NAME"
+
+    # Generate zone files with error handling
+    if ! generate_dns_zone_for_domain "$DNS_DB_FILE" "$DOMAIN_NAME"; then
+        log "ERROR: Failed to generate zone file for $DOMAIN_NAME"
+        return 1
+    fi
+
+    if ! generate_dns_zone_for_domain "$EXTERNAL_DNS_DB_FILE" "$EXTERNAL_DOMAIN_NAME"; then
+        log "ERROR: Failed to generate zone file for $EXTERNAL_DOMAIN_NAME"
+        return 1
+    fi
+
+    if ! generate_dns_zone_for_domain "$ARGOS_DNS_DB_FILE" "$ARGOS_DOMAIN_NAME"; then
+        log "ERROR: Failed to generate zone file for $ARGOS_DOMAIN_NAME"
+        return 1
+    fi
+
+    log "All DNS zone files generated successfully"
 }
 
 # Reload CoreDNS configuration
@@ -158,12 +182,14 @@ main() {
         log "Updating DNS registrations..."
 
         # Generate new zone files for all domains
-        generate_dns_zones
+        if generate_dns_zones; then
+            # Reload CoreDNS only if zone generation was successful
+            reload_coredns
+            log "DNS update complete"
+        else
+            log "ERROR: DNS zone generation failed, skipping CoreDNS reload"
+        fi
 
-        # Reload CoreDNS
-        reload_coredns
-
-        log "DNS update complete"
         sleep "$UPDATE_INTERVAL"
     done
 }
