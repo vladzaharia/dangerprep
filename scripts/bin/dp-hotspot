@@ -3,7 +3,7 @@
 # Creates a complete WiFi hotspot with DHCP, DNS, forwarding, and firewall rules
 # 
 # Usage:
-#   dp-hotspot [OPTIONS]
+#   dangerprep-wifi-hotspot [OPTIONS]
 #
 # Options:
 #   -h, --help       Show this help message
@@ -21,12 +21,12 @@
 set -euo pipefail
 
 # Script configuration
-readonly SCRIPT_NAME="dp-hotspot"
+readonly SCRIPT_NAME="dp-wifi-hotspot"
 readonly SCRIPT_VERSION="1.0.0"
-readonly LOCK_FILE_DEFAULT="/var/run/dp-hotspot.lock"
+readonly LOCK_FILE_DEFAULT="/var/run/dp-wifi-hotspot.lock"
 
 # Log file (not readonly so it can be exported)
-LOG_FILE="/var/log/dp-hotspot.log"
+LOG_FILE="/var/log/dp-wifi-hotspot.log"
 
 # Lock file descriptor (will be set by acquire_lock)
 LOCK_FD=""
@@ -59,6 +59,7 @@ NON_INTERACTIVE=false
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
 readonly NC='\033[0m' # No Color
 
 # Source shared utilities if available
@@ -105,62 +106,30 @@ if [[ -f "${SHARED_DIR}/firewall-utils.sh" ]]; then
     source "${SHARED_DIR}/firewall-utils.sh"
 fi
 
-#######################################
-# Setup logging configuration
-# Globals:
-#   VERBOSE, LOG_FILE, DEBUG
-# Arguments:
-#   None
-# Returns:
-#   0 on success
-#######################################
+# Setup logging - will be configured after argument parsing
 setup_logging() {
     # Set DEBUG environment variable for gum-utils debug logging
-    [[ "${VERBOSE}" == "true" ]] && export DEBUG=true
+    [[ "$VERBOSE" == "true" ]] && export DEBUG=true
 
     # Set LOG_FILE for gum-utils file logging
     export LOG_FILE="${LOG_FILE}"
 }
 
-#######################################
-# Error handler that logs error and exits
-# Globals:
-#   None
-# Arguments:
-#   Error message
-# Returns:
-#   Exits with status 1
-#######################################
+# Error handling
 error_exit() {
     log_error "$@"
     cleanup
     exit 1
 }
 
-#######################################
-# Cleanup function to release resources
-# Globals:
-#   LOCK_FD
-# Arguments:
-#   None
-# Returns:
-#   0 on success
-#######################################
+# Cleanup function
 cleanup() {
     if [[ -n "${LOCK_FD}" ]]; then
         release_lock "${LOCK_FD}"
     fi
 }
 
-#######################################
 # Handle interrupt signal (Ctrl-C)
-# Globals:
-#   None
-# Arguments:
-#   None
-# Returns:
-#   Exits with status 130
-#######################################
 handle_interrupt() {
     echo
     log_info "Received interrupt signal. Exiting..."
@@ -172,19 +141,7 @@ handle_interrupt() {
 trap cleanup EXIT
 trap handle_interrupt INT
 
-#######################################
-# Display help message
-# Globals:
-#   SCRIPT_VERSION, SCRIPT_NAME, LOG_FILE
-#   DEFAULT_SSID, DEFAULT_PASSWORD, DEFAULT_INTERFACE
-#   DEFAULT_IP, DEFAULT_DHCP_START, DEFAULT_DHCP_END, DEFAULT_CHANNEL
-# Arguments:
-#   None
-# Outputs:
-#   Writes help text to stdout
-# Returns:
-#   0 on success
-#######################################
+# Show help
 show_help() {
     cat << EOF
 DangerPrep WiFi Hotspot Setup v${SCRIPT_VERSION}
@@ -327,7 +284,7 @@ create_lock() {
 get_wifi_interfaces() {
     local interfaces=()
 
-    # Get all wireless interfaces (optimized: single awk instead of grep+awk)
+    # Get all wireless interfaces
     while IFS= read -r iface; do
         if [[ -n "${iface}" ]]; then
             # Check if interface supports AP mode using network-utils
@@ -338,7 +295,7 @@ get_wifi_interfaces() {
                 log_debug "Interface ${iface} does not support AP mode"
             fi
         fi
-    done < <(iw dev 2>/dev/null | awk '/Interface/ {print $2}')
+    done < <(iw dev 2>/dev/null | grep Interface | awk '{print $2}')
 
     # Fallback: get all wireless interfaces if iw failed
     if [[ ${#interfaces[@]} -eq 0 ]]; then
@@ -387,24 +344,22 @@ get_hotspot_config() {
     local existing_dhcp_end=""
     local has_existing_config=false
 
-    if [[ -f "${HOSTAPD_CONF}" ]]; then
-        # Optimized: use awk instead of grep+cut
-        existing_ssid=$(awk -F= '/^ssid=/ {print $2; exit}' "${HOSTAPD_CONF}" 2>/dev/null || echo "")
-        existing_interface=$(awk -F= '/^interface=/ {print $2; exit}' "${HOSTAPD_CONF}" 2>/dev/null || echo "")
-        existing_channel=$(awk -F= '/^channel=/ {print $2; exit}' "${HOSTAPD_CONF}" 2>/dev/null || echo "")
+    if [[ -f "$HOSTAPD_CONF" ]]; then
+        existing_ssid=$(grep "^ssid=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+        existing_interface=$(grep "^interface=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+        existing_channel=$(grep "^channel=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "")
     fi
 
     # Read IP and DHCP config from dnsmasq
-    if [[ -f "${DNSMASQ_CONF}" ]]; then
-        # Extract IP from listen-address (optimized: awk instead of grep+cut)
-        existing_ip=$(awk -F= '/^listen-address=/ {print $2; exit}' "${DNSMASQ_CONF}" 2>/dev/null || echo "")
-        # Extract DHCP range (optimized: awk with field splitting)
+    if [[ -f "$DNSMASQ_CONF" ]]; then
+        # Extract IP from listen-address
+        existing_ip=$(grep "^listen-address=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+        # Extract DHCP range
         local dhcp_range
-        dhcp_range=$(awk -F= '/^dhcp-range=/ {print $2; exit}' "${DNSMASQ_CONF}" 2>/dev/null || echo "")
-        if [[ -n "${dhcp_range}" ]]; then
-            # Optimized: awk for comma splitting instead of multiple cut calls
-            existing_dhcp_start=$(echo "${dhcp_range}" | awk -F, '{print $1}')
-            existing_dhcp_end=$(echo "${dhcp_range}" | awk -F, '{print $2}')
+        dhcp_range=$(grep "^dhcp-range=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+        if [[ -n "$dhcp_range" ]]; then
+            existing_dhcp_start=$(echo "$dhcp_range" | cut -d, -f1)
+            existing_dhcp_end=$(echo "$dhcp_range" | cut -d, -f2)
         fi
     fi
 
@@ -895,15 +850,7 @@ configure_interface() {
     log_success "Interface ${interface} configured with IP ${ip_address}"
 }
 
-#######################################
-# Start hotspot services (hostapd and dnsmasq)
-# Globals:
-#   None
-# Arguments:
-#   None
-# Returns:
-#   0 on success, 1 on failure
-#######################################
+# Start services
 start_services() {
     log_info "Starting hotspot services..."
 
@@ -930,18 +877,7 @@ start_services() {
     fi
 }
 
-#######################################
-# Display comprehensive hotspot status
-# Shows service status, configuration, firewall rules, and connected clients
-# Globals:
-#   HOSTAPD_CONF, DNSMASQ_CONF, RED, GREEN, YELLOW, NC
-# Arguments:
-#   None
-# Outputs:
-#   Writes status information to stdout
-# Returns:
-#   0 on success
-#######################################
+# Show hotspot status
 show_status() {
     echo "DangerPrep WiFi Hotspot Status"
     echo "=============================="
@@ -964,15 +900,13 @@ show_status() {
     echo
 
     # Show configuration if config files exist
-    if [[ -f "${HOSTAPD_CONF}" ]]; then
+    if [[ -f "$HOSTAPD_CONF" ]]; then
         echo "Hotspot Configuration:"
         local ssid interface channel country_code
-
-        # Optimized: use awk instead of grep+cut (60% fewer subprocesses)
-        ssid=$(awk -F= '/^ssid=/ {print $2; exit}' "${HOSTAPD_CONF}" 2>/dev/null || echo "Unknown")
-        interface=$(awk -F= '/^interface=/ {print $2; exit}' "${HOSTAPD_CONF}" 2>/dev/null || echo "Unknown")
-        channel=$(awk -F= '/^channel=/ {print $2; exit}' "${HOSTAPD_CONF}" 2>/dev/null || echo "Unknown")
-        country_code=$(awk -F= '/^country_code=/ {print $2; exit}' "${HOSTAPD_CONF}" 2>/dev/null || echo "Unknown")
+        ssid=$(grep "^ssid=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+        interface=$(grep "^interface=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+        channel=$(grep "^channel=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+        country_code=$(grep "^country_code=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
 
         echo "  SSID: ${ssid}"
         echo "  Interface: ${interface}"
@@ -980,29 +914,25 @@ show_status() {
         echo "  Country Code: ${country_code}"
 
         # Show interface IP and DHCP range from dnsmasq
-        if [[ -f "${DNSMASQ_CONF}" ]]; then
+        if [[ -f "$DNSMASQ_CONF" ]]; then
             local ip_addr dhcp_range
-
-            # Optimized: awk instead of grep+cut
-            ip_addr=$(awk -F= '/^listen-address=/ {print $2; exit}' "${DNSMASQ_CONF}" 2>/dev/null || echo "Unknown")
-            dhcp_range=$(awk -F= '/^dhcp-range=/ {print $2; exit}' "${DNSMASQ_CONF}" 2>/dev/null || echo "Unknown")
+            ip_addr=$(grep "^listen-address=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+            dhcp_range=$(grep "^dhcp-range=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
 
             echo "  IP Address: ${ip_addr}"
-            if [[ "${dhcp_range}" != "Unknown" ]]; then
+            if [[ "$dhcp_range" != "Unknown" ]]; then
                 local dhcp_start dhcp_end
-                # Optimized: awk for comma splitting
-                dhcp_start=$(echo "${dhcp_range}" | awk -F, '{print $1}')
-                dhcp_end=$(echo "${dhcp_range}" | awk -F, '{print $2}')
+                dhcp_start=$(echo "$dhcp_range" | cut -d, -f1)
+                dhcp_end=$(echo "$dhcp_range" | cut -d, -f2)
                 echo "  DHCP Range: ${dhcp_start} - ${dhcp_end}"
             fi
         fi
 
         # Show actual interface IP if interface is up
-        if [[ "${interface}" != "Unknown" ]] && ip link show "${interface}" &>/dev/null; then
+        if [[ "$interface" != "Unknown" ]] && ip link show "$interface" &>/dev/null; then
             local actual_ip
-            # Optimized: single awk instead of grep+awk+cut
-            actual_ip=$(ip addr show "${interface}" 2>/dev/null | awk '/inet / {split($2, a, "/"); print a[1]; exit}')
-            if [[ -n "${actual_ip}" ]]; then
+            actual_ip=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1 || echo "")
+            if [[ -n "$actual_ip" ]]; then
                 echo "  Interface Status: ${GREEN}UP${NC} (${actual_ip})"
             else
                 echo -e "  Interface Status: ${YELLOW}UP (no IP)${NC}"
@@ -1106,16 +1036,7 @@ disable_hotspot() {
     log_success "WiFi hotspot disabled and configuration removed"
 }
 
-#######################################
 # Main execution function
-# Parses arguments, validates inputs, handles setup/disable/status workflows
-# Globals:
-#   All script globals
-# Arguments:
-#   Command line arguments
-# Returns:
-#   0 on success, exits with error code on failure
-#######################################
 main() {
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
