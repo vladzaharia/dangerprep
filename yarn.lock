@@ -735,6 +735,8 @@ __metadata:
     "@dangerprep/eslint": "workspace:*"
     "@dangerprep/prettier": "workspace:*"
     "@dangerprep/typescript": "workspace:*"
+    "@fontsource/aleo": "npm:^5.2.7"
+    "@fontsource/geist-mono": "npm:^5.2.7"
     "@fortawesome/fontawesome-svg-core": "npm:^6.7.2"
     "@fortawesome/free-solid-svg-icons": "npm:^6.7.2"
     "@fortawesome/react-fontawesome": "npm:^0.2.2"
@@ -1410,6 +1412,20 @@ __metadata:
   version: 0.2.10
   resolution: "@floating-ui/utils@npm:0.2.10"
   checksum: 10c0/e9bc2a1730ede1ee25843937e911ab6e846a733a4488623cd353f94721b05ec2c9ec6437613a2ac9379a94c2fd40c797a2ba6fa1df2716f5ce4aa6ddb1cf9ea4
+  languageName: node
+  linkType: hard
+
+"@fontsource/aleo@npm:^5.2.7":
+  version: 5.2.7
+  resolution: "@fontsource/aleo@npm:5.2.7"
+  checksum: 10c0/23bbcf9c117d8b8196d5a3a0223b55f7073a55cd062e07436363d7bff8af2f62a5a87c1df1842c87961104ceb195440e05225fc5cc547c686ddaa31366e9ac02
+  languageName: node
+  linkType: hard
+
+"@fontsource/geist-mono@npm:^5.2.7":
+  version: 5.2.7
+  resolution: "@fontsource/geist-mono@npm:5.2.7"
+  checksum: 10c0/7334f0e09fe5d2d0c59a11bc74720e095faa62a977c6fd75f3f2800894a8041c0d81384bd405b8730b05da63c30ae91ac2ae7dbcad9b02265fdb5a64f37aac06
   languageName: node
   linkType: hard
 

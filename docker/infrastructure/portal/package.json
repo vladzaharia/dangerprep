@@ -5,6 +5,8 @@
   "author": "Vlad Zaharia <hey@vlad.gg>",
   "dependencies": {
     "@awesome.me/webawesome": "3.0.0-beta.6",
+    "@fontsource/aleo": "^5.2.7",
+    "@fontsource/geist-mono": "^5.2.7",
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
