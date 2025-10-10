@@ -1,5 +1,34 @@
 import { Plugin } from 'vite';
 import { ServiceDiscoveryService } from './services/ServiceDiscoveryService';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+// Load environment variables from .env file
+function loadEnvFile(): Record<string, string> {
+  try {
+    const envPath = resolve(__dirname, '../../.env');
+    const envContent = readFileSync(envPath, 'utf8');
+    const envVars: Record<string, string> = {};
+
+    envContent.split('\n').forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const [key, ...valueParts] = trimmed.split('=');
+        if (key && valueParts.length > 0) {
+          envVars[key.trim()] = valueParts.join('=').trim();
+        }
+      }
+    });
+
+    return envVars;
+  } catch (error) {
+    console.warn('Could not load .env file:', error);
+    return {};
+  }
+}
+
+// Load environment variables
+const envVars = loadEnvFile();
 
 // Initialize service discovery
 const serviceDiscovery = new ServiceDiscoveryService();
@@ -63,24 +92,31 @@ export function apiPlugin(): Plugin {
 
           // Environment variables endpoint
           if (pathname === '/config') {
+            // Helper function to get env var with fallbacks
+            const getEnvVar = (key: string, fallback: string) => {
+              return process.env[key] || envVars[key] || fallback;
+            };
+
+
+
             const configData = {
               wifi: {
-                ssid: process.env.WIFI_SSID || 'DangerPrep',
-                password: process.env.WIFI_PASSWORD || 'change_me',
+                ssid: getEnvVar('WIFI_SSID', 'DangerPrep'),
+                password: getEnvVar('WIFI_PASSWORD', 'change_me'),
               },
               services: {
-                baseDomain: process.env.BASE_DOMAIN || 'danger.diy',
-                jellyfin: process.env.JELLYFIN_SUBDOMAIN || 'media',
-                kiwix: process.env.KIWIX_SUBDOMAIN || 'kiwix',
-                romm: process.env.ROMM_SUBDOMAIN || 'retro',
-                docmost: process.env.DOCMOST_SUBDOMAIN || 'docmost',
-                onedev: process.env.ONEDEV_SUBDOMAIN || 'onedev',
-                traefik: process.env.TRAEFIK_SUBDOMAIN || 'traefik',
-                komodo: process.env.KOMODO_SUBDOMAIN || 'docker',
+                baseDomain: getEnvVar('BASE_DOMAIN', 'danger.diy'),
+                jellyfin: getEnvVar('JELLYFIN_SUBDOMAIN', 'media'),
+                kiwix: getEnvVar('KIWIX_SUBDOMAIN', 'kiwix'),
+                romm: getEnvVar('ROMM_SUBDOMAIN', 'retro'),
+                docmost: getEnvVar('DOCMOST_SUBDOMAIN', 'docmost'),
+                onedev: getEnvVar('ONEDEV_SUBDOMAIN', 'onedev'),
+                traefik: getEnvVar('TRAEFIK_SUBDOMAIN', 'traefik'),
+                komodo: getEnvVar('KOMODO_SUBDOMAIN', 'docker'),
               },
               app: {
-                title: process.env.VITE_APP_TITLE || 'DangerPrep Portal',
-                description: process.env.VITE_APP_DESCRIPTION || 'Your portable hotspot services portal',
+                title: getEnvVar('VITE_APP_TITLE', 'DangerPrep Portal'),
+                description: getEnvVar('VITE_APP_DESCRIPTION', 'Your portable hotspot services portal'),
               },
               metadata: {
                 lastUpdated: new Date().toISOString(),

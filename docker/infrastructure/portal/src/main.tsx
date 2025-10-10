@@ -5,8 +5,8 @@ import App from './App';
 import './styles/global.css';
 
 // Import fonts locally
-import '@fontsource/aleo/400.css';
-import '@fontsource/aleo/700.css';
+import '@fontsource/sansation/400.css';
+import '@fontsource/sansation/700.css';
 import '@fontsource/geist-mono/400.css';
 import '@fontsource/geist-mono/500.css';
 

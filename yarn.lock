@@ -735,8 +735,8 @@ __metadata:
     "@dangerprep/eslint": "workspace:*"
     "@dangerprep/prettier": "workspace:*"
     "@dangerprep/typescript": "workspace:*"
-    "@fontsource/aleo": "npm:^5.2.7"
     "@fontsource/geist-mono": "npm:^5.2.7"
+    "@fontsource/sansation": "npm:^5.2.2"
     "@fortawesome/fontawesome-svg-core": "npm:^6.7.2"
     "@fortawesome/free-solid-svg-icons": "npm:^6.7.2"
     "@fortawesome/react-fontawesome": "npm:^0.2.2"
@@ -1415,17 +1415,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fontsource/aleo@npm:^5.2.7":
-  version: 5.2.7
-  resolution: "@fontsource/aleo@npm:5.2.7"
-  checksum: 10c0/23bbcf9c117d8b8196d5a3a0223b55f7073a55cd062e07436363d7bff8af2f62a5a87c1df1842c87961104ceb195440e05225fc5cc547c686ddaa31366e9ac02
-  languageName: node
-  linkType: hard
-
 "@fontsource/geist-mono@npm:^5.2.7":
   version: 5.2.7
   resolution: "@fontsource/geist-mono@npm:5.2.7"
   checksum: 10c0/7334f0e09fe5d2d0c59a11bc74720e095faa62a977c6fd75f3f2800894a8041c0d81384bd405b8730b05da63c30ae91ac2ae7dbcad9b02265fdb5a64f37aac06
+  languageName: node
+  linkType: hard
+
+"@fontsource/sansation@npm:^5.2.2":
+  version: 5.2.2
+  resolution: "@fontsource/sansation@npm:5.2.2"
+  checksum: 10c0/3318995d68b2c29c2ee52d0c2490bc73742e27054c8580be0366acd455464b271bd5b7d28211dc2d0c72c0841601a037113d13c4529dd6901cf7c0dbd3475225
   languageName: node
   linkType: hard
 
@@ -3947,8 +3947,8 @@ __metadata:
     "@dangerprep/eslint": "workspace:*"
     "@dangerprep/prettier": "workspace:*"
     "@dangerprep/typescript": "workspace:*"
-    "@fontsource/aleo": "npm:^5.2.7"
     "@fontsource/geist-mono": "npm:^5.2.7"
+    "@fontsource/sansation": "npm:^5.2.2"
     "@types/fs-extra": "npm:^11.0.4"
     "@types/jest": "npm:^30.0.0"
     "@types/node": "npm:^24.0.0"
