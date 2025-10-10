@@ -387,11 +387,15 @@ get_hotspot_config() {
         fi
     fi
 
-    # Validate SSID: should not be empty or same as interface
-    if [[ -n "$existing_ssid" ]] && [[ "$existing_ssid" == "$existing_interface" ]]; then
-        log_warn "Invalid SSID in config (same as interface): ${existing_ssid}"
-        existing_ssid=""
-        config_valid=false
+    # Validate SSID: should not be empty, same as interface, or look like an interface name
+    if [[ -n "$existing_ssid" ]]; then
+        # Check if SSID matches common interface name patterns
+        if [[ "$existing_ssid" =~ ^(wlan|eth|wlp|enp|eno|ens|wlo)[0-9]+$ ]] || \
+           [[ "$existing_ssid" == "$existing_interface" ]]; then
+            log_warn "Invalid SSID in config (looks like interface name): ${existing_ssid}"
+            existing_ssid=""
+            config_valid=false
+        fi
     fi
 
     # Validate channel: should be a number between 1 and 14
@@ -988,7 +992,9 @@ show_status() {
             interface=$(ps aux | grep '[h]ostapd' | grep -oP '\-i\s+\K\w+' || echo "Unknown")
         fi
 
-        if [[ "$ssid" == "$interface" ]] || [[ "$ssid" == "Unknown" ]]; then
+        # Validate SSID: should not look like an interface name
+        if [[ "$ssid" =~ ^(wlan|eth|wlp|enp|eno|ens|wlo)[0-9]+$ ]] || \
+           [[ "$ssid" == "$interface" ]] || [[ "$ssid" == "Unknown" ]]; then
             # Try to get actual SSID from interface
             if [[ "$interface" != "Unknown" ]]; then
                 ssid=$(iw dev "$interface" info 2>/dev/null | grep ssid | awk '{$1=""; print $0}' | xargs || echo "Unknown")
