@@ -39,7 +39,7 @@ readonly NC='\033[0m' # No Color
 
 # Source shared utilities if available
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SHARED_DIR="${SCRIPT_DIR}/shared"
+SHARED_DIR="${SCRIPT_DIR}/../shared"
 
 if [[ -f "${SHARED_DIR}/gum-utils.sh" ]]; then
     source "${SHARED_DIR}/gum-utils.sh"
