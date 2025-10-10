@@ -331,27 +331,49 @@ get_hotspot_config() {
     local existing_interface=""
     local existing_channel=""
     local existing_ip=""
+    local existing_dhcp_start=""
+    local existing_dhcp_end=""
     local has_existing_config=false
 
     if [[ -f "$HOSTAPD_CONF" ]]; then
         existing_ssid=$(grep "^ssid=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "")
         existing_interface=$(grep "^interface=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "")
         existing_channel=$(grep "^channel=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+    fi
 
-        if [[ -n "$existing_ssid" ]] && [[ -n "$existing_interface" ]]; then
-            has_existing_config=true
-            log_info "Found existing hotspot configuration:"
-            log_info "  SSID: $existing_ssid"
-            log_info "  Interface: $existing_interface"
-            log_info "  Channel: $existing_channel"
-
-            # Check if hotspot is currently running
-            if systemctl is-active --quiet hostapd; then
-                log_info "  Status: ${GREEN}Running${NC}"
-            else
-                log_info "  Status: ${YELLOW}Stopped${NC}"
-            fi
+    # Read IP and DHCP config from dnsmasq
+    if [[ -f "$DNSMASQ_CONF" ]]; then
+        # Extract IP from listen-address
+        existing_ip=$(grep "^listen-address=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+        # Extract DHCP range
+        local dhcp_range
+        dhcp_range=$(grep "^dhcp-range=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "")
+        if [[ -n "$dhcp_range" ]]; then
+            existing_dhcp_start=$(echo "$dhcp_range" | cut -d, -f1)
+            existing_dhcp_end=$(echo "$dhcp_range" | cut -d, -f2)
         fi
+    fi
+
+    if [[ -n "$existing_ssid" ]] && [[ -n "$existing_interface" ]]; then
+        has_existing_config=true
+        log_info "Found existing hotspot configuration:"
+        log_info "  SSID: ${existing_ssid}"
+        log_info "  Interface: ${existing_interface}"
+        log_info "  IP Address: ${existing_ip:-$DEFAULT_IP}"
+        log_info "  DHCP Range: ${existing_dhcp_start:-$DEFAULT_DHCP_START} - ${existing_dhcp_end:-$DEFAULT_DHCP_END}"
+        log_info "  Channel: ${existing_channel}"
+
+        # Check if hotspot is currently running
+        local status_color status_text
+        if systemctl is-active --quiet hostapd; then
+            status_color="${GREEN}"
+            status_text="Running"
+        else
+            status_color="${YELLOW}"
+            status_text="Stopped"
+        fi
+        # Use echo -e to interpret color codes
+        echo -e "$(date '+%Y-%m-%dT%H:%M:%SZ') INFO   Status: ${status_color}${status_text}${NC}"
     fi
 
     if [[ "$NON_INTERACTIVE" == "true" ]]; then
@@ -362,8 +384,8 @@ get_hotspot_config() {
                 "$existing_ssid"
                 "$DEFAULT_PASSWORD"  # Can't retrieve password from config
                 "${existing_ip:-$DEFAULT_IP}"
-                "$DEFAULT_DHCP_START"
-                "$DEFAULT_DHCP_END"
+                "${existing_dhcp_start:-$DEFAULT_DHCP_START}"
+                "${existing_dhcp_end:-$DEFAULT_DHCP_END}"
                 "${existing_channel:-$DEFAULT_CHANNEL}"
             )
         else
@@ -842,46 +864,100 @@ show_status() {
     # Check service status
     echo "Service Status:"
     if systemctl is-active --quiet hostapd; then
-        echo "  hostapd: ${GREEN}Running${NC}"
+        echo -e "  hostapd: ${GREEN}Running${NC}"
     else
-        echo "  hostapd: ${RED}Stopped${NC}"
+        echo -e "  hostapd: ${RED}Stopped${NC}"
     fi
 
     if systemctl is-active --quiet dnsmasq; then
-        echo "  dnsmasq: ${GREEN}Running${NC}"
+        echo -e "  dnsmasq: ${GREEN}Running${NC}"
     else
-        echo "  dnsmasq: ${RED}Stopped${NC}"
+        echo -e "  dnsmasq: ${RED}Stopped${NC}"
     fi
 
     echo
 
-    # Show configuration if hostapd is running
-    if systemctl is-active --quiet hostapd && [[ -f "$HOSTAPD_CONF" ]]; then
+    # Show configuration if config files exist
+    if [[ -f "$HOSTAPD_CONF" ]]; then
         echo "Hotspot Configuration:"
-        local ssid interface channel
+        local ssid interface channel country_code
         ssid=$(grep "^ssid=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
         interface=$(grep "^interface=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
         channel=$(grep "^channel=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+        country_code=$(grep "^country_code=" "$HOSTAPD_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
 
-        echo "  SSID: $ssid"
-        echo "  Interface: $interface"
-        echo "  Channel: $channel"
+        echo "  SSID: ${ssid}"
+        echo "  Interface: ${interface}"
+        echo "  Channel: ${channel}"
+        echo "  Country Code: ${country_code}"
 
-        # Show interface IP
-        if [[ "$interface" != "Unknown" ]]; then
-            local ip_addr
-            ip_addr=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1 || echo "Not configured")
-            echo "  IP Address: $ip_addr"
+        # Show interface IP and DHCP range from dnsmasq
+        if [[ -f "$DNSMASQ_CONF" ]]; then
+            local ip_addr dhcp_range
+            ip_addr=$(grep "^listen-address=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+            dhcp_range=$(grep "^dhcp-range=" "$DNSMASQ_CONF" 2>/dev/null | cut -d= -f2 || echo "Unknown")
+
+            echo "  IP Address: ${ip_addr}"
+            if [[ "$dhcp_range" != "Unknown" ]]; then
+                local dhcp_start dhcp_end
+                dhcp_start=$(echo "$dhcp_range" | cut -d, -f1)
+                dhcp_end=$(echo "$dhcp_range" | cut -d, -f2)
+                echo "  DHCP Range: ${dhcp_start} - ${dhcp_end}"
+            fi
         fi
+
+        # Show actual interface IP if interface is up
+        if [[ "$interface" != "Unknown" ]] && ip link show "$interface" &>/dev/null; then
+            local actual_ip
+            actual_ip=$(ip addr show "$interface" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1 || echo "")
+            if [[ -n "$actual_ip" ]]; then
+                echo "  Interface Status: ${GREEN}UP${NC} (${actual_ip})"
+            else
+                echo -e "  Interface Status: ${YELLOW}UP (no IP)${NC}"
+            fi
+        else
+            echo -e "  Interface Status: ${RED}DOWN${NC}"
+        fi
+    else
+        echo "No hotspot configuration found"
     fi
 
     echo
 
-    # Show connected clients if possible
-    if [[ -f "/var/lib/dhcp/dhcpd.leases" ]]; then
+    # Show firewall status
+    if check_hotspot_firewall 2>/dev/null; then
+        echo -e "Firewall Rules: ${GREEN}Active${NC}"
+    else
+        echo -e "Firewall Rules: ${RED}Not configured${NC}"
+    fi
+
+    # Show IP forwarding status
+    local ip_forward
+    ip_forward=$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo "0")
+    if [[ "$ip_forward" == "1" ]]; then
+        echo -e "IP Forwarding: ${GREEN}Enabled${NC}"
+    else
+        echo -e "IP Forwarding: ${RED}Disabled${NC}"
+    fi
+
+    echo
+
+    # Show connected clients if dnsmasq is running
+    if systemctl is-active --quiet dnsmasq && [[ -f "/var/lib/misc/dnsmasq.leases" ]]; then
         local client_count
-        client_count=$(grep -c "binding state active" /var/lib/dhcp/dhcpd.leases 2>/dev/null || echo "0")
-        echo "Connected Clients: $client_count"
+        client_count=$(wc -l < /var/lib/misc/dnsmasq.leases 2>/dev/null || echo "0")
+        echo "Connected Clients: ${client_count}"
+
+        if [[ "$client_count" -gt 0 ]]; then
+            echo "Client Details:"
+            while IFS= read -r line; do
+                local mac ip hostname
+                mac=$(echo "$line" | awk '{print $2}')
+                ip=$(echo "$line" | awk '{print $3}')
+                hostname=$(echo "$line" | awk '{print $4}')
+                echo "  - ${ip} (${mac}) ${hostname}"
+            done < /var/lib/misc/dnsmasq.leases
+        fi
     fi
 }
 

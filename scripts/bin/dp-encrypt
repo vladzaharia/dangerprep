@@ -12,7 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Path to the main encryption script
-ENCRYPTION_SCRIPT="${SCRIPT_DIR}/dangerprep-encryption.sh"
+ENCRYPTION_SCRIPT="${SCRIPT_DIR}/../dangerprep-encryption.sh"
 
 # Check if main script exists
 if [[ ! -f "$ENCRYPTION_SCRIPT" ]]; then

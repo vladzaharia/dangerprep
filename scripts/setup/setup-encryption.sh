@@ -357,8 +357,8 @@ install_encryption_scripts() {
     fi
     
     # Copy command wrappers
-    local encrypt_script="$SCRIPT_DIR/../dp-encrypt"
-    local decrypt_script="$SCRIPT_DIR/../dp-decrypt"
+    local encrypt_script="$SCRIPT_DIR/../bin/dp-encrypt"
+    local decrypt_script="$SCRIPT_DIR/../bin/dp-decrypt"
     
     if [[ -f "$encrypt_script" ]]; then
         cp "$encrypt_script" /usr/local/bin/

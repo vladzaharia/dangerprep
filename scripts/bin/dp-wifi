@@ -364,9 +364,9 @@ show_status() {
     # Check NetworkManager status
     echo "Service Status:"
     if systemctl is-active --quiet NetworkManager; then
-        echo "  NetworkManager: ${GREEN}Running${NC}"
+        echo -e "  NetworkManager: ${GREEN}Running${NC}"
     else
-        echo "  NetworkManager: ${RED}Stopped${NC}"
+        echo -e "  NetworkManager: ${RED}Stopped${NC}"
         return 1
     fi
 
@@ -385,28 +385,78 @@ show_status() {
 
     # Show status for each WiFi interface
     for interface in "${interfaces[@]}"; do
-        echo "Interface: $interface"
+        echo "Interface: ${interface}"
 
         # Get interface state
         local state
         state=$(nmcli -t -f DEVICE,STATE device status | grep "^${interface}:" | cut -d: -f2)
-        echo "  State: $state"
+
+        # Color code the state
+        case "$state" in
+            "connected")
+                echo -e "  State: ${GREEN}${state}${NC}"
+                ;;
+            "disconnected")
+                echo -e "  State: ${YELLOW}${state}${NC}"
+                ;;
+            "unavailable")
+                echo -e "  State: ${RED}${state}${NC}"
+                ;;
+            *)
+                echo "  State: ${state}"
+                ;;
+        esac
 
         # Get current connection if connected
         if [[ "$state" == "connected" ]]; then
-            local current_ssid
+            local current_ssid connection_name
             current_ssid=$(nmcli -t -f active,ssid dev wifi | grep "^yes:" | cut -d: -f2)
-            [[ -n "$current_ssid" ]] && echo "  Connected to: $current_ssid"
+            connection_name=$(nmcli -t -f DEVICE,CONNECTION device status | grep "^${interface}:" | cut -d: -f2)
 
-            # Get IP address
-            local ip_address
+            if [[ -n "$current_ssid" ]]; then
+                echo "  Connected to: ${current_ssid}"
+                [[ -n "$connection_name" && "$connection_name" != "$current_ssid" ]] && echo "  Connection Name: ${connection_name}"
+            fi
+
+            # Get IP address and gateway
+            local ip_address gateway dns
             ip_address=$(nmcli -t -f IP4.ADDRESS dev show "$interface" | cut -d: -f2 | cut -d/ -f1)
-            [[ -n "$ip_address" ]] && echo "  IP Address: $ip_address"
+            gateway=$(nmcli -t -f IP4.GATEWAY dev show "$interface" | cut -d: -f2)
+            dns=$(nmcli -t -f IP4.DNS dev show "$interface" | cut -d: -f2 | head -1)
 
-            # Get signal strength
-            local signal
+            [[ -n "$ip_address" ]] && echo "  IP Address: ${ip_address}"
+            [[ -n "$gateway" ]] && echo "  Gateway: ${gateway}"
+            [[ -n "$dns" ]] && echo "  DNS: ${dns}"
+
+            # Get signal strength and rate
+            local signal rate
             signal=$(nmcli -t -f IN-USE,SIGNAL dev wifi | grep "^\*:" | cut -d: -f2)
-            [[ -n "$signal" ]] && echo "  Signal Strength: ${signal}%"
+            rate=$(nmcli -t -f IN-USE,RATE dev wifi | grep "^\*:" | cut -d: -f2)
+
+            if [[ -n "$signal" ]]; then
+                # Color code signal strength
+                if [[ "$signal" -ge 70 ]]; then
+                    echo -e "  Signal Strength: ${GREEN}${signal}%${NC}"
+                elif [[ "$signal" -ge 50 ]]; then
+                    echo -e "  Signal Strength: ${YELLOW}${signal}%${NC}"
+                else
+                    echo -e "  Signal Strength: ${RED}${signal}%${NC}"
+                fi
+            fi
+
+            [[ -n "$rate" ]] && echo "  Link Rate: ${rate}"
+
+            # Get security info
+            local security
+            security=$(nmcli -t -f IN-USE,SECURITY dev wifi | grep "^\*:" | cut -d: -f2)
+            [[ -n "$security" ]] && echo "  Security: ${security}"
+
+            # Check internet connectivity
+            if ping -c 1 -W 2 8.8.8.8 &>/dev/null; then
+                echo -e "  Internet: ${GREEN}Connected${NC}"
+            else
+                echo -e "  Internet: ${RED}No connectivity${NC}"
+            fi
         fi
 
         echo
@@ -415,17 +465,29 @@ show_status() {
     # Show available networks for the first interface
     if [[ ${#interfaces[@]} -gt 0 ]]; then
         local first_interface="${interfaces[0]}"
-        echo "Available Networks (on $first_interface):"
+        echo "Available Networks (on ${first_interface}):"
 
         # Get available networks with signal strength
         local networks_info
         networks_info=$(nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list ifname "$first_interface" 2>/dev/null | grep -v "^$" | sort -t: -k2 -nr | head -10)
 
         if [[ -n "$networks_info" ]]; then
-            echo "  SSID                    Signal  Security"
-            echo "  ----                    ------  --------"
+            printf "  %-30s  %6s  %s\n" "SSID" "Signal" "Security"
+            printf "  %-30s  %6s  %s\n" "----" "------" "--------"
             while IFS=: read -r ssid signal security; do
-                [[ -n "$ssid" ]] && printf "  %-22s  %3s%%    %s\n" "$ssid" "$signal" "$security"
+                if [[ -n "$ssid" ]]; then
+                    # Color code signal strength
+                    local signal_display
+                    if [[ "$signal" -ge 70 ]]; then
+                        signal_display="${GREEN}${signal}%${NC}"
+                    elif [[ "$signal" -ge 50 ]]; then
+                        signal_display="${YELLOW}${signal}%${NC}"
+                    else
+                        signal_display="${RED}${signal}%${NC}"
+                    fi
+                    printf "  %-30s  " "$ssid"
+                    echo -e "${signal_display}    ${security}"
+                fi
             done <<< "$networks_info"
         else
             echo "  No networks found"
