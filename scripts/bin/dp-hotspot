@@ -694,6 +694,7 @@ configure_dnsmasq() {
 # Interface configuration
 interface=${interface}
 bind-interfaces
+listen-address=${ip_address}
 
 # DHCP configuration
 dhcp-range=${dhcp_start},${dhcp_end},255.255.255.0,24h
