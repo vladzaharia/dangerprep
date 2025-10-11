@@ -432,7 +432,15 @@ export class NetworkService {
    */
   private async determineWiFiPurpose(name: string): Promise<BaseNetworkInterface['purpose']> {
     try {
-      // Check if it's configured as a hotspot
+      // Get comprehensive hostapd information
+      const hostapdInfo = await this.getHostapdInfo();
+
+      // Check if this interface is the active hotspot interface
+      if (hostapdInfo.isRunning && hostapdInfo.activeInterface === name) {
+        return 'wlan'; // This is the active hotspot interface
+      }
+
+      // Check if it's configured as a hotspot in hostapd config
       if (this.isHotspotInterface(name)) {
         return 'wlan';
       }
@@ -456,7 +464,8 @@ export class NetworkService {
       }
 
       return 'unknown';
-    } catch {
+    } catch (error) {
+      console.warn(`[NetworkService] Error determining WiFi purpose for ${name}:`, error);
       return 'unknown';
     }
   }
@@ -778,7 +787,7 @@ export class NetworkService {
     }
 
     // Add hotspot-specific information if this is a hotspot interface
-    return this.addHotspotInfoToWiFi(wifiInfo);
+    return await this.addHotspotInfoToWiFi(wifiInfo);
   }
 
   /**
@@ -825,34 +834,90 @@ export class NetworkService {
   /**
    * Add hotspot-specific information to WiFi interface
    */
-  private addHotspotInfoToWiFi(wifiInfo: WiFiInterface): WiFiInterface {
+  private async addHotspotInfoToWiFi(wifiInfo: WiFiInterface): Promise<WiFiInterface> {
     if (wifiInfo.purpose !== 'wlan') {
       return wifiInfo;
     }
 
-    const hostapdConfig = this.readHostapdConfig();
+    try {
+      const hostapdInfo = await this.getHostapdInfo();
+      const hostapdConfig = hostapdInfo.config;
 
-    // Add hotspot-specific properties
-    const hotspotWifi = { ...wifiInfo };
+      // Add hotspot-specific properties
+      const hotspotWifi = { ...wifiInfo };
 
-    // Override SSID and security from hostapd config if available
-    if (hostapdConfig.ssid) {
-      hotspotWifi.ssid = hostapdConfig.ssid;
+      // Use actual runtime values if available, otherwise fall back to config
+      if (hostapdInfo.isRunning && hostapdInfo.activeInterface === wifiInfo.name) {
+        // Use runtime information for active hotspot
+        if (hostapdInfo.actualSSID) {
+          hotspotWifi.ssid = hostapdInfo.actualSSID;
+        }
+
+        if (hostapdInfo.connectedClients !== undefined) {
+          hotspotWifi.connectedClients = hostapdInfo.connectedClients;
+        }
+
+        if (hostapdInfo.runtimeInfo) {
+          if (hostapdInfo.runtimeInfo.channel) {
+            hotspotWifi.channel = hostapdInfo.runtimeInfo.channel;
+          }
+          if (hostapdInfo.runtimeInfo.macAddress) {
+            hotspotWifi.macAddress = hostapdInfo.runtimeInfo.macAddress;
+          }
+        }
+      }
+
+      // Override with config values if runtime values not available
+      if (!hotspotWifi.ssid && hostapdConfig.ssid) {
+        hotspotWifi.ssid = hostapdConfig.ssid;
+      }
+
+      if (hostapdConfig.wpa) {
+        hotspotWifi.security = hostapdConfig.wpa === '3' ? 'WPA3' : 'WPA2';
+      }
+
+      if (!hotspotWifi.channel && hostapdConfig.channel) {
+        hotspotWifi.channel = parseInt(hostapdConfig.channel);
+      }
+
+      // Add additional hostapd config information
+      if (hostapdConfig.country_code) {
+        hotspotWifi.frequency = this.getFrequencyFromChannel(hotspotWifi.channel || parseInt(hostapdConfig.channel || '6'));
+      }
+
+      if (hostapdConfig.max_num_sta) {
+        // This would require extending the WiFiInterface to include maxClients
+        // For now, we'll add it as a custom property
+        (hotspotWifi as any).maxClients = parseInt(hostapdConfig.max_num_sta);
+      }
+
+      if (hostapdConfig.ignore_broadcast_ssid === '1') {
+        (hotspotWifi as any).hidden = true;
+      }
+
+      return hotspotWifi;
+    } catch (error) {
+      console.warn(`[NetworkService] Error adding hotspot info to WiFi interface ${wifiInfo.name}:`, error);
+      return wifiInfo;
     }
-
-    if (hostapdConfig.wpa) {
-      hotspotWifi.security = hostapdConfig.wpa === '3' ? 'WPA3' : 'WPA2';
-    }
-
-    if (hostapdConfig.channel) {
-      hotspotWifi.channel = parseInt(hostapdConfig.channel);
-    }
-
-    return hotspotWifi;
   }
 
   /**
-   * Read hostapd configuration
+   * Get frequency band from WiFi channel
+   */
+  private getFrequencyFromChannel(channel: number): string {
+    if (channel <= 14) {
+      return '2.4GHz';
+    } else if (channel >= 36 && channel <= 165) {
+      return '5GHz';
+    } else if (channel >= 1 && channel <= 233) {
+      return '6GHz';
+    }
+    return 'Unknown';
+  }
+
+  /**
+   * Read hostapd configuration with enhanced parsing
    */
   private readHostapdConfig(): Record<string, string> {
     try {
@@ -870,9 +935,128 @@ export class NetworkService {
       }
 
       return config;
-    } catch {
+    } catch (error) {
+      console.warn(`[NetworkService] Could not read hostapd config from ${this.hostapdPath}:`, error);
       return {};
     }
+  }
+
+  /**
+   * Get comprehensive hostapd information including runtime status
+   */
+  private async getHostapdInfo(): Promise<{
+    config: Record<string, string>;
+    isRunning: boolean;
+    activeInterface?: string;
+    actualSSID?: string;
+    connectedClients?: number;
+    runtimeInfo?: Record<string, any>;
+  }> {
+    const config = this.readHostapdConfig();
+
+    try {
+      // Check if hostapd is running
+      const { stdout: psOutput } = await execAsync('ps aux | grep "[h]ostapd" || true');
+      const isRunning = psOutput.trim().length > 0;
+
+      let activeInterface: string | undefined;
+      let actualSSID: string | undefined;
+      let connectedClients: number | undefined;
+      let runtimeInfo: Record<string, any> | undefined;
+
+      if (isRunning) {
+        // Get active interface from running hostapd process
+        const interfaceMatch = psOutput.match(/-i\s+(\w+)/);
+        if (interfaceMatch) {
+          activeInterface = interfaceMatch[1];
+        } else {
+          // Fallback: get interface from config file being used
+          const configMatch = psOutput.match(/\/etc\/hostapd\/\S+/);
+          if (configMatch) {
+            try {
+              const configContent = readFileSync(configMatch[0], 'utf-8');
+              const interfaceConfigMatch = configContent.match(/^interface=(.+)$/m);
+              if (interfaceConfigMatch && interfaceConfigMatch[1]) {
+                activeInterface = interfaceConfigMatch[1].trim();
+              }
+            } catch {
+              // Ignore errors reading config
+            }
+          }
+        }
+
+        // Get actual SSID and connected clients if we have an active interface
+        if (activeInterface) {
+          try {
+            // Get actual SSID from the interface
+            const { stdout: iwOutput } = await execAsync(`iw dev ${activeInterface} info 2>/dev/null || true`);
+            const ssidMatch = iwOutput.match(/ssid (.+)/);
+            if (ssidMatch && ssidMatch[1]) {
+              actualSSID = ssidMatch[1].trim();
+            }
+
+            // Get connected clients count
+            const { stdout: stationOutput } = await execAsync(`iw dev ${activeInterface} station dump 2>/dev/null | grep Station | wc -l || echo "0"`);
+            connectedClients = parseInt(stationOutput.trim()) || 0;
+
+            // Get additional runtime info
+            const { stdout: infoOutput } = await execAsync(`iw dev ${activeInterface} info 2>/dev/null || true`);
+            if (infoOutput) {
+              runtimeInfo = this.parseIwInfo(infoOutput);
+            }
+          } catch (error) {
+            console.warn(`[NetworkService] Could not get runtime info for interface ${activeInterface}:`, error);
+          }
+        }
+      }
+
+      return {
+        config,
+        isRunning,
+        ...(activeInterface && { activeInterface }),
+        ...(actualSSID && { actualSSID }),
+        ...(connectedClients !== undefined && { connectedClients }),
+        ...(runtimeInfo && { runtimeInfo }),
+      };
+    } catch (error) {
+      console.warn('[NetworkService] Error getting hostapd info:', error);
+      return { config, isRunning: false };
+    }
+  }
+
+  /**
+   * Parse iw info output into structured data
+   */
+  private parseIwInfo(iwOutput: string): Record<string, any> {
+    const info: Record<string, any> = {};
+
+    const lines = iwOutput.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Parse various fields
+      if (trimmed.includes('type ')) {
+        const typeMatch = trimmed.match(/type (\w+)/);
+        if (typeMatch) info.type = typeMatch[1];
+      }
+
+      if (trimmed.includes('channel ')) {
+        const channelMatch = trimmed.match(/channel (\d+)/);
+        if (channelMatch && channelMatch[1]) info.channel = parseInt(channelMatch[1]);
+      }
+
+      if (trimmed.includes('txpower ')) {
+        const powerMatch = trimmed.match(/txpower ([\d.]+) dBm/);
+        if (powerMatch && powerMatch[1]) info.txpower = parseFloat(powerMatch[1]);
+      }
+
+      if (trimmed.includes('addr ')) {
+        const addrMatch = trimmed.match(/addr ([a-f0-9:]{17})/);
+        if (addrMatch) info.macAddress = addrMatch[1];
+      }
+    }
+
+    return info;
   }
 
   /**
@@ -977,6 +1161,86 @@ export class NetworkService {
     }
 
     return dnsServers;
+  }
+
+  /**
+   * Get detailed hostapd status for API consumption
+   */
+  async getHostapdStatus(): Promise<{
+    isConfigured: boolean;
+    isRunning: boolean;
+    configuredInterface?: string;
+    activeInterface?: string;
+    ssid?: string;
+    actualSSID?: string;
+    channel?: number;
+    connectedClients?: number;
+    security?: string;
+    countryCode?: string;
+    maxClients?: number;
+    hidden?: boolean;
+  }> {
+    try {
+      const hostapdInfo = await this.getHostapdInfo();
+      const config = hostapdInfo.config;
+
+      const status = {
+        isConfigured: Object.keys(config).length > 0,
+        isRunning: hostapdInfo.isRunning,
+      };
+
+      // Add configuration information
+      if (config.interface) {
+        (status as any).configuredInterface = config.interface;
+      }
+
+      if (config.ssid) {
+        (status as any).ssid = config.ssid;
+      }
+
+      if (config.channel) {
+        (status as any).channel = parseInt(config.channel);
+      }
+
+      if (config.wpa) {
+        (status as any).security = config.wpa === '3' ? 'WPA3' : 'WPA2';
+      }
+
+      if (config.country_code) {
+        (status as any).countryCode = config.country_code;
+      }
+
+      if (config.max_num_sta) {
+        (status as any).maxClients = parseInt(config.max_num_sta);
+      }
+
+      if (config.ignore_broadcast_ssid === '1') {
+        (status as any).hidden = true;
+      }
+
+      // Add runtime information if available
+      if (hostapdInfo.isRunning) {
+        if (hostapdInfo.activeInterface) {
+          (status as any).activeInterface = hostapdInfo.activeInterface;
+        }
+
+        if (hostapdInfo.actualSSID) {
+          (status as any).actualSSID = hostapdInfo.actualSSID;
+        }
+
+        if (hostapdInfo.connectedClients !== undefined) {
+          (status as any).connectedClients = hostapdInfo.connectedClients;
+        }
+      }
+
+      return status;
+    } catch (error) {
+      console.error('[NetworkService] Error getting hostapd status:', error);
+      return {
+        isConfigured: false,
+        isRunning: false,
+      };
+    }
   }
 
   /**

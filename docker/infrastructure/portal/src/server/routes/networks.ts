@@ -238,6 +238,52 @@ networks.get('/:interface', async (c) => {
 });
 
 /**
+ * GET /api/networks/hostapd/status
+ * Get detailed hostapd status information
+ */
+networks.get('/hostapd/status', async (c) => {
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[NetworksRoute:${requestId}] GET /api/networks/hostapd/status - Request started`);
+
+  try {
+    console.log(`[NetworksRoute:${requestId}] Getting hostapd status`);
+    const hostapdStatus = await networkService.getHostapdStatus();
+    console.log(`[NetworksRoute:${requestId}] Hostapd status retrieved:`, {
+      isConfigured: hostapdStatus.isConfigured,
+      isRunning: hostapdStatus.isRunning,
+      activeInterface: hostapdStatus.activeInterface,
+      connectedClients: hostapdStatus.connectedClients
+    });
+
+    return c.json({
+      success: true,
+      data: {
+        hostapd: hostapdStatus,
+      },
+      metadata: {
+        timestamp: new Date().toISOString(),
+        source: 'hostapd',
+      },
+    });
+  } catch (error) {
+    console.error(`[NetworksRoute:${requestId}] Failed to get hostapd status:`, error);
+    console.error(`[NetworksRoute:${requestId}] Error details:`, {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
+    return c.json(
+      {
+        success: false,
+        error: 'Failed to retrieve hostapd status',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
+  }
+});
+
+/**
  * POST /api/networks/refresh
  * Refresh the network interface cache
  */
