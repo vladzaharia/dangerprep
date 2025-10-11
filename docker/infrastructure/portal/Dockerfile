@@ -27,6 +27,9 @@ COPY . .
 # Generate a partial monorepo with a pruned lockfile for portal
 RUN turbo prune @dangerprep/portal --docker
 
+# Copy back the scripts directory that turbo prune might have excluded
+COPY docker/infrastructure/portal/scripts /app/out/full/docker/infrastructure/portal/scripts
+
 FROM base AS installer
 RUN apk update && apk add --no-cache \
     libc6-compat \
