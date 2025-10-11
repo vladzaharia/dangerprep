@@ -49,7 +49,7 @@ services:
 
       # Service discovery
       - "service.type=public"
-      - "service.name=Entertainment at Sea"
+      - "service.name=Entertainment to Go"
       - "service.description=Stream movies, TV shows, and more"
       - "service.icon=film"
 

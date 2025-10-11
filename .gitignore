@@ -66,6 +66,9 @@ out/
 *.tsbuildinfo
 .tsbuildinfo
 
+# Compiled CommonJS files (generated from TypeScript)
+*.cjs
+
 # Turborepo
 .turbo/
 

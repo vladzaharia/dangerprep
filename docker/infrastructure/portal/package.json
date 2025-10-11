@@ -10,15 +10,19 @@
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
+    "@hono/node-server": "^1.19.5",
+    "@hono/zod-validator": "^0.7.4",
     "dockerode": "^4.0.2",
     "express": "^4.21.2",
     "express-rate-limit": "^7.4.1",
     "helmet": "^8.0.0",
+    "hono": "^4.9.10",
     "node-cache": "^5.1.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.9.1",
-    "tslib": "^2.8.1"
+    "tslib": "^2.8.1",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@dangerprep/eslint": "workspace:*",

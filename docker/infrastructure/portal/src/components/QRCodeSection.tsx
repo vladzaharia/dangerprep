@@ -1,9 +1,46 @@
-import React, { useMemo } from 'react';
-import { useWiFiConfig } from '../hooks/useConfig';
+import React, { useMemo, Suspense } from 'react';
+import { useWifi } from '../hooks/useModernWifi';
 
-export const QRCodeSection: React.FC = () => {
-  // Get WiFi configuration from API (runtime)
-  const { wifi, loading, error } = useWiFiConfig();
+/**
+ * Loading skeleton for QR code section using Web Awesome components
+ */
+function QRCodeSkeleton() {
+  return (
+    <div className="wifi-connection-container">
+      <div className="wifi-connection-content">
+        {/* Left Side - Connection Details Skeleton */}
+        <div className="wifi-details">
+          <div className="wifi-detail-item">
+            <span className="wifi-detail-label">Network Name:</span>
+            <wa-skeleton style={{ width: '150px', height: '20px' }}></wa-skeleton>
+          </div>
+          <div className="wifi-detail-item">
+            <span className="wifi-detail-label">Password:</span>
+            <wa-skeleton style={{ width: '120px', height: '20px' }}></wa-skeleton>
+          </div>
+
+        </div>
+
+        {/* Right Side - QR Code Skeleton */}
+        <div className="wifi-qr">
+          <wa-skeleton style={{ width: '200px', height: '200px' }}></wa-skeleton>
+        </div>
+      </div>
+
+      {/* Instructions Skeleton */}
+      <div className="wifi-instructions">
+        <wa-skeleton style={{ width: '100%', height: '20px' }}></wa-skeleton>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * QR Code content component (wrapped in Suspense)
+ */
+function QRCodeContent() {
+  // Use modern Suspense-compatible hook
+  const { wifi } = useWifi();
   const { ssid, password } = wifi;
 
   // Generate WiFi QR code string
@@ -13,25 +50,6 @@ export const QRCodeSection: React.FC = () => {
     const escapedPassword = password.replace(/[\\;,":]/g, '\\$&');
     return `WIFI:T:WPA;S:${escapedSSID};P:${escapedPassword};H:false;;`;
   }, [ssid, password]);
-
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="wifi-connection-container">
-        <div className="wifi-connection-content">
-          <div className="wifi-details">
-            <p>Loading WiFi configuration...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state with fallback
-  if (error) {
-    console.warn('WiFi config error:', error);
-    // Continue with fallback values from the hook
-  }
 
   return (
     <div className="wifi-connection-container">
@@ -63,8 +81,19 @@ export const QRCodeSection: React.FC = () => {
 
       {/* Instructions Below */}
       <div className="wifi-instructions">
-        <p>Scan the QR code with your device's camera to automatically connect to the WiFi network, or use the connection details above to connect manually.</p>
+        <p>Scan the QR code with your device's camera or use the details above to connect to the WiFi network.</p>
       </div>
     </div>
+  );
+}
+
+/**
+ * Modern QR Code Section component using React 19 Suspense patterns
+ */
+export const QRCodeSection: React.FC = () => {
+  return (
+    <Suspense fallback={<QRCodeSkeleton />}>
+      <QRCodeContent />
+    </Suspense>
   );
 };

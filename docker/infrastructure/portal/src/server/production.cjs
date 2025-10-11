@@ -1,45 +1,46 @@
-const express = require('express');
+const { serve } = require('@hono/node-server');
+const { serveStatic } = require('@hono/node-server/serve-static');
 const path = require('path');
-const { createApiMiddleware } = require('./middleware.cjs');
+const fs = require('fs');
 
-const app = express();
+// Import the Hono app (compiled from TypeScript)
+const { default: app } = require('./app.cjs');
+
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-// Trust proxy settings for reverse proxy (Traefik)
-// This is required when running behind a reverse proxy to properly handle X-Forwarded-For headers
-app.set('trust proxy', true);
-
-// API routes
-app.use('/api', createApiMiddleware());
-
-// Serve static files from the dist directory
+// Serve static files from the dist directory for non-API routes
 const distPath = path.join(__dirname, '../../dist');
-app.use(express.static(distPath));
 
-// Handle React Router - serve index.html for all non-API routes
-app.get('*', (req, res) => {
+// Add static file serving middleware for the frontend
+app.use('/*', serveStatic({ root: distPath }));
+
+// Fallback to index.html for client-side routing (must be after API routes)
+app.get('*', (c) => {
   // Skip API routes
-  if (req.path.startsWith('/api')) {
-    return res.status(404).json({ error: 'API endpoint not found' });
+  if (c.req.path.startsWith('/api')) {
+    return c.json({ error: 'API endpoint not found' }, 404);
   }
-  
-  res.sendFile(path.join(distPath, 'index.html'));
-});
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server Error:', err);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: 'An unexpected error occurred',
-  });
+  // Serve index.html for all other routes (React Router)
+  const indexPath = path.join(distPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return c.html(fs.readFileSync(indexPath, 'utf8'));
+  }
+
+  return c.text('Frontend not found', 404);
 });
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Portal server running on port ${PORT}`);
-  console.log(`📱 Frontend: http://localhost:${PORT}`);
-  console.log(`🔌 API: http://localhost:${PORT}/api`);
+console.log('🚀 Starting DangerPrep Portal server...');
+serve({
+  fetch: app.fetch,
+  port: PORT,
+  hostname: '0.0.0.0',
+}, (info) => {
+  console.log(`🚀 Portal server running on port ${info.port}`);
+  console.log(`📱 Frontend: http://localhost:${info.port}`);
+  console.log(`🔌 API: http://localhost:${info.port}/api`);
+  console.log(`⚡ Powered by Hono`);
 });
 
 // Graceful shutdown
