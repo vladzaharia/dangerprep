@@ -14,12 +14,19 @@ const networks = new Hono();
  *   - detailed: Include detailed information for all interfaces (default: false)
  */
 networks.get('/', async (c) => {
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[NetworksRoute:${requestId}] GET /api/networks - Request started`);
+
   try {
     const detailed = c.req.query('detailed') === 'true';
-    
+    console.log(`[NetworksRoute:${requestId}] Query parameters: detailed=${detailed}`);
+
     if (detailed) {
+      console.log(`[NetworksRoute:${requestId}] Fetching detailed interface information`);
       // Return detailed information for all interfaces
       const interfaces = await networkService.getAllInterfaces();
+      console.log(`[NetworksRoute:${requestId}] Retrieved ${interfaces.length} interfaces`);
+
       return c.json({
         success: true,
         data: {
@@ -32,8 +39,11 @@ networks.get('/', async (c) => {
         },
       });
     } else {
+      console.log(`[NetworksRoute:${requestId}] Fetching network summary`);
       // Return network summary with special interface mappings
       const summary = await networkService.getNetworkSummary();
+      console.log(`[NetworksRoute:${requestId}] Retrieved network summary with ${summary.totalInterfaces} interfaces`);
+
       return c.json({
         success: true,
         data: summary,
@@ -44,7 +54,12 @@ networks.get('/', async (c) => {
       });
     }
   } catch (error) {
-    console.error('Failed to get network interfaces:', error);
+    console.error(`[NetworksRoute:${requestId}] Failed to get network interfaces:`, error);
+    console.error(`[NetworksRoute:${requestId}] Error details:`, {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
     return c.json(
       {
         success: false,
@@ -116,18 +131,24 @@ function createDefaultInterfaceData(keyword: string) {
  * For keywords, shows default data if actual interface not found
  */
 networks.get('/:interface', async (c) => {
+  const requestId = Math.random().toString(36).substring(7);
+  const interfaceName = c.req.param('interface');
+  console.log(`[NetworksRoute:${requestId}] GET /api/networks/${interfaceName} - Request started`);
+
   try {
-    const interfaceName = c.req.param('interface');
     const isKeyword = ['hotspot', 'internet', 'tailscale'].includes(interfaceName);
+    console.log(`[NetworksRoute:${requestId}] Interface '${interfaceName}' is keyword: ${isKeyword}`);
 
     let networkInterface;
 
     // Check if it's a keyword
     if (isKeyword) {
+      console.log(`[NetworksRoute:${requestId}] Looking up keyword interface: ${interfaceName}`);
       networkInterface = await networkService.getInterfaceByKeyword(interfaceName as 'hotspot' | 'internet' | 'tailscale');
 
       // If keyword interface not found, return default data
       if (!networkInterface) {
+        console.log(`[NetworksRoute:${requestId}] Keyword interface '${interfaceName}' not found, creating default data`);
         const defaultInterface = createDefaultInterfaceData(interfaceName);
 
         return c.json({
@@ -146,13 +167,21 @@ networks.get('/:interface', async (c) => {
             message: `${interfaceName} interface not found, showing default configuration`,
           },
         });
+      } else {
+        console.log(`[NetworksRoute:${requestId}] Found keyword interface '${interfaceName}':`, {
+          name: networkInterface.name,
+          type: networkInterface.type,
+          state: networkInterface.state
+        });
       }
     } else {
+      console.log(`[NetworksRoute:${requestId}] Looking up actual interface: ${interfaceName}`);
       // Treat as actual interface name
       networkInterface = await networkService.getInterface(interfaceName);
 
       // For actual interface names, return 404 if not found
       if (!networkInterface) {
+        console.log(`[NetworksRoute:${requestId}] Actual interface '${interfaceName}' not found`);
         return c.json(
           {
             success: false,
@@ -161,10 +190,17 @@ networks.get('/:interface', async (c) => {
           },
           404
         );
+      } else {
+        console.log(`[NetworksRoute:${requestId}] Found actual interface '${interfaceName}':`, {
+          name: networkInterface.name,
+          type: networkInterface.type,
+          state: networkInterface.state
+        });
       }
     }
 
     // Return the interface with type-specific information (already included by NetworkService)
+    console.log(`[NetworksRoute:${requestId}] Returning interface data for '${interfaceName}'`);
     return c.json({
       success: true,
       data: {
@@ -181,7 +217,12 @@ networks.get('/:interface', async (c) => {
       },
     });
   } catch (error) {
-    console.error(`Failed to get interface ${c.req.param('interface')}:`, error);
+    console.error(`[NetworksRoute:${requestId}] Failed to get interface ${interfaceName}:`, error);
+    console.error(`[NetworksRoute:${requestId}] Error details:`, {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
     return c.json(
       {
         success: false,
@@ -198,12 +239,18 @@ networks.get('/:interface', async (c) => {
  * Refresh the network interface cache
  */
 networks.post('/refresh', async (c) => {
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[NetworksRoute:${requestId}] POST /api/networks/refresh - Request started`);
+
   try {
+    console.log(`[NetworksRoute:${requestId}] Clearing network service cache`);
     networkService.clearCache();
-    
+
+    console.log(`[NetworksRoute:${requestId}] Triggering cache refresh by fetching summary`);
     // Trigger a refresh by getting the summary
     const summary = await networkService.getNetworkSummary();
-    
+    console.log(`[NetworksRoute:${requestId}] Cache refreshed, found ${summary.totalInterfaces} interfaces`);
+
     return c.json({
       success: true,
       data: {
@@ -216,7 +263,12 @@ networks.post('/refresh', async (c) => {
       },
     });
   } catch (error) {
-    console.error('Failed to refresh network cache:', error);
+    console.error(`[NetworksRoute:${requestId}] Failed to refresh network cache:`, error);
+    console.error(`[NetworksRoute:${requestId}] Error details:`, {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
     return c.json(
       {
         success: false,

@@ -13,14 +13,25 @@ const config = new Hono();
  * This does NOT include WiFi or service-specific configuration
  */
 config.get('/', (c) => {
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[ConfigRoute:${requestId}] GET /api/config - Request started`);
+
   try {
+    console.log(`[ConfigRoute:${requestId}] Fetching app configuration`);
     const appConfig = configService.getAppConfig();
+    console.log(`[ConfigRoute:${requestId}] Retrieved app config:`, JSON.stringify(appConfig, null, 2));
+
     return c.json({
       success: true,
       data: appConfig,
     });
   } catch (error) {
-    console.error('Failed to get app configuration:', error);
+    console.error(`[ConfigRoute:${requestId}] Failed to get app configuration:`, error);
+    console.error(`[ConfigRoute:${requestId}] Error details:`, {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
     return c.json(
       {
         success: false,
@@ -38,14 +49,25 @@ config.get('/', (c) => {
  * @deprecated Use /api/config instead
  */
 config.get('/app', (c) => {
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[ConfigRoute:${requestId}] GET /api/config/app - Request started (deprecated endpoint)`);
+
   try {
+    console.log(`[ConfigRoute:${requestId}] Fetching app configuration via deprecated endpoint`);
     const appConfig = configService.getAppConfig();
+    console.log(`[ConfigRoute:${requestId}] Retrieved app config via deprecated endpoint:`, JSON.stringify(appConfig, null, 2));
+
     return c.json({
       success: true,
       data: appConfig,
     });
   } catch (error) {
-    console.error('Failed to get app configuration:', error);
+    console.error(`[ConfigRoute:${requestId}] Failed to get app configuration via deprecated endpoint:`, error);
+    console.error(`[ConfigRoute:${requestId}] Error details:`, {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
     return c.json(
       {
         success: false,

@@ -113,54 +113,85 @@ export class NetworkService {
    * Get all network interfaces
    */
   async getAllInterfaces(): Promise<NetworkInterface[]> {
+    console.log('[NetworkService] getAllInterfaces called');
     await this.refreshCacheIfNeeded();
-    return Array.from(this.interfaceCache.values());
+    const interfaces = Array.from(this.interfaceCache.values());
+    console.log(`[NetworkService] Returning ${interfaces.length} interfaces:`, interfaces.map(i => ({ name: i.name, type: i.type, state: i.state })));
+    return interfaces;
   }
 
   /**
    * Get network summary with all interfaces and special interface mappings
    */
   async getNetworkSummary(): Promise<NetworkSummary> {
+    console.log('[NetworkService] getNetworkSummary called');
     const interfaces = await this.getAllInterfaces();
-    
+
+    console.log('[NetworkService] Finding special interfaces...');
     // Find special interfaces
     const internetInterface = await this.findInternetInterface(interfaces);
     const hotspotInterface = this.findHotspotInterface(interfaces);
     const tailscaleInterface = this.findTailscaleInterface(interfaces);
 
-    return {
+    console.log('[NetworkService] Special interfaces found:', {
+      internet: internetInterface?.name || 'none',
+      hotspot: hotspotInterface?.name || 'none',
+      tailscale: tailscaleInterface?.name || 'none'
+    });
+
+    const summary = {
       interfaces,
       internetInterface: internetInterface?.name,
       hotspotInterface: hotspotInterface?.name,
       tailscaleInterface: tailscaleInterface?.name,
       totalInterfaces: interfaces.length,
     };
+
+    console.log('[NetworkService] Network summary created:', {
+      totalInterfaces: summary.totalInterfaces,
+      internetInterface: summary.internetInterface,
+      hotspotInterface: summary.hotspotInterface,
+      tailscaleInterface: summary.tailscaleInterface
+    });
+
+    return summary;
   }
 
   /**
    * Get specific interface by name
    */
   async getInterface(name: string): Promise<NetworkInterface | undefined> {
+    console.log(`[NetworkService] getInterface called for: ${name}`);
     await this.refreshCacheIfNeeded();
-    return this.interfaceCache.get(name);
+    const interface_ = this.interfaceCache.get(name);
+    console.log(`[NetworkService] Interface '${name}' ${interface_ ? 'found' : 'not found'}${interface_ ? `: ${interface_.type}, ${interface_.state}` : ''}`);
+    return interface_;
   }
 
   /**
    * Get interface by keyword (hotspot, internet, tailscale)
    */
   async getInterfaceByKeyword(keyword: 'hotspot' | 'internet' | 'tailscale'): Promise<NetworkInterface | undefined> {
+    console.log(`[NetworkService] getInterfaceByKeyword called for: ${keyword}`);
     const interfaces = await this.getAllInterfaces();
-    
+
+    let result: NetworkInterface | undefined;
     switch (keyword) {
       case 'hotspot':
-        return this.findHotspotInterface(interfaces);
+        result = this.findHotspotInterface(interfaces);
+        break;
       case 'internet':
-        return await this.findInternetInterface(interfaces);
+        result = await this.findInternetInterface(interfaces);
+        break;
       case 'tailscale':
-        return this.findTailscaleInterface(interfaces);
+        result = this.findTailscaleInterface(interfaces);
+        break;
       default:
-        return undefined;
+        result = undefined;
     }
+
+    console.log(`[NetworkService] Keyword '${keyword}' ${result ? 'found' : 'not found'}${result ? `: ${result.name} (${result.type}, ${result.state})` : ''}`);
+    return result;
   }
 
   /**
@@ -168,9 +199,18 @@ export class NetworkService {
    */
   private async refreshCacheIfNeeded(): Promise<void> {
     const now = Date.now();
-    if (now - this.lastCacheUpdate > this.cacheTimeout) {
+    const cacheAge = now - this.lastCacheUpdate;
+    const isStale = cacheAge > this.cacheTimeout;
+
+    console.log(`[NetworkService] Cache check: age=${cacheAge}ms, stale=${isStale}, timeout=${this.cacheTimeout}ms`);
+
+    if (isStale) {
+      console.log('[NetworkService] Cache is stale, refreshing...');
       await this.refreshInterfaceCache();
       this.lastCacheUpdate = now;
+      console.log('[NetworkService] Cache refreshed');
+    } else {
+      console.log('[NetworkService] Using cached interface data');
     }
   }
 
@@ -178,26 +218,35 @@ export class NetworkService {
    * Refresh the interface cache by detecting all interfaces
    */
   private async refreshInterfaceCache(): Promise<void> {
+    console.log('[NetworkService] Starting interface cache refresh');
     this.interfaceCache.clear();
-    
+
     try {
+      console.log('[NetworkService] Executing "ip link show" to get interface list');
       // Get all network interfaces
       const { stdout } = await execAsync('ip link show');
       const interfaceNames = this.parseInterfaceNames(stdout);
-      
+      console.log(`[NetworkService] Found ${interfaceNames.length} interfaces:`, interfaceNames);
+
       // Get detailed information for each interface
       for (const name of interfaceNames) {
+        console.log(`[NetworkService] Getting details for interface: ${name}`);
         try {
           const interfaceInfo = await this.getInterfaceDetails(name);
           if (interfaceInfo) {
             this.interfaceCache.set(name, interfaceInfo);
+            console.log(`[NetworkService] Cached interface ${name}: ${interfaceInfo.type}, ${interfaceInfo.state}`);
+          } else {
+            console.log(`[NetworkService] No details returned for interface: ${name}`);
           }
         } catch (error) {
-          console.warn(`Failed to get details for interface ${name}:`, error);
+          console.warn(`[NetworkService] Failed to get details for interface ${name}:`, error);
         }
       }
+
+      console.log(`[NetworkService] Interface cache refresh complete. Cached ${this.interfaceCache.size} interfaces`);
     } catch (error) {
-      console.error('Failed to refresh interface cache:', error);
+      console.error('[NetworkService] Failed to refresh interface cache:', error);
     }
   }
 
@@ -698,7 +747,10 @@ export class NetworkService {
    * Clear the interface cache (useful for testing or manual refresh)
    */
   clearCache(): void {
+    console.log('[NetworkService] Clearing interface cache');
+    const previousSize = this.interfaceCache.size;
     this.interfaceCache.clear();
     this.lastCacheUpdate = 0;
+    console.log(`[NetworkService] Cache cleared. Previous size: ${previousSize}, new size: ${this.interfaceCache.size}`);
   }
 }
