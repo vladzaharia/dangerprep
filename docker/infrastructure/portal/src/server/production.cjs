@@ -3,6 +3,11 @@ const { serveStatic } = require('@hono/node-server/serve-static');
 const path = require('path');
 const fs = require('fs');
 
+// Set NODE_ENV to production if not set
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'production';
+}
+
 // Import the Hono app (compiled from TypeScript)
 const { default: app } = require('./app.cjs');
 

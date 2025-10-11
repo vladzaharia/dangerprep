@@ -24,26 +24,34 @@ if (isDevelopment) {
 }
 
 app.use('*', secureHeaders({
-  // Modern security headers for 2025
+  // Permissive security headers for all hosts as requested
   contentSecurityPolicy: {
-    defaultSrc: ["'self'"],
-    styleSrc: ["'self'", "'unsafe-inline'"],
-    scriptSrc: ["'self'"],
-    imgSrc: ["'self'", "data:", "https:"],
-    connectSrc: ["'self'"],
-    fontSrc: ["'self'"],
+    defaultSrc: ["'self'", "*"],
+    styleSrc: ["'self'", "'unsafe-inline'", "*"],
+    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "*"],
+    imgSrc: ["'self'", "data:", "https:", "http:", "*"],
+    connectSrc: ["'self'", "*"],
+    fontSrc: ["'self'", "data:", "https:", "http:", "*"],
     objectSrc: ["'none'"],
-    mediaSrc: ["'self'"],
-    frameSrc: ["'none'"],
+    mediaSrc: ["'self'", "*"],
+    frameSrc: ["'self'", "*"],
+    frameAncestors: ["'self'", "*"],
+    baseUri: ["'self'", "*"],
+    formAction: ["'self'", "*"],
   },
   crossOriginEmbedderPolicy: false, // Disable for compatibility
+  crossOriginOpenerPolicy: false, // Disable to prevent HTTP/HTTPS issues
+  crossOriginResourcePolicy: false, // Disable for compatibility
+  originAgentCluster: false, // Disable to prevent agent cluster issues
 }));
 
 app.use('*', cors({
-  origin: isDevelopment ? '*' : ['https://portal.danger.diy', 'https://portal.argos.surf'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
+  origin: '*', // Allow all hosts as requested
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
+  allowHeaders: ['*'], // Allow all headers
+  exposeHeaders: ['*'], // Expose all headers
   credentials: false,
+  maxAge: 86400, // Cache preflight for 24 hours
 }));
 
 // Mount API routes
