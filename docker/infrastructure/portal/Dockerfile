@@ -43,8 +43,8 @@ RUN yarn install --immutable
 # Copy source code for development
 COPY --from=builder /app/out/full/ .
 
-# Copy back the scripts directory that turbo prune might have excluded
-COPY --from=builder /app/docker/infrastructure/portal/scripts ./docker/infrastructure/portal/scripts
+# Copy the scripts directory directly from build context (more reliable than builder stage)
+COPY docker/infrastructure/portal/scripts ./docker/infrastructure/portal/scripts
 
 FROM base AS runner
 WORKDIR /app
