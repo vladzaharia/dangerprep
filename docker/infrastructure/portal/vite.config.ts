@@ -12,9 +12,13 @@ export default defineConfig(({ command, mode }) => {
   const isDevelopment = command === 'serve'
 
   const plugins = [
-    // Hono dev server for development
+    // Hono dev server for development - only handle API routes
     devServer({
       entry: 'src/server/index.ts',
+      exclude: [
+        /^\/$/, // Exclude root path
+        /^\/(?!api).*/, // Exclude all non-API paths
+      ],
     }),
 
     // React with SWC - optimized for React 19 and Vite 7

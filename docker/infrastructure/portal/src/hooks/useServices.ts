@@ -112,7 +112,7 @@ async function fetchServices(serviceType?: string, domain?: string): Promise<Ser
   if (serviceType) params.append('type', serviceType);
   if (domain) params.append('domain', domain);
 
-  const url = `/api/services/discovery${params.toString() ? `?${params.toString()}` : ''}`;
+  const url = `/api/services${params.toString() ? `?${params.toString()}` : ''}`;
   const response = await fetch(url);
 
   if (!response.ok) {
