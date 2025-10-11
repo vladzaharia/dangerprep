@@ -90,5 +90,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 RUN yarn build
 
 # Start production server
-# CMD ["node", "src/server/production.cjs"]
-CMD ["yarn", "dev"]
+CMD ["node", "src/server/production.cjs"]
+# CMD ["yarn", "dev"]
