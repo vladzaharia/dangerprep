@@ -14,13 +14,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/hostapd:/etc/hostapd:ro
       - /sys/class/net:/sys/class/net:ro
-      - /proc/net:/proc/net:ro
       - /etc/resolv.conf:/etc/resolv.conf:ro
       - /var/run/tailscale:/var/run/tailscale:ro
     env_file:
       - compose.env
-    ports:
-      - "3000:3000"
     user: root
     environment:
       # Runtime environment variables for the React app

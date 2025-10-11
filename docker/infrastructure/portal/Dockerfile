@@ -43,10 +43,6 @@ RUN yarn install --immutable
 # Copy source code for development
 COPY --from=builder /app/out/full/ .
 
-# Debug: List what's available in build context
-RUN ls -la docker/infrastructure/portal/ || echo "portal directory not found"
-RUN ls -la docker/infrastructure/portal/scripts/ || echo "scripts directory not found"
-
 # Copy the scripts directory directly from build context (turbo prune excludes it)
 COPY docker/infrastructure/portal/scripts ./docker/infrastructure/portal/scripts
 
