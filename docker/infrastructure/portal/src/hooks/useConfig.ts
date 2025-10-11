@@ -1,7 +1,30 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+
+// React 19 use hook with fallback for older versions
+const useHook = (React as any).use || ((promise: Promise<any>) => {
+  throw promise; // Fallback behavior for Suspense
+});
 
 /**
- * Configuration data structure from the API
+ * App configuration data structure
+ */
+export interface AppConfig {
+  app: {
+    title: string;
+    description: string;
+  };
+  global: {
+    baseDomain: string;
+    kioskMode: boolean;
+  };
+  metadata: {
+    lastUpdated: string;
+    nodeEnv: string;
+  };
+}
+
+/**
+ * Configuration data structure from the API (legacy)
  */
 export interface ConfigData {
   wifi: {
@@ -29,77 +52,144 @@ export interface ConfigData {
 }
 
 /**
- * Hook for fetching runtime configuration from the API
- * This replaces build-time environment variables with runtime configuration
+ * API response structure
  */
-export function useConfig() {
-  const [config, setConfig] = useState<ConfigData | null>(null);
+interface ConfigApiResponse {
+  success: boolean;
+  data: AppConfig;
+}
+
+/**
+ * Cache for configuration data
+ */
+const configCache = new Map<string, Promise<AppConfig>>();
+
+/**
+ * Fetch app configuration from API
+ */
+async function fetchConfig(): Promise<AppConfig> {
+  const response = await fetch('/api/config/app');
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch configuration: ${response.status} ${response.statusText}`);
+  }
+
+  const configResponse: ConfigApiResponse = await response.json();
+
+  if (!configResponse.success) {
+    throw new Error('Failed to retrieve configuration');
+  }
+
+  return configResponse.data;
+}
+/**
+ * Get cached configuration or create new fetch promise
+ */
+function getCachedConfig(): Promise<AppConfig> {
+  const cacheKey = 'app-config';
+
+  if (!configCache.has(cacheKey)) {
+    const promise = fetchConfig().catch((error) => {
+      // Remove failed promise from cache so it can be retried
+      configCache.delete(cacheKey);
+
+      // Return fallback configuration
+      console.error('Configuration fetch error, using fallback:', error);
+      return {
+        app: {
+          title: import.meta.env.VITE_APP_TITLE || 'DangerPrep Portal',
+          description: import.meta.env.VITE_APP_DESCRIPTION || 'Your portable hotspot services portal',
+        },
+        global: {
+          baseDomain: import.meta.env.VITE_BASE_DOMAIN || 'danger.diy',
+          kioskMode: false,
+        },
+        metadata: {
+          lastUpdated: new Date().toISOString(),
+          nodeEnv: 'fallback',
+        },
+      };
+    });
+
+    configCache.set(cacheKey, promise);
+  }
+
+  return configCache.get(cacheKey)!;
+}
+
+/**
+ * Modern React 19 hook for app configuration using Suspense
+ * This hook throws promises for Suspense boundaries to catch
+ */
+export function useAppConfig(): AppConfig {
+  const configPromise = getCachedConfig();
+  return useHook(configPromise);
+}
+
+/**
+ * Traditional hook for app configuration (for components not using Suspense)
+ */
+export function useAppConfigTraditional() {
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchConfig = async () => {
+    const loadConfig = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        const response = await fetch('/api/config');
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch configuration: ${response.status} ${response.statusText}`);
-        }
-
-        const configData: ConfigData = await response.json();
+        const configData = await getCachedConfig();
         setConfig(configData);
       } catch (err) {
         console.error('Configuration fetch error:', err);
         setError(err instanceof Error ? err.message : 'Failed to load configuration');
-        
-        // Fallback to build-time environment variables if API fails
-        const fallbackConfig: ConfigData = {
-          wifi: {
-            ssid: import.meta.env.VITE_WIFI_SSID || 'DangerPrep',
-            password: import.meta.env.VITE_WIFI_PASSWORD || 'change_me',
-          },
-          services: {
-            baseDomain: import.meta.env.VITE_BASE_DOMAIN || 'danger.diy',
-            jellyfin: import.meta.env.VITE_JELLYFIN_SUBDOMAIN || 'media',
-            kiwix: import.meta.env.VITE_KIWIX_SUBDOMAIN || 'kiwix',
-            romm: import.meta.env.VITE_ROMM_SUBDOMAIN || 'retro',
-            docmost: import.meta.env.VITE_DOCMOST_SUBDOMAIN || 'docmost',
-            onedev: import.meta.env.VITE_ONEDEV_SUBDOMAIN || 'onedev',
-            traefik: import.meta.env.VITE_TRAEFIK_SUBDOMAIN || 'traefik',
-            komodo: import.meta.env.VITE_KOMODO_SUBDOMAIN || 'docker',
-          },
+
+        // Set fallback configuration
+        setConfig({
           app: {
             title: import.meta.env.VITE_APP_TITLE || 'DangerPrep Portal',
             description: import.meta.env.VITE_APP_DESCRIPTION || 'Your portable hotspot services portal',
+          },
+          global: {
+            baseDomain: import.meta.env.VITE_BASE_DOMAIN || 'danger.diy',
+            kioskMode: false,
           },
           metadata: {
             lastUpdated: new Date().toISOString(),
             nodeEnv: 'fallback',
           },
-        };
-        
-        setConfig(fallbackConfig);
+        });
       } finally {
         setLoading(false);
       }
     };
 
-    fetchConfig();
+    loadConfig();
   }, []);
 
-  // Refresh function for manual updates
   const refresh = () => {
+    configCache.clear();
     setConfig(null);
     setError(null);
-    // Re-trigger the useEffect
-    window.location.reload();
+    setLoading(true);
   };
 
   return {
-    config,
+    config: config || {
+      app: {
+        title: 'DangerPrep Portal',
+        description: 'Your portable hotspot services portal',
+      },
+      global: {
+        baseDomain: 'danger.diy',
+        kioskMode: false,
+      },
+      metadata: {
+        lastUpdated: new Date().toISOString(),
+        nodeEnv: 'fallback',
+      },
+    },
     loading,
     error,
     refresh,
@@ -107,28 +197,15 @@ export function useConfig() {
 }
 
 /**
- * Hook for getting WiFi configuration specifically
- */
-export function useWiFiConfig() {
-  const { config, loading, error, refresh } = useConfig();
-  
-  return {
-    wifi: config?.wifi || { ssid: 'DangerPrep', password: 'change_me' },
-    loading,
-    error,
-    refresh,
-  };
-}
-
-/**
- * Hook for getting service configuration specifically
+ * Legacy hook for getting service configuration specifically
+ * Kept for backward compatibility with useServiceDiscovery
  */
 export function useServiceConfig() {
-  const { config, loading, error, refresh } = useConfig();
-  
+  const { config, loading, error, refresh } = useAppConfigTraditional();
+
   return {
-    services: config?.services || {
-      baseDomain: 'danger.diy',
+    services: {
+      baseDomain: config?.global?.baseDomain || 'danger.diy',
       jellyfin: 'media',
       kiwix: 'kiwix',
       romm: 'retro',
@@ -141,4 +218,11 @@ export function useServiceConfig() {
     error,
     refresh,
   };
+}
+
+/**
+ * Clear configuration cache (useful for testing or manual refresh)
+ */
+export function clearConfigCache() {
+  configCache.clear();
 }

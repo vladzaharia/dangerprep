@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import { Navigation } from './components/Navigation';
+import { DefaultRoute } from './components/DefaultRoute';
 import { QRCodePage, ServicesPage, MaintenanceServicesPage, PowerPage } from './pages';
 
 // Service configuration type
@@ -47,7 +48,8 @@ const App: React.FC = () => {
             <Suspense fallback={<AppLoadingFallback />}>
               <Routes>
                 {/* Modern React 19 routes with Suspense */}
-                <Route path="/" element={<QRCodePage />} />
+                <Route path="/" element={<DefaultRoute />} />
+                <Route path="/qr" element={<QRCodePage />} />
                 <Route path="/services" element={<ServicesPage />} />
                 <Route path="/maintenance" element={<MaintenanceServicesPage />} />
                 <Route path="/power" element={<PowerPage />} />

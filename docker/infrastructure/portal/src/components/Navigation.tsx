@@ -21,11 +21,11 @@ export const Navigation: React.FC = () => {
   };
 
   const mainNavItems: NavItem[] = [
-    { path: '/', icon: faQrcode, label: 'QR Code' },
     { path: '/services', icon: faGrip, label: 'Services' },
   ];
 
   const powerNavItems: NavItem[] = [
+    { path: '/qr', icon: faQrcode, label: 'QR Code' },
     { path: '/maintenance', icon: faCog, label: 'Maintenance' },
     { path: '/power', icon: faPowerOff, label: 'Power' },
   ];

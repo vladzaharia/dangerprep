@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 
 import { ServiceGrid } from '../components/ServiceGrid';
-import { useServices } from '../hooks/useModernServices';
+import { useServices } from '../hooks/useServices';
 
 /**
  * Loading skeleton for services page using Web Awesome components

@@ -1,5 +1,5 @@
 import React, { useMemo, Suspense } from 'react';
-import { useWifi } from '../hooks/useModernWifi';
+import { useWifi } from '../hooks/useWifi';
 
 /**
  * Loading skeleton for QR code section using Web Awesome components

@@ -1,4 +1,8 @@
 import { readFileSync } from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 /**
  * WiFi configuration data
@@ -9,12 +13,30 @@ export interface WifiConfig {
 }
 
 /**
+ * Network information for WiFi interface
+ */
+export interface NetworkInfo {
+  ipAddress?: string;
+  gateway?: string;
+  dnsServers?: string[];
+  subnetMask?: string;
+  interface?: string;
+}
+
+/**
  * WiFi configuration with metadata
  */
 export interface WifiConfigWithMetadata {
   ssid: string;
   password: string;
   source: 'hostapd' | 'environment' | 'default';
+}
+
+/**
+ * WiFi configuration with network information
+ */
+export interface WifiConfigWithNetwork extends WifiConfigWithMetadata {
+  network?: NetworkInfo;
 }
 
 /**
@@ -98,6 +120,164 @@ export class WifiConfigService {
       console.warn('Could not read hostapd configuration:', error);
       return {};
     }
+  }
+
+  /**
+   * Get WiFi configuration with network information
+   */
+  async getWifiConfigWithNetwork(): Promise<WifiConfigWithNetwork> {
+    const config = this.getWifiConfigWithMetadata();
+    const network = await this.getNetworkInfo();
+
+    return {
+      ...config,
+      ...(network && { network }),
+    };
+  }
+
+  /**
+   * Get network information for the active WiFi interface
+   */
+  async getNetworkInfo(): Promise<NetworkInfo | undefined> {
+    try {
+      // First, find the active WiFi interface
+      const activeInterface = await this.getActiveWifiInterface();
+      if (!activeInterface) {
+        console.warn('No active WiFi interface found');
+        return undefined;
+      }
+
+      // Get network details for the interface
+      const [ipInfo, gatewayInfo, dnsInfo] = await Promise.allSettled([
+        this.getInterfaceIpInfo(activeInterface),
+        this.getInterfaceGateway(activeInterface),
+        this.getInterfaceDns(activeInterface),
+      ]);
+
+      const networkInfo: NetworkInfo = {
+        interface: activeInterface,
+      };
+
+      // Process IP information
+      if (ipInfo.status === 'fulfilled' && ipInfo.value) {
+        networkInfo.ipAddress = ipInfo.value.ipAddress;
+        networkInfo.subnetMask = ipInfo.value.subnetMask;
+      }
+
+      // Process gateway information
+      if (gatewayInfo.status === 'fulfilled' && gatewayInfo.value) {
+        networkInfo.gateway = gatewayInfo.value;
+      }
+
+      // Process DNS information
+      if (dnsInfo.status === 'fulfilled' && dnsInfo.value) {
+        networkInfo.dnsServers = dnsInfo.value;
+      }
+
+      return networkInfo;
+    } catch (error) {
+      console.error('Failed to get network information:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Find the active WiFi interface
+   */
+  private async getActiveWifiInterface(): Promise<string | undefined> {
+    try {
+      const { stdout } = await execAsync('nmcli -t -f DEVICE,TYPE,STATE device status');
+      const lines = stdout.trim().split('\n');
+
+      for (const line of lines) {
+        const [device, type, state] = line.split(':');
+        if (type === 'wifi' && state === 'connected') {
+          return device;
+        }
+      }
+
+      return undefined;
+    } catch (error) {
+      console.error('Failed to get active WiFi interface:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Get IP address and subnet mask for an interface
+   */
+  private async getInterfaceIpInfo(interfaceName: string): Promise<{ ipAddress: string; subnetMask: string } | undefined> {
+    try {
+      const { stdout } = await execAsync(`nmcli -t -f IP4.ADDRESS dev show "${interfaceName}"`);
+      const addressLine = stdout.trim();
+
+      if (addressLine && addressLine.includes(':')) {
+        const address = addressLine.split(':')[1];
+        if (address && address.includes('/')) {
+          const [ipAddress, cidr] = address.split('/');
+          const subnetMask = this.cidrToSubnetMask(parseInt(cidr, 10));
+          return { ipAddress, subnetMask };
+        }
+      }
+
+      return undefined;
+    } catch (error) {
+      console.error(`Failed to get IP info for interface ${interfaceName}:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Get gateway for an interface
+   */
+  private async getInterfaceGateway(interfaceName: string): Promise<string | undefined> {
+    try {
+      const { stdout } = await execAsync(`nmcli -t -f IP4.GATEWAY dev show "${interfaceName}"`);
+      const gatewayLine = stdout.trim();
+
+      if (gatewayLine && gatewayLine.includes(':')) {
+        const gateway = gatewayLine.split(':')[1];
+        return gateway || undefined;
+      }
+
+      return undefined;
+    } catch (error) {
+      console.error(`Failed to get gateway for interface ${interfaceName}:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Get DNS servers for an interface
+   */
+  private async getInterfaceDns(interfaceName: string): Promise<string[] | undefined> {
+    try {
+      const { stdout } = await execAsync(`nmcli -t -f IP4.DNS dev show "${interfaceName}"`);
+      const dnsLines = stdout.trim().split('\n').filter(line => line.includes(':'));
+
+      const dnsServers = dnsLines
+        .map(line => line.split(':')[1])
+        .filter(dns => dns && dns.trim())
+        .map(dns => dns.trim());
+
+      return dnsServers.length > 0 ? dnsServers : undefined;
+    } catch (error) {
+      console.error(`Failed to get DNS for interface ${interfaceName}:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Convert CIDR notation to subnet mask
+   */
+  private cidrToSubnetMask(cidr: number): string {
+    const mask = (0xffffffff << (32 - cidr)) >>> 0;
+    return [
+      (mask >>> 24) & 0xff,
+      (mask >>> 16) & 0xff,
+      (mask >>> 8) & 0xff,
+      mask & 0xff,
+    ].join('.');
   }
 
   /**

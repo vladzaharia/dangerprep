@@ -11,22 +11,46 @@ const wifi = new Hono();
 
 /**
  * GET /api/wifi
- * Get WiFi configuration (SSID and password)
+ * Get WiFi configuration (SSID and password) with optional network information
+ * Query params:
+ *   - includeNetwork: Include network information (IP, gateway, DNS) if available
  */
-wifi.get('/', (c) => {
+wifi.get('/', async (c) => {
   try {
-    const configWithMetadata = wifiService.getWifiConfigWithMetadata();
-    return c.json({
-      success: true,
-      data: {
-        ssid: configWithMetadata.ssid,
-        password: configWithMetadata.password,
-      },
-      metadata: {
-        source: configWithMetadata.source,
-        timestamp: new Date().toISOString(),
-      },
-    });
+    const includeNetwork = c.req.query('includeNetwork') === 'true';
+
+    if (includeNetwork) {
+      // Get configuration with network information
+      const configWithNetwork = await wifiService.getWifiConfigWithNetwork();
+      return c.json({
+        success: true,
+        data: {
+          ssid: configWithNetwork.ssid,
+          password: configWithNetwork.password,
+          network: configWithNetwork.network,
+        },
+        metadata: {
+          source: configWithNetwork.source,
+          timestamp: new Date().toISOString(),
+          includesNetwork: true,
+        },
+      });
+    } else {
+      // Get basic configuration only (backward compatibility)
+      const configWithMetadata = wifiService.getWifiConfigWithMetadata();
+      return c.json({
+        success: true,
+        data: {
+          ssid: configWithMetadata.ssid,
+          password: configWithMetadata.password,
+        },
+        metadata: {
+          source: configWithMetadata.source,
+          timestamp: new Date().toISOString(),
+          includesNetwork: false,
+        },
+      });
+    }
   } catch (error) {
     console.error('Failed to get WiFi configuration:', error);
     return c.json(

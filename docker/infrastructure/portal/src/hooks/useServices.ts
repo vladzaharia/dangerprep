@@ -1,148 +1,209 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+
+// React 19 use hook with fallback for older versions
+const useHook = (React as any).use || ((promise: Promise<any>) => {
+  throw promise; // Fallback behavior for Suspense
+});
 
 /**
- * Service configuration data structure
+ * Service metadata from the API
  */
-export interface ServiceConfig {
-  baseDomain: string;
-  jellyfin: string;
-  kiwix: string;
-  romm: string;
-  docmost: string;
-  onedev: string;
-  traefik: string;
-  komodo: string;
-}
-
-/**
- * App configuration data structure
- */
-export interface AppConfig {
-  title: string;
+export interface ServiceMetadata {
+  name: string;
   description: string;
+  icon: string;
+  url?: string;
+  type: 'public' | 'private' | 'maintenance';
+  status: 'healthy' | 'warning' | 'error';
+  version?: string;
 }
 
 /**
- * Combined configuration from /api/config/app
+ * API response structure
  */
-interface AppConfigResponse {
+interface ServiceDiscoveryResponse {
   success: boolean;
-  data: {
-    app: AppConfig;
-    services: ServiceConfig;
-    metadata: {
-      lastUpdated: string;
-      nodeEnv: string;
-    };
+  services: ServiceMetadata[];
+  metadata: {
+    lastScan: string;
+    totalServices: number;
+    baseDomain: string;
+    cached: boolean;
   };
 }
 
 /**
- * Modern React 19 hook for fetching service configuration
+ * Cache for services data
  */
-export function useServices() {
-  const [services, setServices] = useState<ServiceConfig | null>(null);
+const servicesCache = new Map<string, Promise<ServiceMetadata[]>>();
+
+/**
+ * Get fallback services based on service type and domain
+ */
+function getFallbackServices(serviceType: string, baseDomain: string): ServiceMetadata[] {
+  const allServices: ServiceMetadata[] = [
+    {
+      name: 'Jellyfin',
+      description: 'Media streaming server',
+      icon: 'jellyfin',
+      url: `https://media.${baseDomain}`,
+      type: 'public',
+      status: 'healthy',
+    },
+    {
+      name: 'Kiwix',
+      description: 'Offline Wikipedia and educational content',
+      icon: 'kiwix',
+      url: `https://kiwix.${baseDomain}`,
+      type: 'public',
+      status: 'healthy',
+    },
+    {
+      name: 'ROMM',
+      description: 'Retro gaming collection manager',
+      icon: 'romm',
+      url: `https://retro.${baseDomain}`,
+      type: 'public',
+      status: 'healthy',
+    },
+    {
+      name: 'Docmost',
+      description: 'Documentation and knowledge base',
+      icon: 'docmost',
+      url: `https://docmost.${baseDomain}`,
+      type: 'public',
+      status: 'healthy',
+    },
+    {
+      name: 'OneDev',
+      description: 'Git repository and CI/CD platform',
+      icon: 'onedev',
+      url: `https://onedev.${baseDomain}`,
+      type: 'private',
+      status: 'healthy',
+    },
+    {
+      name: 'Traefik',
+      description: 'Reverse proxy and load balancer dashboard',
+      icon: 'traefik',
+      url: `https://traefik.${baseDomain}`,
+      type: 'maintenance',
+      status: 'healthy',
+    },
+    {
+      name: 'Komodo',
+      description: 'Docker container management',
+      icon: 'komodo',
+      url: `https://docker.${baseDomain}`,
+      type: 'maintenance',
+      status: 'healthy',
+    },
+  ];
+
+  return allServices.filter(service => service.type === serviceType);
+}
+
+/**
+ * Fetch services from API
+ */
+async function fetchServices(serviceType?: string, domain?: string): Promise<ServiceMetadata[]> {
+  const params = new URLSearchParams();
+  if (serviceType) params.append('type', serviceType);
+  if (domain) params.append('domain', domain);
+
+  const url = `/api/services/discovery${params.toString() ? `?${params.toString()}` : ''}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch services: ${response.status} ${response.statusText}`);
+  }
+
+  const servicesResponse: ServiceDiscoveryResponse = await response.json();
+
+  if (!servicesResponse.success) {
+    throw new Error('Failed to retrieve services');
+  }
+
+  return servicesResponse.services;
+}
+
+/**
+ * Get cached services or create new fetch promise
+ */
+function getCachedServices(serviceType?: string, domain?: string): Promise<ServiceMetadata[]> {
+  const cacheKey = `services-${serviceType || 'all'}-${domain || 'default'}`;
+
+  if (!servicesCache.has(cacheKey)) {
+    const promise = fetchServices(serviceType, domain).catch((error) => {
+      // Remove failed promise from cache so it can be retried
+      servicesCache.delete(cacheKey);
+
+      // Return fallback services
+      console.error('Services fetch error, using fallback:', error);
+      const baseDomain = domain || import.meta.env.VITE_BASE_DOMAIN || 'danger.diy';
+      return getFallbackServices(serviceType || 'public', baseDomain);
+    });
+
+    servicesCache.set(cacheKey, promise);
+  }
+
+  return servicesCache.get(cacheKey)!;
+}
+
+/**
+ * Modern React 19 hook for services using Suspense
+ */
+export function useServices(serviceType?: 'public' | 'private' | 'maintenance'): ServiceMetadata[] {
+  const [searchParams] = useSearchParams();
+  const domainOverride = searchParams.get('domain');
+
+  const servicesPromise = getCachedServices(serviceType, domainOverride || undefined);
+  return useHook(servicesPromise);
+}
+
+/**
+ * Traditional hook for services (for components not using Suspense)
+ */
+export function useServicesTraditional(serviceType?: 'public' | 'private' | 'maintenance') {
+  const [services, setServices] = useState<ServiceMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+
+  const domainOverride = searchParams.get('domain');
 
   useEffect(() => {
-    const fetchServices = async () => {
+    const loadServices = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        const response = await fetch('/api/config/app');
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch service configuration: ${response.status} ${response.statusText}`);
-        }
-
-        const configResponse: AppConfigResponse = await response.json();
-        
-        if (!configResponse.success) {
-          throw new Error('Failed to retrieve service configuration');
-        }
-
-        setServices(configResponse.data.services);
+        const servicesData = await getCachedServices(serviceType, domainOverride || undefined);
+        setServices(servicesData);
       } catch (err) {
-        console.error('Service configuration fetch error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load service configuration');
-        
-        // Fallback to build-time environment variables
-        const fallbackServices: ServiceConfig = {
-          baseDomain: import.meta.env.VITE_BASE_DOMAIN || 'danger.diy',
-          jellyfin: import.meta.env.VITE_JELLYFIN_SUBDOMAIN || 'media',
-          kiwix: import.meta.env.VITE_KIWIX_SUBDOMAIN || 'kiwix',
-          romm: import.meta.env.VITE_ROMM_SUBDOMAIN || 'retro',
-          docmost: import.meta.env.VITE_DOCMOST_SUBDOMAIN || 'docmost',
-          onedev: import.meta.env.VITE_ONEDEV_SUBDOMAIN || 'onedev',
-          traefik: import.meta.env.VITE_TRAEFIK_SUBDOMAIN || 'traefik',
-          komodo: import.meta.env.VITE_KOMODO_SUBDOMAIN || 'docker',
-        };
-        
-        setServices(fallbackServices);
+        console.error('Services fetch error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load services');
+
+        // Set fallback services
+        const baseDomain = domainOverride || import.meta.env.VITE_BASE_DOMAIN || 'danger.diy';
+        setServices(getFallbackServices(serviceType || 'public', baseDomain));
       } finally {
         setLoading(false);
       }
     };
 
-    fetchServices();
-  }, []);
+    loadServices();
+  }, [serviceType, domainOverride]);
 
-  // Refresh function for manual updates
-  const refresh = async () => {
-    setServices(null);
+  const refresh = () => {
+    servicesCache.clear();
+    setServices([]);
     setError(null);
     setLoading(true);
-    
-    // Re-trigger the fetch
-    try {
-      const response = await fetch('/api/config/app');
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch service configuration: ${response.status} ${response.statusText}`);
-      }
-
-      const configResponse: AppConfigResponse = await response.json();
-      
-      if (!configResponse.success) {
-        throw new Error('Failed to retrieve service configuration');
-      }
-
-      setServices(configResponse.data.services);
-    } catch (err) {
-      console.error('Service configuration fetch error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load service configuration');
-      
-      // Fallback to build-time environment variables
-      const fallbackServices: ServiceConfig = {
-        baseDomain: import.meta.env.VITE_BASE_DOMAIN || 'danger.diy',
-        jellyfin: import.meta.env.VITE_JELLYFIN_SUBDOMAIN || 'media',
-        kiwix: import.meta.env.VITE_KIWIX_SUBDOMAIN || 'kiwix',
-        romm: import.meta.env.VITE_ROMM_SUBDOMAIN || 'retro',
-        docmost: import.meta.env.VITE_DOCMOST_SUBDOMAIN || 'docmost',
-        onedev: import.meta.env.VITE_ONEDEV_SUBDOMAIN || 'onedev',
-        traefik: import.meta.env.VITE_TRAEFIK_SUBDOMAIN || 'traefik',
-        komodo: import.meta.env.VITE_KOMODO_SUBDOMAIN || 'docker',
-      };
-      
-      setServices(fallbackServices);
-    } finally {
-      setLoading(false);
-    }
   };
 
   return {
-    services: services || {
-      baseDomain: 'danger.diy',
-      jellyfin: 'media',
-      kiwix: 'kiwix',
-      romm: 'retro',
-      docmost: 'docmost',
-      onedev: 'onedev',
-      traefik: 'traefik',
-      komodo: 'docker',
-    },
+    services,
     loading,
     error,
     refresh,
@@ -150,111 +211,16 @@ export function useServices() {
 }
 
 /**
- * Hook for fetching app configuration
+ * Clear services cache (useful for testing or manual refresh)
  */
-export function useAppConfig() {
-  const [app, setApp] = useState<AppConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchApp = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch('/api/config/app');
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch app configuration: ${response.status} ${response.statusText}`);
-        }
-
-        const configResponse: AppConfigResponse = await response.json();
-        
-        if (!configResponse.success) {
-          throw new Error('Failed to retrieve app configuration');
-        }
-
-        setApp(configResponse.data.app);
-      } catch (err) {
-        console.error('App configuration fetch error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load app configuration');
-        
-        // Fallback to build-time environment variables
-        const fallbackApp: AppConfig = {
-          title: import.meta.env.VITE_APP_TITLE || 'DangerPrep Portal',
-          description: import.meta.env.VITE_APP_DESCRIPTION || 'Your portable hotspot services portal',
-        };
-        
-        setApp(fallbackApp);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchApp();
-  }, []);
-
-  return {
-    app: app || {
-      title: 'DangerPrep Portal',
-      description: 'Your portable hotspot services portal',
-    },
-    loading,
-    error,
-  };
+export function clearServicesCache() {
+  servicesCache.clear();
 }
 
 /**
- * Suspense-compatible services hook for React 19
+ * Clear specific services cache entry
  */
-export function useServicesSuspense(): { services: ServiceConfig } {
-  const [services, setServices] = useState<ServiceConfig | null>(null);
-  const [promise, setPromise] = useState<Promise<void> | null>(null);
-
-  if (!services && !promise) {
-    const fetchPromise = fetch('/api/config/app')
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`Failed to fetch service configuration: ${response.status} ${response.statusText}`);
-        }
-
-        const configResponse: AppConfigResponse = await response.json();
-        
-        if (!configResponse.success) {
-          throw new Error('Failed to retrieve service configuration');
-        }
-
-        setServices(configResponse.data.services);
-        setPromise(null);
-      })
-      .catch((err) => {
-        console.error('Service configuration fetch error:', err);
-        
-        // Fallback to build-time environment variables
-        const fallbackServices: ServiceConfig = {
-          baseDomain: import.meta.env.VITE_BASE_DOMAIN || 'danger.diy',
-          jellyfin: import.meta.env.VITE_JELLYFIN_SUBDOMAIN || 'media',
-          kiwix: import.meta.env.VITE_KIWIX_SUBDOMAIN || 'kiwix',
-          romm: import.meta.env.VITE_ROMM_SUBDOMAIN || 'retro',
-          docmost: import.meta.env.VITE_DOCMOST_SUBDOMAIN || 'docmost',
-          onedev: import.meta.env.VITE_ONEDEV_SUBDOMAIN || 'onedev',
-          traefik: import.meta.env.VITE_TRAEFIK_SUBDOMAIN || 'traefik',
-          komodo: import.meta.env.VITE_KOMODO_SUBDOMAIN || 'docker',
-        };
-        
-        setServices(fallbackServices);
-        setPromise(null);
-      });
-
-    setPromise(fetchPromise);
-  }
-
-  if (promise) {
-    throw promise;
-  }
-
-  return {
-    services: services!,
-  };
+export function clearServicesCacheEntry(serviceType?: string, domain?: string) {
+  const cacheKey = `services-${serviceType || 'all'}-${domain || 'default'}`;
+  servicesCache.delete(cacheKey);
 }
