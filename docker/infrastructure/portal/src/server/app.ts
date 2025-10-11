@@ -5,7 +5,7 @@ import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
 
 // Import routes
-import wifi from './routes/wifi';
+import networks from './routes/networks';
 import services from './routes/services';
 import config from './routes/config';
 import health from './routes/health';
@@ -25,7 +25,7 @@ app.use('*', cors({
 
 // Mount routes
 app.route('/api/health', health);
-app.route('/api/wifi', wifi);
+app.route('/api/networks', networks);
 app.route('/api/services', services);
 app.route('/api/config', config);
 

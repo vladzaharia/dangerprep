@@ -1,5 +1,5 @@
 import React, { useMemo, Suspense } from 'react';
-import { useWifi } from '../hooks/useWifi';
+import { useWifi } from '../hooks/useNetworks';
 
 /**
  * Loading skeleton for QR code section using Web Awesome components
@@ -39,9 +39,12 @@ function QRCodeSkeleton() {
  * QR Code content component (wrapped in Suspense)
  */
 function QRCodeContent() {
-  // Use modern Suspense-compatible hook
-  const { wifi } = useWifi();
-  const { ssid, password } = wifi;
+  // Use modern Suspense-compatible hook to get hotspot interface
+  const hotspotInterface = useWifi();
+
+  // Extract SSID and password from hotspot interface
+  const ssid = (hotspotInterface as any)?.ssid || 'DangerPrep';
+  const password = (hotspotInterface as any)?.password || 'change_me';
 
   // Generate WiFi QR code string
   const wifiQRString = useMemo(() => {

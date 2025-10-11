@@ -1,0 +1,237 @@
+import { Hono } from 'hono';
+import { NetworkService } from '../services/NetworkService';
+
+// Initialize service
+const networkService = new NetworkService();
+
+// Create router
+const networks = new Hono();
+
+/**
+ * GET /api/networks
+ * Get summary of all network interfaces
+ * Query params:
+ *   - detailed: Include detailed information for all interfaces (default: false)
+ */
+networks.get('/', async (c) => {
+  try {
+    const detailed = c.req.query('detailed') === 'true';
+    
+    if (detailed) {
+      // Return detailed information for all interfaces
+      const interfaces = await networkService.getAllInterfaces();
+      return c.json({
+        success: true,
+        data: {
+          interfaces,
+          totalInterfaces: interfaces.length,
+        },
+        metadata: {
+          timestamp: new Date().toISOString(),
+          detailed: true,
+        },
+      });
+    } else {
+      // Return network summary with special interface mappings
+      const summary = await networkService.getNetworkSummary();
+      return c.json({
+        success: true,
+        data: summary,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          detailed: false,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Failed to get network interfaces:', error);
+    return c.json(
+      {
+        success: false,
+        error: 'Failed to retrieve network interfaces',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
+  }
+});
+
+/**
+ * Create default interface data for keywords when actual interface not found
+ */
+function createDefaultInterfaceData(keyword: string) {
+  const baseInterface = {
+    name: `${keyword}-default`,
+    state: 'down' as const,
+    ipAddress: undefined,
+    gateway: undefined,
+    netmask: undefined,
+    dnsServers: undefined,
+    macAddress: undefined,
+    mtu: undefined,
+  };
+
+  switch (keyword) {
+    case 'hotspot':
+      return {
+        ...baseInterface,
+        type: 'hotspot' as const,
+        ssid: process.env.WIFI_SSID || 'DangerPrep',
+        password: process.env.WIFI_PASSWORD || 'change_me',
+        wpaType: 'WPA2',
+        channel: 6,
+        frequency: '2.4GHz',
+        connectedClients: 0,
+        maxClients: 10,
+      };
+
+    case 'internet':
+      return {
+        ...baseInterface,
+        type: 'ethernet' as const,
+      };
+
+    case 'tailscale':
+      return {
+        ...baseInterface,
+        type: 'tailscale' as const,
+        status: 'stopped',
+        tailnetName: undefined,
+        peers: [],
+        exitNode: false,
+      };
+
+    default:
+      return {
+        ...baseInterface,
+        type: 'unknown' as const,
+      };
+  }
+}
+
+/**
+ * GET /api/networks/:interface
+ * Get detailed information for a specific network interface
+ * Supports both actual interface names (e.g., eth0, wlan0) and keywords (hotspot, internet, tailscale)
+ * For keywords, shows default data if actual interface not found
+ */
+networks.get('/:interface', async (c) => {
+  try {
+    const interfaceName = c.req.param('interface');
+    const isKeyword = ['hotspot', 'internet', 'tailscale'].includes(interfaceName);
+
+    let networkInterface;
+
+    // Check if it's a keyword
+    if (isKeyword) {
+      networkInterface = await networkService.getInterfaceByKeyword(interfaceName as 'hotspot' | 'internet' | 'tailscale');
+
+      // If keyword interface not found, return default data
+      if (!networkInterface) {
+        const defaultInterface = createDefaultInterfaceData(interfaceName);
+
+        return c.json({
+          success: true,
+          data: {
+            interface: defaultInterface,
+            isKeyword: true,
+            isDefault: true,
+            requestedName: interfaceName,
+          },
+          metadata: {
+            timestamp: new Date().toISOString(),
+            interfaceType: defaultInterface.type,
+            interfaceState: defaultInterface.state,
+            source: 'default',
+            message: `${interfaceName} interface not found, showing default configuration`,
+          },
+        });
+      }
+    } else {
+      // Treat as actual interface name
+      networkInterface = await networkService.getInterface(interfaceName);
+
+      // For actual interface names, return 404 if not found
+      if (!networkInterface) {
+        return c.json(
+          {
+            success: false,
+            error: 'Interface Not Found',
+            message: `Network interface '${interfaceName}' not found or not available`,
+          },
+          404
+        );
+      }
+    }
+
+    // Return the interface with type-specific information (already included by NetworkService)
+    return c.json({
+      success: true,
+      data: {
+        interface: networkInterface,
+        isKeyword,
+        isDefault: false,
+        requestedName: interfaceName,
+      },
+      metadata: {
+        timestamp: new Date().toISOString(),
+        interfaceType: networkInterface.type,
+        interfaceState: networkInterface.state,
+        source: 'system',
+      },
+    });
+  } catch (error) {
+    console.error(`Failed to get interface ${c.req.param('interface')}:`, error);
+    return c.json(
+      {
+        success: false,
+        error: 'Failed to retrieve interface information',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
+  }
+});
+
+/**
+ * POST /api/networks/refresh
+ * Refresh the network interface cache
+ */
+networks.post('/refresh', async (c) => {
+  try {
+    networkService.clearCache();
+    
+    // Trigger a refresh by getting the summary
+    const summary = await networkService.getNetworkSummary();
+    
+    return c.json({
+      success: true,
+      data: {
+        message: 'Network interface cache refreshed successfully',
+        interfaceCount: summary.totalInterfaces,
+      },
+      metadata: {
+        timestamp: new Date().toISOString(),
+        action: 'cache_refresh',
+      },
+    });
+  } catch (error) {
+    console.error('Failed to refresh network cache:', error);
+    return c.json(
+      {
+        success: false,
+        error: 'Failed to refresh network cache',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
+  }
+});
+
+
+
+
+
+
+
+export default networks;
