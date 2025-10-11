@@ -76,8 +76,6 @@ services:
 
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
-    networks:
-      - traefik
     deploy:
       resources:
         limits:
@@ -90,8 +88,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-
-networks:
-  traefik:
-    external: true
-    name: traefik
