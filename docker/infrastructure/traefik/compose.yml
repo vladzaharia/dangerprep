@@ -14,6 +14,8 @@ services:
       - compose.env
     environment:
       - LEGO_DISABLE_CNAME_SUPPORT=true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     labels:
       - "traefik.enable=true"
 

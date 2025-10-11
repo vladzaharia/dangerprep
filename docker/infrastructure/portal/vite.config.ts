@@ -35,7 +35,8 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
-    strictPort: false,
+    strictPort: true,
+    allowedHosts: ["portal.danger.diy", "portal.argos.surf", "portal.danger"]
   },
   preview: {
     port: 3000,

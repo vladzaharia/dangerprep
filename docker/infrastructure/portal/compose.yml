@@ -60,7 +60,8 @@ services:
       - "traefik.http.routers.portal-argos.service=portal"
 
       # Service definition (shared by both routers)
-      - "traefik.http.services.portal.loadbalancer.server.port=3000"
+      # Use host.docker.internal to reach the host network from Traefik container
+      - "traefik.http.services.portal.loadbalancer.server.url=http://host.docker.internal:3000"
 
       # DNS registration
       - "dns.register=portal"
