@@ -9,7 +9,8 @@ const execAsync = promisify(exec);
  */
 export interface BaseNetworkInterface {
   name: string;
-  type: 'ethernet' | 'wifi' | 'tailscale' | 'hotspot' | 'loopback' | 'unknown';
+  type: 'ethernet' | 'wifi' | 'tailscale' | 'bridge' | 'virtual' | 'loopback' | 'unknown';
+  purpose: 'wan' | 'lan' | 'wlan' | 'docker' | 'loopback' | 'unknown';
   state: 'up' | 'down' | 'unknown';
   ipAddress?: string | undefined;
   gateway?: string | undefined;
@@ -70,24 +71,28 @@ export interface TailscalePeer {
 }
 
 /**
- * Hotspot interface information
+ * Bridge interface information (Docker bridges, etc.)
  */
-export interface HotspotInterface extends BaseNetworkInterface {
-  type: 'hotspot';
-  ssid: string;
-  password: string;
-  wpaType?: 'WPA2' | 'WPA3' | 'WPA2/WPA3';
-  channel?: number;
-  frequency?: string;
-  connectedClients?: number;
-  maxClients?: number;
-  hidden?: boolean;
+export interface BridgeInterface extends BaseNetworkInterface {
+  type: 'bridge';
+  bridgeId?: string;
+  stp?: boolean; // Spanning Tree Protocol
+  interfaces?: string[]; // Interfaces connected to this bridge
+}
+
+/**
+ * Virtual interface information (Docker veth pairs, etc.)
+ */
+export interface VirtualInterface extends BaseNetworkInterface {
+  type: 'virtual';
+  peerInterface?: string; // For veth pairs
+  containerId?: string; // For Docker containers
 }
 
 /**
  * Network interface union type
  */
-export type NetworkInterface = EthernetInterface | WiFiInterface | TailscaleInterface | HotspotInterface | BaseNetworkInterface;
+export type NetworkInterface = EthernetInterface | WiFiInterface | TailscaleInterface | BridgeInterface | VirtualInterface | BaseNetworkInterface;
 
 /**
  * Network summary for listing interfaces
@@ -97,7 +102,17 @@ export interface NetworkSummary {
   internetInterface?: string | undefined;
   hotspotInterface?: string | undefined;
   tailscaleInterface?: string | undefined;
+  lanInterfaces?: string[] | undefined;
+  dockerInterfaces?: string[] | undefined;
   totalInterfaces: number;
+  interfacesByPurpose: {
+    wan: string[];
+    lan: string[];
+    wlan: string[];
+    docker: string[];
+    loopback: string[];
+    unknown: string[];
+  };
 }
 
 /**
@@ -133,25 +148,47 @@ export class NetworkService {
     const hotspotInterface = this.findHotspotInterface(interfaces);
     const tailscaleInterface = this.findTailscaleInterface(interfaces);
 
+    // Find additional interface categories
+    const lanInterfaces = this.findLanInterfaces(interfaces);
+    const dockerInterfaces = this.findDockerInterfaces(interfaces);
+
     console.log('[NetworkService] Special interfaces found:', {
       internet: internetInterface?.name || 'none',
       hotspot: hotspotInterface?.name || 'none',
-      tailscale: tailscaleInterface?.name || 'none'
+      tailscale: tailscaleInterface?.name || 'none',
+      lan: lanInterfaces.map(i => i.name),
+      docker: dockerInterfaces.map(i => i.name)
     });
+
+    // Group interfaces by purpose
+    const interfacesByPurpose = {
+      wan: interfaces.filter(i => i.purpose === 'wan').map(i => i.name),
+      lan: interfaces.filter(i => i.purpose === 'lan').map(i => i.name),
+      wlan: interfaces.filter(i => i.purpose === 'wlan').map(i => i.name),
+      docker: interfaces.filter(i => i.purpose === 'docker').map(i => i.name),
+      loopback: interfaces.filter(i => i.purpose === 'loopback').map(i => i.name),
+      unknown: interfaces.filter(i => i.purpose === 'unknown').map(i => i.name),
+    };
 
     const summary = {
       interfaces,
       internetInterface: internetInterface?.name,
       hotspotInterface: hotspotInterface?.name,
       tailscaleInterface: tailscaleInterface?.name,
+      lanInterfaces: lanInterfaces.map(i => i.name),
+      dockerInterfaces: dockerInterfaces.map(i => i.name),
       totalInterfaces: interfaces.length,
+      interfacesByPurpose,
     };
 
     console.log('[NetworkService] Network summary created:', {
       totalInterfaces: summary.totalInterfaces,
       internetInterface: summary.internetInterface,
       hotspotInterface: summary.hotspotInterface,
-      tailscaleInterface: summary.tailscaleInterface
+      tailscaleInterface: summary.tailscaleInterface,
+      lanInterfaces: summary.lanInterfaces,
+      dockerInterfaces: summary.dockerInterfaces,
+      interfacesByPurpose: summary.interfacesByPurpose
     });
 
     return summary;
@@ -273,19 +310,23 @@ export class NetworkService {
   private async getInterfaceDetails(name: string): Promise<NetworkInterface | undefined> {
     try {
       const baseInfo = await this.getBaseInterfaceInfo(name);
-      const type = this.determineInterfaceType(name, baseInfo);
-      
+      const { type, purpose } = await this.determineInterfaceTypeAndPurpose(name, baseInfo);
+
+      const interfaceWithTypePurpose = { ...baseInfo, type, purpose };
+
       switch (type) {
         case 'ethernet':
-          return await this.getEthernetInterfaceInfo(name, baseInfo);
+          return await this.getEthernetInterfaceInfo(name, interfaceWithTypePurpose);
         case 'wifi':
-          return await this.getWiFiInterfaceInfo(name, baseInfo);
+          return await this.getWiFiInterfaceInfo(name, interfaceWithTypePurpose);
         case 'tailscale':
-          return await this.getTailscaleInterfaceInfo(name, baseInfo);
-        case 'hotspot':
-          return await this.getHotspotInterfaceInfo(name, baseInfo);
+          return await this.getTailscaleInterfaceInfo(name, interfaceWithTypePurpose);
+        case 'bridge':
+          return await this.getBridgeInterfaceInfo(name, interfaceWithTypePurpose);
+        case 'virtual':
+          return await this.getVirtualInterfaceInfo(name, interfaceWithTypePurpose);
         default:
-          return { ...baseInfo, type };
+          return interfaceWithTypePurpose;
       }
     } catch (error) {
       console.warn(`Failed to get interface details for ${name}:`, error);
@@ -296,7 +337,7 @@ export class NetworkService {
   /**
    * Get base interface information (IP, state, etc.)
    */
-  private async getBaseInterfaceInfo(name: string): Promise<Omit<BaseNetworkInterface, 'type'>> {
+  private async getBaseInterfaceInfo(name: string): Promise<Omit<BaseNetworkInterface, 'type' | 'purpose'>> {
     const [ipInfo, macInfo, mtuInfo] = await Promise.allSettled([
       this.getInterfaceIpInfo(name),
       this.getInterfaceMacAddress(name),
@@ -304,7 +345,7 @@ export class NetworkService {
     ]);
 
     const state = await this.getInterfaceState(name);
-    
+
     return {
       name,
       state,
@@ -315,27 +356,50 @@ export class NetworkService {
   }
 
   /**
-   * Determine interface type based on name and characteristics
+   * Determine interface type and purpose based on name and characteristics
    */
-  private determineInterfaceType(name: string, _baseInfo: Omit<BaseNetworkInterface, 'type'>): BaseNetworkInterface['type'] {
+  private async determineInterfaceTypeAndPurpose(
+    name: string,
+    baseInfo: Omit<BaseNetworkInterface, 'type' | 'purpose'>
+  ): Promise<{ type: BaseNetworkInterface['type']; purpose: BaseNetworkInterface['purpose'] }> {
+    // Tailscale interfaces
     if (name.startsWith('tailscale') || name.startsWith('ts-')) {
-      return 'tailscale';
+      return { type: 'tailscale', purpose: 'wan' };
     }
-    
-    if (name.startsWith('wl') || name.startsWith('wlan')) {
-      // Check if it's in AP mode (hotspot)
-      return this.isHotspotInterface(name) ? 'hotspot' : 'wifi';
-    }
-    
-    if (name.startsWith('eth') || name.startsWith('en')) {
-      return 'ethernet';
-    }
-    
+
+    // Loopback interface
     if (name === 'lo') {
-      return 'loopback';
+      return { type: 'loopback', purpose: 'loopback' };
     }
-    
-    return 'unknown';
+
+    // Docker-related interfaces
+    if (this.isDockerInterface(name)) {
+      if (name.startsWith('br-') || name.startsWith('docker')) {
+        return { type: 'bridge', purpose: 'docker' };
+      }
+      if (name.startsWith('veth')) {
+        return { type: 'virtual', purpose: 'docker' };
+      }
+    }
+
+    // WiFi interfaces - determine purpose based on mode
+    if (name.startsWith('wl') || name.startsWith('wlan')) {
+      const purpose = await this.determineWiFiPurpose(name);
+      return { type: 'wifi', purpose };
+    }
+
+    // Ethernet interfaces - determine purpose based on connectivity
+    if (name.startsWith('eth') || name.startsWith('en')) {
+      const purpose = await this.determineEthernetPurpose(name, baseInfo);
+      return { type: 'ethernet', purpose };
+    }
+
+    // Check if it's a bridge interface
+    if (await this.isBridgeInterface(name)) {
+      return { type: 'bridge', purpose: 'unknown' };
+    }
+
+    return { type: 'unknown', purpose: 'unknown' };
   }
 
   /**
@@ -346,6 +410,94 @@ export class NetworkService {
       // Check if interface is mentioned in hostapd config
       const hostapdConfig = readFileSync(this.hostapdPath, 'utf-8');
       return hostapdConfig.includes(`interface=${name}`);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if an interface is Docker-related
+   */
+  private isDockerInterface(name: string): boolean {
+    return (
+      name.startsWith('br-') ||
+      name.startsWith('docker') ||
+      name.startsWith('veth') ||
+      name.includes('docker')
+    );
+  }
+
+  /**
+   * Determine WiFi interface purpose (wan, wlan, lan, unknown)
+   */
+  private async determineWiFiPurpose(name: string): Promise<BaseNetworkInterface['purpose']> {
+    try {
+      // Check if it's configured as a hotspot
+      if (this.isHotspotInterface(name)) {
+        return 'wlan';
+      }
+
+      // Check WiFi mode using iw command
+      const { stdout } = await execAsync(`iw dev ${name} info 2>/dev/null`);
+      const modeMatch = stdout.match(/type (\w+)/);
+
+      if (modeMatch && modeMatch[1] === 'AP') {
+        return 'wlan'; // Access Point mode = hotspot
+      }
+
+      if (modeMatch && modeMatch[1] === 'managed') {
+        // Check if it has internet connectivity
+        try {
+          await execAsync(`ping -c 1 -W 5 -I ${name} 8.8.8.8 >/dev/null 2>&1`);
+          return 'wan'; // Has internet connectivity
+        } catch {
+          return 'lan'; // No internet, likely local network
+        }
+      }
+
+      return 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  /**
+   * Determine Ethernet interface purpose (wan, lan, unknown)
+   */
+  private async determineEthernetPurpose(
+    name: string,
+    baseInfo: Omit<BaseNetworkInterface, 'type' | 'purpose'>
+  ): Promise<BaseNetworkInterface['purpose']> {
+    try {
+      // If interface is down or has no IP, it's likely unused
+      if (baseInfo.state === 'down' || !baseInfo.ipAddress) {
+        return 'unknown';
+      }
+
+      // Check if it has internet connectivity
+      if (baseInfo.gateway) {
+        try {
+          await execAsync(`ping -c 1 -W 5 -I ${name} 8.8.8.8 >/dev/null 2>&1`);
+          return 'wan'; // Has internet connectivity
+        } catch {
+          return 'lan'; // Has gateway but no internet, likely local network
+        }
+      }
+
+      return 'lan'; // No gateway, likely local network
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  /**
+   * Check if an interface is a bridge
+   */
+  private async isBridgeInterface(name: string): Promise<boolean> {
+    try {
+      // Check if it's listed as a bridge
+      const { stdout } = await execAsync('ip link show type bridge 2>/dev/null');
+      return stdout.includes(name);
     } catch {
       return false;
     }
@@ -437,9 +589,85 @@ export class NetworkService {
   }
 
   /**
+   * Get bridge-specific information
+   */
+  private async getBridgeInterfaceInfo(name: string, baseInfo: BaseNetworkInterface): Promise<BridgeInterface> {
+    const [bridgeInfoResult, stpResult] = await Promise.allSettled([
+      execAsync(`brctl show ${name} 2>/dev/null || ip link show ${name} 2>/dev/null`),
+      execAsync(`brctl showstp ${name} 2>/dev/null`),
+    ]);
+
+    const bridgeInfo: BridgeInterface = {
+      ...baseInfo,
+      type: 'bridge',
+    };
+
+    // Parse bridge information
+    if (bridgeInfoResult.status === 'fulfilled') {
+      const output = bridgeInfoResult.value.stdout;
+
+      // Extract bridge ID if available
+      const bridgeIdMatch = output.match(/bridge id\s+([a-f0-9:.]+)/);
+      if (bridgeIdMatch && bridgeIdMatch[1]) {
+        bridgeInfo.bridgeId = bridgeIdMatch[1];
+      }
+
+      // Extract connected interfaces
+      const interfaceMatches = output.match(/^\s+(\w+)$/gm);
+      if (interfaceMatches) {
+        bridgeInfo.interfaces = interfaceMatches.map(match => match.trim());
+      }
+    }
+
+    // Parse STP information
+    if (stpResult.status === 'fulfilled') {
+      bridgeInfo.stp = stpResult.value.stdout.includes('enabled');
+    }
+
+    return bridgeInfo;
+  }
+
+  /**
+   * Get virtual interface-specific information
+   */
+  private async getVirtualInterfaceInfo(name: string, baseInfo: BaseNetworkInterface): Promise<VirtualInterface> {
+    const [peerResult, containerResult] = await Promise.allSettled([
+      execAsync(`ip link show ${name} 2>/dev/null`),
+      execAsync(`docker ps --format "table {{.ID}}\\t{{.Names}}" 2>/dev/null`),
+    ]);
+
+    const virtualInfo: VirtualInterface = {
+      ...baseInfo,
+      type: 'virtual',
+    };
+
+    // Parse peer interface for veth pairs
+    if (peerResult.status === 'fulfilled') {
+      const peerMatch = peerResult.value.stdout.match(/veth\w+@if\d+/);
+      if (peerMatch) {
+        virtualInfo.peerInterface = peerMatch[0];
+      }
+    }
+
+    // Try to find associated container (basic implementation)
+    if (containerResult.status === 'fulfilled' && name.startsWith('veth')) {
+      // This is a simplified approach - in practice, you'd need more sophisticated container detection
+      const containers = containerResult.value.stdout.split('\n').slice(1);
+      if (containers.length > 0 && containers[0]) {
+        const containerInfo = containers[0].split('\t');
+        if (containerInfo[0]) {
+          virtualInfo.containerId = containerInfo[0];
+        }
+      }
+    }
+
+    return virtualInfo;
+  }
+
+  /**
    * Get ethernet-specific information
    */
-  private async getEthernetInterfaceInfo(name: string, baseInfo: Omit<BaseNetworkInterface, 'type'>): Promise<EthernetInterface> {
+  private async getEthernetInterfaceInfo(name: string, baseInfo: BaseNetworkInterface): Promise<EthernetInterface> {
     const [speedResult, duplexResult, driverResult, linkResult] = await Promise.allSettled([
       execAsync(`ethtool ${name} 2>/dev/null | grep Speed`),
       execAsync(`ethtool ${name} 2>/dev/null | grep Duplex`),
@@ -549,7 +777,8 @@ export class NetworkService {
       }
     }
 
-    return wifiInfo;
+    // Add hotspot-specific information if this is a hotspot interface
+    return this.addHotspotInfoToWiFi(wifiInfo);
   }
 
   /**
@@ -594,55 +823,32 @@ export class NetworkService {
   }
 
   /**
-   * Get hotspot-specific information
+   * Add hotspot-specific information to WiFi interface
    */
-  private async getHotspotInterfaceInfo(name: string, baseInfo: Omit<BaseNetworkInterface, 'type'>): Promise<HotspotInterface> {
+  private addHotspotInfoToWiFi(wifiInfo: WiFiInterface): WiFiInterface {
+    if (wifiInfo.purpose !== 'wlan') {
+      return wifiInfo;
+    }
+
     const hostapdConfig = this.readHostapdConfig();
-    const [clientsResult, channelResult] = await Promise.allSettled([
-      execAsync(`iw dev ${name} station dump 2>/dev/null | grep Station | wc -l`),
-      execAsync(`iw dev ${name} info 2>/dev/null | grep channel`),
-    ]);
 
-    const hotspotInfo: HotspotInterface = {
-      ...baseInfo,
-      type: 'hotspot',
-      ssid: hostapdConfig.ssid || 'DangerPrep',
-      password: hostapdConfig.password || 'change_me',
-    };
+    // Add hotspot-specific properties
+    const hotspotWifi = { ...wifiInfo };
 
-    // Parse hostapd configuration
+    // Override SSID and security from hostapd config if available
+    if (hostapdConfig.ssid) {
+      hotspotWifi.ssid = hostapdConfig.ssid;
+    }
+
     if (hostapdConfig.wpa) {
-      hotspotInfo.wpaType = hostapdConfig.wpa === '3' ? 'WPA3' : 'WPA2';
+      hotspotWifi.security = hostapdConfig.wpa === '3' ? 'WPA3' : 'WPA2';
     }
+
     if (hostapdConfig.channel) {
-      hotspotInfo.channel = parseInt(hostapdConfig.channel);
-    }
-    if (hostapdConfig.max_num_sta) {
-      hotspotInfo.maxClients = parseInt(hostapdConfig.max_num_sta);
-    }
-    if (hostapdConfig.ignore_broadcast_ssid) {
-      hotspotInfo.hidden = hostapdConfig.ignore_broadcast_ssid === '1';
+      hotspotWifi.channel = parseInt(hostapdConfig.channel);
     }
 
-    // Connected clients
-    if (clientsResult.status === 'fulfilled') {
-      const clientCount = parseInt(clientsResult.value.stdout.trim());
-      if (!isNaN(clientCount)) {
-        hotspotInfo.connectedClients = clientCount;
-      }
-    }
-
-    // Channel and frequency
-    if (channelResult.status === 'fulfilled') {
-      const channelMatch = channelResult.value.stdout.match(/channel (\d+)/);
-      if (channelMatch && channelMatch[1]) {
-        const channel = parseInt(channelMatch[1]);
-        hotspotInfo.channel = channel;
-        hotspotInfo.frequency = channel <= 14 ? '2.4GHz' : '5GHz';
-      }
-    }
-
-    return hotspotInfo;
+    return hotspotWifi;
   }
 
   /**
@@ -670,11 +876,14 @@ export class NetworkService {
   }
 
   /**
-   * Find the interface with internet connectivity
+   * Find the interface with internet connectivity (WAN purpose)
    */
   private async findInternetInterface(interfaces: NetworkInterface[]): Promise<NetworkInterface | undefined> {
-    for (const iface of interfaces) {
-      if (iface.state === 'up' && iface.ipAddress && iface.gateway) {
+    // First, look for interfaces with WAN purpose
+    const wanInterfaces = interfaces.filter(iface => iface.purpose === 'wan' && iface.state === 'up');
+
+    for (const iface of wanInterfaces) {
+      if (iface.ipAddress && iface.gateway) {
         // Test internet connectivity
         try {
           await execAsync(`ping -c 1 -W 5 -I ${iface.name} 8.8.8.8 >/dev/null 2>&1`);
@@ -684,14 +893,27 @@ export class NetworkService {
         }
       }
     }
+
+    // Fallback: test all up interfaces with IP and gateway
+    for (const iface of interfaces) {
+      if (iface.state === 'up' && iface.ipAddress && iface.gateway && iface.purpose !== 'docker') {
+        try {
+          await execAsync(`ping -c 1 -W 5 -I ${iface.name} 8.8.8.8 >/dev/null 2>&1`);
+          return iface;
+        } catch {
+          // Continue to next interface
+        }
+      }
+    }
+
     return undefined;
   }
 
   /**
-   * Find the hotspot interface
+   * Find the hotspot interface (WLAN purpose)
    */
   private findHotspotInterface(interfaces: NetworkInterface[]): NetworkInterface | undefined {
-    return interfaces.find(iface => iface.type === 'hotspot');
+    return interfaces.find(iface => iface.purpose === 'wlan');
   }
 
   /**
@@ -699,6 +921,20 @@ export class NetworkService {
    */
   private findTailscaleInterface(interfaces: NetworkInterface[]): NetworkInterface | undefined {
     return interfaces.find(iface => iface.type === 'tailscale');
+  }
+
+  /**
+   * Find LAN interfaces
+   */
+  private findLanInterfaces(interfaces: NetworkInterface[]): NetworkInterface[] {
+    return interfaces.filter(iface => iface.purpose === 'lan');
+  }
+
+  /**
+   * Find Docker interfaces
+   */
+  private findDockerInterfaces(interfaces: NetworkInterface[]): NetworkInterface[] {
+    return interfaces.filter(iface => iface.purpose === 'docker');
   }
 
   /**

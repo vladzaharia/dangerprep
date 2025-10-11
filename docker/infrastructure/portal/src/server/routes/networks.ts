@@ -90,26 +90,28 @@ function createDefaultInterfaceData(keyword: string) {
     case 'hotspot':
       return {
         ...baseInterface,
-        type: 'hotspot' as const,
+        type: 'wifi' as const,
+        purpose: 'wlan' as const,
         ssid: process.env.WIFI_SSID || 'DangerPrep',
-        password: process.env.WIFI_PASSWORD || 'change_me',
-        wpaType: 'WPA2',
+        security: 'WPA2',
         channel: 6,
         frequency: '2.4GHz',
         connectedClients: 0,
-        maxClients: 10,
+        mode: 'ap' as const,
       };
 
     case 'internet':
       return {
         ...baseInterface,
         type: 'ethernet' as const,
+        purpose: 'wan' as const,
       };
 
     case 'tailscale':
       return {
         ...baseInterface,
         type: 'tailscale' as const,
+        purpose: 'wan' as const,
         status: 'stopped',
         tailnetName: undefined,
         peers: [],
@@ -120,6 +122,7 @@ function createDefaultInterfaceData(keyword: string) {
       return {
         ...baseInterface,
         type: 'unknown' as const,
+        purpose: 'unknown' as const,
       };
   }
 }
