@@ -44,7 +44,7 @@ RUN yarn install --immutable
 COPY --from=builder /app/out/full/ .
 
 # Copy the scripts directory directly from build context (more reliable than builder stage)
-COPY docker/infrastructure/portal/scripts ./docker/infrastructure/portal/scripts
+COPY ./docker/infrastructure/portal/scripts ./app/docker/infrastructure/portal/scripts
 
 FROM base AS runner
 WORKDIR /app
