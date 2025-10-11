@@ -7,10 +7,7 @@ import { visualizer } from 'rollup-plugin-visualizer'
 import viteCompression from 'vite-plugin-compression'
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command, mode }) => {
-  const isProduction = mode === 'production'
-  const isDevelopment = command === 'serve'
-
+export default defineConfig(({ mode }) => {
   const plugins = [
     // Hono dev server for development - only handle API routes
     devServer({
@@ -26,11 +23,12 @@ export default defineConfig(({ command, mode }) => {
       // SWC options optimized for React 19 and Vite 7
       // Vite 7: Improved SWC integration with better performance
       jsxImportSource: 'react',
+
     }),
   ]
 
   // Add production-only plugins
-  if (isProduction) {
+  // if (isProduction) {
     plugins.push(
       // PWA capabilities
       VitePWA({
@@ -92,7 +90,7 @@ export default defineConfig(({ command, mode }) => {
         brotliSize: true,
       }) as any
     )
-  }
+  // }
 
   return {
     plugins,
@@ -130,78 +128,9 @@ export default defineConfig(({ command, mode }) => {
       target: 'es2022', // Vite 7: baseline-widely-available
       outDir: 'dist',
       assetsDir: 'assets',
-      sourcemap: isDevelopment,
-      minify: isProduction ? 'esbuild' : false,
-      cssMinify: isProduction,
-
-      // Rollup options for advanced bundling
-      rollupOptions: {
-        output: {
-          // Manual chunk splitting for optimal caching
-          manualChunks: (id) => {
-            // React and React DOM
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'react-vendor'
-            }
-
-            // FontAwesome icons
-            if (id.includes('@fortawesome')) {
-              return 'icons-vendor'
-            }
-
-            // UI libraries (WebAwesome, Shoelace)
-            if (id.includes('@awesome.me/webawesome') || id.includes('@shoelace-style')) {
-              return 'ui-vendor'
-            }
-
-            // Router
-            if (id.includes('react-router')) {
-              return 'vendor'
-            }
-
-            // Other node_modules
-            if (id.includes('node_modules')) {
-              return 'vendor'
-            }
-
-            // App code organization
-            if (id.includes('/src/components/')) {
-              return 'components'
-            }
-            if (id.includes('/src/pages/')) {
-              return 'pages'
-            }
-            if (id.includes('/src/hooks/')) {
-              return 'hooks'
-            }
-            if (id.includes('/src/utils/')) {
-              return 'utils'
-            }
-
-            // Default case - return undefined to let Vite handle it
-            return undefined
-          },
-
-          // Asset file naming with organized directories
-          assetFileNames: (assetInfo) => {
-            const fileName = assetInfo.names?.[0] || 'asset'
-            const info = fileName.split('.')
-            const extType = info[info.length - 1]
-
-            if (/\.(woff|woff2|eot|ttf|otf)$/.test(fileName)) {
-              return 'assets/fonts/[name]-[hash][extname]'
-            }
-            if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/.test(fileName)) {
-              return 'assets/images/[name]-[hash][extname]'
-            }
-            return `assets/${extType}/[name]-[hash][extname]`
-          },
-
-          // JavaScript chunk naming
-          chunkFileNames: 'assets/js/[name]-[hash].js',
-          entryFileNames: 'assets/js/[name]-[hash].js',
-        },
-      },
+      sourcemap: true,
+      minify: 'esbuild',
+      cssMinify: true,
     },
 
     // Dependency optimization
@@ -216,13 +145,13 @@ export default defineConfig(({ command, mode }) => {
       ],
       exclude: ['@vite/client', '@vite/env'],
       // Vite 7: Force optimization for better performance
-      force: isProduction,
+      force: true,
     },
 
     // Environment variables
     define: {
-      __DEV__: isDevelopment,
-      __PROD__: isProduction,
+      __DEV__: false,
+      __PROD__: true,
       'process.env.NODE_ENV': JSON.stringify(mode),
     },
 
@@ -231,7 +160,7 @@ export default defineConfig(({ command, mode }) => {
       // Enable CSS modules with optimized class names
       modules: {
         localsConvention: 'camelCaseOnly',
-        generateScopedName: isProduction
+        generateScopedName: true
           ? '[hash:base64:5]'
           : '[name]__[local]__[hash:base64:5]',
       },
@@ -240,13 +169,12 @@ export default defineConfig(({ command, mode }) => {
         plugins: [],
       },
       // Enable CSS code splitting
-      devSourcemap: isDevelopment,
+      devSourcemap: true,
     },
 
     // Performance optimizations for Vite 7
     esbuild: {
-      // Drop console and debugger in production
-      drop: isProduction ? ['console', 'debugger'] : [],
+      drop: [],
       // Vite 7: Target ES2022 for baseline-widely-available compatibility
       target: 'es2022',
       // Enable top-level await and other modern features
@@ -255,7 +183,7 @@ export default defineConfig(({ command, mode }) => {
       },
       // JSX configuration
       jsx: 'automatic',
-      jsxDev: isDevelopment,
+      jsxDev: true,
     },
 
     // SSR configuration for Hono
