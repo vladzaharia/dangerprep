@@ -110,6 +110,7 @@ export default defineConfig(({ command, mode }) => {
       port: 3000,
       host: '0.0.0.0',
       strictPort: true,
+      allowedHosts: ['localhost', '127.0.0.1', 'portal.danger.diy', 'portal.argos.surf', 'portal.danger'],
       // Vite 7: Warmup options for faster development startup
       warmup: {
         clientFiles: ['./src/main.tsx', './src/App.tsx'],
