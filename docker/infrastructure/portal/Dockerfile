@@ -46,6 +46,9 @@ COPY --from=builder /app/out/full/ .
 # Copy the scripts directory directly from build context (turbo prune excludes it)
 COPY docker/infrastructure/portal/scripts ./docker/infrastructure/portal/scripts
 
+# Copy essential server files that turbo prune might exclude
+COPY docker/infrastructure/portal/src/server/production.cjs ./docker/infrastructure/portal/src/server/production.cjs
+
 FROM base AS runner
 WORKDIR /app
 
