@@ -68,6 +68,10 @@ out/
 
 # Compiled CommonJS files (generated from TypeScript)
 *.cjs
+# But keep essential build scripts and manually written source files
+!**/scripts/*.cjs
+!docker/infrastructure/portal/src/server/production.cjs
+!docker/infrastructure/portal/src/server/build.cjs
 
 # Turborepo
 .turbo/
