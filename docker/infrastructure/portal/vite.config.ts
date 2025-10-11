@@ -107,7 +107,7 @@ export default defineConfig(({ command, mode }) => {
 
     // Development server configuration
     server: {
-      port: 3001,
+      port: 3000,
       host: '0.0.0.0',
       strictPort: true,
       // Vite 7: Warmup options for faster development startup
@@ -119,7 +119,7 @@ export default defineConfig(({ command, mode }) => {
 
     // Preview server configuration
     preview: {
-      port: 3001,
+      port: 3000,
       host: '0.0.0.0',
       strictPort: true,
     },
