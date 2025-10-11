@@ -210,7 +210,7 @@ export class NetworkService {
     
     for (const line of lines) {
       const match = line.match(/^\d+:\s+([^:@]+)[@:]?/);
-      if (match && match[1] !== 'lo') { // Skip loopback
+      if (match && match[1] && match[1] !== 'lo') { // Skip loopback
         interfaces.push(match[1]);
       }
     }
@@ -332,7 +332,7 @@ export class NetworkService {
       // Parse IP address and netmask
       if (ipResult.status === 'fulfilled') {
         const ipMatch = ipResult.value.stdout.match(/inet (\d+\.\d+\.\d+\.\d+)\/(\d+)/);
-        if (ipMatch) {
+        if (ipMatch && ipMatch[1] && ipMatch[2]) {
           result.ipAddress = ipMatch[1];
           result.netmask = this.cidrToNetmask(parseInt(ipMatch[2]));
         }
@@ -381,7 +381,7 @@ export class NetworkService {
     try {
       const { stdout } = await execAsync(`ip link show ${name}`);
       const mtuMatch = stdout.match(/mtu (\d+)/);
-      return mtuMatch ? parseInt(mtuMatch[1]) : undefined;
+      return mtuMatch && mtuMatch[1] ? parseInt(mtuMatch[1]) : undefined;
     } catch {
       return undefined;
     }
@@ -414,7 +414,7 @@ export class NetworkService {
     // Parse duplex
     if (duplexResult.status === 'fulfilled') {
       const duplexMatch = duplexResult.value.stdout.match(/Duplex: (Full|Half)/i);
-      if (duplexMatch) {
+      if (duplexMatch && duplexMatch[1]) {
         ethernetInfo.duplex = duplexMatch[1].toLowerCase() as 'full' | 'half';
       }
     }
@@ -460,13 +460,13 @@ export class NetworkService {
 
       // Signal strength
       const signalMatch = iwconfig.match(/Signal level=(-?\d+) dBm/);
-      if (signalMatch) {
+      if (signalMatch && signalMatch[1]) {
         wifiInfo.signalStrength = parseInt(signalMatch[1]);
       }
 
       // Frequency
       const freqMatch = iwconfig.match(/Frequency:(\d+\.\d+) GHz/);
-      if (freqMatch) {
+      if (freqMatch && freqMatch[1]) {
         const freq = parseFloat(freqMatch[1]);
         wifiInfo.frequency = freq < 3 ? '2.4GHz' : '5GHz';
       }
@@ -478,7 +478,7 @@ export class NetworkService {
 
       // Interface type/mode
       const typeMatch = iwinfo.match(/type (\w+)/);
-      if (typeMatch) {
+      if (typeMatch && typeMatch[1]) {
         const mode = typeMatch[1];
         if (['managed', 'ap', 'monitor', 'unknown'].includes(mode)) {
           wifiInfo.mode = mode as WiFiInterface['mode'];
@@ -487,7 +487,7 @@ export class NetworkService {
 
       // Channel
       const channelMatch = iwinfo.match(/channel (\d+)/);
-      if (channelMatch) {
+      if (channelMatch && channelMatch[1]) {
         wifiInfo.channel = parseInt(channelMatch[1]);
       }
     }
@@ -586,7 +586,7 @@ export class NetworkService {
     // Channel and frequency
     if (channelResult.status === 'fulfilled') {
       const channelMatch = channelResult.value.stdout.match(/channel (\d+)/);
-      if (channelMatch) {
+      if (channelMatch && channelMatch[1]) {
         const channel = parseInt(channelMatch[1]);
         hotspotInfo.channel = channel;
         hotspotInfo.frequency = channel <= 14 ? '2.4GHz' : '5GHz';
@@ -673,7 +673,7 @@ export class NetworkService {
 
     // Try to parse from systemd-resolve output
     const systemdMatch = output.match(/DNS Servers:\s*([\d\.\s]+)/);
-    if (systemdMatch) {
+    if (systemdMatch && systemdMatch[1]) {
       const servers = systemdMatch[1].trim().split(/\s+/);
       dnsServers.push(...servers.filter(ip => /^\d+\.\d+\.\d+\.\d+$/.test(ip)));
     }

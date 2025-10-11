@@ -99,13 +99,13 @@ export class WifiConfigService {
 
       // Parse SSID
       const ssidMatch = hostapdContent.match(/^ssid=(.+)$/m);
-      if (ssidMatch) {
+      if (ssidMatch && ssidMatch[1]) {
         config.ssid = ssidMatch[1].trim();
       }
 
       // Parse password
       const passwordMatch = hostapdContent.match(/^wpa_passphrase=(.+)$/m);
-      if (passwordMatch) {
+      if (passwordMatch && passwordMatch[1]) {
         config.password = passwordMatch[1].trim();
       }
 
@@ -215,8 +215,10 @@ export class WifiConfigService {
         const address = addressLine.split(':')[1];
         if (address && address.includes('/')) {
           const [ipAddress, cidr] = address.split('/');
-          const subnetMask = this.cidrToSubnetMask(parseInt(cidr, 10));
-          return { ipAddress, subnetMask };
+          if (ipAddress && cidr) {
+            const subnetMask = this.cidrToSubnetMask(parseInt(cidr, 10));
+            return { ipAddress, subnetMask };
+          }
         }
       }
 
@@ -258,7 +260,7 @@ export class WifiConfigService {
       const dnsServers = dnsLines
         .map(line => line.split(':')[1])
         .filter(dns => dns && dns.trim())
-        .map(dns => dns.trim());
+        .map(dns => dns!.trim());
 
       return dnsServers.length > 0 ? dnsServers : undefined;
     } catch (error) {

@@ -1,5 +1,5 @@
 import * as solidIcons from '@fortawesome/free-solid-svg-icons';
-import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 
 /**
  * Comprehensive FontAwesome icon cache for emergency/travel use case
@@ -68,8 +68,8 @@ export class IconCache {
   static getIcon(iconName: string): IconDefinition {
     // Normalize icon name (remove fa- prefix if present, convert to lowercase)
     const normalizedName = iconName.toLowerCase().replace(/^fa-/, '');
-    
-    return this.iconMap[normalizedName] || this.iconMap['question-circle'];
+
+    return this.iconMap[normalizedName] || this.iconMap['question-circle'] || solidIcons.faQuestionCircle;
   }
 
   /**

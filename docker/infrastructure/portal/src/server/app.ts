@@ -29,15 +29,8 @@ app.route('/api/networks', networks);
 app.route('/api/services', services);
 app.route('/api/config', config);
 
-// Root endpoint
-app.get('/', (c) => {
-  return c.json({
-    name: 'DangerPrep Portal API',
-    version: '2.0.0',
-    framework: 'Hono',
-    documentation: 'https://github.com/vladzaharia/dangerprep',
-  });
-});
+// Note: Root endpoint removed - now handled by Vite dev server for frontend
+// API routes are mounted under /api prefix
 
 // 404 handler
 app.notFound((c) => {

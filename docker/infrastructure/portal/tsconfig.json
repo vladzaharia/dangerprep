@@ -1,15 +1,27 @@
 {
   "compilerOptions": {
+    // Target modern JavaScript for better performance
     "target": "ES2022",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
+
+    // Performance optimizations
     "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
+
+    // Module resolution optimizations for 2025
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+
+    // React 19 optimizations
     "jsx": "react-jsx",
+    "jsxImportSource": "react",
+
+    // Strict type checking for better code quality
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -17,22 +29,40 @@
     "noImplicitReturns": true,
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+
+    // Path mapping
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
-        "types": ["vite/client", "node", "../../../node_modules/@awesome.me/webawesome/dist/custom-elements-jsx"],
+
+    // Type definitions
+    "types": [
+      "vite/client",
+      "node",
+      "../../../node_modules/@awesome.me/webawesome/dist/custom-elements-jsx"
+    ],
+
+    // Module interop
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+
+    // Additional optimizations for 2025
+    "verbatimModuleSyntax": true,
+    "useDefineForClassFields": true
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "vite.config.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "build",
-    "vite.config.ts"
+    ".tsbuildinfo",
+    "**/*.test.*",
+    "**/*.spec.*"
   ]
 }
