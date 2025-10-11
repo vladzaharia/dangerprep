@@ -25,7 +25,7 @@ WORKDIR /app
 COPY . .
 
 # Generate a partial monorepo with a pruned lockfile for portal
-RUN turbo prune @dangerprep/portal --docker
+# RUN turbo prune @dangerprep/portal --docker
 
 FROM base AS installer
 RUN apk update && apk add --no-cache \
@@ -42,9 +42,6 @@ RUN yarn install --immutable
 
 # Copy source code for development
 COPY --from=builder /app/out/full/ .
-
-# Copy the scripts directory directly from build context (more reliable than builder stage)
-COPY ./docker/infrastructure/portal/scripts ./app/docker/infrastructure/portal/scripts
 
 FROM base AS runner
 WORKDIR /app
