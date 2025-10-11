@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
+import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import devServer from '@hono/vite-dev-server'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -21,11 +21,11 @@ export default defineConfig(({ command, mode }) => {
       ],
     }),
 
-    // React with SWC - optimized for React 19 and Vite 7
+    // React with standard plugin - optimized for React 19 and Vite 7
     react({
-      // SWC options optimized for React 19 and Vite 7
-      // Vite 7: Improved SWC integration with better performance
-      jsxImportSource: 'react',
+      // Standard React plugin options for React 19 and Vite 7
+      // Vite 7: Improved React integration with better performance
+      jsxRuntime: 'automatic',
     }),
   ]
 

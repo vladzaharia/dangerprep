@@ -84,11 +84,11 @@ EXPOSE 3000
 
 # Health check for dev server
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
 # Build the application
 RUN yarn build
 
 # Start production server
-CMD ["node", "src/server/production.cjs"]
-# CMD ["yarn", "dev"]
+# CMD ["node", "src/server/production.cjs"]
+CMD ["yarn", "dev"]
