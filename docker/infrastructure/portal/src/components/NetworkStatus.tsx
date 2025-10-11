@@ -1,12 +1,92 @@
 import { Suspense } from 'react';
-import { 
-  useNetworkSummary, 
-  useHotspotInterface, 
-  useInternetInterface, 
+import {
+  useNetworkSummary,
+  useHotspotInterface,
+  useInternetInterface,
   useTailscaleInterface,
   useNetworkSummaryWithLoading,
-  type NetworkInterface 
+  type NetworkInterface
 } from '../hooks/useNetworks';
+
+/**
+ * Loading skeleton for network summary section
+ */
+function NetworkSummarySkeleton() {
+  return (
+    <div className="space-y-4">
+      {/* Network Summary Card Skeleton */}
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <wa-skeleton effect="sheen" style={{ width: '180px', height: '28px', marginBottom: '8px' }}></wa-skeleton>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div>
+            <wa-skeleton effect="sheen" style={{ width: '120px', height: '16px' }}></wa-skeleton>
+          </div>
+          <div>
+            <wa-skeleton effect="sheen" style={{ width: '100px', height: '16px' }}></wa-skeleton>
+          </div>
+          <div>
+            <wa-skeleton effect="sheen" style={{ width: '110px', height: '16px' }}></wa-skeleton>
+          </div>
+          <div>
+            <wa-skeleton effect="sheen" style={{ width: '130px', height: '16px' }}></wa-skeleton>
+          </div>
+        </div>
+      </div>
+
+      {/* Network Interface Cards Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 3 }, (_, index) => (
+          <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="space-y-3">
+              {/* Interface header with icon and name */}
+              <div className="flex items-center space-x-3">
+                <wa-skeleton effect="sheen" style={{ width: '24px', height: '24px', borderRadius: '4px' }}></wa-skeleton>
+                <wa-skeleton effect="sheen" style={{ width: `${80 + (index * 20)}px`, height: '20px' }}></wa-skeleton>
+              </div>
+
+              {/* Interface details */}
+              <div className="space-y-2">
+                <wa-skeleton effect="sheen" style={{ width: '90%', height: '16px' }}></wa-skeleton>
+                <wa-skeleton effect="sheen" style={{ width: '75%', height: '16px' }}></wa-skeleton>
+                <wa-skeleton effect="sheen" style={{ width: '85%', height: '16px' }}></wa-skeleton>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Loading skeleton for special network interfaces
+ */
+function SpecialNetworkInterfacesSkeleton() {
+  return (
+    <div className="space-y-4">
+      {/* Special interfaces section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {Array.from({ length: 2 }, (_, index) => (
+          <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="space-y-3">
+              {/* Interface header */}
+              <div className="flex items-center space-x-3">
+                <wa-skeleton effect="sheen" style={{ width: '24px', height: '24px', borderRadius: '4px' }}></wa-skeleton>
+                <wa-skeleton effect="sheen" style={{ width: `${100 + (index * 30)}px`, height: '20px' }}></wa-skeleton>
+              </div>
+
+              {/* Interface details */}
+              <div className="space-y-2">
+                <wa-skeleton effect="sheen" style={{ width: '95%', height: '16px' }}></wa-skeleton>
+                <wa-skeleton effect="sheen" style={{ width: '80%', height: '16px' }}></wa-skeleton>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Component to display network interface information
@@ -140,11 +220,7 @@ function NetworkSummaryWithLoading() {
   const { summary, loading, error, refresh } = useNetworkSummaryWithLoading();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-gray-600">Loading network information...</div>
-      </div>
-    );
+    return <NetworkSummarySkeleton />;
   }
 
   if (error) {
@@ -259,11 +335,11 @@ export function NetworkStatus({ useSuspense = true }: { useSuspense?: boolean })
   if (useSuspense) {
     return (
       <div className="space-y-6">
-        <Suspense fallback={<div className="text-gray-600 p-4">Loading network information...</div>}>
+        <Suspense fallback={<NetworkSummarySkeleton />}>
           <NetworkSummaryWithSuspense />
         </Suspense>
-        
-        <Suspense fallback={<div className="text-gray-600 p-4">Loading special interfaces...</div>}>
+
+        <Suspense fallback={<SpecialNetworkInterfacesSkeleton />}>
           <SpecialNetworkInterfaces />
         </Suspense>
       </div>
@@ -273,7 +349,7 @@ export function NetworkStatus({ useSuspense = true }: { useSuspense?: boolean })
   return (
     <div className="space-y-6">
       <NetworkSummaryWithLoading />
-      <Suspense fallback={<div className="text-gray-600 p-4">Loading special interfaces...</div>}>
+      <Suspense fallback={<SpecialNetworkInterfacesSkeleton />}>
         <SpecialNetworkInterfaces />
       </Suspense>
     </div>

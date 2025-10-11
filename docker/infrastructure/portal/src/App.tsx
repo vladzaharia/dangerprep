@@ -25,8 +25,10 @@ function AppLoadingFallback() {
       <div className="app-content">
         <div className="app-content-inner">
           <div className="wa-stack wa-gap-xl">
-            <wa-skeleton style={{ width: '200px', height: '32px' }}></wa-skeleton>
-            <wa-skeleton style={{ width: '100%', height: '200px' }}></wa-skeleton>
+            {/* Page title skeleton */}
+            <wa-skeleton effect="sheen" style={{ width: '240px', height: '36px' }}></wa-skeleton>
+            {/* Main content area skeleton */}
+            <wa-skeleton effect="sheen" style={{ width: '100%', height: '300px', borderRadius: '8px' }}></wa-skeleton>
           </div>
         </div>
       </div>

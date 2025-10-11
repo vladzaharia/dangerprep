@@ -4,9 +4,19 @@ services:
       context: ../../..
       dockerfile: docker/infrastructure/portal/Dockerfile
     restart: unless-stopped
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/hostapd:/etc/hostapd:ro
+      - /sys/class/net:/sys/class/net:ro
+      - /proc/net:/proc/net:ro
+      - /etc/resolv.conf:/etc/resolv.conf:ro
+      - /var/run/tailscale:/var/run/tailscale:ro
     env_file:
       - compose.env
     ports:

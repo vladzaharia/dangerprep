@@ -12,24 +12,31 @@ function QRCodeSkeleton() {
         <div className="wifi-details">
           <div className="wifi-detail-item">
             <span className="wifi-detail-label">Network Name:</span>
-            <wa-skeleton style={{ width: '150px', height: '20px' }}></wa-skeleton>
+            {/* Skeleton INSIDE the wifi-detail-value container to maintain layout */}
+            <div className="wifi-detail-value">
+              <wa-skeleton effect="sheen" style={{ width: '100%', height: '2rem' }}></wa-skeleton>
+            </div>
           </div>
           <div className="wifi-detail-item">
             <span className="wifi-detail-label">Password:</span>
-            <wa-skeleton style={{ width: '120px', height: '20px' }}></wa-skeleton>
+            {/* Skeleton INSIDE the wifi-detail-value container to maintain layout */}
+            <div className="wifi-detail-value">
+              <wa-skeleton effect="sheen" style={{ width: '100%', height: '2rem' }}></wa-skeleton>
+            </div>
           </div>
 
         </div>
 
         {/* Right Side - QR Code Skeleton */}
         <div className="wifi-qr">
-          <wa-skeleton style={{ width: '200px', height: '200px' }}></wa-skeleton>
+          {/* QR code skeleton - exactly 200px to match wa-qr-code size */}
+          <wa-skeleton effect="sheen" style={{ width: '200px', height: '200px', borderRadius: 'var(--wa-border-radius-m)' }}></wa-skeleton>
         </div>
       </div>
 
       {/* Instructions Skeleton */}
       <div className="wifi-instructions">
-        <wa-skeleton style={{ width: '100%', height: '20px' }}></wa-skeleton>
+        <p>Scan the QR code with your device's camera or use the details above to connect to the WiFi network.</p>
       </div>
     </div>
   );

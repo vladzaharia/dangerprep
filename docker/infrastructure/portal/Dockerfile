@@ -46,28 +46,29 @@ COPY --from=builder /app/out/full/ .
 FROM base AS runner
 WORKDIR /app
 
-# Install runtime system dependencies
+# Install runtime system dependencies including network tools
 RUN apk add --no-cache \
     wget \
     curl \
-    bash
+    bash \
+    iproute2 \
+    wireless-tools \
+    iw \
+    ethtool \
+    bind-tools
 
-# Create docker group and non-root user with consistent UID/GID
-# Use a different GID for docker group to avoid conflicts
-RUN addgroup -g 998 -S docker && \
-    addgroup -g 1001 -S appuser && \
-    adduser -S appuser -u 1001 -G appuser && \
-    adduser appuser docker
+# Note: Tailscale CLI not installed in container
+# Tailscale interfaces will be detected through host network access
+# Tailscale status commands will gracefully fail if not available
 
 # Copy the entire workspace structure to maintain Yarn workspace functionality
 COPY --from=installer /app ./
 
-# Set permissions
-RUN mkdir -p /app/logs && \
-    chown -R appuser:appuser /app
+# Set permissions and create necessary directories
+RUN mkdir -p /app/logs
 
-# Switch to non-root user
-USER appuser
+# Note: Running as root to access host network interfaces
+# The compose.yml file specifies user: root for network access
 
 # Set working directory to the portal service
 WORKDIR /app/docker/infrastructure/portal

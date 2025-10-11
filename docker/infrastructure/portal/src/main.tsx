@@ -21,6 +21,7 @@ import '@awesome.me/webawesome/dist/components/qr-code/qr-code.js';
 import '@awesome.me/webawesome/dist/components/card/card.js';
 import '@awesome.me/webawesome/dist/components/icon/icon.js';
 import '@awesome.me/webawesome/dist/components/button/button.js';
+import '@awesome.me/webawesome/dist/components/skeleton/skeleton.js';
 
 // Set default icon family for WebAwesome
 import { setDefaultIconFamily } from '@awesome.me/webawesome';

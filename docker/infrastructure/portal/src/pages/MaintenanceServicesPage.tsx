@@ -17,16 +17,21 @@ function MaintenanceServicesPageSkeleton() {
             <div className="wa-stack service-card">
               <div className="service-card-header">
                 <div className="service-icon">
-                  <wa-skeleton style={{ width: '32px', height: '32px', borderRadius: '4px' }}></wa-skeleton>
+                  {/* Icon skeleton - 48px to match actual FontAwesome icon size */}
+                  <wa-skeleton effect="sheen" style={{ width: '48px', height: '48px', borderRadius: '6px' }}></wa-skeleton>
                 </div>
                 <div className="wa-stack service-info">
-                  <wa-skeleton style={{ width: '120px', height: '24px' }}></wa-skeleton>
-                  <wa-skeleton style={{ width: '200px', height: '16px' }}></wa-skeleton>
+                  {/* Service name skeleton - varying widths for realism */}
+                  <wa-skeleton effect="sheen" style={{ width: `${130 + (index * 25)}px`, height: '24px' }}></wa-skeleton>
+                  {/* Service description skeleton - paragraph-like with varying widths */}
+                  <wa-skeleton effect="sheen" style={{ width: `${200 + (index * 40)}px`, height: '16px' }}></wa-skeleton>
                 </div>
               </div>
               <div className="service-card-footer">
-                <wa-skeleton style={{ width: '80px', height: '16px' }}></wa-skeleton>
-                <wa-skeleton style={{ width: '60px', height: '20px', borderRadius: '10px' }}></wa-skeleton>
+                {/* URL text skeleton */}
+                <wa-skeleton effect="sheen" style={{ width: `${140 + (index * 20)}px`, height: '16px' }}></wa-skeleton>
+                {/* External link icon skeleton */}
+                <wa-skeleton effect="sheen" style={{ width: '16px', height: '16px', borderRadius: '2px' }}></wa-skeleton>
               </div>
             </div>
           </wa-card>
