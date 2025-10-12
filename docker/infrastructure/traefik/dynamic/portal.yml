@@ -52,7 +52,7 @@ http:
     portal-service:
       loadBalancer:
         servers:
-          - url: "http://localhost:3000"
+          - url: "http://host.docker.internal:3000"
         healthCheck:
           path: "/api/health"
           interval: "30s"

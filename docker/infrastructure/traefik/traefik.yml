@@ -20,6 +20,10 @@ providers:
     # Removed network constraint to support host-networked containers like RaspAP
     # network: traefik
 
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
 serversTransport:
   insecureSkipVerify: true
 
