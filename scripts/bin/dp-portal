@@ -3,7 +3,7 @@
 # Installs and manages the DangerPrep Portal as a system service instead of Docker
 # 
 # Usage:
-#   dp-portal-service [OPTIONS] [COMMAND]
+#   dp-portal [OPTIONS] [COMMAND]
 #
 # Commands:
 #   install      Install portal as system service
@@ -22,7 +22,7 @@
 set -euo pipefail
 
 # Script configuration
-readonly PORTAL_SCRIPT_NAME="dp-portal-service"
+readonly PORTAL_SCRIPT_NAME="dp-portal"
 readonly SERVICE_NAME="dangerprep-portal"
 
 # Paths
@@ -141,32 +141,54 @@ install_nodejs() {
 # Install Yarn 4
 install_yarn() {
     log_info "Installing Yarn $REQUIRED_YARN_VERSION..."
-    
+
     # Use corepack to install Yarn 4
     corepack prepare yarn@stable --activate
-    
+
     log_success "Yarn installed successfully"
+}
+
+# Check if turbo is available
+check_turbo() {
+    if command -v turbo >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Install turbo globally
+install_turbo() {
+    log_info "Installing Turbo..."
+    yarn global add turbo@^2
+    log_success "Turbo installed successfully"
 }
 
 # Build the portal application
 build_portal() {
     log_info "Building portal application..."
-    
+
+    if [[ ! -d "$INSTALL_ROOT" ]]; then
+        log_error "DangerPrep installation directory not found: $INSTALL_ROOT"
+        return 1
+    fi
+
     if [[ ! -d "$PORTAL_DIR" ]]; then
         log_error "Portal directory not found: $PORTAL_DIR"
         return 1
     fi
-    
-    cd "$PORTAL_DIR"
-    
-    # Install dependencies
-    log_info "Installing dependencies..."
+
+    # Build from the monorepo root to handle workspace dependencies
+    cd "$INSTALL_ROOT"
+
+    # Install dependencies for the entire monorepo
+    log_info "Installing monorepo dependencies..."
     yarn install --immutable
-    
-    # Build the application
-    log_info "Building application..."
-    yarn build
-    
+
+    # Build the portal application using turbo
+    log_info "Building portal application..."
+    yarn turbo build --filter=@dangerprep/portal
+
     log_success "Portal application built successfully"
 }
 
@@ -258,6 +280,14 @@ install_portal_service() {
         install_yarn
     else
         log_success "Yarn requirement satisfied"
+    fi
+
+    # Check and install Turbo
+    if ! check_turbo; then
+        log_info "Turbo not found, installing..."
+        install_turbo
+    else
+        log_success "Turbo requirement satisfied"
     fi
     
     # Build portal
