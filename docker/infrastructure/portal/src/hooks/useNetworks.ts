@@ -32,6 +32,19 @@ export interface EthernetInterface extends BaseNetworkInterface {
 }
 
 /**
+ * Connected client information for WiFi hotspots
+ */
+export interface ConnectedClient {
+  macAddress: string;
+  ipAddress?: string;
+  hostname?: string;
+  signalStrength?: number; // dBm
+  connectedTime?: string; // duration or timestamp
+  txRate?: string;
+  rxRate?: string;
+}
+
+/**
  * WiFi interface information
  */
 export interface WiFiInterface extends BaseNetworkInterface {
@@ -42,7 +55,9 @@ export interface WiFiInterface extends BaseNetworkInterface {
   channel?: number;
   security?: string;
   mode?: 'managed' | 'ap' | 'monitor' | 'unknown';
-  connectedClients?: number;
+  password?: string; // For AP mode (hotspot) only
+  connectedClientsCount?: number; // For AP mode - number of connected clients
+  connectedClientsDetails?: ConnectedClient[]; // For AP mode - detailed client information
 }
 
 /**

@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { WifiConfigService } from './WifiConfigService';
 
 const execAsync = promisify(exec);
 
@@ -42,7 +43,9 @@ export interface WiFiInterface extends BaseNetworkInterface {
   channel?: number | undefined;
   security?: string | undefined; // e.g., "WPA2", "WPA3"
   mode?: 'managed' | 'ap' | 'monitor' | 'unknown' | undefined;
-  connectedClients?: number | undefined; // For AP mode
+  password?: string | undefined; // For AP mode (hotspot) only
+  connectedClientsCount?: number | undefined; // For AP mode - number of connected clients
+  connectedClientsDetails?: ConnectedClient[] | undefined; // For AP mode - detailed client information
 }
 
 /**
@@ -56,6 +59,19 @@ export interface TailscaleInterface extends BaseNetworkInterface {
   peers?: TailscalePeer[];
   exitNode?: boolean;
   routeAdvertising?: string[];
+}
+
+/**
+ * Connected client information for WiFi hotspots
+ */
+export interface ConnectedClient {
+  macAddress: string;
+  ipAddress?: string | undefined;
+  hostname?: string | undefined;
+  signalStrength?: number | undefined; // dBm
+  connectedTime?: string | undefined; // duration or timestamp
+  txRate?: string | undefined;
+  rxRate?: string | undefined;
 }
 
 /**
@@ -123,6 +139,64 @@ export class NetworkService {
   private readonly interfaceCache = new Map<string, NetworkInterface>();
   private readonly cacheTimeout = 30000; // 30 seconds
   private lastCacheUpdate = 0;
+  private readonly wifiConfigService = new WifiConfigService();
+
+  /**
+   * Parse connected clients from iw station dump output
+   */
+  private parseConnectedClients(stationDumpOutput: string): ConnectedClient[] {
+    const clients: ConnectedClient[] = [];
+    const stations = stationDumpOutput.split('Station ').filter(section => section.trim());
+
+    for (const station of stations) {
+      const lines = station.split('\n');
+      if (lines.length === 0) continue;
+
+      // Extract MAC address from first line
+      const macMatch = lines[0]?.match(/([a-f0-9:]{17})/);
+      if (!macMatch || !macMatch[1]) continue;
+
+      const client: ConnectedClient = {
+        macAddress: macMatch[1],
+      };
+
+      // Parse additional information from subsequent lines
+      for (const line of lines) {
+        const trimmed = line.trim();
+
+        // Signal strength
+        const signalMatch = trimmed.match(/signal:\s*(-?\d+)\s*dBm/);
+        if (signalMatch && signalMatch[1]) {
+          client.signalStrength = parseInt(signalMatch[1]);
+        }
+
+        // TX bitrate
+        const txMatch = trimmed.match(/tx bitrate:\s*([\d.]+\s*\w+)/);
+        if (txMatch) {
+          client.txRate = txMatch[1];
+        }
+
+        // RX bitrate
+        const rxMatch = trimmed.match(/rx bitrate:\s*([\d.]+\s*\w+)/);
+        if (rxMatch) {
+          client.rxRate = rxMatch[1];
+        }
+
+        // Connected time (inactive time can give us an idea)
+        const inactiveMatch = trimmed.match(/inactive time:\s*(\d+)\s*ms/);
+        if (inactiveMatch && inactiveMatch[1]) {
+          const inactiveMs = parseInt(inactiveMatch[1]);
+          if (inactiveMs < 60000) { // Less than 1 minute inactive
+            client.connectedTime = `${Math.floor(inactiveMs / 1000)}s ago`;
+          }
+        }
+      }
+
+      clients.push(client);
+    }
+
+    return clients;
+  }
 
   /**
    * Get all network interfaces
@@ -723,10 +797,11 @@ export class NetworkService {
    * Get WiFi-specific information
    */
   private async getWiFiInterfaceInfo(name: string, baseInfo: Omit<BaseNetworkInterface, 'type'>): Promise<WiFiInterface> {
-    const [iwConfigResult, iwInfoResult, clientsResult] = await Promise.allSettled([
+    const [iwConfigResult, iwInfoResult, clientsCountResult, clientsDetailResult] = await Promise.allSettled([
       execAsync(`iwconfig ${name} 2>/dev/null`),
       execAsync(`iw dev ${name} info 2>/dev/null`),
       execAsync(`iw dev ${name} station dump 2>/dev/null | grep Station | wc -l`),
+      execAsync(`iw dev ${name} station dump 2>/dev/null`),
     ]);
 
     const wifiInfo: WiFiInterface = {
@@ -778,11 +853,22 @@ export class NetworkService {
       }
     }
 
-    // Connected clients (for AP mode)
-    if (clientsResult.status === 'fulfilled') {
-      const clientCount = parseInt(clientsResult.value.stdout.trim());
-      if (!isNaN(clientCount)) {
-        wifiInfo.connectedClients = clientCount;
+    // Connected clients (for AP mode only)
+    if (wifiInfo.mode === 'ap') {
+      // Get client count
+      if (clientsCountResult.status === 'fulfilled') {
+        const clientCount = parseInt(clientsCountResult.value.stdout.trim());
+        if (!isNaN(clientCount)) {
+          wifiInfo.connectedClientsCount = clientCount;
+        }
+      }
+
+      // Get detailed client information
+      if (clientsDetailResult.status === 'fulfilled') {
+        const clientDetails = this.parseConnectedClients(clientsDetailResult.value.stdout);
+        if (clientDetails.length > 0) {
+          wifiInfo.connectedClientsDetails = clientDetails;
+        }
       }
     }
 
@@ -835,7 +921,8 @@ export class NetworkService {
    * Add hotspot-specific information to WiFi interface
    */
   private async addHotspotInfoToWiFi(wifiInfo: WiFiInterface): Promise<WiFiInterface> {
-    if (wifiInfo.purpose !== 'wlan') {
+    // Only add hotspot info for AP mode interfaces with wlan purpose
+    if (wifiInfo.purpose !== 'wlan' || wifiInfo.mode !== 'ap') {
       return wifiInfo;
     }
 
@@ -843,8 +930,16 @@ export class NetworkService {
       const hostapdInfo = await this.getHostapdInfo();
       const hostapdConfig = hostapdInfo.config;
 
+      // Get WiFi configuration including password
+      const wifiConfig = this.wifiConfigService.getWifiConfig();
+
       // Add hotspot-specific properties
       const hotspotWifi = { ...wifiInfo };
+
+      // Add password for hotspot
+      if (wifiConfig.password) {
+        hotspotWifi.password = wifiConfig.password;
+      }
 
       // Use actual runtime values if available, otherwise fall back to config
       if (hostapdInfo.isRunning && hostapdInfo.activeInterface === wifiInfo.name) {
@@ -854,7 +949,7 @@ export class NetworkService {
         }
 
         if (hostapdInfo.connectedClients !== undefined) {
-          hotspotWifi.connectedClients = hostapdInfo.connectedClients;
+          hotspotWifi.connectedClientsCount = hostapdInfo.connectedClients;
         }
 
         if (hostapdInfo.runtimeInfo) {

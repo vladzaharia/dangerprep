@@ -158,6 +158,35 @@ function NetworkInterfaceCard({ interface: networkInterface }: { interface: Netw
             )}
           </>
         )}
+
+        {networkInterface.type === 'wifi' && 'mode' in networkInterface && networkInterface.mode === 'ap' && (
+          <>
+            {'ssid' in networkInterface && networkInterface.ssid && (
+              <div><strong>SSID:</strong> {networkInterface.ssid}</div>
+            )}
+            {'connectedClientsCount' in networkInterface && networkInterface.connectedClientsCount !== undefined && (
+              <div><strong>Connected Clients:</strong> {networkInterface.connectedClientsCount}</div>
+            )}
+            {'connectedClientsDetails' in networkInterface && networkInterface.connectedClientsDetails && networkInterface.connectedClientsDetails.length > 0 && (
+              <div className="mt-2">
+                <strong>Client Details:</strong>
+                <div className="ml-2 text-xs space-y-1">
+                  {networkInterface.connectedClientsDetails.map((client, index) => (
+                    <div key={client.macAddress || index} className="border-l-2 border-gray-200 pl-2">
+                      <div><strong>MAC:</strong> {client.macAddress}</div>
+                      {client.signalStrength && (
+                        <div><strong>Signal:</strong> {client.signalStrength} dBm</div>
+                      )}
+                      {client.txRate && (
+                        <div><strong>TX Rate:</strong> {client.txRate}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
         
         {networkInterface.type === 'tailscale' && 'status' in networkInterface && (
           <>

@@ -50,8 +50,8 @@ function QRCodeContent() {
   const hotspotInterface = useWifi();
 
   // Extract SSID and password from hotspot interface
-  const ssid = (hotspotInterface as any)?.ssid || 'DangerPrep';
-  const password = (hotspotInterface as any)?.password || 'change_me';
+  const ssid = hotspotInterface?.ssid || 'DangerPrep';
+  const password = hotspotInterface?.password || 'change_me';
 
   // Generate WiFi QR code string
   const wifiQRString = useMemo(() => {
