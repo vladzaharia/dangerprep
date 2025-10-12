@@ -22,7 +22,7 @@
 set -euo pipefail
 
 # Script configuration
-readonly SCRIPT_NAME="dp-portal-service"
+readonly PORTAL_SCRIPT_NAME="dp-portal-service"
 readonly SCRIPT_VERSION="1.0.0"
 readonly SERVICE_NAME="dangerprep-portal"
 
@@ -49,7 +49,7 @@ for util_file in "$SHARED_DIR"/*.sh; do
 done
 
 # Initialize logging
-init_logging "$SCRIPT_NAME"
+init_logging "$PORTAL_SCRIPT_NAME"
 
 # Function to show help
 show_help() {
@@ -57,7 +57,7 @@ show_help() {
 DangerPrep Portal System Service Manager
 
 USAGE:
-    $SCRIPT_NAME [OPTIONS] [COMMAND]
+    $PORTAL_SCRIPT_NAME [OPTIONS] [COMMAND]
 
 COMMANDS:
     install      Install portal as system service
@@ -74,9 +74,9 @@ OPTIONS:
     --force          Force installation even if already installed
 
 EXAMPLES:
-    $SCRIPT_NAME install
-    $SCRIPT_NAME status
-    $SCRIPT_NAME restart
+    $PORTAL_SCRIPT_NAME install
+    $PORTAL_SCRIPT_NAME status
+    $PORTAL_SCRIPT_NAME restart
 
 EOF
 }
