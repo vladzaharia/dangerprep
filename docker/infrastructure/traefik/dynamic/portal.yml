@@ -1,0 +1,66 @@
+# =============================================================================
+# DangerPrep Portal - Dynamic Traefik Configuration
+# =============================================================================
+# Routes portal.X domains to the system-running portal service on localhost:3000
+# Supports multiple domain patterns: argos.surf, danger.diy, danger
+# =============================================================================
+
+http:
+  routers:
+    # Portal - argos.surf domain (external with Let's Encrypt)
+    portal-argos:
+      rule: "Host(`portal.argos.surf`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt-cloudflare
+      service: portal-service
+      priority: 100
+
+    # Portal - danger.diy domain (external with Let's Encrypt)  
+    portal-danger-diy:
+      rule: "Host(`portal.danger.diy`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt-cloudflare
+      service: portal-service
+      priority: 100
+
+    # Portal - danger domain (internal with step-ca)
+    portal-danger:
+      rule: "Host(`portal.danger`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: step-ca
+      service: portal-service
+      priority: 100
+
+    # Portal - HTTP to HTTPS redirect for all domains
+    portal-redirect:
+      rule: "Host(`portal.argos.surf`) || Host(`portal.danger.diy`) || Host(`portal.danger`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+      service: portal-service
+      priority: 90
+
+  services:
+    # Portal service running on host machine
+    portal-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3000"
+        healthCheck:
+          path: "/api/health"
+          interval: "30s"
+          timeout: "10s"
+
+  middlewares:
+    # HTTPS redirect middleware
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
