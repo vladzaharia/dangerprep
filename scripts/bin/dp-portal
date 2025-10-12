@@ -160,7 +160,8 @@ check_turbo() {
 # Install turbo globally
 install_turbo() {
     log_info "Installing Turbo..."
-    yarn global add turbo@^2
+    # Use npm to install turbo globally since yarn global is deprecated
+    npm install -g turbo@^2
     log_success "Turbo installed successfully"
 }
 
