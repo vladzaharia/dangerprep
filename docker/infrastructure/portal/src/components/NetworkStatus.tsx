@@ -5,8 +5,62 @@ import {
   useInternetInterface,
   useTailscaleInterface,
   useNetworkSummaryWithLoading,
-  type NetworkInterface
+  type NetworkInterface,
+  type ConnectedClient
 } from '../hooks/useNetworks';
+import {
+  useNetworkWorker,
+  useHotspotFromWorker,
+  useInternetFromWorker,
+  useTailscaleFromWorker
+} from '../hooks/useNetworkWorker';
+
+/**
+ * Component to display connected client details
+ */
+function ConnectedClientCard({ client }: { client: ConnectedClient }) {
+  return (
+    <div className="border border-gray-200 rounded p-2 bg-gray-50">
+      <div className="text-xs space-y-1">
+        <div className="font-mono">
+          <strong>MAC:</strong> {client.macAddress}
+        </div>
+        {client.ipAddress && (
+          <div>
+            <strong>IP:</strong> {client.ipAddress}
+          </div>
+        )}
+        {client.hostname && (
+          <div>
+            <strong>Hostname:</strong> {client.hostname}
+          </div>
+        )}
+        {client.signalStrength && (
+          <div>
+            <strong>Signal:</strong> {client.signalStrength} dBm
+          </div>
+        )}
+        <div className="flex gap-2">
+          {client.txRate && (
+            <div>
+              <strong>TX:</strong> {client.txRate}
+            </div>
+          )}
+          {client.rxRate && (
+            <div>
+              <strong>RX:</strong> {client.rxRate}
+            </div>
+          )}
+        </div>
+        {client.connectedTime && (
+          <div className="text-gray-500">
+            <strong>Last seen:</strong> {client.connectedTime}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Loading skeleton for network summary section
@@ -168,19 +222,11 @@ function NetworkInterfaceCard({ interface: networkInterface }: { interface: Netw
               <div><strong>Connected Clients:</strong> {networkInterface.connectedClientsCount}</div>
             )}
             {'connectedClientsDetails' in networkInterface && networkInterface.connectedClientsDetails && networkInterface.connectedClientsDetails.length > 0 && (
-              <div className="mt-2">
-                <strong>Client Details:</strong>
-                <div className="ml-2 text-xs space-y-1">
+              <div className="mt-3">
+                <strong className="block mb-2">Client Details:</strong>
+                <div className="space-y-2">
                   {networkInterface.connectedClientsDetails.map((client, index) => (
-                    <div key={client.macAddress || index} className="border-l-2 border-gray-200 pl-2">
-                      <div><strong>MAC:</strong> {client.macAddress}</div>
-                      {client.signalStrength && (
-                        <div><strong>Signal:</strong> {client.signalStrength} dBm</div>
-                      )}
-                      {client.txRate && (
-                        <div><strong>TX Rate:</strong> {client.txRate}</div>
-                      )}
-                    </div>
+                    <ConnectedClientCard key={client.macAddress || index} client={client} />
                   ))}
                 </div>
               </div>
@@ -358,9 +404,173 @@ function SpecialNetworkInterfaces() {
 }
 
 /**
+ * Network status component with real-time updates via Web Worker
+ */
+export function NetworkStatusWithWorker({
+  pollInterval = 5000,
+  detailed = false
+}: {
+  pollInterval?: number;
+  detailed?: boolean;
+}) {
+  const worker = useNetworkWorker({ pollInterval, detailed, autoStart: true });
+  const hotspot = useHotspotFromWorker(worker.data);
+  const internet = useInternetFromWorker(worker.data);
+  const tailscale = useTailscaleFromWorker(worker.data);
+
+  if (worker.loading && !worker.data) {
+    return (
+      <div className="space-y-6">
+        <NetworkSummarySkeleton />
+        <SpecialNetworkInterfacesSkeleton />
+      </div>
+    );
+  }
+
+  if (worker.error && !worker.data) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <h3 className="text-red-800 font-semibold mb-2">Error Loading Network Data</h3>
+        <p className="text-red-600 text-sm">{worker.error}</p>
+        <button
+          onClick={worker.refresh}
+          className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!worker.data) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Real-time indicator */}
+      <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${worker.isPolling ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+          <span className="text-sm text-green-800">
+            {worker.isPolling ? 'Live Updates Active' : 'Updates Paused'}
+          </span>
+          {worker.lastUpdate && (
+            <span className="text-xs text-green-600">
+              Last update: {new Date(worker.lastUpdate).toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={worker.refresh}
+            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          >
+            Refresh Now
+          </button>
+          {worker.isPolling ? (
+            <button
+              onClick={worker.stop}
+              className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+            >
+              Pause
+            </button>
+          ) : (
+            <button
+              onClick={worker.start}
+              className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            >
+              Resume
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Network Summary */}
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h2 className="text-lg font-semibold mb-2">Network Summary</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div>
+            <strong>Total Interfaces:</strong> {worker.data.totalInterfaces}
+          </div>
+          <div>
+            <strong>Internet:</strong> {worker.data.internetInterface || 'None'}
+          </div>
+          <div>
+            <strong>Hotspot:</strong> {worker.data.hotspotInterface || 'None'}
+          </div>
+          <div>
+            <strong>Tailscale:</strong> {worker.data.tailscaleInterface || 'None'}
+          </div>
+        </div>
+      </div>
+
+      {/* Special Interfaces */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="border rounded-lg p-4">
+          <h3 className="font-semibold text-orange-600 mb-2">📡 Hotspot</h3>
+          {hotspot ? (
+            <NetworkInterfaceCard interface={hotspot} />
+          ) : (
+            <div className="text-gray-500 text-sm">No hotspot interface found</div>
+          )}
+        </div>
+
+        <div className="border rounded-lg p-4">
+          <h3 className="font-semibold text-green-600 mb-2">🌐 Internet</h3>
+          {internet ? (
+            <NetworkInterfaceCard interface={internet} />
+          ) : (
+            <div className="text-gray-500 text-sm">No internet interface found</div>
+          )}
+        </div>
+
+        <div className="border rounded-lg p-4">
+          <h3 className="font-semibold text-blue-600 mb-2">🔗 Tailscale</h3>
+          {tailscale ? (
+            <NetworkInterfaceCard interface={tailscale} />
+          ) : (
+            <div className="text-gray-500 text-sm">No Tailscale interface found</div>
+          )}
+        </div>
+      </div>
+
+      {/* All Interfaces */}
+      <div>
+        <h2 className="text-lg font-semibold mb-3">All Network Interfaces</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {worker.data.interfaces.map((networkInterface) => (
+            <NetworkInterfaceCard
+              key={networkInterface.name}
+              interface={networkInterface}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Main NetworkStatus component with Suspense support
  */
-export function NetworkStatus({ useSuspense = true }: { useSuspense?: boolean }) {
+export function NetworkStatus({
+  useSuspense = true,
+  useWorker = false,
+  pollInterval = 5000,
+  detailed = false
+}: {
+  useSuspense?: boolean;
+  useWorker?: boolean;
+  pollInterval?: number;
+  detailed?: boolean;
+}) {
+  // Use web worker for real-time updates
+  if (useWorker) {
+    return <NetworkStatusWithWorker pollInterval={pollInterval} detailed={detailed} />;
+  }
+
+  // Use Suspense-based approach
   if (useSuspense) {
     return (
       <div className="space-y-6">
@@ -375,6 +585,7 @@ export function NetworkStatus({ useSuspense = true }: { useSuspense?: boolean })
     );
   }
 
+  // Use traditional loading states
   return (
     <div className="space-y-6">
       <NetworkSummaryWithLoading />

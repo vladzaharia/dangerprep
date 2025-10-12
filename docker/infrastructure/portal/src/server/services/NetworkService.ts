@@ -142,11 +142,47 @@ export class NetworkService {
   private readonly wifiConfigService = new WifiConfigService();
 
   /**
+   * Get DHCP leases to map MAC addresses to IP addresses and hostnames
+   */
+  private async getDhcpLeases(): Promise<Map<string, { ip: string; hostname?: string }>> {
+    const leaseMap = new Map<string, { ip: string; hostname?: string }>();
+
+    try {
+      // Try to read dnsmasq leases file
+      const { stdout } = await execAsync('cat /var/lib/misc/dnsmasq.leases 2>/dev/null || cat /var/lib/dnsmasq/dnsmasq.leases 2>/dev/null || echo ""');
+
+      if (stdout.trim()) {
+        const lines = stdout.trim().split('\n');
+        for (const line of lines) {
+          // Format: timestamp mac ip hostname client-id
+          const parts = line.split(/\s+/);
+          if (parts.length >= 3) {
+            const mac = parts[1]?.toLowerCase();
+            const ip = parts[2];
+            const hostname = parts[3] !== '*' ? parts[3] : undefined;
+
+            if (mac && ip) {
+              leaseMap.set(mac, hostname ? { ip, hostname } : { ip });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[NetworkService] Could not read DHCP leases:', error);
+    }
+
+    return leaseMap;
+  }
+
+  /**
    * Parse connected clients from iw station dump output
    */
-  private parseConnectedClients(stationDumpOutput: string): ConnectedClient[] {
+  private async parseConnectedClients(stationDumpOutput: string): Promise<ConnectedClient[]> {
     const clients: ConnectedClient[] = [];
     const stations = stationDumpOutput.split('Station ').filter(section => section.trim());
+
+    // Get DHCP leases for IP/hostname mapping
+    const dhcpLeases = await this.getDhcpLeases();
 
     for (const station of stations) {
       const lines = station.split('\n');
@@ -156,9 +192,19 @@ export class NetworkService {
       const macMatch = lines[0]?.match(/([a-f0-9:]{17})/);
       if (!macMatch || !macMatch[1]) continue;
 
+      const macAddress = macMatch[1];
       const client: ConnectedClient = {
-        macAddress: macMatch[1],
+        macAddress,
       };
+
+      // Try to get IP and hostname from DHCP leases
+      const lease = dhcpLeases.get(macAddress.toLowerCase());
+      if (lease) {
+        client.ipAddress = lease.ip;
+        if (lease.hostname) {
+          client.hostname = lease.hostname;
+        }
+      }
 
       // Parse additional information from subsequent lines
       for (const line of lines) {
@@ -865,7 +911,7 @@ export class NetworkService {
 
       // Get detailed client information
       if (clientsDetailResult.status === 'fulfilled') {
-        const clientDetails = this.parseConnectedClients(clientsDetailResult.value.stdout);
+        const clientDetails = await this.parseConnectedClients(clientsDetailResult.value.stdout);
         if (clientDetails.length > 0) {
           wifiInfo.connectedClientsDetails = clientDetails;
         }

@@ -1,5 +1,5 @@
-import React, { useMemo, Suspense } from 'react';
-import { useWifi } from '../hooks/useNetworks';
+import React, { useMemo } from 'react';
+import { useNetworkWorker, useHotspotFromWorker } from '../hooks/useNetworkWorker';
 
 /**
  * Loading skeleton for QR code section using Web Awesome components
@@ -43,15 +43,22 @@ function QRCodeSkeleton() {
 }
 
 /**
- * QR Code content component (wrapped in Suspense)
+ * QR Code content component with real-time updates
  */
 function QRCodeContent() {
-  // Use modern Suspense-compatible hook to get hotspot interface
-  const hotspotInterface = useWifi();
+  // Use worker for real-time network updates
+  const network = useNetworkWorker({
+    pollInterval: 5000,
+    detailed: false,
+    autoStart: true
+  });
+
+  const hotspotInterface = useHotspotFromWorker(network.data);
 
   // Extract SSID and password from hotspot interface
   const ssid = hotspotInterface?.ssid || 'DangerPrep';
   const password = hotspotInterface?.password || 'change_me';
+  const connectedClients = hotspotInterface?.connectedClientsCount || 0;
 
   // Generate WiFi QR code string
   const wifiQRString = useMemo(() => {
@@ -61,8 +68,26 @@ function QRCodeContent() {
     return `WIFI:T:WPA;S:${escapedSSID};P:${escapedPassword};H:false;;`;
   }, [ssid, password]);
 
+  // Show loading state while fetching initial data
+  if (network.loading && !network.data) {
+    return <QRCodeSkeleton />;
+  }
+
   return (
     <div className="wifi-connection-container">
+      {/* Real-time update indicator */}
+      {network.isPolling && (
+        <div className="flex items-center gap-2 mb-4 text-sm text-green-600">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <span>Live updates active</span>
+          {network.lastUpdate && (
+            <span className="text-xs text-gray-500">
+              Updated: {new Date(network.lastUpdate).toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Connection Details and QR Code Side by Side */}
       <div className="wifi-connection-content">
         {/* Left Side - Connection Details */}
@@ -74,6 +99,10 @@ function QRCodeContent() {
           <div className="wifi-detail-item">
             <span className="wifi-detail-label">Password:</span>
             <span className="wifi-detail-value">{password}</span>
+          </div>
+          <div className="wifi-detail-item">
+            <span className="wifi-detail-label">Connected Devices:</span>
+            <span className="wifi-detail-value">{connectedClients}</span>
           </div>
         </div>
 
@@ -98,12 +127,8 @@ function QRCodeContent() {
 }
 
 /**
- * Modern QR Code Section component using React 19 Suspense patterns
+ * QR Code Section component with real-time updates via Web Worker
  */
 export const QRCodeSection: React.FC = () => {
-  return (
-    <Suspense fallback={<QRCodeSkeleton />}>
-      <QRCodeContent />
-    </Suspense>
-  );
+  return <QRCodeContent />;
 };

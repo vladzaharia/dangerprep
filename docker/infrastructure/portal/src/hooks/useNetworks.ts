@@ -10,7 +10,8 @@ const useHook = (React as any).use || ((promise: Promise<any>) => {
  */
 export interface BaseNetworkInterface {
   name: string;
-  type: 'ethernet' | 'wifi' | 'tailscale' | 'hotspot' | 'loopback' | 'unknown';
+  type: 'ethernet' | 'wifi' | 'tailscale' | 'bridge' | 'virtual' | 'hotspot' | 'loopback' | 'unknown';
+  purpose: 'wan' | 'lan' | 'wlan' | 'docker' | 'loopback' | 'unknown';
   state: 'up' | 'down' | 'unknown';
   ipAddress?: string;
   gateway?: string;
