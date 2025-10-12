@@ -169,26 +169,49 @@ install_turbo() {
 build_portal() {
     log_info "Building portal application..."
 
-    if [[ ! -d "$INSTALL_ROOT" ]]; then
-        log_error "DangerPrep installation directory not found: $INSTALL_ROOT"
-        return 1
-    fi
-
-    if [[ ! -d "$PORTAL_DIR" ]]; then
+    # Use the current working directory if we're already in the portal directory
+    local build_dir
+    if [[ "$(basename "$PWD")" == "portal" && -f "package.json" ]]; then
+        build_dir="$PWD"
+        log_info "Using current directory for build: $build_dir"
+    elif [[ -d "$PORTAL_DIR" ]]; then
+        build_dir="$PORTAL_DIR"
+        log_info "Using portal directory: $build_dir"
+    else
         log_error "Portal directory not found: $PORTAL_DIR"
         return 1
     fi
 
-    # Build from the monorepo root to handle workspace dependencies
-    cd "$INSTALL_ROOT"
+    cd "$build_dir"
 
-    # Install dependencies for the entire monorepo
-    log_info "Installing monorepo dependencies..."
-    yarn install --immutable
+    # Check if we're in a monorepo context (has workspace dependencies)
+    if grep -q '"workspace:\*"' package.json 2>/dev/null; then
+        log_info "Detected monorepo workspace dependencies"
+        # Find the monorepo root
+        local monorepo_root="$build_dir"
+        while [[ "$monorepo_root" != "/" ]]; do
+            if [[ -f "$monorepo_root/turbo.json" ]]; then
+                break
+            fi
+            monorepo_root="$(dirname "$monorepo_root")"
+        done
 
-    # Build the portal application using turbo
-    log_info "Building portal application..."
-    yarn turbo build --filter=@dangerprep/portal
+        if [[ -f "$monorepo_root/turbo.json" ]]; then
+            log_info "Building from monorepo root: $monorepo_root"
+            cd "$monorepo_root"
+            yarn install --immutable
+            yarn turbo build --filter=@dangerprep/portal
+        else
+            log_error "Could not find monorepo root with turbo.json"
+            return 1
+        fi
+    else
+        log_info "Building standalone portal application"
+        # Install dependencies directly
+        yarn install --immutable
+        # Build the application
+        yarn build
+    fi
 
     log_success "Portal application built successfully"
 }
