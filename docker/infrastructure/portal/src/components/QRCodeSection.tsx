@@ -56,9 +56,16 @@ function QRCodeContent() {
   const hotspotInterface = useHotspotFromWorker(network.data);
 
   // Extract SSID and password from hotspot interface
-  const ssid = hotspotInterface?.ssid || 'DangerPrep';
-  const password = hotspotInterface?.password || 'change_me';
-  const connectedClients = hotspotInterface?.connectedClientsCount || 0;
+  // Type guard to ensure we have a WiFi interface with the required properties
+  const ssid = (hotspotInterface?.type === 'wifi' && 'ssid' in hotspotInterface)
+    ? hotspotInterface.ssid || 'DangerPrep'
+    : 'DangerPrep';
+  const password = (hotspotInterface?.type === 'wifi' && 'password' in hotspotInterface)
+    ? hotspotInterface.password || 'change_me'
+    : 'change_me';
+  const connectedClients = (hotspotInterface?.type === 'wifi' && 'connectedClientsCount' in hotspotInterface)
+    ? hotspotInterface.connectedClientsCount || 0
+    : 0;
 
   // Generate WiFi QR code string
   const wifiQRString = useMemo(() => {

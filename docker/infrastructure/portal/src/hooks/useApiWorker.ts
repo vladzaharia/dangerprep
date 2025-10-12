@@ -190,9 +190,9 @@ export function useApiWorker<T = any>(
     if (workerRef.current) {
       const message: WorkerInboundMessage = {
         type: 'config',
-        endpoint: newOptions.endpoint,
-        pollInterval: newOptions.pollInterval,
-        queryParams: newOptions.queryParams,
+        ...(newOptions.endpoint !== undefined && { endpoint: newOptions.endpoint }),
+        ...(newOptions.pollInterval !== undefined && { pollInterval: newOptions.pollInterval }),
+        ...(newOptions.queryParams !== undefined && { queryParams: newOptions.queryParams }),
       };
       workerRef.current.postMessage(message);
     }
