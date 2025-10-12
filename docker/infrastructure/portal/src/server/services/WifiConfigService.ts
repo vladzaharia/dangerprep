@@ -64,26 +64,29 @@ export class WifiConfigService {
     // Try to read from hostapd configuration first
     const hostapdConfig = this.readHostapdConfig();
 
-    let ssid: string;
-    let password: string;
+    // Use intelligent fallback: prefer hostapd values, fall back to environment, then defaults
+    const ssid = hostapdConfig.ssid || process.env.WIFI_SSID || 'DangerPrep';
+    const password = hostapdConfig.password || process.env.WIFI_PASSWORD || 'change_me';
+
+    // Determine source based on where the values actually came from
     let source: 'hostapd' | 'environment' | 'default';
 
     if (hostapdConfig.ssid && hostapdConfig.password) {
-      // Both values from hostapd
-      ssid = hostapdConfig.ssid;
-      password = hostapdConfig.password;
+      // Both values successfully read from hostapd
       source = 'hostapd';
+    } else if ((hostapdConfig.ssid || hostapdConfig.password) && (process.env.WIFI_SSID || process.env.WIFI_PASSWORD)) {
+      // Mixed sources: some from hostapd, some from environment
+      source = 'environment';
     } else if (process.env.WIFI_SSID || process.env.WIFI_PASSWORD) {
-      // At least one value from environment
-      ssid = hostapdConfig.ssid || process.env.WIFI_SSID || 'DangerPrep';
-      password = hostapdConfig.password || process.env.WIFI_PASSWORD || 'change_me';
+      // Values from environment variables
       source = 'environment';
     } else {
-      // Using defaults
-      ssid = hostapdConfig.ssid || 'DangerPrep';
-      password = hostapdConfig.password || 'change_me';
+      // Using default values
       source = 'default';
     }
+
+    console.log(`[WifiConfigService] Final config - SSID: ${ssid}, Password: ${password ? '[REDACTED]' : 'missing'}, Source: ${source}`);
+    console.log(`[WifiConfigService] Environment variables - WIFI_SSID: ${process.env.WIFI_SSID ? 'present' : 'missing'}, WIFI_PASSWORD: ${process.env.WIFI_PASSWORD ? 'present' : 'missing'}`);
 
     return { ssid, password, source };
   }
@@ -109,15 +112,17 @@ export class WifiConfigService {
         config.password = passwordMatch[1].trim();
       }
 
+      console.log(`[WifiConfigService] Read hostapd config: SSID=${config.ssid ? 'present' : 'missing'}, Password=${config.password ? 'present' : 'missing'}`);
       return config;
     } catch (error) {
       // Silently handle missing hostapd configuration - this is expected in development
       if (error instanceof Error && error.message.includes('ENOENT')) {
         // File doesn't exist, which is normal in development environments
+        console.log(`[WifiConfigService] Hostapd config file not found: ${this.hostapdPath}`);
         return {};
       }
       // Log other errors that might indicate real issues
-      console.warn('Could not read hostapd configuration:', error);
+      console.warn(`[WifiConfigService] Could not read hostapd configuration from ${this.hostapdPath}:`, error);
       return {};
     }
   }
