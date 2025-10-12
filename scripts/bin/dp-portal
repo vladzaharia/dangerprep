@@ -219,7 +219,25 @@ build_portal() {
 # Create systemd service file
 create_service_file() {
     log_info "Creating systemd service file..."
-    
+
+    # Use the current working directory if we're in the portal directory
+    local actual_portal_dir
+    if [[ "$(basename "$PWD")" == "portal" && -f "package.json" ]]; then
+        actual_portal_dir="$PWD"
+        log_info "Using current directory for service: $actual_portal_dir"
+    else
+        actual_portal_dir="$PORTAL_DIR"
+        log_info "Using configured portal directory: $actual_portal_dir"
+    fi
+
+    # Check for environment file in the actual directory
+    local actual_env_file
+    if [[ -f "$actual_portal_dir/compose.env" ]]; then
+        actual_env_file="$actual_portal_dir/compose.env"
+    else
+        actual_env_file="$ENV_FILE"
+    fi
+
     local service_content
     read -r -d '' service_content << 'EOF' || true
 [Unit]
@@ -235,7 +253,7 @@ User=root
 Group=root
 WorkingDirectory={{PORTAL_DIR}}
 Environment=NODE_ENV=production
-EnvironmentFile={{ENV_FILE}}
+EnvironmentFile=-{{ENV_FILE}}
 ExecStart=/usr/bin/yarn start
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
@@ -264,18 +282,20 @@ SyslogIdentifier=dangerprep-portal
 WantedBy=multi-user.target
 EOF
 
-    # Replace template variables
-    service_content="${service_content//\{\{PORTAL_DIR\}\}/$PORTAL_DIR}"
-    service_content="${service_content//\{\{ENV_FILE\}\}/$ENV_FILE}"
-    
+    # Replace template variables with actual paths
+    service_content="${service_content//\{\{PORTAL_DIR\}\}/$actual_portal_dir}"
+    service_content="${service_content//\{\{ENV_FILE\}\}/$actual_env_file}"
+
     # Write service file
     echo "$service_content" > "$SERVICE_FILE"
     chmod 644 "$SERVICE_FILE"
-    
+
     # Reload systemd
     systemctl daemon-reload
-    
+
     log_success "Service file created: $SERVICE_FILE"
+    log_info "Working directory: $actual_portal_dir"
+    log_info "Environment file: $actual_env_file"
 }
 
 # Install portal service
