@@ -26,7 +26,7 @@ readonly PORTAL_SCRIPT_NAME="dp-portal"
 readonly SERVICE_NAME="dangerprep-portal"
 
 # Paths
-readonly INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-/opt/dangerprep}"
+readonly INSTALL_ROOT="${DANGERPREP_INSTALL_ROOT:-/dangerprep}"
 readonly PORTAL_DIR="$INSTALL_ROOT/docker/infrastructure/portal"
 readonly SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 readonly ENV_FILE="$PORTAL_DIR/compose.env"
