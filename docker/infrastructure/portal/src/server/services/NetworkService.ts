@@ -921,8 +921,15 @@ export class NetworkService {
    * Add hotspot-specific information to WiFi interface
    */
   private async addHotspotInfoToWiFi(wifiInfo: WiFiInterface): Promise<WiFiInterface> {
-    // Only add hotspot info for AP mode interfaces with wlan purpose
-    if (wifiInfo.purpose !== 'wlan' || wifiInfo.mode !== 'ap') {
+    // Add hotspot info for interfaces that are either:
+    // 1. Configured as hotspot in hostapd (purpose === 'wlan')
+    // 2. Running in AP mode (mode === 'ap')
+    // This is more lenient to handle cases where mode detection might fail
+    const isHotspot = wifiInfo.purpose === 'wlan' || wifiInfo.mode === 'ap';
+
+    console.log(`[NetworkService] addHotspotInfoToWiFi for ${wifiInfo.name}: purpose=${wifiInfo.purpose}, mode=${wifiInfo.mode}, isHotspot=${isHotspot}`);
+
+    if (!isHotspot) {
       return wifiInfo;
     }
 
@@ -932,6 +939,7 @@ export class NetworkService {
 
       // Get WiFi configuration including password
       const wifiConfig = this.wifiConfigService.getWifiConfig();
+      console.log(`[NetworkService] Retrieved WiFi config for ${wifiInfo.name}: SSID=${wifiConfig.ssid}, Password=${wifiConfig.password ? '[REDACTED]' : 'missing'}`);
 
       // Add hotspot-specific properties
       const hotspotWifi = { ...wifiInfo };
