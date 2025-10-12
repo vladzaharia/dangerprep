@@ -58,11 +58,11 @@ try {
     const serviceFiles = fs.readdirSync(servicesSrcDir);
     serviceFiles.forEach(file => {
       if (file.endsWith('.js')) {
+        let content = fs.readFileSync(path.join(servicesSrcDir, file), 'utf8');
+        // Fix service-to-service imports (e.g., ./WifiConfigService -> ./WifiConfigService.cjs)
+        content = content.replace(/require\("\.\/([^"]+)"\)/g, 'require("./$1.cjs")');
         const cjsFile = file.replace('.js', '.cjs');
-        fs.copyFileSync(
-          path.join(servicesSrcDir, file),
-          path.join(servicesDir, cjsFile)
-        );
+        fs.writeFileSync(path.join(servicesDir, cjsFile), content);
         console.log(`✅ Copied services/${cjsFile}`);
       }
     });
