@@ -37,7 +37,7 @@ export const ConnectionStatusButton: React.FC = () => {
   const connectedClients = hostapd.data?.connectedClients || 0;
 
   return (
-    <div className="qr-status-button">
+    <div className="connection-status-button">
       <wa-button
         appearance="plain"
         style={{
@@ -48,33 +48,19 @@ export const ConnectionStatusButton: React.FC = () => {
       >
         <FontAwesomeIcon
           icon={isConnected ? faUsers : faCircleExclamation}
-          size="lg"
+          size="xl"
         />
-        {isConnected && connectedClients > 0 && (
-          <wa-badge
-            variant="success"
-            attention="pulse"
-            style={{
-              position: 'absolute',
-              top: '-8px',
-              right: '-8px',
-            }}
-          >
-            {connectedClients}
-          </wa-badge>
-        )}
-        {!isConnected && (
-          <wa-badge
-            variant="danger"
-            style={{
-              position: 'absolute',
-              top: '-8px',
-              right: '-8px',
-            }}
-          >
-            !
-          </wa-badge>
-        )}
+        <wa-badge
+          variant={isConnected ? 'success' : 'danger'}
+          attention={isConnected && connectedClients > 0 ? 'pulse' : 'none'}
+          style={{
+            position: 'absolute',
+            top: '-8px',
+            right: '-8px',
+          }}
+        >
+          {isConnected ? connectedClients : '!'}
+        </wa-badge>
       </wa-button>
     </div>
   );

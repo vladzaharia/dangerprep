@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQrcode, faGrip, faCog, faPowerOff } from '@fortawesome/free-solid-svg-icons';
+import { ConnectionStatusButton } from './ConnectionStatusButton';
 
 interface NavItem {
   path: string;
@@ -64,6 +65,7 @@ export const Navigation: React.FC = () => {
               </wa-button>
             </NavLink>
           ))}
+          <ConnectionStatusButton />
         </div>
       )}
     </div>

@@ -33,12 +33,26 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   padding-top: var(--wa-space-l);
   padding-bottom: var(--wa-space-l);
 }
 
 .app-navigation-list {
   gap: var(--wa-space-xl);
+}
+
+.app-navigation-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-xl);
+  align-items: center;
+}
+
+.connection-status-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Main content area - Raised layer */
@@ -66,7 +80,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
 }
 
 .wifi-connection-container {
@@ -76,14 +89,6 @@ body {
   gap: var(--wa-space-xl);
   max-width: 600px;
   width: 100%;
-  position: relative;
-}
-
-.qr-status-button {
-  position: absolute;
-  top: var(--wa-space-l);
-  right: var(--wa-space-l);
-  z-index: 10;
 }
 
 .wifi-connection-content {
