@@ -29,15 +29,14 @@ export interface ApiWorkerControls {
 /**
  * Generic hook to manage API data fetching via Web Worker
  * Provides real-time API updates in the background
- * 
+ *
  * @example
  * // Fetch network data
  * const network = useApiWorker<NetworkSummary>({
  *   endpoint: '/api/networks',
- *   queryParams: { detailed: 'true' },
  *   pollInterval: 5000
  * });
- * 
+ *
  * @example
  * // Fetch services data
  * const services = useApiWorker<Service[]>({

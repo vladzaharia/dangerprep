@@ -407,13 +407,11 @@ function SpecialNetworkInterfaces() {
  * Network status component with real-time updates via Web Worker
  */
 export function NetworkStatusWithWorker({
-  pollInterval = 5000,
-  detailed = false
+  pollInterval = 5000
 }: {
   pollInterval?: number;
-  detailed?: boolean;
 }) {
-  const worker = useNetworkWorker({ pollInterval, detailed, autoStart: true });
+  const worker = useNetworkWorker({ pollInterval, autoStart: true });
   const hotspot = useHotspotFromWorker(worker.data);
   const internet = useInternetFromWorker(worker.data);
   const tailscale = useTailscaleFromWorker(worker.data);
@@ -557,17 +555,15 @@ export function NetworkStatusWithWorker({
 export function NetworkStatus({
   useSuspense = true,
   useWorker = false,
-  pollInterval = 5000,
-  detailed = false
+  pollInterval = 5000
 }: {
   useSuspense?: boolean;
   useWorker?: boolean;
   pollInterval?: number;
-  detailed?: boolean;
 }) {
   // Use web worker for real-time updates
   if (useWorker) {
-    return <NetworkStatusWithWorker pollInterval={pollInterval} detailed={detailed} />;
+    return <NetworkStatusWithWorker pollInterval={pollInterval} />;
   }
 
   // Use Suspense-based approach

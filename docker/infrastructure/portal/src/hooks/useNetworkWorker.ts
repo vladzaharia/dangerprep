@@ -4,33 +4,31 @@ import type { NetworkSummary, NetworkInterface } from './useNetworks';
 
 export interface NetworkWorkerOptions {
   pollInterval?: number; // milliseconds, default: 5000
-  detailed?: boolean; // fetch detailed network info, default: false
   autoStart?: boolean; // auto-start polling on mount, default: true
 }
 
 /**
  * Hook to manage network data fetching via Web Worker
  * Provides real-time network updates in the background
- * 
+ *
  * This is a specialized wrapper around useApiWorker for network data
- * 
+ *
  * @example
- * const network = useNetworkWorker({ pollInterval: 5000, detailed: true });
+ * const network = useNetworkWorker({ pollInterval: 5000 });
  * const hotspot = useHotspotFromWorker(network.data);
  */
 export function useNetworkWorker(options: NetworkWorkerOptions = {}) {
   const {
     pollInterval = 5000,
-    detailed = false,
     autoStart = true,
   } = options;
 
   const apiOptions: ApiWorkerOptions = useMemo(() => ({
     endpoint: '/api/networks',
     pollInterval,
-    queryParams: detailed ? { detailed: 'true' } : {},
+    queryParams: {},
     autoStart,
-  }), [pollInterval, detailed, autoStart]);
+  }), [pollInterval, autoStart]);
 
   return useApiWorker<NetworkSummary>(apiOptions);
 }

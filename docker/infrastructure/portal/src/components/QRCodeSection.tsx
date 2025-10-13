@@ -49,7 +49,6 @@ function QRCodeContent() {
   // Use worker for real-time network updates
   const network = useNetworkWorker({
     pollInterval: 5000,
-    detailed: false,
     autoStart: true
   });
 
@@ -63,9 +62,6 @@ function QRCodeContent() {
   const password = (hotspotInterface?.type === 'wifi' && 'password' in hotspotInterface)
     ? hotspotInterface.password || 'change_me'
     : 'change_me';
-  const connectedClients = (hotspotInterface?.type === 'wifi' && 'connectedClientsCount' in hotspotInterface)
-    ? hotspotInterface.connectedClientsCount || 0
-    : 0;
 
   // Generate WiFi QR code string
   const wifiQRString = useMemo(() => {
@@ -106,10 +102,6 @@ function QRCodeContent() {
           <div className="wifi-detail-item">
             <span className="wifi-detail-label">Password:</span>
             <span className="wifi-detail-value">{password}</span>
-          </div>
-          <div className="wifi-detail-item">
-            <span className="wifi-detail-label">Connected Devices:</span>
-            <span className="wifi-detail-value">{connectedClients}</span>
           </div>
         </div>
 

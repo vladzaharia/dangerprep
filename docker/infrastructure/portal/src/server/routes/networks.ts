@@ -9,50 +9,25 @@ const networks = new Hono();
 
 /**
  * GET /api/networks
- * Get summary of all network interfaces
- * Query params:
- *   - detailed: Include detailed information for all interfaces (default: false)
+ * Get all network interfaces with full information
  */
 networks.get('/', async (c) => {
   const requestId = Math.random().toString(36).substring(7);
   console.log(`[NetworksRoute:${requestId}] GET /api/networks - Request started`);
 
   try {
-    const detailed = c.req.query('detailed') === 'true';
-    console.log(`[NetworksRoute:${requestId}] Query parameters: detailed=${detailed}`);
+    console.log(`[NetworksRoute:${requestId}] Fetching network summary`);
+    // Return network summary with special interface mappings
+    const summary = await networkService.getNetworkSummary();
+    console.log(`[NetworksRoute:${requestId}] Retrieved network summary with ${summary.totalInterfaces} interfaces`);
 
-    if (detailed) {
-      console.log(`[NetworksRoute:${requestId}] Fetching detailed interface information`);
-      // Return detailed information for all interfaces
-      const interfaces = await networkService.getAllInterfaces();
-      console.log(`[NetworksRoute:${requestId}] Retrieved ${interfaces.length} interfaces`);
-
-      return c.json({
-        success: true,
-        data: {
-          interfaces,
-          totalInterfaces: interfaces.length,
-        },
-        metadata: {
-          timestamp: new Date().toISOString(),
-          detailed: true,
-        },
-      });
-    } else {
-      console.log(`[NetworksRoute:${requestId}] Fetching network summary`);
-      // Return network summary with special interface mappings
-      const summary = await networkService.getNetworkSummary();
-      console.log(`[NetworksRoute:${requestId}] Retrieved network summary with ${summary.totalInterfaces} interfaces`);
-
-      return c.json({
-        success: true,
-        data: summary,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          detailed: false,
-        },
-      });
-    }
+    return c.json({
+      success: true,
+      data: summary,
+      metadata: {
+        timestamp: new Date().toISOString(),
+      },
+    });
   } catch (error) {
     console.error(`[NetworksRoute:${requestId}] Failed to get network interfaces:`, error);
     console.error(`[NetworksRoute:${requestId}] Error details:`, {

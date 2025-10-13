@@ -141,9 +141,8 @@ const networkCache = new Map<string, Promise<any>>();
 /**
  * Fetch network summary from API
  */
-async function fetchNetworkSummary(detailed: boolean = false): Promise<NetworkSummary> {
-  const url = detailed ? '/api/networks?detailed=true' : '/api/networks';
-  const response = await fetch(url);
+async function fetchNetworkSummary(): Promise<NetworkSummary> {
+  const response = await fetch('/api/networks');
 
   if (!response.ok) {
     throw new Error(`Failed to fetch network summary: ${response.status} ${response.statusText}`);
@@ -202,11 +201,11 @@ async function refreshNetworkCache(): Promise<void> {
 /**
  * Get cached network summary or create new fetch promise
  */
-function getCachedNetworkSummary(detailed: boolean = false): Promise<NetworkSummary> {
-  const cacheKey = detailed ? 'network-summary-detailed' : 'network-summary';
+function getCachedNetworkSummary(): Promise<NetworkSummary> {
+  const cacheKey = 'network-summary';
 
   if (!networkCache.has(cacheKey)) {
-    const promise = fetchNetworkSummary(detailed).catch((error) => {
+    const promise = fetchNetworkSummary().catch((error) => {
       // Remove failed promise from cache so it can be retried
       networkCache.delete(cacheKey);
       throw error;
@@ -240,8 +239,8 @@ function getCachedNetworkInterface(interfaceName: string): Promise<NetworkInterf
 /**
  * Hook for getting network summary with React 19 Suspense support
  */
-export function useNetworkSummary(detailed: boolean = false): NetworkSummary {
-  return useHook(getCachedNetworkSummary(detailed));
+export function useNetworkSummary(): NetworkSummary {
+  return useHook(getCachedNetworkSummary());
 }
 
 /**
@@ -296,7 +295,7 @@ export function useTailscaleInterface(): NetworkInterface | null {
 /**
  * Traditional hook for network summary with loading states (fallback for non-Suspense usage)
  */
-export function useNetworkSummaryWithLoading(detailed: boolean = false) {
+export function useNetworkSummaryWithLoading() {
   const [summary, setSummary] = useState<NetworkSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -305,12 +304,12 @@ export function useNetworkSummaryWithLoading(detailed: boolean = false) {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Clear cache and fetch fresh data
-      const cacheKey = detailed ? 'network-summary-detailed' : 'network-summary';
+      const cacheKey = 'network-summary';
       networkCache.delete(cacheKey);
-      
-      const data = await fetchNetworkSummary(detailed);
+
+      const data = await fetchNetworkSummary();
       setSummary(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -321,7 +320,7 @@ export function useNetworkSummaryWithLoading(detailed: boolean = false) {
 
   useEffect(() => {
     refresh();
-  }, [detailed]);
+  }, []);
 
   return {
     summary,
