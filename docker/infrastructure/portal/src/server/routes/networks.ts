@@ -186,9 +186,8 @@ networks.get('/:interface', async (c) => {
       logger.info('Returning WiFi interface data', {
         interfaceName,
         mode: wifiInterface.mode,
-        hasConnectedClientsDetails: !!wifiInterface.connectedClientsDetails,
-        connectedClientsCount: wifiInterface.connectedClientsCount,
-        clientDetailsCount: wifiInterface.connectedClientsDetails?.length || 0
+        hasConnectedClients: !!wifiInterface.connectedClients,
+        connectedClientsCount: wifiInterface.connectedClients?.length || 0
       });
     } else {
       logger.debug('Returning interface data', { interfaceName, type: networkInterface.type });

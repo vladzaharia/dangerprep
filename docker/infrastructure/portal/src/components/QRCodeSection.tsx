@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useNetworkWorker, useHotspotFromWorker } from '../hooks/useNetworkWorker';
+import { ConnectionStatusButton } from './ConnectionStatusButton';
 
 /**
  * Loading skeleton for QR code section using Web Awesome components
@@ -78,6 +79,9 @@ function QRCodeContent() {
 
   return (
     <div className="wifi-connection-container">
+      {/* Status Button with Badge - Top Right */}
+      <ConnectionStatusButton />
+
       {/* Real-time update indicator */}
       {network.isPolling && (
         <div className="flex items-center gap-2 mb-4 text-sm text-green-600">

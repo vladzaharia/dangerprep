@@ -66,6 +66,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .wifi-connection-container {
@@ -75,6 +76,14 @@ body {
   gap: var(--wa-space-xl);
   max-width: 600px;
   width: 100%;
+  position: relative;
+}
+
+.qr-status-button {
+  position: absolute;
+  top: var(--wa-space-l);
+  right: var(--wa-space-l);
+  z-index: 10;
 }
 
 .wifi-connection-content {

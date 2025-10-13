@@ -45,8 +45,7 @@ export interface WiFiInterface extends BaseNetworkInterface {
   security?: string | undefined; // e.g., "WPA2", "WPA3"
   mode?: 'managed' | 'ap' | 'monitor' | 'unknown' | undefined;
   password?: string | undefined; // For AP mode (hotspot) only
-  connectedClientsCount?: number | undefined; // For AP mode - number of connected clients
-  connectedClientsDetails?: ConnectedClient[] | undefined; // For AP mode - detailed client information
+  connectedClients?: ConnectedClient[] | undefined; // For AP mode - detailed client information
 }
 
 /**
@@ -1008,15 +1007,6 @@ export class NetworkService {
         reason: baseInfo.purpose === 'wlan' ? 'purpose=wlan' : 'mode=ap'
       });
 
-      // Get client count
-      if (clientsCountResult.status === 'fulfilled') {
-        const clientCount = parseInt(clientsCountResult.value.stdout.trim());
-        if (!isNaN(clientCount)) {
-          wifiInfo.connectedClientsCount = clientCount;
-          this.logger.info('Found connected clients', { name, clientCount });
-        }
-      }
-
       // Get detailed client information - always try to parse, even if empty
       if (clientsDetailResult.status === 'fulfilled') {
         this.logger.info('Parsing client details', { name });
@@ -1027,7 +1017,7 @@ export class NetworkService {
           clients: clientDetails
         });
         // Always set the array, even if empty, so we know we tried to fetch it
-        wifiInfo.connectedClientsDetails = clientDetails;
+        wifiInfo.connectedClients = clientDetails;
       } else {
         this.logger.warn('Failed to get station dump', {
           name,
@@ -1104,8 +1094,8 @@ export class NetworkService {
       purpose: wifiInfo.purpose,
       mode: wifiInfo.mode,
       isHotspot,
-      hasConnectedClientsDetails: !!wifiInfo.connectedClientsDetails,
-      connectedClientsCount: wifiInfo.connectedClientsCount
+      hasConnectedClients: !!wifiInfo.connectedClients,
+      connectedClientsCount: wifiInfo.connectedClients?.length || 0
     });
 
     if (!isHotspot) {
@@ -1128,8 +1118,8 @@ export class NetworkService {
       // Add hotspot-specific properties
       const hotspotWifi = { ...wifiInfo };
       this.logger.debug('Creating hotspot WiFi from base WiFi', {
-        hasConnectedClientsDetails: !!wifiInfo.connectedClientsDetails,
-        count: wifiInfo.connectedClientsDetails?.length || 0
+        hasConnectedClients: !!wifiInfo.connectedClients,
+        count: wifiInfo.connectedClients?.length || 0
       });
 
       // Add password for hotspot
@@ -1144,13 +1134,9 @@ export class NetworkService {
           hotspotWifi.ssid = hostapdInfo.actualSSID;
         }
 
-        if (hostapdInfo.connectedClients !== undefined) {
-          hotspotWifi.connectedClientsCount = hostapdInfo.connectedClients;
-        }
-
         this.logger.debug('After applying hostapd runtime info', {
-          connectedClientsCount: hotspotWifi.connectedClientsCount,
-          hasDetails: !!hotspotWifi.connectedClientsDetails
+          connectedClientsCount: hotspotWifi.connectedClients?.length || 0,
+          hasDetails: !!hotspotWifi.connectedClients
         });
 
         if (hostapdInfo.runtimeInfo) {
@@ -1195,9 +1181,8 @@ export class NetworkService {
         name: wifiInfo.name,
         ssid: hotspotWifi.ssid,
         hasPassword: !!hotspotWifi.password,
-        hasConnectedClientsDetails: !!hotspotWifi.connectedClientsDetails,
-        connectedClientsCount: hotspotWifi.connectedClientsCount,
-        clientDetailsCount: hotspotWifi.connectedClientsDetails?.length || 0
+        hasConnectedClients: !!hotspotWifi.connectedClients,
+        connectedClientsCount: hotspotWifi.connectedClients?.length || 0
       });
       return hotspotWifi;
     } catch (error) {
