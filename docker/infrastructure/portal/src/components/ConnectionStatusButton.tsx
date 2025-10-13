@@ -39,12 +39,8 @@ export const ConnectionStatusButton: React.FC = () => {
   return (
     <div className="connection-status-button">
       <wa-button
-        appearance="plain"
-        style={{
-          border: `2px solid var(--wa-color-${isConnected ? 'success' : 'danger'}-600)`,
-          backgroundColor: 'transparent',
-          position: 'relative',
-        }}
+        appearance="outlined"
+        variant={isConnected ? 'success' : 'danger'}
       >
         <FontAwesomeIcon
           icon={isConnected ? faUsers : faCircleExclamation}
@@ -53,11 +49,6 @@ export const ConnectionStatusButton: React.FC = () => {
         <wa-badge
           variant={isConnected ? 'success' : 'danger'}
           attention={isConnected && connectedClients > 0 ? 'pulse' : 'none'}
-          style={{
-            position: 'absolute',
-            top: '-8px',
-            right: '-8px',
-          }}
         >
           {isConnected ? connectedClients : '!'}
         </wa-badge>
