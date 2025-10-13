@@ -180,7 +180,20 @@ networks.get('/:interface', async (c) => {
     }
 
     // Return the interface with type-specific information (already included by NetworkService)
-    logger.debug('Returning interface data', { interfaceName });
+    // Log connected clients info if this is a WiFi interface
+    if (networkInterface.type === 'wifi') {
+      const wifiInterface = networkInterface as any;
+      logger.info('Returning WiFi interface data', {
+        interfaceName,
+        mode: wifiInterface.mode,
+        hasConnectedClientsDetails: !!wifiInterface.connectedClientsDetails,
+        connectedClientsCount: wifiInterface.connectedClientsCount,
+        clientDetailsCount: wifiInterface.connectedClientsDetails?.length || 0
+      });
+    } else {
+      logger.debug('Returning interface data', { interfaceName, type: networkInterface.type });
+    }
+
     return c.json({
       success: true,
       data: {

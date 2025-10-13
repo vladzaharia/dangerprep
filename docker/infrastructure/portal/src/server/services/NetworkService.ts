@@ -970,22 +970,22 @@ export class NetworkService {
 
     // Connected clients (for AP mode only)
     if (wifiInfo.mode === 'ap') {
-      this.logger.debug('Processing AP mode, getting connected clients', { name });
+      this.logger.info('Processing AP mode interface, fetching connected clients', { name });
 
       // Get client count
       if (clientsCountResult.status === 'fulfilled') {
         const clientCount = parseInt(clientsCountResult.value.stdout.trim());
         if (!isNaN(clientCount)) {
           wifiInfo.connectedClientsCount = clientCount;
-          this.logger.debug('Found connected clients', { name, clientCount });
+          this.logger.info('Found connected clients', { name, clientCount });
         }
       }
 
       // Get detailed client information - always try to parse, even if empty
       if (clientsDetailResult.status === 'fulfilled') {
-        this.logger.debug('Parsing client details', { name });
+        this.logger.info('Parsing client details', { name });
         const clientDetails = await this.parseConnectedClients(clientsDetailResult.value.stdout);
-        this.logger.debug('Parsed client details', {
+        this.logger.info('Parsed client details', {
           name,
           clientCount: clientDetails.length,
           clients: clientDetails
@@ -998,6 +998,11 @@ export class NetworkService {
           reason: clientsDetailResult.status === 'rejected' ? String(clientsDetailResult.reason) : 'unknown'
         });
       }
+    } else {
+      this.logger.debug('Not in AP mode, skipping connected clients', {
+        name,
+        mode: wifiInfo.mode
+      });
     }
 
     // Add hotspot-specific information if this is a hotspot interface
@@ -1057,14 +1062,17 @@ export class NetworkService {
     // This is more lenient to handle cases where mode detection might fail
     const isHotspot = wifiInfo.purpose === 'wlan' || wifiInfo.mode === 'ap';
 
-    this.logger.debug('addHotspotInfoToWiFi called', {
+    this.logger.info('Checking if WiFi interface is hotspot', {
       name: wifiInfo.name,
       purpose: wifiInfo.purpose,
       mode: wifiInfo.mode,
-      isHotspot
+      isHotspot,
+      hasConnectedClientsDetails: !!wifiInfo.connectedClientsDetails,
+      connectedClientsCount: wifiInfo.connectedClientsCount
     });
 
     if (!isHotspot) {
+      this.logger.debug('Not a hotspot interface, returning as-is', { name: wifiInfo.name });
       return wifiInfo;
     }
 
@@ -1146,10 +1154,13 @@ export class NetworkService {
         (hotspotWifi as any).hidden = true;
       }
 
-      this.logger.debug('Returning hotspot WiFi', {
+      this.logger.info('Returning hotspot WiFi with client information', {
         name: wifiInfo.name,
+        ssid: hotspotWifi.ssid,
+        hasPassword: !!hotspotWifi.password,
         hasConnectedClientsDetails: !!hotspotWifi.connectedClientsDetails,
-        count: hotspotWifi.connectedClientsDetails?.length || 0
+        connectedClientsCount: hotspotWifi.connectedClientsCount,
+        clientDetailsCount: hotspotWifi.connectedClientsDetails?.length || 0
       });
       return hotspotWifi;
     } catch (error) {
