@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { LoggerFactory, LogLevel } from '../../../../../../packages/logging/dist/index';
 
 const execAsync = promisify(exec);
 
@@ -45,6 +46,11 @@ export interface WifiConfigWithNetwork extends WifiConfigWithMetadata {
  */
 export class WifiConfigService {
   private readonly hostapdPath = '/etc/hostapd/hostapd.conf';
+  private logger = LoggerFactory.createStructuredLogger(
+    'WifiConfigService',
+    '/var/log/dangerprep/portal.log',
+    process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
+  );
 
   /**
    * Get WiFi configuration from system or environment variables
@@ -85,8 +91,15 @@ export class WifiConfigService {
       source = 'default';
     }
 
-    console.log(`[WifiConfigService] Final config - SSID: ${ssid}, Password: ${password ? '[REDACTED]' : 'missing'}, Source: ${source}`);
-    console.log(`[WifiConfigService] Environment variables - WIFI_SSID: ${process.env.WIFI_SSID ? 'present' : 'missing'}, WIFI_PASSWORD: ${process.env.WIFI_PASSWORD ? 'present' : 'missing'}`);
+    this.logger.debug('Final WiFi config', {
+      ssid,
+      hasPassword: !!password,
+      source
+    });
+    this.logger.debug('Environment variables', {
+      hasWifiSsid: !!process.env.WIFI_SSID,
+      hasWifiPassword: !!process.env.WIFI_PASSWORD
+    });
 
     return { ssid, password, source };
   }
@@ -112,17 +125,25 @@ export class WifiConfigService {
         config.password = passwordMatch[1].trim();
       }
 
-      console.log(`[WifiConfigService] Read hostapd config: SSID=${config.ssid ? 'present' : 'missing'}, Password=${config.password ? 'present' : 'missing'}`);
+      this.logger.debug('Read hostapd config', {
+        hasSsid: !!config.ssid,
+        hasPassword: !!config.password
+      });
       return config;
     } catch (error) {
       // Silently handle missing hostapd configuration - this is expected in development
       if (error instanceof Error && error.message.includes('ENOENT')) {
         // File doesn't exist, which is normal in development environments
-        console.log(`[WifiConfigService] Hostapd config file not found: ${this.hostapdPath}`);
+        this.logger.debug('Hostapd config file not found', {
+          path: this.hostapdPath
+        });
         return {};
       }
       // Log other errors that might indicate real issues
-      console.warn(`[WifiConfigService] Could not read hostapd configuration from ${this.hostapdPath}:`, error);
+      this.logger.warn('Could not read hostapd configuration', {
+        path: this.hostapdPath,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return {};
     }
   }
@@ -148,7 +169,7 @@ export class WifiConfigService {
       // First, find the active WiFi interface
       const activeInterface = await this.getActiveWifiInterface();
       if (!activeInterface) {
-        console.warn('No active WiFi interface found');
+        this.logger.warn('No active WiFi interface found');
         return undefined;
       }
 
@@ -181,7 +202,9 @@ export class WifiConfigService {
 
       return networkInfo;
     } catch (error) {
-      console.error('Failed to get network information:', error);
+      this.logger.error('Failed to get network information', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       return undefined;
     }
   }
@@ -203,7 +226,9 @@ export class WifiConfigService {
 
       return undefined;
     } catch (error) {
-      console.error('Failed to get active WiFi interface:', error);
+      this.logger.error('Failed to get active WiFi interface', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       return undefined;
     }
   }
@@ -229,7 +254,10 @@ export class WifiConfigService {
 
       return undefined;
     } catch (error) {
-      console.error(`Failed to get IP info for interface ${interfaceName}:`, error);
+      this.logger.error('Failed to get IP info for interface', {
+        interface: interfaceName,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return undefined;
     }
   }
@@ -249,7 +277,10 @@ export class WifiConfigService {
 
       return undefined;
     } catch (error) {
-      console.error(`Failed to get gateway for interface ${interfaceName}:`, error);
+      this.logger.error('Failed to get gateway for interface', {
+        interface: interfaceName,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return undefined;
     }
   }
@@ -269,7 +300,10 @@ export class WifiConfigService {
 
       return dnsServers.length > 0 ? dnsServers : undefined;
     } catch (error) {
-      console.error(`Failed to get DNS for interface ${interfaceName}:`, error);
+      this.logger.error('Failed to get DNS for interface', {
+        interface: interfaceName,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return undefined;
     }
   }

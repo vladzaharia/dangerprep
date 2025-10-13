@@ -60,33 +60,41 @@ export class ServiceDiscoveryService {
    * Get all discovered services
    */
   async getServices(options: ServiceDiscoveryOptions = {}): Promise<ServiceMetadata[]> {
-    console.log('[ServiceDiscovery] getServices called with options:', JSON.stringify(options));
+    this.logger.debug('getServices called', { options });
 
     // Refresh if cache is stale
     const cacheAge = Date.now() - this.lastScan;
     const isStale = cacheAge > this.scanInterval;
-    console.log(`[ServiceDiscovery] Cache age: ${cacheAge}ms, stale: ${isStale}, interval: ${this.scanInterval}ms`);
+    this.logger.debug('Cache check', {
+      age: `${cacheAge}ms`,
+      stale: isStale,
+      interval: `${this.scanInterval}ms`
+    });
 
     if (isStale) {
-      console.log('[ServiceDiscovery] Cache is stale, rescanning services...');
+      this.logger.debug('Cache is stale, rescanning services');
       await this.scanServices(options.baseDomain);
     } else {
-      console.log('[ServiceDiscovery] Using cached services');
+      this.logger.debug('Using cached services');
     }
 
     let services = this.services;
-    console.log(`[ServiceDiscovery] Initial services count: ${services.length}`);
+    this.logger.debug('Initial services count', { count: services.length });
 
     // Filter by service type if specified
     if (options.serviceType && options.serviceType !== 'all') {
       const originalCount = services.length;
       services = services.filter(service => service.type === options.serviceType);
-      console.log(`[ServiceDiscovery] Filtered by type '${options.serviceType}': ${originalCount} -> ${services.length} services`);
+      this.logger.debug('Filtered by type', {
+        type: options.serviceType,
+        before: originalCount,
+        after: services.length
+      });
     }
 
     // Override domain if specified
     if (options.baseDomain) {
-      console.log(`[ServiceDiscovery] Overriding domain to: ${options.baseDomain}`);
+      this.logger.debug('Overriding domain', { domain: options.baseDomain });
       services = services.map(service => {
         const updatedService: ServiceMetadata = {
           ...service,
@@ -94,13 +102,25 @@ export class ServiceDiscoveryService {
         if (service.url && options.baseDomain) {
           const originalUrl = service.url;
           updatedService.url = this.replaceBaseDomain(service.url, options.baseDomain);
-          console.log(`[ServiceDiscovery] Updated URL for ${service.name}: ${originalUrl} -> ${updatedService.url}`);
+          this.logger.debug('Updated URL', {
+            service: service.name,
+            from: originalUrl,
+            to: updatedService.url
+          });
         }
         return updatedService;
       });
     }
 
-    console.log(`[ServiceDiscovery] Returning ${services.length} services:`, services.map(s => ({ name: s.name, type: s.type, status: s.status, url: s.url })));
+    this.logger.debug('Returning services', {
+      count: services.length,
+      services: services.map(s => ({
+        name: s.name,
+        type: s.type,
+        status: s.status,
+        url: s.url
+      }))
+    });
     return services;
   }
 
@@ -109,7 +129,7 @@ export class ServiceDiscoveryService {
    */
   getDefaultDomain(): string {
     const domain = process.env.VITE_BASE_DOMAIN || 'danger';
-    console.log(`[ServiceDiscovery] Default domain: ${domain}`);
+    this.logger.debug('Default domain', { domain });
     return domain;
   }
 
@@ -117,41 +137,50 @@ export class ServiceDiscoveryService {
    * Scan Docker containers for service metadata
    */
   private async scanServices(overrideDomain?: string): Promise<void> {
-    console.log(`[ServiceDiscovery] Starting service scan${overrideDomain ? ` with override domain: ${overrideDomain}` : ''}`);
+    this.logger.debug('Starting service scan', {
+      overrideDomain: overrideDomain || 'none'
+    });
 
     try {
       const containers = await this.getDockerContainers();
-      console.log(`[ServiceDiscovery] Found ${containers.length} Docker containers`);
+      this.logger.debug('Found Docker containers', { count: containers.length });
 
       const discoveredServices: ServiceMetadata[] = [];
 
       for (const container of containers) {
-        console.log(`[ServiceDiscovery] Processing container: ${container.name}`);
-        console.log(`[ServiceDiscovery] Container status: ${container.status}`);
-        console.log(`[ServiceDiscovery] Container labels:`, JSON.stringify(container.labels, null, 2));
+        this.logger.debug('Processing container', {
+          name: container.name,
+          status: container.status,
+          labels: container.labels
+        });
 
         const service = this.extractServiceMetadata(container, overrideDomain);
         if (service) {
-          console.log(`[ServiceDiscovery] Extracted service metadata:`, JSON.stringify(service, null, 2));
+          this.logger.debug('Extracted service metadata', { service });
           discoveredServices.push(service);
         } else {
-          console.log(`[ServiceDiscovery] No service metadata found for container: ${container.name}`);
+          this.logger.debug('No service metadata found for container', {
+            name: container.name
+          });
         }
       }
 
       this.services = discoveredServices.sort((a, b) => a.name.localeCompare(b.name));
       this.lastScan = Date.now();
-      console.log(`[ServiceDiscovery] Scan complete. Discovered ${discoveredServices.length} services:`,
-        discoveredServices.map(s => s.name));
+      this.logger.debug('Scan complete', {
+        count: discoveredServices.length,
+        services: discoveredServices.map(s => s.name)
+      });
     } catch (error) {
-      console.error('[ServiceDiscovery] Failed to scan for services:', error);
-      console.error('[ServiceDiscovery] Error details:', {
-        message: error instanceof Error ? error.message : String(error),
+      this.logger.error('Failed to scan for services', {
+        error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
       });
       // Keep existing services on error
       this.lastScan = Date.now();
-      console.log(`[ServiceDiscovery] Keeping ${this.services.length} existing services after scan failure`);
+      this.logger.debug('Keeping existing services after scan failure', {
+        count: this.services.length
+      });
     }
   }
 
@@ -159,11 +188,11 @@ export class ServiceDiscoveryService {
    * Get Docker containers with labels using Docker API
    */
   private async getDockerContainers(): Promise<DockerContainer[]> {
-    console.log('[ServiceDiscovery] Fetching Docker containers...');
+    this.logger.debug('Fetching Docker containers');
 
     try {
       const containers = await this.docker.listContainers();
-      console.log(`[ServiceDiscovery] Docker API returned ${containers.length} containers`);
+      this.logger.debug('Docker API returned containers', { count: containers.length });
 
       const mappedContainers = containers.map(container => {
         const name = container.Names?.[0]?.replace(/^\//, '') || '';
@@ -173,7 +202,11 @@ export class ServiceDiscoveryService {
         ) || [];
         const labels = container.Labels || {};
 
-        console.log(`[ServiceDiscovery] Mapped container: ${name}, status: ${status}, ports: [${ports.join(', ')}]`);
+        this.logger.debug('Mapped container', {
+          name,
+          status,
+          ports: ports.join(', ')
+        });
 
         return {
           name,
@@ -183,12 +216,13 @@ export class ServiceDiscoveryService {
         };
       });
 
-      console.log(`[ServiceDiscovery] Successfully mapped ${mappedContainers.length} containers`);
+      this.logger.debug('Successfully mapped containers', {
+        count: mappedContainers.length
+      });
       return mappedContainers;
     } catch (error) {
-      console.error('[ServiceDiscovery] Failed to get Docker containers:', error);
-      console.error('[ServiceDiscovery] Docker API error details:', {
-        message: error instanceof Error ? error.message : String(error),
+      this.logger.error('Failed to get Docker containers', {
+        error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
       });
       return [];
@@ -199,7 +233,7 @@ export class ServiceDiscoveryService {
    * Extract service metadata from Docker container
    */
   private extractServiceMetadata(container: DockerContainer, overrideDomain?: string): ServiceMetadata | null {
-    console.log(`[ServiceDiscovery] Extracting metadata for container: ${container.name}`);
+    this.logger.debug('Extracting metadata for container', { name: container.name });
     const labels = container.labels;
 
     // Check if container has service metadata
@@ -208,7 +242,7 @@ export class ServiceDiscoveryService {
     const serviceIcon = labels['service.icon'];
     const serviceType = labels['service.type'] as 'public' | 'private' | 'maintenance';
 
-    console.log(`[ServiceDiscovery] Service labels found:`, {
+    this.logger.debug('Service labels found', {
       name: serviceName,
       description: serviceDescription,
       icon: serviceIcon,
@@ -217,8 +251,12 @@ export class ServiceDiscoveryService {
 
     // Skip if missing required service metadata
     if (!serviceName || !serviceDescription || !serviceType) {
-      console.log(`[ServiceDiscovery] Skipping container ${container.name} - missing required service metadata`);
-      console.log(`[ServiceDiscovery] Required fields: name=${!!serviceName}, description=${!!serviceDescription}, type=${!!serviceType}`);
+      this.logger.debug('Skipping container - missing required service metadata', {
+        container: container.name,
+        hasName: !!serviceName,
+        hasDescription: !!serviceDescription,
+        hasType: !!serviceType
+      });
       return null;
     }
 
@@ -229,14 +267,19 @@ export class ServiceDiscoveryService {
     } else if (container.status.includes('Restarting') || container.status.includes('Paused')) {
       status = 'warning';
     }
-    console.log(`[ServiceDiscovery] Determined status for ${serviceName}: ${status} (container status: ${container.status})`);
+    this.logger.debug('Determined status', {
+      service: serviceName,
+      status,
+      containerStatus: container.status
+    });
 
     // Build URL if service is web-accessible
     let url: string | undefined;
     const dnsRegister = labels['dns.register'];
     const traefikEnabled = labels['traefik.enable'] === 'true';
 
-    console.log(`[ServiceDiscovery] URL building for ${serviceName}:`, {
+    this.logger.debug('URL building', {
+      service: serviceName,
       dnsRegister,
       traefikEnabled,
       overrideDomain
@@ -245,9 +288,13 @@ export class ServiceDiscoveryService {
     if (dnsRegister && traefikEnabled) {
       const baseDomain = overrideDomain || this.getDefaultDomain();
       url = `https://${dnsRegister}.${baseDomain}`;
-      console.log(`[ServiceDiscovery] Built URL for ${serviceName}: ${url}`);
+      this.logger.debug('Built URL', { service: serviceName, url });
     } else {
-      console.log(`[ServiceDiscovery] No URL built for ${serviceName} - dnsRegister: ${!!dnsRegister}, traefikEnabled: ${traefikEnabled}`);
+      this.logger.debug('No URL built', {
+        service: serviceName,
+        hasDnsRegister: !!dnsRegister,
+        traefikEnabled
+      });
     }
 
     const metadata: ServiceMetadata = {
@@ -266,10 +313,16 @@ export class ServiceDiscoveryService {
     // Add version if available
     if (labels['service.version']) {
       metadata.version = labels['service.version'];
-      console.log(`[ServiceDiscovery] Added version ${labels['service.version']} to ${serviceName}`);
+      this.logger.debug('Added version', {
+        version: labels['service.version'],
+        service: serviceName
+      });
     }
 
-    console.log(`[ServiceDiscovery] Created service metadata for ${serviceName}:`, JSON.stringify(metadata, null, 2));
+    this.logger.debug('Created service metadata', {
+      service: serviceName,
+      metadata
+    });
     return metadata;
   }
 
@@ -277,14 +330,17 @@ export class ServiceDiscoveryService {
    * Replace base domain in URL
    */
   private replaceBaseDomain(url: string, newBaseDomain: string): string {
-    console.log(`[ServiceDiscovery] Replacing base domain in URL: ${url} -> ${newBaseDomain}`);
+    this.logger.debug('Replacing base domain in URL', {
+      url,
+      newBaseDomain
+    });
 
     try {
       const urlObj = new URL(url);
       const originalHostname = urlObj.hostname;
       const parts = urlObj.hostname.split('.');
 
-      console.log(`[ServiceDiscovery] Original hostname parts:`, parts);
+      this.logger.debug('Original hostname parts', { parts });
 
       if (parts.length >= 2) {
         // Replace everything after the first part (subdomain)
@@ -292,14 +348,20 @@ export class ServiceDiscoveryService {
         parts.push(newBaseDomain);
         urlObj.hostname = parts.join('.');
 
-        console.log(`[ServiceDiscovery] Updated hostname: ${originalHostname} -> ${urlObj.hostname}`);
+        this.logger.debug('Updated hostname', {
+          from: originalHostname,
+          to: urlObj.hostname
+        });
       }
 
       const newUrl = urlObj.toString();
-      console.log(`[ServiceDiscovery] Final URL: ${newUrl}`);
+      this.logger.debug('Final URL', { url: newUrl });
       return newUrl;
     } catch (error) {
-      console.error(`[ServiceDiscovery] Failed to parse URL ${url}:`, error);
+      this.logger.error('Failed to parse URL', {
+        url,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return url; // Return original URL if parsing fails
     }
   }

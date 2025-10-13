@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { WifiConfigService } from './WifiConfigService';
+import { LoggerFactory, LogLevel } from '../../../../../../packages/logging/dist/index';
 
 const execAsync = promisify(exec);
 
@@ -140,6 +141,11 @@ export class NetworkService {
   private readonly cacheTimeout = 30000; // 30 seconds
   private lastCacheUpdate = 0;
   private readonly wifiConfigService = new WifiConfigService();
+  private logger = LoggerFactory.createStructuredLogger(
+    'NetworkService',
+    '/var/log/dangerprep/portal.log',
+    process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
+  );
 
   /**
    * Get DHCP leases to map MAC addresses to IP addresses and hostnames
@@ -168,7 +174,9 @@ export class NetworkService {
         }
       }
     } catch (error) {
-      console.warn('[NetworkService] Could not read DHCP leases:', error);
+      this.logger.warn('Could not read DHCP leases', {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
 
     return leaseMap;
@@ -178,14 +186,16 @@ export class NetworkService {
    * Parse connected clients from iw station dump output
    */
   private async parseConnectedClients(stationDumpOutput: string): Promise<ConnectedClient[]> {
-    console.log(`[NetworkService] parseConnectedClients called with output length: ${stationDumpOutput.length}`);
+    this.logger.debug('parseConnectedClients called', {
+      outputLength: stationDumpOutput.length
+    });
     const clients: ConnectedClient[] = [];
     const stations = stationDumpOutput.split('Station ').filter(section => section.trim());
-    console.log(`[NetworkService] Found ${stations.length} stations in output`);
+    this.logger.debug('Found stations in output', { stationCount: stations.length });
 
     // Get DHCP leases for IP/hostname mapping
     const dhcpLeases = await this.getDhcpLeases();
-    console.log(`[NetworkService] Retrieved ${dhcpLeases.size} DHCP leases`);
+    this.logger.debug('Retrieved DHCP leases', { leaseCount: dhcpLeases.size });
 
     for (const station of stations) {
       const lines = station.split('\n');
@@ -194,12 +204,14 @@ export class NetworkService {
       // Extract MAC address from first line
       const macMatch = lines[0]?.match(/([a-f0-9:]{17})/);
       if (!macMatch || !macMatch[1]) {
-        console.log(`[NetworkService] Could not extract MAC from station line: ${lines[0]}`);
+        this.logger.debug('Could not extract MAC from station line', {
+          line: lines[0]
+        });
         continue;
       }
 
       const macAddress = macMatch[1];
-      console.log(`[NetworkService] Processing client with MAC: ${macAddress}`);
+      this.logger.debug('Processing client', { macAddress });
       const client: ConnectedClient = {
         macAddress,
       };
@@ -211,9 +223,13 @@ export class NetworkService {
         if (lease.hostname) {
           client.hostname = lease.hostname;
         }
-        console.log(`[NetworkService] Found DHCP lease for ${macAddress}: IP=${lease.ip}, hostname=${lease.hostname}`);
+        this.logger.debug('Found DHCP lease', {
+          macAddress,
+          ip: lease.ip,
+          hostname: lease.hostname
+        });
       } else {
-        console.log(`[NetworkService] No DHCP lease found for ${macAddress}`);
+        this.logger.debug('No DHCP lease found', { macAddress });
       }
 
       // Parse additional information from subsequent lines
@@ -248,11 +264,11 @@ export class NetworkService {
         }
       }
 
-      console.log(`[NetworkService] Parsed client:`, client);
+      this.logger.debug('Parsed client', { client });
       clients.push(client);
     }
 
-    console.log(`[NetworkService] Returning ${clients.length} parsed clients`);
+    this.logger.debug('Returning parsed clients', { clientCount: clients.length });
     return clients;
   }
 
@@ -260,10 +276,13 @@ export class NetworkService {
    * Get all network interfaces
    */
   async getAllInterfaces(): Promise<NetworkInterface[]> {
-    console.log('[NetworkService] getAllInterfaces called');
+    this.logger.debug('getAllInterfaces called');
     await this.refreshCacheIfNeeded();
     const interfaces = Array.from(this.interfaceCache.values());
-    console.log(`[NetworkService] Returning ${interfaces.length} interfaces:`, interfaces.map(i => ({ name: i.name, type: i.type, state: i.state })));
+    this.logger.debug('Returning interfaces', {
+      count: interfaces.length,
+      interfaces: interfaces.map(i => ({ name: i.name, type: i.type, state: i.state }))
+    });
     return interfaces;
   }
 
@@ -271,10 +290,10 @@ export class NetworkService {
    * Get network summary with all interfaces and special interface mappings
    */
   async getNetworkSummary(): Promise<NetworkSummary> {
-    console.log('[NetworkService] getNetworkSummary called');
+    this.logger.debug('getNetworkSummary called');
     const interfaces = await this.getAllInterfaces();
 
-    console.log('[NetworkService] Finding special interfaces...');
+    this.logger.debug('Finding special interfaces');
     // Find special interfaces
     const internetInterface = await this.findInternetInterface(interfaces);
     const hotspotInterface = this.findHotspotInterface(interfaces);
@@ -284,12 +303,12 @@ export class NetworkService {
     const lanInterfaces = this.findLanInterfaces(interfaces);
     const dockerInterfaces = this.findDockerInterfaces(interfaces);
 
-    console.log('[NetworkService] Special interfaces found:', {
+    this.logger.debug('Special interfaces found', {
       internet: internetInterface?.name || 'none',
       hotspot: hotspotInterface?.name || 'none',
       tailscale: tailscaleInterface?.name || 'none',
       lan: lanInterfaces.map(i => i.name),
-      docker: dockerInterfaces.map(i => i.name)
+      docker: dockerInterfaces.map(i => i.name),
     });
 
     // Group interfaces by purpose
@@ -313,14 +332,14 @@ export class NetworkService {
       interfacesByPurpose,
     };
 
-    console.log('[NetworkService] Network summary created:', {
+    this.logger.debug('Network summary created', {
       totalInterfaces: summary.totalInterfaces,
       internetInterface: summary.internetInterface,
       hotspotInterface: summary.hotspotInterface,
       tailscaleInterface: summary.tailscaleInterface,
       lanInterfaces: summary.lanInterfaces,
       dockerInterfaces: summary.dockerInterfaces,
-      interfacesByPurpose: summary.interfacesByPurpose
+      interfacesByPurpose: summary.interfacesByPurpose,
     });
 
     return summary;
@@ -330,10 +349,15 @@ export class NetworkService {
    * Get specific interface by name
    */
   async getInterface(name: string): Promise<NetworkInterface | undefined> {
-    console.log(`[NetworkService] getInterface called for: ${name}`);
+    this.logger.debug('getInterface called', { name });
     await this.refreshCacheIfNeeded();
     const interface_ = this.interfaceCache.get(name);
-    console.log(`[NetworkService] Interface '${name}' ${interface_ ? 'found' : 'not found'}${interface_ ? `: ${interface_.type}, ${interface_.state}` : ''}`);
+    this.logger.debug('Interface lookup result', {
+      name,
+      found: !!interface_,
+      type: interface_?.type,
+      state: interface_?.state
+    });
     return interface_;
   }
 
@@ -341,7 +365,7 @@ export class NetworkService {
    * Get interface by keyword (hotspot, internet, tailscale)
    */
   async getInterfaceByKeyword(keyword: 'hotspot' | 'internet' | 'tailscale'): Promise<NetworkInterface | undefined> {
-    console.log(`[NetworkService] getInterfaceByKeyword called for: ${keyword}`);
+    this.logger.debug('getInterfaceByKeyword called', { keyword });
     const interfaces = await this.getAllInterfaces();
 
     let result: NetworkInterface | undefined;
@@ -359,7 +383,13 @@ export class NetworkService {
         result = undefined;
     }
 
-    console.log(`[NetworkService] Keyword '${keyword}' ${result ? 'found' : 'not found'}${result ? `: ${result.name} (${result.type}, ${result.state})` : ''}`);
+    this.logger.debug('Keyword lookup result', {
+      keyword,
+      found: !!result,
+      name: result?.name,
+      type: result?.type,
+      state: result?.state
+    });
     return result;
   }
 
@@ -371,15 +401,19 @@ export class NetworkService {
     const cacheAge = now - this.lastCacheUpdate;
     const isStale = cacheAge > this.cacheTimeout;
 
-    console.log(`[NetworkService] Cache check: age=${cacheAge}ms, stale=${isStale}, timeout=${this.cacheTimeout}ms`);
+    this.logger.debug('Cache check', {
+      age: `${cacheAge}ms`,
+      stale: isStale,
+      timeout: `${this.cacheTimeout}ms`
+    });
 
     if (isStale) {
-      console.log('[NetworkService] Cache is stale, refreshing...');
+      this.logger.debug('Cache is stale, refreshing');
       await this.refreshInterfaceCache();
       this.lastCacheUpdate = now;
-      console.log('[NetworkService] Cache refreshed');
+      this.logger.debug('Cache refreshed');
     } else {
-      console.log('[NetworkService] Using cached interface data');
+      this.logger.debug('Using cached interface data');
     }
   }
 
@@ -387,35 +421,49 @@ export class NetworkService {
    * Refresh the interface cache by detecting all interfaces
    */
   private async refreshInterfaceCache(): Promise<void> {
-    console.log('[NetworkService] Starting interface cache refresh');
+    this.logger.debug('Starting interface cache refresh');
     this.interfaceCache.clear();
 
     try {
-      console.log('[NetworkService] Executing "ip link show" to get interface list');
+      this.logger.debug('Executing "ip link show" to get interface list');
       // Get all network interfaces
       const { stdout } = await execAsync('ip link show');
       const interfaceNames = this.parseInterfaceNames(stdout);
-      console.log(`[NetworkService] Found ${interfaceNames.length} interfaces:`, interfaceNames);
+      this.logger.debug('Found interfaces', {
+        count: interfaceNames.length,
+        interfaces: interfaceNames
+      });
 
       // Get detailed information for each interface
       for (const name of interfaceNames) {
-        console.log(`[NetworkService] Getting details for interface: ${name}`);
+        this.logger.debug('Getting details for interface', { name });
         try {
           const interfaceInfo = await this.getInterfaceDetails(name);
           if (interfaceInfo) {
             this.interfaceCache.set(name, interfaceInfo);
-            console.log(`[NetworkService] Cached interface ${name}: ${interfaceInfo.type}, ${interfaceInfo.state}`);
+            this.logger.debug('Cached interface', {
+              name,
+              type: interfaceInfo.type,
+              state: interfaceInfo.state
+            });
           } else {
-            console.log(`[NetworkService] No details returned for interface: ${name}`);
+            this.logger.debug('No details returned for interface', { name });
           }
         } catch (error) {
-          console.warn(`[NetworkService] Failed to get details for interface ${name}:`, error);
+          this.logger.warn('Failed to get details for interface', {
+            name,
+            error: error instanceof Error ? error.message : String(error)
+          });
         }
       }
 
-      console.log(`[NetworkService] Interface cache refresh complete. Cached ${this.interfaceCache.size} interfaces`);
+      this.logger.debug('Interface cache refresh complete', {
+        cachedCount: this.interfaceCache.size
+      });
     } catch (error) {
-      console.error('[NetworkService] Failed to refresh interface cache:', error);
+      this.logger.error('Failed to refresh interface cache', {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
@@ -461,7 +509,10 @@ export class NetworkService {
           return interfaceWithTypePurpose;
       }
     } catch (error) {
-      console.warn(`Failed to get interface details for ${name}:`, error);
+      this.logger.warn('Failed to get interface details', {
+        name,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return undefined;
     }
   }
@@ -597,7 +648,10 @@ export class NetworkService {
 
       return 'unknown';
     } catch (error) {
-      console.warn(`[NetworkService] Error determining WiFi purpose for ${name}:`, error);
+      this.logger.warn('Error determining WiFi purpose', {
+        name,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return 'unknown';
     }
   }
@@ -698,7 +752,10 @@ export class NetworkService {
 
       return result;
     } catch (error) {
-      console.warn(`Failed to get IP info for ${name}:`, error);
+      this.logger.warn('Failed to get IP info', {
+        name,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return {};
     }
   }
@@ -913,26 +970,33 @@ export class NetworkService {
 
     // Connected clients (for AP mode only)
     if (wifiInfo.mode === 'ap') {
-      console.log(`[NetworkService] Processing AP mode for ${name}, getting connected clients`);
+      this.logger.debug('Processing AP mode, getting connected clients', { name });
 
       // Get client count
       if (clientsCountResult.status === 'fulfilled') {
         const clientCount = parseInt(clientsCountResult.value.stdout.trim());
         if (!isNaN(clientCount)) {
           wifiInfo.connectedClientsCount = clientCount;
-          console.log(`[NetworkService] Found ${clientCount} connected clients for ${name}`);
+          this.logger.debug('Found connected clients', { name, clientCount });
         }
       }
 
       // Get detailed client information - always try to parse, even if empty
       if (clientsDetailResult.status === 'fulfilled') {
-        console.log(`[NetworkService] Parsing client details for ${name}`);
+        this.logger.debug('Parsing client details', { name });
         const clientDetails = await this.parseConnectedClients(clientsDetailResult.value.stdout);
-        console.log(`[NetworkService] Parsed ${clientDetails.length} client details for ${name}:`, clientDetails);
+        this.logger.debug('Parsed client details', {
+          name,
+          clientCount: clientDetails.length,
+          clients: clientDetails
+        });
         // Always set the array, even if empty, so we know we tried to fetch it
         wifiInfo.connectedClientsDetails = clientDetails;
       } else {
-        console.warn(`[NetworkService] Failed to get station dump for ${name}:`, clientsDetailResult.status === 'rejected' ? clientsDetailResult.reason : 'unknown');
+        this.logger.warn('Failed to get station dump', {
+          name,
+          reason: clientsDetailResult.status === 'rejected' ? String(clientsDetailResult.reason) : 'unknown'
+        });
       }
     }
 
@@ -974,7 +1038,9 @@ export class NetworkService {
           }));
         }
       } catch (error) {
-        console.warn('Failed to parse Tailscale status JSON:', error);
+        this.logger.warn('Failed to parse Tailscale status JSON', {
+          error: error instanceof Error ? error.message : String(error)
+        });
       }
     }
 
@@ -991,7 +1057,12 @@ export class NetworkService {
     // This is more lenient to handle cases where mode detection might fail
     const isHotspot = wifiInfo.purpose === 'wlan' || wifiInfo.mode === 'ap';
 
-    console.log(`[NetworkService] addHotspotInfoToWiFi for ${wifiInfo.name}: purpose=${wifiInfo.purpose}, mode=${wifiInfo.mode}, isHotspot=${isHotspot}`);
+    this.logger.debug('addHotspotInfoToWiFi called', {
+      name: wifiInfo.name,
+      purpose: wifiInfo.purpose,
+      mode: wifiInfo.mode,
+      isHotspot
+    });
 
     if (!isHotspot) {
       return wifiInfo;
@@ -1003,11 +1074,18 @@ export class NetworkService {
 
       // Get WiFi configuration including password
       const wifiConfig = this.wifiConfigService.getWifiConfig();
-      console.log(`[NetworkService] Retrieved WiFi config for ${wifiInfo.name}: SSID=${wifiConfig.ssid}, Password=${wifiConfig.password ? '[REDACTED]' : 'missing'}`);
+      this.logger.debug('Retrieved WiFi config', {
+        name: wifiInfo.name,
+        ssid: wifiConfig.ssid,
+        hasPassword: !!wifiConfig.password
+      });
 
       // Add hotspot-specific properties
       const hotspotWifi = { ...wifiInfo };
-      console.log(`[NetworkService] Creating hotspot WiFi from base WiFi. Has connectedClientsDetails: ${!!wifiInfo.connectedClientsDetails}, count: ${wifiInfo.connectedClientsDetails?.length || 0}`);
+      this.logger.debug('Creating hotspot WiFi from base WiFi', {
+        hasConnectedClientsDetails: !!wifiInfo.connectedClientsDetails,
+        count: wifiInfo.connectedClientsDetails?.length || 0
+      });
 
       // Add password for hotspot
       if (wifiConfig.password) {
@@ -1025,7 +1103,10 @@ export class NetworkService {
           hotspotWifi.connectedClientsCount = hostapdInfo.connectedClients;
         }
 
-        console.log(`[NetworkService] After applying hostapd runtime info. connectedClientsCount: ${hotspotWifi.connectedClientsCount}, has details: ${!!hotspotWifi.connectedClientsDetails}`);
+        this.logger.debug('After applying hostapd runtime info', {
+          connectedClientsCount: hotspotWifi.connectedClientsCount,
+          hasDetails: !!hotspotWifi.connectedClientsDetails
+        });
 
         if (hostapdInfo.runtimeInfo) {
           if (hostapdInfo.runtimeInfo.channel) {
@@ -1065,10 +1146,17 @@ export class NetworkService {
         (hotspotWifi as any).hidden = true;
       }
 
-      console.log(`[NetworkService] Returning hotspot WiFi for ${wifiInfo.name}. Has connectedClientsDetails: ${!!hotspotWifi.connectedClientsDetails}, count: ${hotspotWifi.connectedClientsDetails?.length || 0}`);
+      this.logger.debug('Returning hotspot WiFi', {
+        name: wifiInfo.name,
+        hasConnectedClientsDetails: !!hotspotWifi.connectedClientsDetails,
+        count: hotspotWifi.connectedClientsDetails?.length || 0
+      });
       return hotspotWifi;
     } catch (error) {
-      console.warn(`[NetworkService] Error adding hotspot info to WiFi interface ${wifiInfo.name}:`, error);
+      this.logger.warn('Error adding hotspot info to WiFi interface', {
+        name: wifiInfo.name,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return wifiInfo;
     }
   }
@@ -1107,7 +1195,10 @@ export class NetworkService {
 
       return config;
     } catch (error) {
-      console.warn(`[NetworkService] Could not read hostapd config from ${this.hostapdPath}:`, error);
+      this.logger.warn('Could not read hostapd config', {
+        path: this.hostapdPath,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return {};
     }
   }
@@ -1176,7 +1267,10 @@ export class NetworkService {
               runtimeInfo = this.parseIwInfo(infoOutput);
             }
           } catch (error) {
-            console.warn(`[NetworkService] Could not get runtime info for interface ${activeInterface}:`, error);
+            this.logger.warn('Could not get runtime info for interface', {
+              interface: activeInterface,
+              error: error instanceof Error ? error.message : String(error)
+            });
           }
         }
       }
@@ -1190,7 +1284,9 @@ export class NetworkService {
         ...(runtimeInfo && { runtimeInfo }),
       };
     } catch (error) {
-      console.warn('[NetworkService] Error getting hostapd info:', error);
+      this.logger.warn('Error getting hostapd info', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       return { config, isRunning: false };
     }
   }
@@ -1406,7 +1502,9 @@ export class NetworkService {
 
       return status;
     } catch (error) {
-      console.error('[NetworkService] Error getting hostapd status:', error);
+      this.logger.error('Error getting hostapd status', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       return {
         isConfigured: false,
         isRunning: false,
@@ -1418,10 +1516,13 @@ export class NetworkService {
    * Clear the interface cache (useful for testing or manual refresh)
    */
   clearCache(): void {
-    console.log('[NetworkService] Clearing interface cache');
+    this.logger.debug('Clearing interface cache');
     const previousSize = this.interfaceCache.size;
     this.interfaceCache.clear();
     this.lastCacheUpdate = 0;
-    console.log(`[NetworkService] Cache cleared. Previous size: ${previousSize}, new size: ${this.interfaceCache.size}`);
+    this.logger.debug('Cache cleared', {
+      previousSize,
+      newSize: this.interfaceCache.size
+    });
   }
 }
