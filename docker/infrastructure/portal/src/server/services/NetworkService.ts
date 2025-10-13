@@ -912,6 +912,8 @@ export class NetworkService {
    * Get WiFi-specific information
    */
   private async getWiFiInterfaceInfo(name: string, baseInfo: Omit<BaseNetworkInterface, 'type'>): Promise<WiFiInterface> {
+    this.logger.info('Getting WiFi interface info', { name });
+
     const [iwConfigResult, iwInfoResult, clientsCountResult, clientsDetailResult] = await Promise.allSettled([
       execAsync(`iwconfig ${name} 2>/dev/null`),
       execAsync(`iw dev ${name} info 2>/dev/null`),
@@ -923,6 +925,14 @@ export class NetworkService {
       ...baseInfo,
       type: 'wifi',
     };
+
+    this.logger.debug('WiFi command results', {
+      name,
+      iwConfigSuccess: iwConfigResult.status === 'fulfilled',
+      iwInfoSuccess: iwInfoResult.status === 'fulfilled',
+      clientsCountSuccess: clientsCountResult.status === 'fulfilled',
+      clientsDetailSuccess: clientsDetailResult.status === 'fulfilled'
+    });
 
     // Parse iwconfig output
     if (iwConfigResult.status === 'fulfilled') {
@@ -958,7 +968,21 @@ export class NetworkService {
         const mode = typeMatch[1];
         if (['managed', 'ap', 'monitor', 'unknown'].includes(mode)) {
           wifiInfo.mode = mode as WiFiInterface['mode'];
+          this.logger.info('Detected WiFi mode from iw info', {
+            name,
+            mode: wifiInfo.mode
+          });
+        } else {
+          this.logger.warn('Unknown WiFi mode detected', {
+            name,
+            detectedMode: mode
+          });
         }
+      } else {
+        this.logger.warn('Could not detect WiFi mode from iw info', {
+          name,
+          iwInfoOutput: iwinfo.substring(0, 200)
+        });
       }
 
       // Channel
@@ -966,11 +990,23 @@ export class NetworkService {
       if (channelMatch && channelMatch[1]) {
         wifiInfo.channel = parseInt(channelMatch[1]);
       }
+    } else {
+      this.logger.warn('Failed to get iw info', {
+        name,
+        reason: iwInfoResult.status === 'rejected' ? String(iwInfoResult.reason) : 'unknown'
+      });
     }
 
-    // Connected clients (for AP mode only)
-    if (wifiInfo.mode === 'ap') {
-      this.logger.info('Processing AP mode interface, fetching connected clients', { name });
+    // Connected clients - fetch for hotspot interfaces (purpose === 'wlan') or AP mode interfaces
+    const isHotspotOrAP = baseInfo.purpose === 'wlan' || wifiInfo.mode === 'ap';
+
+    if (isHotspotOrAP) {
+      this.logger.info('Processing hotspot/AP interface, fetching connected clients', {
+        name,
+        purpose: baseInfo.purpose,
+        mode: wifiInfo.mode,
+        reason: baseInfo.purpose === 'wlan' ? 'purpose=wlan' : 'mode=ap'
+      });
 
       // Get client count
       if (clientsCountResult.status === 'fulfilled') {
@@ -999,8 +1035,9 @@ export class NetworkService {
         });
       }
     } else {
-      this.logger.debug('Not in AP mode, skipping connected clients', {
+      this.logger.debug('Not a hotspot/AP interface, skipping connected clients', {
         name,
+        purpose: baseInfo.purpose,
         mode: wifiInfo.mode
       });
     }
