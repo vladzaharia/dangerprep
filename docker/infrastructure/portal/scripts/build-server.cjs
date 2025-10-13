@@ -19,11 +19,31 @@ try {
   // Copy app.js as app.cjs
   if (fs.existsSync(path.join(srcDir, 'app.js'))) {
     let appContent = fs.readFileSync(path.join(srcDir, 'app.js'), 'utf8');
-    // Fix require paths for routes and services
+    // Fix require paths for routes, services, and middleware
     appContent = appContent.replace(/require\("\.\/routes\/([^"]+)"\)/g, 'require("./routes/$1.cjs")');
     appContent = appContent.replace(/require\("\.\/services\/([^"]+)"\)/g, 'require("./services/$1.cjs")');
+    appContent = appContent.replace(/require\("\.\/middleware\/([^"]+)"\)/g, 'require("./middleware/$1.cjs")');
     fs.writeFileSync(path.join(destDir, 'app.cjs'), appContent);
     console.log('✅ Copied app.cjs');
+  }
+
+  // Copy middleware
+  const middlewareDir = path.join(destDir, 'middleware');
+  if (!fs.existsSync(middlewareDir)) {
+    fs.mkdirSync(middlewareDir, { recursive: true });
+  }
+
+  const middlewareSrcDir = path.join(srcDir, 'middleware');
+  if (fs.existsSync(middlewareSrcDir)) {
+    const middlewareFiles = fs.readdirSync(middlewareSrcDir);
+    middlewareFiles.forEach(file => {
+      if (file.endsWith('.js')) {
+        let content = fs.readFileSync(path.join(middlewareSrcDir, file), 'utf8');
+        const cjsFile = file.replace('.js', '.cjs');
+        fs.writeFileSync(path.join(middlewareDir, cjsFile), content);
+        console.log(`✅ Copied middleware/${cjsFile}`);
+      }
+    });
   }
 
   // Copy routes
@@ -38,8 +58,9 @@ try {
     routeFiles.forEach(file => {
       if (file.endsWith('.js')) {
         let content = fs.readFileSync(path.join(routesSrcDir, file), 'utf8');
-        // Fix service imports
+        // Fix service and middleware imports
         content = content.replace(/require\("\.\.\/services\/([^"]+)"\)/g, 'require("../services/$1.cjs")');
+        content = content.replace(/require\("\.\.\/middleware\/([^"]+)"\)/g, 'require("../middleware/$1.cjs")');
         const cjsFile = file.replace('.js', '.cjs');
         fs.writeFileSync(path.join(routesDir, cjsFile), content);
         console.log(`✅ Copied routes/${cjsFile}`);

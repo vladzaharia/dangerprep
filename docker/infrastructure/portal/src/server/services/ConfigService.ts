@@ -1,3 +1,5 @@
+import { LoggerFactory, LogLevel } from '../../../../../../packages/logging/dist/index';
+
 /**
  * Application configuration data - only app-level settings
  * Service-specific configuration is handled by ServiceDiscoveryService
@@ -23,12 +25,21 @@ export interface AppConfig {
  * Reads from environment variables
  */
 export class ConfigService {
+  private logger = LoggerFactory.createStructuredLogger(
+    'ConfigService',
+    '/var/log/dangerprep/portal.log',
+    process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
+  );
+
   /**
    * Get environment variable with fallback
    */
   private getEnvVar(key: string, fallback: string): string {
     const value = process.env[key] || fallback;
-    console.log(`[ConfigService] Environment variable ${key}: ${value === fallback ? `using fallback '${fallback}'` : `found '${value}'`}`);
+    this.logger.debug('Environment variable', {
+      key,
+      value: value === fallback ? `using fallback '${fallback}'` : `found '${value}'`,
+    });
     return value;
   }
 
@@ -36,7 +47,7 @@ export class ConfigService {
    * Get application configuration - only app-level settings
    */
   getAppConfig(): AppConfig {
-    console.log('[ConfigService] Building application configuration');
+    this.logger.debug('Building application configuration');
 
     const config = {
       app: {
@@ -53,7 +64,7 @@ export class ConfigService {
       },
     };
 
-    console.log('[ConfigService] Application configuration built:', JSON.stringify(config, null, 2));
+    this.logger.debug('Application configuration built', config);
     return config;
   }
 
@@ -61,8 +72,8 @@ export class ConfigService {
    * Update application configuration (placeholder for future CRUD operations)
    */
   async updateAppConfig(_config: Partial<AppConfig>): Promise<AppConfig> {
-    console.log('[ConfigService] updateAppConfig called (not implemented)');
-    console.log('[ConfigService] Attempted config update:', JSON.stringify(_config, null, 2));
+    this.logger.warn('updateAppConfig called (not implemented)');
+    this.logger.debug('Attempted config update', _config);
     // TODO: Implement configuration update
     // This would involve updating environment variables or a config file
     throw new Error('Application configuration update not yet implemented');

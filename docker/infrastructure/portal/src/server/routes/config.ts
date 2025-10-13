@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { ConfigService } from '../services/ConfigService';
+import type { LoggerVariables } from '../middleware/logging';
 
 // Initialize services
 const configService = new ConfigService();
 
-// Create router
-const config = new Hono();
+// Create router with typed variables
+const config = new Hono<{ Variables: LoggerVariables }>();
 
 /**
  * GET /api/config
@@ -13,23 +14,21 @@ const config = new Hono();
  * This does NOT include WiFi or service-specific configuration
  */
 config.get('/', (c) => {
-  const requestId = Math.random().toString(36).substring(7);
-  console.log(`[ConfigRoute:${requestId}] GET /api/config - Request started`);
+  const logger = c.get('logger');
 
   try {
-    console.log(`[ConfigRoute:${requestId}] Fetching app configuration`);
+    logger.debug('Fetching app configuration');
     const appConfig = configService.getAppConfig();
-    console.log(`[ConfigRoute:${requestId}] Retrieved app config:`, JSON.stringify(appConfig, null, 2));
+    logger.debug('Retrieved app config', { appConfig });
 
     return c.json({
       success: true,
       data: appConfig,
     });
   } catch (error) {
-    console.error(`[ConfigRoute:${requestId}] Failed to get app configuration:`, error);
-    console.error(`[ConfigRoute:${requestId}] Error details:`, {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+    logger.error('Failed to get app configuration', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
 
     return c.json(
@@ -49,23 +48,22 @@ config.get('/', (c) => {
  * @deprecated Use /api/config instead
  */
 config.get('/app', (c) => {
-  const requestId = Math.random().toString(36).substring(7);
-  console.log(`[ConfigRoute:${requestId}] GET /api/config/app - Request started (deprecated endpoint)`);
+  const logger = c.get('logger');
+  logger.warn('Using deprecated endpoint /api/config/app - use /api/config instead');
 
   try {
-    console.log(`[ConfigRoute:${requestId}] Fetching app configuration via deprecated endpoint`);
+    logger.debug('Fetching app configuration via deprecated endpoint');
     const appConfig = configService.getAppConfig();
-    console.log(`[ConfigRoute:${requestId}] Retrieved app config via deprecated endpoint:`, JSON.stringify(appConfig, null, 2));
+    logger.debug('Retrieved app config via deprecated endpoint', { appConfig });
 
     return c.json({
       success: true,
       data: appConfig,
     });
   } catch (error) {
-    console.error(`[ConfigRoute:${requestId}] Failed to get app configuration via deprecated endpoint:`, error);
-    console.error(`[ConfigRoute:${requestId}] Error details:`, {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+    logger.error('Failed to get app configuration via deprecated endpoint', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
 
     return c.json(

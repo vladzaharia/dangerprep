@@ -1,4 +1,5 @@
 import Docker from 'dockerode';
+import { LoggerFactory, LogLevel } from '../../../../../../packages/logging/dist/index';
 
 /**
  * Service metadata for portal display
@@ -39,12 +40,19 @@ export class ServiceDiscoveryService {
   private lastScan = 0;
   private readonly scanInterval = 30000; // 30 seconds
   private docker: Docker;
+  private logger = LoggerFactory.createStructuredLogger(
+    'ServiceDiscoveryService',
+    '/var/log/dangerprep/portal.log',
+    process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
+  );
 
   constructor() {
-    console.log('[ServiceDiscovery] Initializing service discovery...');
+    this.logger.info('Initializing service discovery');
     // Initialize Docker client with socket path
     this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
-    console.log('[ServiceDiscovery] Docker client initialized with socket path: /var/run/docker.sock');
+    this.logger.debug('Docker client initialized', {
+      socketPath: '/var/run/docker.sock'
+    });
     this.scanServices();
   }
 

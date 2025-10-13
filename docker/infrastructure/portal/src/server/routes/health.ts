@@ -1,15 +1,15 @@
 import { Hono } from 'hono';
+import type { LoggerVariables } from '../middleware/logging';
 
-// Create router
-const health = new Hono();
+// Create router with typed variables
+const health = new Hono<{ Variables: LoggerVariables }>();
 
 /**
  * GET /api/health
  * Health check endpoint
  */
 health.get('/', (c) => {
-  const requestId = Math.random().toString(36).substring(7);
-  console.log(`[HealthRoute:${requestId}] GET /api/health - Request started`);
+  const logger = c.get('logger');
 
   const healthData = {
     status: 'healthy',
@@ -19,8 +19,7 @@ health.get('/', (c) => {
     nodeVersion: process.version,
   };
 
-  console.log(`[HealthRoute:${requestId}] Health check data:`, JSON.stringify(healthData, null, 2));
-  console.log(`[HealthRoute:${requestId}] Request completed successfully`);
+  logger.debug('Health check data', healthData);
 
   return c.json(healthData);
 });

@@ -1615,7 +1615,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@dangerprep/logging@workspace:*, @dangerprep/logging@workspace:packages/logging":
+"@dangerprep/logging@workspace:*, @dangerprep/logging@workspace:^, @dangerprep/logging@workspace:packages/logging":
   version: 0.0.0-use.local
   resolution: "@dangerprep/logging@workspace:packages/logging"
   dependencies:
@@ -1672,6 +1672,7 @@ __metadata:
   dependencies:
     "@awesome.me/webawesome": "npm:3.0.0-beta.6"
     "@dangerprep/eslint": "workspace:*"
+    "@dangerprep/logging": "workspace:^"
     "@dangerprep/prettier": "workspace:*"
     "@dangerprep/typescript": "workspace:*"
     "@fontsource/geist-mono": "npm:^5.2.7"

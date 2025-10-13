@@ -178,11 +178,14 @@ export class NetworkService {
    * Parse connected clients from iw station dump output
    */
   private async parseConnectedClients(stationDumpOutput: string): Promise<ConnectedClient[]> {
+    console.log(`[NetworkService] parseConnectedClients called with output length: ${stationDumpOutput.length}`);
     const clients: ConnectedClient[] = [];
     const stations = stationDumpOutput.split('Station ').filter(section => section.trim());
+    console.log(`[NetworkService] Found ${stations.length} stations in output`);
 
     // Get DHCP leases for IP/hostname mapping
     const dhcpLeases = await this.getDhcpLeases();
+    console.log(`[NetworkService] Retrieved ${dhcpLeases.size} DHCP leases`);
 
     for (const station of stations) {
       const lines = station.split('\n');
@@ -190,9 +193,13 @@ export class NetworkService {
 
       // Extract MAC address from first line
       const macMatch = lines[0]?.match(/([a-f0-9:]{17})/);
-      if (!macMatch || !macMatch[1]) continue;
+      if (!macMatch || !macMatch[1]) {
+        console.log(`[NetworkService] Could not extract MAC from station line: ${lines[0]}`);
+        continue;
+      }
 
       const macAddress = macMatch[1];
+      console.log(`[NetworkService] Processing client with MAC: ${macAddress}`);
       const client: ConnectedClient = {
         macAddress,
       };
@@ -204,6 +211,9 @@ export class NetworkService {
         if (lease.hostname) {
           client.hostname = lease.hostname;
         }
+        console.log(`[NetworkService] Found DHCP lease for ${macAddress}: IP=${lease.ip}, hostname=${lease.hostname}`);
+      } else {
+        console.log(`[NetworkService] No DHCP lease found for ${macAddress}`);
       }
 
       // Parse additional information from subsequent lines
@@ -238,9 +248,11 @@ export class NetworkService {
         }
       }
 
+      console.log(`[NetworkService] Parsed client:`, client);
       clients.push(client);
     }
 
+    console.log(`[NetworkService] Returning ${clients.length} parsed clients`);
     return clients;
   }
 
@@ -901,20 +913,26 @@ export class NetworkService {
 
     // Connected clients (for AP mode only)
     if (wifiInfo.mode === 'ap') {
+      console.log(`[NetworkService] Processing AP mode for ${name}, getting connected clients`);
+
       // Get client count
       if (clientsCountResult.status === 'fulfilled') {
         const clientCount = parseInt(clientsCountResult.value.stdout.trim());
         if (!isNaN(clientCount)) {
           wifiInfo.connectedClientsCount = clientCount;
+          console.log(`[NetworkService] Found ${clientCount} connected clients for ${name}`);
         }
       }
 
-      // Get detailed client information
+      // Get detailed client information - always try to parse, even if empty
       if (clientsDetailResult.status === 'fulfilled') {
+        console.log(`[NetworkService] Parsing client details for ${name}`);
         const clientDetails = await this.parseConnectedClients(clientsDetailResult.value.stdout);
-        if (clientDetails.length > 0) {
-          wifiInfo.connectedClientsDetails = clientDetails;
-        }
+        console.log(`[NetworkService] Parsed ${clientDetails.length} client details for ${name}:`, clientDetails);
+        // Always set the array, even if empty, so we know we tried to fetch it
+        wifiInfo.connectedClientsDetails = clientDetails;
+      } else {
+        console.warn(`[NetworkService] Failed to get station dump for ${name}:`, clientsDetailResult.status === 'rejected' ? clientsDetailResult.reason : 'unknown');
       }
     }
 
@@ -989,6 +1007,7 @@ export class NetworkService {
 
       // Add hotspot-specific properties
       const hotspotWifi = { ...wifiInfo };
+      console.log(`[NetworkService] Creating hotspot WiFi from base WiFi. Has connectedClientsDetails: ${!!wifiInfo.connectedClientsDetails}, count: ${wifiInfo.connectedClientsDetails?.length || 0}`);
 
       // Add password for hotspot
       if (wifiConfig.password) {
@@ -1005,6 +1024,8 @@ export class NetworkService {
         if (hostapdInfo.connectedClients !== undefined) {
           hotspotWifi.connectedClientsCount = hostapdInfo.connectedClients;
         }
+
+        console.log(`[NetworkService] After applying hostapd runtime info. connectedClientsCount: ${hotspotWifi.connectedClientsCount}, has details: ${!!hotspotWifi.connectedClientsDetails}`);
 
         if (hostapdInfo.runtimeInfo) {
           if (hostapdInfo.runtimeInfo.channel) {
@@ -1044,6 +1065,7 @@ export class NetworkService {
         (hotspotWifi as any).hidden = true;
       }
 
+      console.log(`[NetworkService] Returning hotspot WiFi for ${wifiInfo.name}. Has connectedClientsDetails: ${!!hotspotWifi.connectedClientsDetails}, count: ${hotspotWifi.connectedClientsDetails?.length || 0}`);
       return hotspotWifi;
     } catch (error) {
       console.warn(`[NetworkService] Error adding hotspot info to WiFi interface ${wifiInfo.name}:`, error);

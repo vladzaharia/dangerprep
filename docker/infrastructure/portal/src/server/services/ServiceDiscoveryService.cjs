@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ServiceDiscoveryService = void 0;
 const dockerode_1 = __importDefault(require("dockerode"));
+const index_1 = require("../../../../../../packages/logging/dist/index");
 /**
  * Service discovery service for finding available DangerPrep services
  */
@@ -13,10 +14,13 @@ class ServiceDiscoveryService {
         this.services = [];
         this.lastScan = 0;
         this.scanInterval = 30000; // 30 seconds
-        console.log('[ServiceDiscovery] Initializing service discovery...');
+        this.logger = index_1.LoggerFactory.createStructuredLogger('ServiceDiscoveryService', '/var/log/dangerprep/portal.log', process.env.NODE_ENV === 'development' ? index_1.LogLevel.DEBUG : index_1.LogLevel.INFO);
+        this.logger.info('Initializing service discovery');
         // Initialize Docker client with socket path
         this.docker = new dockerode_1.default({ socketPath: '/var/run/docker.sock' });
-        console.log('[ServiceDiscovery] Docker client initialized with socket path: /var/run/docker.sock');
+        this.logger.debug('Docker client initialized', {
+            socketPath: '/var/run/docker.sock'
+        });
         this.scanServices();
     }
     /**

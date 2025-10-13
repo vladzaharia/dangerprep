@@ -5,6 +5,7 @@
   "author": "Vlad Zaharia <hey@vlad.gg>",
   "dependencies": {
     "@awesome.me/webawesome": "3.0.0-beta.6",
+    "@dangerprep/logging": "workspace:^",
     "@fontsource/geist-mono": "^5.2.7",
     "@fontsource/sansation": "^5.2.2",
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
@@ -73,7 +74,7 @@
   "private": true,
   "scripts": {
     "build": "tsc && vite build && yarn build:server",
-    "build:server": "tsc --target es2020 --module commonjs --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck --outDir src/server/dist src/server/app.ts src/server/routes/*.ts src/server/services/*.ts && node scripts/build-server.cjs",
+    "build:server": "tsc --target es2020 --module commonjs --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck --outDir src/server/dist src/server/app.ts src/server/middleware/*.ts src/server/routes/*.ts src/server/services/*.ts && node scripts/build-server.cjs",
     "clean": "rimraf dist build src/server/dist",
     "dev": "vite",
     "docker:build": "docker compose build",

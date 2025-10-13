@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
+import { requestId } from 'hono/request-id';
 
 // Import routes
 import networks from './routes/networks';
@@ -10,11 +10,17 @@ import services from './routes/services';
 import config from './routes/config';
 import health from './routes/health';
 
-// Create main app
-const app = new Hono();
+// Import custom middleware
+import { structuredLogging, type LoggerVariables } from './middleware/logging';
+
+// Create main app with typed variables
+const app = new Hono<{ Variables: LoggerVariables }>();
 
 // Global middleware
-app.use('*', logger());
+// Request ID must come first for proper request tracking
+app.use('*', requestId());
+// Structured logging middleware (uses requestId from context)
+app.use('*', structuredLogging());
 app.use('*', secureHeaders({
   // Permissive security headers for all hosts as requested
   contentSecurityPolicy: {
@@ -69,7 +75,18 @@ app.notFound((c) => {
 
 // Error handler
 app.onError((err, c) => {
-  console.error('API Error:', err);
+  const logger = c.get('logger');
+  const requestId = c.get('requestId');
+
+  // Log error with structured metadata
+  logger.error('API Error', {
+    error: err.message,
+    stack: err.stack,
+    requestId,
+    path: c.req.path,
+    method: c.req.method,
+  });
+
   return c.json(
     {
       success: false,

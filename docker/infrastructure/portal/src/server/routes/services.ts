@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { ServiceDiscoveryService } from '../services/ServiceDiscoveryService';
 import NodeCache from 'node-cache';
+import type { LoggerVariables } from '../middleware/logging';
 
 // Initialize cache (TTL: 30 seconds)
 const cache = new NodeCache({ stdTTL: 30 });
@@ -8,8 +9,8 @@ const cache = new NodeCache({ stdTTL: 30 });
 // Initialize service
 const serviceDiscovery = new ServiceDiscoveryService();
 
-// Create router
-const services = new Hono();
+// Create router with typed variables
+const services = new Hono<{ Variables: LoggerVariables }>();
 
 /**
  * GET /api/services
@@ -19,36 +20,37 @@ const services = new Hono();
  *   - type: Filter by service type (public, private, maintenance, all)
  */
 services.get('/', async (c) => {
-  const requestId = Math.random().toString(36).substring(7);
-  console.log(`[ServicesRoute:${requestId}] GET /api/services - Request started`);
+  const logger = c.get('logger');
 
   try {
     const domain = c.req.query('domain');
     const type = c.req.query('type');
 
-    console.log(`[ServicesRoute:${requestId}] Query parameters:`, { domain, type });
+    logger.debug('Query parameters', { domain, type });
 
     // Check cache first
     const cacheKey = `services:${domain || 'default'}:${type || 'all'}`;
-    console.log(`[ServicesRoute:${requestId}] Cache key: ${cacheKey}`);
+    logger.debug('Checking cache', { cacheKey });
 
     const cachedResult = cache.get(cacheKey);
 
     if (cachedResult) {
-      console.log(`[ServicesRoute:${requestId}] Cache hit - returning cached result`);
+      logger.debug('Cache hit - returning cached result');
       return c.json(cachedResult);
     }
 
-    console.log(`[ServicesRoute:${requestId}] Cache miss - fetching from service discovery`);
+    logger.debug('Cache miss - fetching from service discovery');
 
     // Get services from discovery service
     const options: any = {};
     if (domain) options.baseDomain = domain;
     if (type) options.serviceType = type;
 
-    console.log(`[ServicesRoute:${requestId}] Service discovery options:`, options);
+    logger.debug('Service discovery options', options);
     const discoveredServices = await serviceDiscovery.getServices(options);
-    console.log(`[ServicesRoute:${requestId}] Service discovery returned ${discoveredServices.length} services`);
+    logger.info('Service discovery completed', {
+      serviceCount: discoveredServices.length
+    });
 
     const response = {
       success: true,
@@ -61,19 +63,17 @@ services.get('/', async (c) => {
       },
     };
 
-    console.log(`[ServicesRoute:${requestId}] Response metadata:`, response.metadata);
+    logger.debug('Response metadata', response.metadata);
 
     // Cache the result
     cache.set(cacheKey, response);
-    console.log(`[ServicesRoute:${requestId}] Result cached with key: ${cacheKey}`);
+    logger.debug('Result cached', { cacheKey });
 
-    console.log(`[ServicesRoute:${requestId}] Request completed successfully`);
     return c.json(response);
   } catch (error) {
-    console.error(`[ServicesRoute:${requestId}] Failed to get services:`, error);
-    console.error(`[ServicesRoute:${requestId}] Error details:`, {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+    logger.error('Failed to get services', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
 
     return c.json(
@@ -92,13 +92,12 @@ services.get('/', async (c) => {
  * Get a specific service by ID (placeholder for future implementation)
  */
 services.get('/:id', (c) => {
-  const requestId = Math.random().toString(36).substring(7);
+  const logger = c.get('logger');
   const id = c.req.param('id');
 
-  console.log(`[ServicesRoute:${requestId}] GET /api/services/${id} - Request started`);
-  console.log(`[ServicesRoute:${requestId}] Service ID parameter: ${id}`);
+  logger.debug('Service detail endpoint called', { id });
+  logger.warn('Service detail endpoint not yet implemented', { id });
 
-  console.log(`[ServicesRoute:${requestId}] Returning 501 Not Implemented`);
   return c.json(
     {
       success: false,
