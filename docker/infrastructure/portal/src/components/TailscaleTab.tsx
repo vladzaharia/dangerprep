@@ -34,7 +34,7 @@ export const TailscaleTab: React.FC = () => {
       {/* Tailscale Status */}
       <wa-card appearance='outlined'>
         <div className='wa-stack wa-gap-m'>
-          <div className='wa-stack wa-gap-xs'>
+          <div className='wa-stack wa-gap-xs wa-body-s'>
             <div>
               <strong>Status:</strong>{' '}
               <wa-badge variant={tailscaleInterface.status === 'connected' ? 'success' : 'danger'}>
@@ -61,26 +61,19 @@ export const TailscaleTab: React.FC = () => {
       </wa-card>
 
       {/* Tailscale Peers */}
-      <div className='wa-stack wa-gap-s'>
+      <div className='wa-stack wa-gap-s wa-body-s'>
         <h3 className='wa-heading-s'>Peers ({peers.length})</h3>
-        <wa-scroller orientation='vertical'>
           {peers.length === 0 ? (
             <wa-callout variant='neutral'>
               <wa-icon name='info-circle' slot='icon'></wa-icon>
               No peers connected.
             </wa-callout>
           ) : (
-            peers.map((peer: TailscalePeer, index: number) => (
+            peers.filter((peer: TailscalePeer) => peer.online).map((peer: TailscalePeer, index: number) => (
               <wa-details key={peer.ipAddress || index} summary={peer.hostname || peer.ipAddress}>
                 <div className='wa-stack wa-gap-xs'>
                   <div>
                     <strong>IP Address:</strong> {peer.ipAddress}
-                  </div>
-                  <div>
-                    <strong>Status:</strong>{' '}
-                    <wa-badge variant={peer.online ? 'success' : 'neutral'}>
-                      {peer.online ? 'Online' : 'Offline'}
-                    </wa-badge>
                   </div>
                   {peer.os && (
                     <div>
@@ -101,7 +94,6 @@ export const TailscaleTab: React.FC = () => {
               </wa-details>
             ))
           )}
-        </wa-scroller>
       </div>
     </div>
   );

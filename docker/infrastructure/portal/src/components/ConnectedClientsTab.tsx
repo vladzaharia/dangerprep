@@ -41,7 +41,7 @@ export const ConnectedClientsTab: React.FC = () => {
           key={client.macAddress || index}
           summary={client.hostname || client.ipAddress || client.macAddress}
         >
-          <div className='wa-stack wa-gap-xs'>
+          <div className='wa-stack wa-gap-xs wa-body-s'>
             {client.ipAddress && (
               <div>
                 <strong>IP Address:</strong> {client.ipAddress}

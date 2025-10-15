@@ -104,18 +104,20 @@ export const NetworkStatusTab: React.FC = () => {
       <div className='wa-stack wa-gap-m'>
         <h3 className='wa-heading-s'>&nbsp;</h3>
         <wa-card appearance='outlined'>
-          <div className='wa-stack wa-gap-m wa-align-items-center'>
-            <FontAwesomeIcon icon={faServer} size='2x' />
-            <div className='wa-stack wa-gap-xs wa-align-items-center'>
-              {deviceIPs.length > 0 && (
-                <div className='wa-stack wa-gap-3xs wa-align-items-center'>
-                  {deviceIPs.filter(({ name }) => !name.startsWith("br")).map(({ name, ip }) => (
-                    <span key={name} className='wa-caption-s'>
-                      <strong>{name}</strong>: {ip}
-                    </span>
-                  ))}
-                </div>
-              )}
+          <div className='wa-stack wa-gap-xs'>
+            <div className='wa-flank wa-gap-s'>
+              <FontAwesomeIcon icon={faServer} size='lg' />
+              <div className='wa-stack wa-gap-3xs'>
+                {deviceIPs.length > 0 && (
+                  <div className='wa-stack wa-gap-3xs wa-align-items-center'>
+                    {deviceIPs.filter(({ name }) => !name.startsWith("br")).map(({ name, ip }) => (
+                      <span key={name} className='wa-caption-s'>
+                        <strong>{name}</strong>: {ip}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </wa-card>
