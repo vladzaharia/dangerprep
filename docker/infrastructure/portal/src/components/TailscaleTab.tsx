@@ -115,12 +115,12 @@ export const TailscaleTab: React.FC = () => {
                   <div className='wa-flank wa-gap-m'>
                     <FontAwesomeIcon icon={faComputer} size='lg' />
 
-                    <div className='wa-stack wa-body-s wa-gap-xs' style={{ paddingTop: '8px' }}>
+                    <div className='wa-stack wa-body-s wa-gap-3xs' style={{ paddingTop: '8px' }}>
                       <span className='wa-body-s' style={{ fontWeight: 600 }}>
                         {peer.hostname || peer.ipAddress}
                       </span>
 
-                      <span className='wa-body-s'>
+                      <span className='wa-caption-s'>
                         {peer.ipAddress}
                       </span>
 
