@@ -1,6 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faNetworkWired } from '@fortawesome/free-solid-svg-icons';
+import { faComputer, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 import { useNetworkWorker, useTailscaleFromWorker } from '../hooks/useNetworkWorker';
 import type { TailscaleInterface, TailscalePeer } from '../hooks/useNetworks';
 
@@ -115,7 +115,9 @@ export const TailscaleTab: React.FC = () => {
             <div className='wa-stack wa-gap-xs'>
               {onlinePeers.map((peer: TailscalePeer, index: number) => (
                 <wa-card orientation="horizontal" key={`peer-${index}`}>
-                  <div className='wa-stack wa-body-s' style={{ paddingTop: '8px' }}>
+                  <FontAwesomeIcon icon={faComputer} size='lg' />
+
+                  <div className='wa-stack wa-body-s wa-gap-xs' style={{ paddingTop: '8px' }}>
                     <span className='wa-body-s' style={{ fontWeight: 600 }}>
                       {peer.hostname || peer.ipAddress}
                     </span>
