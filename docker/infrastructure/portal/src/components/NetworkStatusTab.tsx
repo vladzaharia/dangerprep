@@ -77,16 +77,10 @@ export const NetworkStatusTab: React.FC = () => {
                 <div className="wa-flank wa-gap-s">
                   <FontAwesomeIcon icon={getInterfaceIcon(iface)} size="lg" />
                   <div className="wa-stack wa-gap-3xs">
-                    <span className="wa-body-s" style={{ fontWeight: 600 }}>{iface.name}</span>
-                    {iface.type === 'wifi' && 'ssid' in iface && iface.ssid && (
-                      <span className="wa-caption-s">SSID: {iface.ssid}</span>
-                    )}
+                    <span className="wa-body-s" style={{ fontWeight: 600 }}>{iface.type === 'wifi' && 'ssid' in iface && iface.ssid ? iface.ssid : iface.name}</span>
                     {iface.ipAddress && (
-                      <span className="wa-caption-s">IP: {iface.ipAddress}</span>
+                      <span className="wa-caption-s">{iface.ipAddress}</span>
                     )}
-                    <wa-badge variant={iface.state === 'up' ? 'success' : 'danger'}>
-                      {iface.state}
-                    </wa-badge>
                   </div>
                 </div>
               </div>
@@ -97,17 +91,15 @@ export const NetworkStatusTab: React.FC = () => {
 
       {/* Middle Column - Router/Device */}
       <div className="wa-stack wa-gap-m">
-        <h3 className="wa-heading-s">Device</h3>
-        <wa-card appearance="filled">
+        <h3 className="wa-heading-s">&nbsp;</h3>
+        <wa-card appearance="outlined">
           <div className="wa-stack wa-gap-m wa-align-items-center">
             <FontAwesomeIcon icon={faServer} size="2x" />
             <div className="wa-stack wa-gap-xs wa-align-items-center">
-              <span className="wa-heading-s">DangerPrep</span>
               {deviceIPs.length > 0 && (
                 <div className="wa-stack wa-gap-3xs wa-align-items-center">
-                  <span className="wa-caption-s" style={{ fontWeight: 600 }}>IP Addresses:</span>
                   {deviceIPs.map(({ name, ip }) => (
-                    <span key={name} className="wa-caption-s">{name}: {ip}</span>
+                    <span key={name} className="wa-caption-s"><strong>{name}</strong>: {ip}</span>
                   ))}
                 </div>
               )}
@@ -118,7 +110,7 @@ export const NetworkStatusTab: React.FC = () => {
 
       {/* Right Column - WAN Interfaces */}
       <div className="wa-stack wa-gap-m">
-        <h3 className="wa-heading-s">Internet (WAN)</h3>
+        <h3 className="wa-heading-s">Internet</h3>
         {wanInterfaces.length === 0 ? (
           <wa-card appearance="outlined">
             <div className="wa-stack wa-gap-xs">
@@ -132,19 +124,13 @@ export const NetworkStatusTab: React.FC = () => {
                 <div className="wa-flank wa-gap-s">
                   <FontAwesomeIcon icon={getInterfaceIcon(iface)} size="lg" />
                   <div className="wa-stack wa-gap-3xs">
-                    <span className="wa-body-s" style={{ fontWeight: 600 }}>{iface.name}</span>
-                    {iface.type === 'wifi' && 'ssid' in iface && iface.ssid && (
-                      <span className="wa-caption-s">SSID: {iface.ssid}</span>
-                    )}
+                    <span className="wa-body-s" style={{ fontWeight: 600 }}>{iface.type === 'wifi' && 'ssid' in iface && iface.ssid ? iface.ssid : iface.name}</span>
                     {iface.ipAddress && (
-                      <span className="wa-caption-s">IP: {iface.ipAddress}</span>
+                      <span className="wa-caption-s"><strong>IP:</strong> {iface.ipAddress}</span>
                     )}
                     {iface.gateway && (
-                      <span className="wa-caption-s">Gateway: {iface.gateway}</span>
+                      <span className="wa-caption-s"><strong>Gateway:</strong> {iface.gateway}</span>
                     )}
-                    <wa-badge variant={iface.state === 'up' ? 'success' : 'danger'}>
-                      {iface.state}
-                    </wa-badge>
                   </div>
                 </div>
               </div>
