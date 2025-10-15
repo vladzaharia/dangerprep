@@ -114,7 +114,7 @@ export const TailscaleTab: React.FC = () => {
           <wa-scroller style={{ maxHeight: '500px' }}>
             <div className='wa-stack wa-gap-s'>
               {onlinePeers.map((peer: TailscalePeer, index: number) => (
-                <wa-card orientation="horizontal">
+                <wa-card orientation="horizontal" key={`peer-${index}`}>
                   <div className='wa-stack wa-gap-xs wa-body-s' style={{ paddingTop: '8px' }}>
                     <span className='wa-body-s' style={{ fontWeight: 600 }}>
                       {peer.hostname || peer.ipAddress}
