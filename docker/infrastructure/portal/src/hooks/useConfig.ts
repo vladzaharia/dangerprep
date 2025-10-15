@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
 // React 19 use hook with fallback for older versions
-const useHook = (React as any).use || ((promise: Promise<any>) => {
-  throw promise; // Fallback behavior for Suspense
-});
+const useHook =
+  (React as any).use ||
+  ((promise: Promise<any>) => {
+    throw promise; // Fallback behavior for Suspense
+  });
 
 /**
  * App configuration data structure
@@ -89,7 +91,7 @@ function getCachedConfig(): Promise<AppConfig> {
   const cacheKey = 'app-config';
 
   if (!configCache.has(cacheKey)) {
-    const promise = fetchConfig().catch((error) => {
+    const promise = fetchConfig().catch(error => {
       // Remove failed promise from cache so it can be retried
       configCache.delete(cacheKey);
 
@@ -98,7 +100,8 @@ function getCachedConfig(): Promise<AppConfig> {
       return {
         app: {
           title: import.meta.env.VITE_APP_TITLE || 'DangerPrep Portal',
-          description: import.meta.env.VITE_APP_DESCRIPTION || 'Your portable hotspot services portal',
+          description:
+            import.meta.env.VITE_APP_DESCRIPTION || 'Your portable hotspot services portal',
         },
         global: {
           baseDomain: import.meta.env.VITE_BASE_DOMAIN || 'danger.diy',
@@ -149,7 +152,8 @@ export function useAppConfigTraditional() {
         setConfig({
           app: {
             title: import.meta.env.VITE_APP_TITLE || 'DangerPrep Portal',
-            description: import.meta.env.VITE_APP_DESCRIPTION || 'Your portable hotspot services portal',
+            description:
+              import.meta.env.VITE_APP_DESCRIPTION || 'Your portable hotspot services portal',
           },
           global: {
             baseDomain: import.meta.env.VITE_BASE_DOMAIN || 'danger.diy',

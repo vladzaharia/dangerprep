@@ -13,7 +13,7 @@ const config = new Hono<{ Variables: LoggerVariables }>();
  * Get application-level configuration (title, description, base domain, etc.)
  * This does NOT include WiFi or service-specific configuration
  */
-config.get('/', (c) => {
+config.get('/', c => {
   const logger = c.get('logger');
 
   try {
@@ -47,7 +47,7 @@ config.get('/', (c) => {
  * Alias for /api/config for backward compatibility
  * @deprecated Use /api/config instead
  */
-config.get('/app', (c) => {
+config.get('/app', c => {
   const logger = c.get('logger');
   logger.warn('Using deprecated endpoint /api/config/app - use /api/config instead');
 
@@ -78,4 +78,3 @@ config.get('/app', (c) => {
 });
 
 export default config;
-

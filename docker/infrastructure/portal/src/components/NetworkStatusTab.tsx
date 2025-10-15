@@ -1,6 +1,12 @@
 import React, { useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faWifi, faEthernet, faServer, faGlobe, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
+import {
+  faWifi,
+  faEthernet,
+  faServer,
+  faGlobe,
+  faNetworkWired,
+} from '@fortawesome/free-solid-svg-icons';
 import { useNetworkWorker } from '../hooks/useNetworkWorker';
 import type { NetworkInterface } from '../hooks/useNetworks';
 
@@ -30,16 +36,16 @@ export const NetworkStatusTab: React.FC = () => {
   // Get LAN interfaces (hotspot/wlan)
   const lanInterfaces = useMemo(() => {
     if (!network.data?.interfaces) return [];
-    return network.data.interfaces.filter(iface => 
-      iface.purpose === 'wlan' || iface.purpose === 'lan'
+    return network.data.interfaces.filter(
+      iface => iface.purpose === 'wlan' || iface.purpose === 'lan'
     );
   }, [network.data]);
 
   // Get WAN interfaces (internet)
   const wanInterfaces = useMemo(() => {
     if (!network.data?.interfaces) return [];
-    return network.data.interfaces.filter(iface => 
-      iface.purpose === 'wan' && iface.type !== 'tailscale'
+    return network.data.interfaces.filter(
+      iface => iface.purpose === 'wan' && iface.type !== 'tailscale'
     );
   }, [network.data]);
 
@@ -53,34 +59,39 @@ export const NetworkStatusTab: React.FC = () => {
 
   if (network.loading && !network.data) {
     return (
-      <div className="wa-stack wa-gap-m">
-        <wa-skeleton effect="sheen" style={{ width: '100%', height: '200px' }}></wa-skeleton>
+      <div className='wa-stack wa-gap-m'>
+        <wa-skeleton effect='sheen' style={{ width: '100%', height: '200px' }}></wa-skeleton>
       </div>
     );
   }
 
   return (
-    <div className="wa-grid wa-gap-l" style={{ '--min-column-size': '200px' } as React.CSSProperties}>
+    <div
+      className='wa-grid wa-gap-l'
+      style={{ '--min-column-size': '200px' } as React.CSSProperties}
+    >
       {/* Left Column - LAN Interfaces */}
-      <div className="wa-stack wa-gap-m">
-        <h3 className="wa-heading-s">LAN</h3>
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>LAN</h3>
         {lanInterfaces.length === 0 ? (
-          <wa-card appearance="outlined">
-            <div className="wa-stack wa-gap-xs">
-              <span className="wa-caption-s">No LAN interfaces</span>
+          <wa-card appearance='outlined'>
+            <div className='wa-stack wa-gap-xs'>
+              <span className='wa-caption-s'>No LAN interfaces</span>
             </div>
           </wa-card>
         ) : (
           lanInterfaces.map(iface => (
-            <wa-card key={iface.name} appearance="outlined">
-              <div className="wa-stack wa-gap-xs">
-                <div className="wa-flank wa-gap-s">
-                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size="lg" />
-                  <div className="wa-stack wa-gap-3xs">
-                    <span className="wa-body-s" style={{ fontWeight: 600 }}>{iface.type === 'wifi' && 'ssid' in iface && iface.ssid ? iface.ssid : iface.name}</span>
-                    {iface.ipAddress && (
-                      <span className="wa-caption-s">{iface.ipAddress}</span>
-                    )}
+            <wa-card key={iface.name} appearance='outlined'>
+              <div className='wa-stack wa-gap-xs'>
+                <div className='wa-flank wa-gap-s'>
+                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />
+                  <div className='wa-stack wa-gap-3xs'>
+                    <span className='wa-body-s' style={{ fontWeight: 600 }}>
+                      {iface.type === 'wifi' && 'ssid' in iface && iface.ssid
+                        ? iface.ssid
+                        : iface.name}
+                    </span>
+                    {iface.ipAddress && <span className='wa-caption-s'>{iface.ipAddress}</span>}
                   </div>
                 </div>
               </div>
@@ -90,16 +101,18 @@ export const NetworkStatusTab: React.FC = () => {
       </div>
 
       {/* Middle Column - Router/Device */}
-      <div className="wa-stack wa-gap-m">
-        <h3 className="wa-heading-s">&nbsp;</h3>
-        <wa-card appearance="outlined">
-          <div className="wa-stack wa-gap-m wa-align-items-center">
-            <FontAwesomeIcon icon={faServer} size="2x" />
-            <div className="wa-stack wa-gap-xs wa-align-items-center">
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>&nbsp;</h3>
+        <wa-card appearance='outlined'>
+          <div className='wa-stack wa-gap-m wa-align-items-center'>
+            <FontAwesomeIcon icon={faServer} size='2x' />
+            <div className='wa-stack wa-gap-xs wa-align-items-center'>
               {deviceIPs.length > 0 && (
-                <div className="wa-stack wa-gap-3xs wa-align-items-center">
+                <div className='wa-stack wa-gap-3xs wa-align-items-center'>
                   {deviceIPs.map(({ name, ip }) => (
-                    <span key={name} className="wa-caption-s"><strong>{name}</strong>: {ip}</span>
+                    <span key={name} className='wa-caption-s'>
+                      <strong>{name}</strong>: {ip}
+                    </span>
                   ))}
                 </div>
               )}
@@ -109,27 +122,35 @@ export const NetworkStatusTab: React.FC = () => {
       </div>
 
       {/* Right Column - WAN Interfaces */}
-      <div className="wa-stack wa-gap-m">
-        <h3 className="wa-heading-s">Internet</h3>
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>Internet</h3>
         {wanInterfaces.length === 0 ? (
-          <wa-card appearance="outlined">
-            <div className="wa-stack wa-gap-xs">
-              <span className="wa-caption-s">No internet connection</span>
+          <wa-card appearance='outlined'>
+            <div className='wa-stack wa-gap-xs'>
+              <span className='wa-caption-s'>No internet connection</span>
             </div>
           </wa-card>
         ) : (
           wanInterfaces.map(iface => (
-            <wa-card key={iface.name} appearance="outlined">
-              <div className="wa-stack wa-gap-xs">
-                <div className="wa-flank wa-gap-s">
-                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size="lg" />
-                  <div className="wa-stack wa-gap-3xs">
-                    <span className="wa-body-s" style={{ fontWeight: 600 }}>{iface.type === 'wifi' && 'ssid' in iface && iface.ssid ? iface.ssid : iface.name}</span>
+            <wa-card key={iface.name} appearance='outlined'>
+              <div className='wa-stack wa-gap-xs'>
+                <div className='wa-flank wa-gap-s'>
+                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />
+                  <div className='wa-stack wa-gap-3xs'>
+                    <span className='wa-body-s' style={{ fontWeight: 600 }}>
+                      {iface.type === 'wifi' && 'ssid' in iface && iface.ssid
+                        ? `${iface.ssid} (${iface.name})`
+                        : iface.name}
+                    </span>
                     {iface.ipAddress && (
-                      <span className="wa-caption-s"><strong>IP:</strong> {iface.ipAddress}</span>
+                      <span className='wa-caption-s'>
+                        <strong>IP:</strong> {iface.ipAddress}
+                      </span>
                     )}
                     {iface.gateway && (
-                      <span className="wa-caption-s"><strong>Gateway:</strong> {iface.gateway}</span>
+                      <span className='wa-caption-s'>
+                        <strong>Gateway:</strong> {iface.gateway}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -141,4 +162,3 @@ export const NetworkStatusTab: React.FC = () => {
     </div>
   );
 };
-

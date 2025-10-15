@@ -23,36 +23,42 @@ if (isDevelopment) {
   app.use('*', prettyJSON());
 }
 
-app.use('*', secureHeaders({
-  // Permissive security headers for all hosts as requested
-  contentSecurityPolicy: {
-    defaultSrc: ["'self'", "*"],
-    styleSrc: ["'self'", "'unsafe-inline'", "*"],
-    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "*"],
-    imgSrc: ["'self'", "data:", "https:", "http:", "*"],
-    connectSrc: ["'self'", "*"],
-    fontSrc: ["'self'", "data:", "https:", "http:", "*"],
-    objectSrc: ["'none'"],
-    mediaSrc: ["'self'", "*"],
-    frameSrc: ["'self'", "*"],
-    frameAncestors: ["'self'", "*"],
-    baseUri: ["'self'", "*"],
-    formAction: ["'self'", "*"],
-  },
-  crossOriginEmbedderPolicy: false, // Disable for compatibility
-  crossOriginOpenerPolicy: false, // Disable to prevent HTTP/HTTPS issues
-  crossOriginResourcePolicy: false, // Disable for compatibility
-  originAgentCluster: false, // Disable to prevent agent cluster issues
-}));
+app.use(
+  '*',
+  secureHeaders({
+    // Permissive security headers for all hosts as requested
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'", '*'],
+      styleSrc: ["'self'", "'unsafe-inline'", '*'],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", '*'],
+      imgSrc: ["'self'", 'data:', 'https:', 'http:', '*'],
+      connectSrc: ["'self'", '*'],
+      fontSrc: ["'self'", 'data:', 'https:', 'http:', '*'],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'", '*'],
+      frameSrc: ["'self'", '*'],
+      frameAncestors: ["'self'", '*'],
+      baseUri: ["'self'", '*'],
+      formAction: ["'self'", '*'],
+    },
+    crossOriginEmbedderPolicy: false, // Disable for compatibility
+    crossOriginOpenerPolicy: false, // Disable to prevent HTTP/HTTPS issues
+    crossOriginResourcePolicy: false, // Disable for compatibility
+    originAgentCluster: false, // Disable to prevent agent cluster issues
+  })
+);
 
-app.use('*', cors({
-  origin: '*', // Allow all hosts as requested
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
-  allowHeaders: ['*'], // Allow all headers
-  exposeHeaders: ['*'], // Expose all headers
-  credentials: false,
-  maxAge: 86400, // Cache preflight for 24 hours
-}));
+app.use(
+  '*',
+  cors({
+    origin: '*', // Allow all hosts as requested
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
+    allowHeaders: ['*'], // Allow all headers
+    exposeHeaders: ['*'], // Expose all headers
+    credentials: false,
+    maxAge: 86400, // Cache preflight for 24 hours
+  })
+);
 
 // Mount API routes
 app.route('/api/health', health);
@@ -65,13 +71,13 @@ if (process.env.NODE_ENV === 'production') {
   // Serve static assets
   app.use('/assets/*', serveStatic({ root: './dist' }));
   app.use('/static/*', serveStatic({ root: './dist' }));
-  
+
   // Serve index.html for all non-API routes (SPA routing)
   app.get('*', serveStatic({ path: './dist/index.html' }));
 }
 
 // 404 handler for API routes only (in development, Vite handles non-API routes)
-app.notFound((c) => {
+app.notFound(c => {
   // Only return 404 JSON for API routes
   if (c.req.path.startsWith('/api')) {
     return c.json(
@@ -83,7 +89,7 @@ app.notFound((c) => {
       404
     );
   }
-  
+
   // For non-API routes in development, this won't be reached
   // because Vite dev server handles them
   return c.text('Not Found', 404);

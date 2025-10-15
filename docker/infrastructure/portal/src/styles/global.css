@@ -345,7 +345,8 @@ body {
     font-size: 0.75rem;
   }
 
-  .wifi-details, .wifi-detail-value {
+  .wifi-details,
+  .wifi-detail-value {
     width: 100%;
   }
 }

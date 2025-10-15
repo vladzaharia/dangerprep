@@ -22,13 +22,13 @@ export const ConnectionStatusButton: React.FC = () => {
   // Use worker for real-time network updates
   const network = useNetworkWorker({
     pollInterval: 5000,
-    autoStart: true
+    autoStart: true,
   });
 
   // Use worker for real-time hostapd status updates
   const hostapd = useHostapdWorker({
     pollInterval: 5000,
-    autoStart: true
+    autoStart: true,
   });
 
   // Calculate connection status based on last update time
@@ -37,15 +37,13 @@ export const ConnectionStatusButton: React.FC = () => {
     const lastUpdateTime = new Date(network.lastUpdate).getTime();
     const now = Date.now();
     const fiveMinutesInMs = 5 * 60 * 1000;
-    return (now - lastUpdateTime) < fiveMinutesInMs;
+    return now - lastUpdateTime < fiveMinutesInMs;
   }, [network.lastUpdate]);
 
   // Check if there are any internet (WAN) interfaces that are up
   const hasInternetInterface = useMemo(() => {
     if (!network.data?.interfaces) return false;
-    return network.data.interfaces.some(
-      (iface) => iface.purpose === 'wan' && iface.state === 'up'
-    );
+    return network.data.interfaces.some(iface => iface.purpose === 'wan' && iface.state === 'up');
   }, [network.data]);
 
   // Get connected clients count
@@ -71,35 +69,25 @@ export const ConnectionStatusButton: React.FC = () => {
 
   return (
     <div
-      className="connection-status-button"
+      className='connection-status-button'
       onClick={handleClick}
       style={{ cursor: 'pointer' }}
-      role="button"
+      role='button'
       tabIndex={0}
-      onKeyDown={(e) => {
+      onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           handleClick();
         }
       }}
-      aria-label="View network status"
+      aria-label='View network status'
     >
-      <wa-button
-        appearance="outlined"
-        variant={variant}
-      >
-        <FontAwesomeIcon
-          icon={faWifi}
-          size="xl"
-        />
-        <wa-badge
-          variant={variant}
-          attention={shouldPulse ? 'pulse' : 'none'}
-        >
+      <wa-button appearance='outlined' variant={variant}>
+        <FontAwesomeIcon icon={faWifi} size='xl' />
+        <wa-badge variant={variant} attention={shouldPulse ? 'pulse' : 'none'}>
           {isConnected ? connectedClients : '!'}
         </wa-badge>
       </wa-button>
     </div>
   );
 };
-

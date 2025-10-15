@@ -52,7 +52,10 @@ export class ConfigService {
     const config = {
       app: {
         title: this.getEnvVar('VITE_APP_TITLE', 'DangerPrep Portal'),
-        description: this.getEnvVar('VITE_APP_DESCRIPTION', 'Your portable hotspot services portal'),
+        description: this.getEnvVar(
+          'VITE_APP_DESCRIPTION',
+          'Your portable hotspot services portal'
+        ),
       },
       global: {
         baseDomain: this.getEnvVar('BASE_DOMAIN', 'danger.diy'),
@@ -79,4 +82,3 @@ export class ConfigService {
     throw new Error('Application configuration update not yet implemented');
   }
 }
-

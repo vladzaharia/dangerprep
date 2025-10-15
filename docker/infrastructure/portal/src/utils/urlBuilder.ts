@@ -1,6 +1,6 @@
 /**
  * URL Builder Utility
- * 
+ *
  * Constructs service URLs dynamically from base domain and subdomain configuration.
  * This allows the portal to work with different domains (danger, danger.diy, argos.surf, etc.)
  * by simply changing environment variables.
@@ -8,7 +8,7 @@
 
 /**
  * Constructs a full HTTPS URL from a base domain and subdomain
- * 
+ *
  * @param baseDomain - The base domain (e.g., "argos.surf", "danger.diy")
  * @param subdomain - The service subdomain (e.g., "media", "kiwix", "retro")
  * @returns Full HTTPS URL (e.g., "https://media.argos.surf")
@@ -17,7 +17,7 @@ export function buildServiceUrl(baseDomain: string, subdomain: string): string {
   if (!baseDomain || !subdomain) {
     throw new Error('Both baseDomain and subdomain are required to build service URL');
   }
-  
+
   // Ensure we always use HTTPS
   return `https://${subdomain}.${baseDomain}`;
 }

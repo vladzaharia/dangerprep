@@ -9,7 +9,6 @@ interface ServiceCardProps {
 }
 
 export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
-
   const handleClick = () => {
     if (service.url) {
       window.open(service.url, '_blank', 'noopener,noreferrer');
@@ -32,15 +31,19 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
         className={`wa-stack service-card ${isClickable ? 'service-card--clickable' : ''}`}
         onClick={isClickable ? handleClick : undefined}
         onKeyDown={isClickable ? handleKeyDown : undefined}
-        role={isClickable ? "button" : undefined}
+        role={isClickable ? 'button' : undefined}
         tabIndex={isClickable ? 0 : undefined}
-        aria-label={isClickable ? `Open ${service.name} - ${service.description}` : `${service.name} - ${service.description}`}
+        aria-label={
+          isClickable
+            ? `Open ${service.name} - ${service.description}`
+            : `${service.name} - ${service.description}`
+        }
       >
         <div className='service-card-header'>
           <div className='service-icon'>
             <FontAwesomeIcon
               icon={getIcon(service.icon)}
-              size="2x"
+              size='2x'
               style={{ color: 'var(--wa-color-neutral-text-subtle)' }}
             />
           </div>
@@ -58,7 +61,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
                 <span className='service-url-text'>{service.url}</span>
                 <FontAwesomeIcon
                   icon={getIcon('external-link')}
-                  size="sm"
+                  size='sm'
                   className='service-url-icon'
                 />
               </div>

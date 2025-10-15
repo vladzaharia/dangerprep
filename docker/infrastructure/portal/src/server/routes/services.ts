@@ -19,7 +19,7 @@ const services = new Hono<{ Variables: LoggerVariables }>();
  *   - domain: Override base domain
  *   - type: Filter by service type (public, private, maintenance, all)
  */
-services.get('/', async (c) => {
+services.get('/', async c => {
   const logger = c.get('logger');
 
   try {
@@ -49,7 +49,7 @@ services.get('/', async (c) => {
     logger.debug('Service discovery options', options);
     const discoveredServices = await serviceDiscovery.getServices(options);
     logger.info('Service discovery completed', {
-      serviceCount: discoveredServices.length
+      serviceCount: discoveredServices.length,
     });
 
     const response = {
@@ -91,7 +91,7 @@ services.get('/', async (c) => {
  * GET /api/services/:id
  * Get a specific service by ID (placeholder for future implementation)
  */
-services.get('/:id', (c) => {
+services.get('/:id', c => {
   const logger = c.get('logger');
   const id = c.req.param('id');
 
@@ -109,4 +109,3 @@ services.get('/:id', (c) => {
 });
 
 export default services;
-

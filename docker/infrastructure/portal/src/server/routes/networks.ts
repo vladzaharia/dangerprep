@@ -12,7 +12,7 @@ const networks = new Hono<{ Variables: LoggerVariables }>();
  * GET /api/networks
  * Get all network interfaces with full information
  */
-networks.get('/', async (c) => {
+networks.get('/', async c => {
   const logger = c.get('logger');
 
   try {
@@ -20,7 +20,7 @@ networks.get('/', async (c) => {
     // Return network summary with special interface mappings
     const summary = await networkService.getNetworkSummary();
     logger.info('Retrieved network summary', {
-      totalInterfaces: summary.totalInterfaces
+      totalInterfaces: summary.totalInterfaces,
     });
 
     return c.json({
@@ -109,7 +109,7 @@ function createDefaultInterfaceData(keyword: string) {
  * Supports both actual interface names (e.g., eth0, wlan0) and keywords (hotspot, internet, tailscale)
  * For keywords, shows default data if actual interface not found
  */
-networks.get('/:interface', async (c) => {
+networks.get('/:interface', async c => {
   const logger = c.get('logger');
   const interfaceName = c.req.param('interface');
 
@@ -122,7 +122,9 @@ networks.get('/:interface', async (c) => {
     // Check if it's a keyword
     if (isKeyword) {
       logger.debug('Looking up keyword interface', { interfaceName });
-      networkInterface = await networkService.getInterfaceByKeyword(interfaceName as 'hotspot' | 'internet' | 'tailscale');
+      networkInterface = await networkService.getInterfaceByKeyword(
+        interfaceName as 'hotspot' | 'internet' | 'tailscale'
+      );
 
       // If keyword interface not found, return default data
       if (!networkInterface) {
@@ -187,7 +189,7 @@ networks.get('/:interface', async (c) => {
         interfaceName,
         mode: wifiInterface.mode,
         hasConnectedClients: !!wifiInterface.connectedClients,
-        connectedClientsCount: wifiInterface.connectedClients?.length || 0
+        connectedClientsCount: wifiInterface.connectedClients?.length || 0,
       });
     } else {
       logger.debug('Returning interface data', { interfaceName, type: networkInterface.type });
@@ -230,7 +232,7 @@ networks.get('/:interface', async (c) => {
  * GET /api/networks/hostapd/status
  * Get detailed hostapd status information
  */
-networks.get('/hostapd/status', async (c) => {
+networks.get('/hostapd/status', async c => {
   const logger = c.get('logger');
 
   try {
@@ -274,7 +276,7 @@ networks.get('/hostapd/status', async (c) => {
  * POST /api/networks/refresh
  * Refresh the network interface cache
  */
-networks.post('/refresh', async (c) => {
+networks.post('/refresh', async c => {
   const logger = c.get('logger');
 
   try {
@@ -285,7 +287,7 @@ networks.post('/refresh', async (c) => {
     // Trigger a refresh by getting the summary
     const summary = await networkService.getNetworkSummary();
     logger.info('Cache refreshed', {
-      interfaceCount: summary.totalInterfaces
+      interfaceCount: summary.totalInterfaces,
     });
 
     return c.json({

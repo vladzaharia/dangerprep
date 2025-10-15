@@ -21,36 +21,42 @@ const app = new Hono<{ Variables: LoggerVariables }>();
 app.use('*', requestId());
 // Structured logging middleware (uses requestId from context)
 app.use('*', structuredLogging());
-app.use('*', secureHeaders({
-  // Permissive security headers for all hosts as requested
-  contentSecurityPolicy: {
-    defaultSrc: ["'self'", "*"],
-    styleSrc: ["'self'", "'unsafe-inline'", "*"],
-    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "*"],
-    imgSrc: ["'self'", "data:", "https:", "http:", "*"],
-    connectSrc: ["'self'", "*"],
-    fontSrc: ["'self'", "data:", "https:", "http:", "*"],
-    objectSrc: ["'none'"],
-    mediaSrc: ["'self'", "*"],
-    frameSrc: ["'self'", "*"],
-    frameAncestors: ["'self'", "*"],
-    baseUri: ["'self'", "*"],
-    formAction: ["'self'", "*"],
-  },
-  crossOriginEmbedderPolicy: false, // Disable for compatibility
-  crossOriginOpenerPolicy: false, // Disable to prevent HTTP/HTTPS issues
-  crossOriginResourcePolicy: false, // Disable for compatibility
-  originAgentCluster: false, // Disable to prevent agent cluster issues
-}));
+app.use(
+  '*',
+  secureHeaders({
+    // Permissive security headers for all hosts as requested
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'", '*'],
+      styleSrc: ["'self'", "'unsafe-inline'", '*'],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", '*'],
+      imgSrc: ["'self'", 'data:', 'https:', 'http:', '*'],
+      connectSrc: ["'self'", '*'],
+      fontSrc: ["'self'", 'data:', 'https:', 'http:', '*'],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'", '*'],
+      frameSrc: ["'self'", '*'],
+      frameAncestors: ["'self'", '*'],
+      baseUri: ["'self'", '*'],
+      formAction: ["'self'", '*'],
+    },
+    crossOriginEmbedderPolicy: false, // Disable for compatibility
+    crossOriginOpenerPolicy: false, // Disable to prevent HTTP/HTTPS issues
+    crossOriginResourcePolicy: false, // Disable for compatibility
+    originAgentCluster: false, // Disable to prevent agent cluster issues
+  })
+);
 app.use('*', prettyJSON());
-app.use('*', cors({
-  origin: '*', // Allow all hosts as requested
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
-  allowHeaders: ['*'], // Allow all headers
-  exposeHeaders: ['*'], // Expose all headers
-  credentials: false,
-  maxAge: 86400, // Cache preflight for 24 hours
-}));
+app.use(
+  '*',
+  cors({
+    origin: '*', // Allow all hosts as requested
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
+    allowHeaders: ['*'], // Allow all headers
+    exposeHeaders: ['*'], // Expose all headers
+    credentials: false,
+    maxAge: 86400, // Cache preflight for 24 hours
+  })
+);
 
 // Mount routes
 app.route('/api/health', health);
@@ -62,7 +68,7 @@ app.route('/api/config', config);
 // API routes are mounted under /api prefix
 
 // 404 handler
-app.notFound((c) => {
+app.notFound(c => {
   return c.json(
     {
       success: false,
@@ -98,4 +104,3 @@ app.onError((err, c) => {
 });
 
 export default app;
-

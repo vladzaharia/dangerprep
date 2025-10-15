@@ -18,17 +18,17 @@ export interface NetworkWorkerOptions {
  * const hotspot = useHotspotFromWorker(network.data);
  */
 export function useNetworkWorker(options: NetworkWorkerOptions = {}) {
-  const {
-    pollInterval = 5000,
-    autoStart = true,
-  } = options;
+  const { pollInterval = 5000, autoStart = true } = options;
 
-  const apiOptions: ApiWorkerOptions = useMemo(() => ({
-    endpoint: '/api/networks',
-    pollInterval,
-    queryParams: {},
-    autoStart,
-  }), [pollInterval, autoStart]);
+  const apiOptions: ApiWorkerOptions = useMemo(
+    () => ({
+      endpoint: '/api/networks',
+      pollInterval,
+      queryParams: {},
+      autoStart,
+    }),
+    [pollInterval, autoStart]
+  );
 
   return useApiWorker<NetworkSummary>(apiOptions);
 }
@@ -42,7 +42,7 @@ export function useNetworkInterfaceFromWorker(
 ): NetworkInterface | null {
   return useMemo(() => {
     if (!workerData) return null;
-    return workerData.interfaces.find((iface) => iface.name === interfaceName) || null;
+    return workerData.interfaces.find(iface => iface.name === interfaceName) || null;
   }, [workerData, interfaceName]);
 }
 
@@ -52,7 +52,7 @@ export function useNetworkInterfaceFromWorker(
 export function useHotspotFromWorker(workerData: NetworkSummary | null): NetworkInterface | null {
   return useMemo(() => {
     if (!workerData) return null;
-    return workerData.interfaces.find((iface) => iface.purpose === 'wlan') || null;
+    return workerData.interfaces.find(iface => iface.purpose === 'wlan') || null;
   }, [workerData]);
 }
 
@@ -62,7 +62,7 @@ export function useHotspotFromWorker(workerData: NetworkSummary | null): Network
 export function useInternetFromWorker(workerData: NetworkSummary | null): NetworkInterface | null {
   return useMemo(() => {
     if (!workerData) return null;
-    return workerData.interfaces.find((iface) => iface.purpose === 'wan') || null;
+    return workerData.interfaces.find(iface => iface.purpose === 'wan') || null;
   }, [workerData]);
 }
 
@@ -72,6 +72,6 @@ export function useInternetFromWorker(workerData: NetworkSummary | null): Networ
 export function useTailscaleFromWorker(workerData: NetworkSummary | null): NetworkInterface | null {
   return useMemo(() => {
     if (!workerData) return null;
-    return workerData.interfaces.find((iface) => iface.type === 'tailscale') || null;
+    return workerData.interfaces.find(iface => iface.type === 'tailscale') || null;
   }, [workerData]);
 }

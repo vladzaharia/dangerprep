@@ -21,9 +21,7 @@ export const Navigation: React.FC = () => {
     return queryString ? `${path}?${queryString}` : path;
   };
 
-  const mainNavItems: NavItem[] = [
-    { path: '/services', icon: faGrip, label: 'Services' },
-  ];
+  const mainNavItems: NavItem[] = [{ path: '/services', icon: faGrip, label: 'Services' }];
 
   const powerNavItems: NavItem[] = [
     { path: '/qr', icon: faQrcode, label: 'QR Code' },
@@ -32,9 +30,9 @@ export const Navigation: React.FC = () => {
   ];
 
   return (
-    <div className="app-navigation wa-split:column">
-      <div className="wa-stack app-navigation-list">
-        {mainNavItems.map((item) => (
+    <div className='app-navigation wa-split:column'>
+      <div className='wa-stack app-navigation-list'>
+        {mainNavItems.map(item => (
           <NavLink
             key={item.path}
             to={getNavLinkTo(item.path)}
@@ -43,15 +41,15 @@ export const Navigation: React.FC = () => {
             }
             aria-label={item.label}
           >
-            <wa-button appearance="plain">
-              <FontAwesomeIcon icon={item.icon} size="xl" />
+            <wa-button appearance='plain'>
+              <FontAwesomeIcon icon={item.icon} size='xl' />
             </wa-button>
           </NavLink>
         ))}
       </div>
       {isKioskMode && (
-        <div className="wa-stack app-navigation-list">
-          {powerNavItems.map((item) => (
+        <div className='wa-stack app-navigation-list'>
+          {powerNavItems.map(item => (
             <NavLink
               key={item.path}
               to={getNavLinkTo(item.path)}
@@ -60,8 +58,8 @@ export const Navigation: React.FC = () => {
               }
               aria-label={item.label}
             >
-              <wa-button appearance="plain">
-                <FontAwesomeIcon icon={item.icon} size="xl" />
+              <wa-button appearance='plain'>
+                <FontAwesomeIcon icon={item.icon} size='xl' />
               </wa-button>
             </NavLink>
           ))}

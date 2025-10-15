@@ -51,7 +51,7 @@ export class ServiceDiscoveryService {
     // Initialize Docker client with socket path
     this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
     this.logger.debug('Docker client initialized', {
-      socketPath: '/var/run/docker.sock'
+      socketPath: '/var/run/docker.sock',
     });
     this.scanServices();
   }
@@ -68,7 +68,7 @@ export class ServiceDiscoveryService {
     this.logger.debug('Cache check', {
       age: `${cacheAge}ms`,
       stale: isStale,
-      interval: `${this.scanInterval}ms`
+      interval: `${this.scanInterval}ms`,
     });
 
     if (isStale) {
@@ -88,7 +88,7 @@ export class ServiceDiscoveryService {
       this.logger.debug('Filtered by type', {
         type: options.serviceType,
         before: originalCount,
-        after: services.length
+        after: services.length,
       });
     }
 
@@ -105,7 +105,7 @@ export class ServiceDiscoveryService {
           this.logger.debug('Updated URL', {
             service: service.name,
             from: originalUrl,
-            to: updatedService.url
+            to: updatedService.url,
           });
         }
         return updatedService;
@@ -118,8 +118,8 @@ export class ServiceDiscoveryService {
         name: s.name,
         type: s.type,
         status: s.status,
-        url: s.url
-      }))
+        url: s.url,
+      })),
     });
     return services;
   }
@@ -138,7 +138,7 @@ export class ServiceDiscoveryService {
    */
   private async scanServices(overrideDomain?: string): Promise<void> {
     this.logger.debug('Starting service scan', {
-      overrideDomain: overrideDomain || 'none'
+      overrideDomain: overrideDomain || 'none',
     });
 
     try {
@@ -151,7 +151,7 @@ export class ServiceDiscoveryService {
         this.logger.debug('Processing container', {
           name: container.name,
           status: container.status,
-          labels: container.labels
+          labels: container.labels,
         });
 
         const service = this.extractServiceMetadata(container, overrideDomain);
@@ -160,7 +160,7 @@ export class ServiceDiscoveryService {
           discoveredServices.push(service);
         } else {
           this.logger.debug('No service metadata found for container', {
-            name: container.name
+            name: container.name,
           });
         }
       }
@@ -169,17 +169,17 @@ export class ServiceDiscoveryService {
       this.lastScan = Date.now();
       this.logger.debug('Scan complete', {
         count: discoveredServices.length,
-        services: discoveredServices.map(s => s.name)
+        services: discoveredServices.map(s => s.name),
       });
     } catch (error) {
       this.logger.error('Failed to scan for services', {
         error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
       // Keep existing services on error
       this.lastScan = Date.now();
       this.logger.debug('Keeping existing services after scan failure', {
-        count: this.services.length
+        count: this.services.length,
       });
     }
   }
@@ -197,15 +197,16 @@ export class ServiceDiscoveryService {
       const mappedContainers = containers.map(container => {
         const name = container.Names?.[0]?.replace(/^\//, '') || '';
         const status = container.Status || '';
-        const ports = container.Ports?.map(port =>
-          port.PublicPort ? `${port.PublicPort}:${port.PrivatePort}` : `${port.PrivatePort}`
-        ) || [];
+        const ports =
+          container.Ports?.map(port =>
+            port.PublicPort ? `${port.PublicPort}:${port.PrivatePort}` : `${port.PrivatePort}`
+          ) || [];
         const labels = container.Labels || {};
 
         this.logger.debug('Mapped container', {
           name,
           status,
-          ports: ports.join(', ')
+          ports: ports.join(', '),
         });
 
         return {
@@ -217,13 +218,13 @@ export class ServiceDiscoveryService {
       });
 
       this.logger.debug('Successfully mapped containers', {
-        count: mappedContainers.length
+        count: mappedContainers.length,
       });
       return mappedContainers;
     } catch (error) {
       this.logger.error('Failed to get Docker containers', {
         error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
       return [];
     }
@@ -232,7 +233,10 @@ export class ServiceDiscoveryService {
   /**
    * Extract service metadata from Docker container
    */
-  private extractServiceMetadata(container: DockerContainer, overrideDomain?: string): ServiceMetadata | null {
+  private extractServiceMetadata(
+    container: DockerContainer,
+    overrideDomain?: string
+  ): ServiceMetadata | null {
     this.logger.debug('Extracting metadata for container', { name: container.name });
     const labels = container.labels;
 
@@ -246,7 +250,7 @@ export class ServiceDiscoveryService {
       name: serviceName,
       description: serviceDescription,
       icon: serviceIcon,
-      type: serviceType
+      type: serviceType,
     });
 
     // Skip if missing required service metadata
@@ -255,7 +259,7 @@ export class ServiceDiscoveryService {
         container: container.name,
         hasName: !!serviceName,
         hasDescription: !!serviceDescription,
-        hasType: !!serviceType
+        hasType: !!serviceType,
       });
       return null;
     }
@@ -270,7 +274,7 @@ export class ServiceDiscoveryService {
     this.logger.debug('Determined status', {
       service: serviceName,
       status,
-      containerStatus: container.status
+      containerStatus: container.status,
     });
 
     // Build URL if service is web-accessible
@@ -282,7 +286,7 @@ export class ServiceDiscoveryService {
       service: serviceName,
       dnsRegister,
       traefikEnabled,
-      overrideDomain
+      overrideDomain,
     });
 
     if (dnsRegister && traefikEnabled) {
@@ -293,7 +297,7 @@ export class ServiceDiscoveryService {
       this.logger.debug('No URL built', {
         service: serviceName,
         hasDnsRegister: !!dnsRegister,
-        traefikEnabled
+        traefikEnabled,
       });
     }
 
@@ -315,13 +319,13 @@ export class ServiceDiscoveryService {
       metadata.version = labels['service.version'];
       this.logger.debug('Added version', {
         version: labels['service.version'],
-        service: serviceName
+        service: serviceName,
       });
     }
 
     this.logger.debug('Created service metadata', {
       service: serviceName,
-      metadata
+      metadata,
     });
     return metadata;
   }
@@ -332,7 +336,7 @@ export class ServiceDiscoveryService {
   private replaceBaseDomain(url: string, newBaseDomain: string): string {
     this.logger.debug('Replacing base domain in URL', {
       url,
-      newBaseDomain
+      newBaseDomain,
     });
 
     try {
@@ -350,7 +354,7 @@ export class ServiceDiscoveryService {
 
         this.logger.debug('Updated hostname', {
           from: originalHostname,
-          to: urlObj.hostname
+          to: urlObj.hostname,
         });
       }
 
@@ -360,7 +364,7 @@ export class ServiceDiscoveryService {
     } catch (error) {
       this.logger.error('Failed to parse URL', {
         url,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return url; // Return original URL if parsing fails
     }

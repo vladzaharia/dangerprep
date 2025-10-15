@@ -108,7 +108,13 @@ export interface VirtualInterface extends BaseNetworkInterface {
 /**
  * Network interface union type
  */
-export type NetworkInterface = EthernetInterface | WiFiInterface | TailscaleInterface | BridgeInterface | VirtualInterface | BaseNetworkInterface;
+export type NetworkInterface =
+  | EthernetInterface
+  | WiFiInterface
+  | TailscaleInterface
+  | BridgeInterface
+  | VirtualInterface
+  | BaseNetworkInterface;
 
 /**
  * Network summary for listing interfaces
@@ -154,7 +160,9 @@ export class NetworkService {
 
     try {
       // Try to read dnsmasq leases file
-      const { stdout } = await execAsync('cat /var/lib/misc/dnsmasq.leases 2>/dev/null || cat /var/lib/dnsmasq/dnsmasq.leases 2>/dev/null || echo ""');
+      const { stdout } = await execAsync(
+        'cat /var/lib/misc/dnsmasq.leases 2>/dev/null || cat /var/lib/dnsmasq/dnsmasq.leases 2>/dev/null || echo ""'
+      );
 
       if (stdout.trim()) {
         const lines = stdout.trim().split('\n');
@@ -174,7 +182,7 @@ export class NetworkService {
       }
     } catch (error) {
       this.logger.warn('Could not read DHCP leases', {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
 
@@ -186,7 +194,7 @@ export class NetworkService {
    */
   private async parseConnectedClients(stationDumpOutput: string): Promise<ConnectedClient[]> {
     this.logger.debug('parseConnectedClients called', {
-      outputLength: stationDumpOutput.length
+      outputLength: stationDumpOutput.length,
     });
     const clients: ConnectedClient[] = [];
     const stations = stationDumpOutput.split('Station ').filter(section => section.trim());
@@ -204,7 +212,7 @@ export class NetworkService {
       const macMatch = lines[0]?.match(/([a-f0-9:]{17})/);
       if (!macMatch || !macMatch[1]) {
         this.logger.debug('Could not extract MAC from station line', {
-          line: lines[0]
+          line: lines[0],
         });
         continue;
       }
@@ -225,7 +233,7 @@ export class NetworkService {
         this.logger.debug('Found DHCP lease', {
           macAddress,
           ip: lease.ip,
-          hostname: lease.hostname
+          hostname: lease.hostname,
         });
       } else {
         this.logger.debug('No DHCP lease found', { macAddress });
@@ -257,7 +265,8 @@ export class NetworkService {
         const inactiveMatch = trimmed.match(/inactive time:\s*(\d+)\s*ms/);
         if (inactiveMatch && inactiveMatch[1]) {
           const inactiveMs = parseInt(inactiveMatch[1]);
-          if (inactiveMs < 60000) { // Less than 1 minute inactive
+          if (inactiveMs < 60000) {
+            // Less than 1 minute inactive
             client.connectedTime = `${Math.floor(inactiveMs / 1000)}s ago`;
           }
         }
@@ -280,7 +289,7 @@ export class NetworkService {
     const interfaces = Array.from(this.interfaceCache.values());
     this.logger.debug('Returning interfaces', {
       count: interfaces.length,
-      interfaces: interfaces.map(i => ({ name: i.name, type: i.type, state: i.state }))
+      interfaces: interfaces.map(i => ({ name: i.name, type: i.type, state: i.state })),
     });
     return interfaces;
   }
@@ -355,7 +364,7 @@ export class NetworkService {
       name,
       found: !!interface_,
       type: interface_?.type,
-      state: interface_?.state
+      state: interface_?.state,
     });
     return interface_;
   }
@@ -363,7 +372,9 @@ export class NetworkService {
   /**
    * Get interface by keyword (hotspot, internet, tailscale)
    */
-  async getInterfaceByKeyword(keyword: 'hotspot' | 'internet' | 'tailscale'): Promise<NetworkInterface | undefined> {
+  async getInterfaceByKeyword(
+    keyword: 'hotspot' | 'internet' | 'tailscale'
+  ): Promise<NetworkInterface | undefined> {
     this.logger.debug('getInterfaceByKeyword called', { keyword });
     const interfaces = await this.getAllInterfaces();
 
@@ -387,7 +398,7 @@ export class NetworkService {
       found: !!result,
       name: result?.name,
       type: result?.type,
-      state: result?.state
+      state: result?.state,
     });
     return result;
   }
@@ -403,7 +414,7 @@ export class NetworkService {
     this.logger.debug('Cache check', {
       age: `${cacheAge}ms`,
       stale: isStale,
-      timeout: `${this.cacheTimeout}ms`
+      timeout: `${this.cacheTimeout}ms`,
     });
 
     if (isStale) {
@@ -430,7 +441,7 @@ export class NetworkService {
       const interfaceNames = this.parseInterfaceNames(stdout);
       this.logger.debug('Found interfaces', {
         count: interfaceNames.length,
-        interfaces: interfaceNames
+        interfaces: interfaceNames,
       });
 
       // Get detailed information for each interface
@@ -443,7 +454,7 @@ export class NetworkService {
             this.logger.debug('Cached interface', {
               name,
               type: interfaceInfo.type,
-              state: interfaceInfo.state
+              state: interfaceInfo.state,
             });
           } else {
             this.logger.debug('No details returned for interface', { name });
@@ -451,17 +462,17 @@ export class NetworkService {
         } catch (error) {
           this.logger.warn('Failed to get details for interface', {
             name,
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }
 
       this.logger.debug('Interface cache refresh complete', {
-        cachedCount: this.interfaceCache.size
+        cachedCount: this.interfaceCache.size,
       });
     } catch (error) {
       this.logger.error('Failed to refresh interface cache', {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -472,14 +483,15 @@ export class NetworkService {
   private parseInterfaceNames(ipLinkOutput: string): string[] {
     const lines = ipLinkOutput.split('\n');
     const interfaces: string[] = [];
-    
+
     for (const line of lines) {
       const match = line.match(/^\d+:\s+([^:@]+)[@:]?/);
-      if (match && match[1] && match[1] !== 'lo') { // Skip loopback
+      if (match && match[1] && match[1] !== 'lo') {
+        // Skip loopback
         interfaces.push(match[1]);
       }
     }
-    
+
     return interfaces;
   }
 
@@ -510,7 +522,7 @@ export class NetworkService {
     } catch (error) {
       this.logger.warn('Failed to get interface details', {
         name,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return undefined;
     }
@@ -519,7 +531,9 @@ export class NetworkService {
   /**
    * Get base interface information (IP, state, etc.)
    */
-  private async getBaseInterfaceInfo(name: string): Promise<Omit<BaseNetworkInterface, 'type' | 'purpose'>> {
+  private async getBaseInterfaceInfo(
+    name: string
+  ): Promise<Omit<BaseNetworkInterface, 'type' | 'purpose'>> {
     const [ipInfo, macInfo, mtuInfo] = await Promise.allSettled([
       this.getInterfaceIpInfo(name),
       this.getInterfaceMacAddress(name),
@@ -649,7 +663,7 @@ export class NetworkService {
     } catch (error) {
       this.logger.warn('Error determining WiFi purpose', {
         name,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return 'unknown';
     }
@@ -714,15 +728,23 @@ export class NetworkService {
   /**
    * Get IP information for an interface
    */
-  private async getInterfaceIpInfo(name: string): Promise<Partial<Pick<BaseNetworkInterface, 'ipAddress' | 'netmask' | 'gateway' | 'dnsServers'>>> {
+  private async getInterfaceIpInfo(
+    name: string
+  ): Promise<
+    Partial<Pick<BaseNetworkInterface, 'ipAddress' | 'netmask' | 'gateway' | 'dnsServers'>>
+  > {
     try {
       const [ipResult, gatewayResult, dnsResult] = await Promise.allSettled([
         execAsync(`ip addr show ${name}`),
         execAsync(`ip route show dev ${name} | grep default`),
-        execAsync(`resolvectl status ${name} 2>/dev/null || systemd-resolve --status ${name} 2>/dev/null || cat /etc/resolv.conf`),
+        execAsync(
+          `resolvectl status ${name} 2>/dev/null || systemd-resolve --status ${name} 2>/dev/null || cat /etc/resolv.conf`
+        ),
       ]);
 
-      const result: Partial<Pick<BaseNetworkInterface, 'ipAddress' | 'netmask' | 'gateway' | 'dnsServers'>> = {};
+      const result: Partial<
+        Pick<BaseNetworkInterface, 'ipAddress' | 'netmask' | 'gateway' | 'dnsServers'>
+      > = {};
 
       // Parse IP address and netmask
       if (ipResult.status === 'fulfilled') {
@@ -753,7 +775,7 @@ export class NetworkService {
     } catch (error) {
       this.logger.warn('Failed to get IP info', {
         name,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return {};
     }
@@ -788,7 +810,10 @@ export class NetworkService {
   /**
    * Get bridge-specific information
    */
-  private async getBridgeInterfaceInfo(name: string, baseInfo: BaseNetworkInterface): Promise<BridgeInterface> {
+  private async getBridgeInterfaceInfo(
+    name: string,
+    baseInfo: BaseNetworkInterface
+  ): Promise<BridgeInterface> {
     const [bridgeInfoResult, stpResult] = await Promise.allSettled([
       execAsync(`brctl show ${name} 2>/dev/null || ip link show ${name} 2>/dev/null`),
       execAsync(`brctl showstp ${name} 2>/dev/null`),
@@ -827,7 +852,10 @@ export class NetworkService {
   /**
    * Get virtual interface-specific information
    */
-  private async getVirtualInterfaceInfo(name: string, baseInfo: BaseNetworkInterface): Promise<VirtualInterface> {
+  private async getVirtualInterfaceInfo(
+    name: string,
+    baseInfo: BaseNetworkInterface
+  ): Promise<VirtualInterface> {
     const [peerResult, containerResult] = await Promise.allSettled([
       execAsync(`ip link show ${name} 2>/dev/null`),
       execAsync(`docker ps --format "table {{.ID}}\\t{{.Names}}" 2>/dev/null`),
@@ -864,7 +892,10 @@ export class NetworkService {
   /**
    * Get ethernet-specific information
    */
-  private async getEthernetInterfaceInfo(name: string, baseInfo: BaseNetworkInterface): Promise<EthernetInterface> {
+  private async getEthernetInterfaceInfo(
+    name: string,
+    baseInfo: BaseNetworkInterface
+  ): Promise<EthernetInterface> {
     const [speedResult, duplexResult, driverResult, linkResult] = await Promise.allSettled([
       execAsync(`ethtool ${name} 2>/dev/null | grep Speed`),
       execAsync(`ethtool ${name} 2>/dev/null | grep Duplex`),
@@ -910,15 +941,19 @@ export class NetworkService {
   /**
    * Get WiFi-specific information
    */
-  private async getWiFiInterfaceInfo(name: string, baseInfo: Omit<BaseNetworkInterface, 'type'>): Promise<WiFiInterface> {
+  private async getWiFiInterfaceInfo(
+    name: string,
+    baseInfo: Omit<BaseNetworkInterface, 'type'>
+  ): Promise<WiFiInterface> {
     this.logger.info('Getting WiFi interface info', { name });
 
-    const [iwConfigResult, iwInfoResult, clientsCountResult, clientsDetailResult] = await Promise.allSettled([
-      execAsync(`iwconfig ${name} 2>/dev/null`),
-      execAsync(`iw dev ${name} info 2>/dev/null`),
-      execAsync(`iw dev ${name} station dump 2>/dev/null | grep Station | wc -l`),
-      execAsync(`iw dev ${name} station dump 2>/dev/null`),
-    ]);
+    const [iwConfigResult, iwInfoResult, clientsCountResult, clientsDetailResult] =
+      await Promise.allSettled([
+        execAsync(`iwconfig ${name} 2>/dev/null`),
+        execAsync(`iw dev ${name} info 2>/dev/null`),
+        execAsync(`iw dev ${name} station dump 2>/dev/null | grep Station | wc -l`),
+        execAsync(`iw dev ${name} station dump 2>/dev/null`),
+      ]);
 
     const wifiInfo: WiFiInterface = {
       ...baseInfo,
@@ -930,7 +965,7 @@ export class NetworkService {
       iwConfigSuccess: iwConfigResult.status === 'fulfilled',
       iwInfoSuccess: iwInfoResult.status === 'fulfilled',
       clientsCountSuccess: clientsCountResult.status === 'fulfilled',
-      clientsDetailSuccess: clientsDetailResult.status === 'fulfilled'
+      clientsDetailSuccess: clientsDetailResult.status === 'fulfilled',
     });
 
     // Parse iwconfig output
@@ -969,18 +1004,18 @@ export class NetworkService {
           wifiInfo.mode = mode as WiFiInterface['mode'];
           this.logger.info('Detected WiFi mode from iw info', {
             name,
-            mode: wifiInfo.mode
+            mode: wifiInfo.mode,
           });
         } else {
           this.logger.warn('Unknown WiFi mode detected', {
             name,
-            detectedMode: mode
+            detectedMode: mode,
           });
         }
       } else {
         this.logger.warn('Could not detect WiFi mode from iw info', {
           name,
-          iwInfoOutput: iwinfo.substring(0, 200)
+          iwInfoOutput: iwinfo.substring(0, 200),
         });
       }
 
@@ -992,7 +1027,7 @@ export class NetworkService {
     } else {
       this.logger.warn('Failed to get iw info', {
         name,
-        reason: iwInfoResult.status === 'rejected' ? String(iwInfoResult.reason) : 'unknown'
+        reason: iwInfoResult.status === 'rejected' ? String(iwInfoResult.reason) : 'unknown',
       });
     }
 
@@ -1004,7 +1039,7 @@ export class NetworkService {
         name,
         purpose: baseInfo.purpose,
         mode: wifiInfo.mode,
-        reason: baseInfo.purpose === 'wlan' ? 'purpose=wlan' : 'mode=ap'
+        reason: baseInfo.purpose === 'wlan' ? 'purpose=wlan' : 'mode=ap',
       });
 
       // Get detailed client information - always try to parse, even if empty
@@ -1014,21 +1049,24 @@ export class NetworkService {
         this.logger.info('Parsed client details', {
           name,
           clientCount: clientDetails.length,
-          clients: clientDetails
+          clients: clientDetails,
         });
         // Always set the array, even if empty, so we know we tried to fetch it
         wifiInfo.connectedClients = clientDetails;
       } else {
         this.logger.warn('Failed to get station dump', {
           name,
-          reason: clientsDetailResult.status === 'rejected' ? String(clientsDetailResult.reason) : 'unknown'
+          reason:
+            clientsDetailResult.status === 'rejected'
+              ? String(clientsDetailResult.reason)
+              : 'unknown',
         });
       }
     } else {
       this.logger.debug('Not a hotspot/AP interface, skipping connected clients', {
         name,
         purpose: baseInfo.purpose,
-        mode: wifiInfo.mode
+        mode: wifiInfo.mode,
       });
     }
 
@@ -1039,7 +1077,10 @@ export class NetworkService {
   /**
    * Get Tailscale-specific information
    */
-  private async getTailscaleInterfaceInfo(_name: string, baseInfo: Omit<BaseNetworkInterface, 'type'>): Promise<TailscaleInterface> {
+  private async getTailscaleInterfaceInfo(
+    _name: string,
+    baseInfo: Omit<BaseNetworkInterface, 'type'>
+  ): Promise<TailscaleInterface> {
     const [statusResult] = await Promise.allSettled([
       execAsync('tailscale status --json 2>/dev/null'),
     ]);
@@ -1071,7 +1112,7 @@ export class NetworkService {
         }
       } catch (error) {
         this.logger.warn('Failed to parse Tailscale status JSON', {
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -1095,7 +1136,7 @@ export class NetworkService {
       mode: wifiInfo.mode,
       isHotspot,
       hasConnectedClients: !!wifiInfo.connectedClients,
-      connectedClientsCount: wifiInfo.connectedClients?.length || 0
+      connectedClientsCount: wifiInfo.connectedClients?.length || 0,
     });
 
     if (!isHotspot) {
@@ -1112,14 +1153,14 @@ export class NetworkService {
       this.logger.debug('Retrieved WiFi config', {
         name: wifiInfo.name,
         ssid: wifiConfig.ssid,
-        hasPassword: !!wifiConfig.password
+        hasPassword: !!wifiConfig.password,
       });
 
       // Add hotspot-specific properties
       const hotspotWifi = { ...wifiInfo };
       this.logger.debug('Creating hotspot WiFi from base WiFi', {
         hasConnectedClients: !!wifiInfo.connectedClients,
-        count: wifiInfo.connectedClients?.length || 0
+        count: wifiInfo.connectedClients?.length || 0,
       });
 
       // Add password for hotspot
@@ -1136,7 +1177,7 @@ export class NetworkService {
 
         this.logger.debug('After applying hostapd runtime info', {
           connectedClientsCount: hotspotWifi.connectedClients?.length || 0,
-          hasDetails: !!hotspotWifi.connectedClients
+          hasDetails: !!hotspotWifi.connectedClients,
         });
 
         if (hostapdInfo.runtimeInfo) {
@@ -1164,7 +1205,9 @@ export class NetworkService {
 
       // Add additional hostapd config information
       if (hostapdConfig.country_code) {
-        hotspotWifi.frequency = this.getFrequencyFromChannel(hotspotWifi.channel || parseInt(hostapdConfig.channel || '6'));
+        hotspotWifi.frequency = this.getFrequencyFromChannel(
+          hotspotWifi.channel || parseInt(hostapdConfig.channel || '6')
+        );
       }
 
       if (hostapdConfig.max_num_sta) {
@@ -1182,13 +1225,13 @@ export class NetworkService {
         ssid: hotspotWifi.ssid,
         hasPassword: !!hotspotWifi.password,
         hasConnectedClients: !!hotspotWifi.connectedClients,
-        connectedClientsCount: hotspotWifi.connectedClients?.length || 0
+        connectedClientsCount: hotspotWifi.connectedClients?.length || 0,
       });
       return hotspotWifi;
     } catch (error) {
       this.logger.warn('Error adding hotspot info to WiFi interface', {
         name: wifiInfo.name,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return wifiInfo;
     }
@@ -1230,7 +1273,7 @@ export class NetworkService {
     } catch (error) {
       this.logger.warn('Could not read hostapd config', {
         path: this.hostapdPath,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return {};
     }
@@ -1284,25 +1327,31 @@ export class NetworkService {
         if (activeInterface) {
           try {
             // Get actual SSID from the interface
-            const { stdout: iwOutput } = await execAsync(`iw dev ${activeInterface} info 2>/dev/null || true`);
+            const { stdout: iwOutput } = await execAsync(
+              `iw dev ${activeInterface} info 2>/dev/null || true`
+            );
             const ssidMatch = iwOutput.match(/ssid (.+)/);
             if (ssidMatch && ssidMatch[1]) {
               actualSSID = ssidMatch[1].trim();
             }
 
             // Get connected clients count
-            const { stdout: stationOutput } = await execAsync(`iw dev ${activeInterface} station dump 2>/dev/null | grep Station | wc -l || echo "0"`);
+            const { stdout: stationOutput } = await execAsync(
+              `iw dev ${activeInterface} station dump 2>/dev/null | grep Station | wc -l || echo "0"`
+            );
             connectedClients = parseInt(stationOutput.trim()) || 0;
 
             // Get additional runtime info
-            const { stdout: infoOutput } = await execAsync(`iw dev ${activeInterface} info 2>/dev/null || true`);
+            const { stdout: infoOutput } = await execAsync(
+              `iw dev ${activeInterface} info 2>/dev/null || true`
+            );
             if (infoOutput) {
               runtimeInfo = this.parseIwInfo(infoOutput);
             }
           } catch (error) {
             this.logger.warn('Could not get runtime info for interface', {
               interface: activeInterface,
-              error: error instanceof Error ? error.message : String(error)
+              error: error instanceof Error ? error.message : String(error),
             });
           }
         }
@@ -1318,7 +1367,7 @@ export class NetworkService {
       };
     } catch (error) {
       this.logger.warn('Error getting hostapd info', {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return { config, isRunning: false };
     }
@@ -1362,9 +1411,13 @@ export class NetworkService {
   /**
    * Find the interface with internet connectivity (WAN purpose)
    */
-  private async findInternetInterface(interfaces: NetworkInterface[]): Promise<NetworkInterface | undefined> {
+  private async findInternetInterface(
+    interfaces: NetworkInterface[]
+  ): Promise<NetworkInterface | undefined> {
     // First, look for interfaces with WAN purpose
-    const wanInterfaces = interfaces.filter(iface => iface.purpose === 'wan' && iface.state === 'up');
+    const wanInterfaces = interfaces.filter(
+      iface => iface.purpose === 'wan' && iface.state === 'up'
+    );
 
     for (const iface of wanInterfaces) {
       if (iface.ipAddress && iface.gateway) {
@@ -1426,12 +1479,7 @@ export class NetworkService {
    */
   private cidrToNetmask(cidr: number): string {
     const mask = (0xffffffff << (32 - cidr)) >>> 0;
-    return [
-      (mask >>> 24) & 0xff,
-      (mask >>> 16) & 0xff,
-      (mask >>> 8) & 0xff,
-      mask & 0xff,
-    ].join('.');
+    return [(mask >>> 24) & 0xff, (mask >>> 16) & 0xff, (mask >>> 8) & 0xff, mask & 0xff].join('.');
   }
 
   /**
@@ -1536,7 +1584,7 @@ export class NetworkService {
       return status;
     } catch (error) {
       this.logger.error('Error getting hostapd status', {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return {
         isConfigured: false,
@@ -1555,7 +1603,7 @@ export class NetworkService {
     this.lastCacheUpdate = 0;
     this.logger.debug('Cache cleared', {
       previousSize,
-      newSize: this.interfaceCache.size
+      newSize: this.interfaceCache.size,
     });
   }
 }

@@ -1,8 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import type { 
-  WorkerInboundMessage, 
-  WorkerOutboundMessage,
-} from '../workers/apiWorker';
+import type { WorkerInboundMessage, WorkerOutboundMessage } from '../workers/apiWorker';
 
 export interface ApiWorkerOptions {
   endpoint: string; // API endpoint to poll
@@ -47,12 +44,7 @@ export interface ApiWorkerControls {
 export function useApiWorker<T = any>(
   options: ApiWorkerOptions
 ): ApiWorkerState<T> & ApiWorkerControls {
-  const {
-    endpoint,
-    pollInterval = 5000,
-    queryParams = {},
-    autoStart = true,
-  } = options;
+  const { endpoint, pollInterval = 5000, queryParams = {}, autoStart = true } = options;
 
   const [state, setState] = useState<ApiWorkerState<T>>({
     data: null,
@@ -73,10 +65,9 @@ export function useApiWorker<T = any>(
   // Initialize worker
   useEffect(() => {
     // Create worker
-    const worker = new Worker(
-      new URL('../workers/apiWorker.ts', import.meta.url),
-      { type: 'module' }
-    );
+    const worker = new Worker(new URL('../workers/apiWorker.ts', import.meta.url), {
+      type: 'module',
+    });
 
     workerRef.current = worker;
 
@@ -86,7 +77,7 @@ export function useApiWorker<T = any>(
 
       switch (message.type) {
         case 'data-update':
-          setState((prev) => ({
+          setState(prev => ({
             ...prev,
             data: message.data,
             loading: false,
@@ -96,7 +87,7 @@ export function useApiWorker<T = any>(
           break;
 
         case 'error':
-          setState((prev) => ({
+          setState(prev => ({
             ...prev,
             loading: false,
             error: message.error,
@@ -105,7 +96,7 @@ export function useApiWorker<T = any>(
           break;
 
         case 'status':
-          setState((prev) => ({
+          setState(prev => ({
             ...prev,
             isPolling: message.status === 'started' || message.status === 'polling',
           }));
@@ -117,9 +108,9 @@ export function useApiWorker<T = any>(
     });
 
     // Handle worker errors
-    worker.addEventListener('error', (error) => {
+    worker.addEventListener('error', error => {
       console.error('Worker error:', error);
-      setState((prev) => ({
+      setState(prev => ({
         ...prev,
         loading: false,
         error: error.message || 'Worker error occurred',
@@ -205,4 +196,3 @@ export function useApiWorker<T = any>(
     configure,
   };
 }
-

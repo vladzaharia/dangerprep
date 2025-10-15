@@ -23,10 +23,10 @@ export interface WorkerRefreshMessage {
   type: 'refresh';
 }
 
-export type WorkerInboundMessage = 
-  | WorkerConfigMessage 
-  | WorkerStartMessage 
-  | WorkerStopMessage 
+export type WorkerInboundMessage =
+  | WorkerConfigMessage
+  | WorkerStartMessage
+  | WorkerStopMessage
   | WorkerRefreshMessage;
 
 export interface DataUpdateMessage {
@@ -49,10 +49,7 @@ export interface WorkerStatusMessage {
   timestamp: string;
 }
 
-export type WorkerOutboundMessage = 
-  | DataUpdateMessage 
-  | WorkerErrorMessage 
-  | WorkerStatusMessage;
+export type WorkerOutboundMessage = DataUpdateMessage | WorkerErrorMessage | WorkerStatusMessage;
 
 // Worker state
 let pollInterval = 5000; // Default: 5 seconds
@@ -102,14 +99,14 @@ async function fetchApiData(): Promise<any> {
 async function pollApiData() {
   try {
     const data = await fetchApiData();
-    
+
     const message: DataUpdateMessage = {
       type: 'data-update',
       data,
       timestamp: new Date().toISOString(),
       endpoint,
     };
-    
+
     self.postMessage(message);
   } catch (error) {
     const errorMessage: WorkerErrorMessage = {
@@ -118,7 +115,7 @@ async function pollApiData() {
       timestamp: new Date().toISOString(),
       endpoint,
     };
-    
+
     self.postMessage(errorMessage);
   }
 }
@@ -132,7 +129,7 @@ function startPolling() {
   }
 
   isRunning = true;
-  
+
   const statusMessage: WorkerStatusMessage = {
     type: 'status',
     status: 'started',
@@ -189,7 +186,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerInboundMessage>) => 
       if (message.queryParams !== undefined) {
         queryParams = message.queryParams;
       }
-      
+
       // Restart polling if running to apply new config
       if (isRunning) {
         stopPolling();
@@ -219,4 +216,3 @@ self.addEventListener('message', (event: MessageEvent<WorkerInboundMessage>) => 
 
 // Export empty object to make this a module
 export {};
-

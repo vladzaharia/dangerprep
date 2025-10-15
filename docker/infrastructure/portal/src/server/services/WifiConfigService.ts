@@ -80,7 +80,10 @@ export class WifiConfigService {
     if (hostapdConfig.ssid && hostapdConfig.password) {
       // Both values successfully read from hostapd
       source = 'hostapd';
-    } else if ((hostapdConfig.ssid || hostapdConfig.password) && (process.env.WIFI_SSID || process.env.WIFI_PASSWORD)) {
+    } else if (
+      (hostapdConfig.ssid || hostapdConfig.password) &&
+      (process.env.WIFI_SSID || process.env.WIFI_PASSWORD)
+    ) {
       // Mixed sources: some from hostapd, some from environment
       source = 'environment';
     } else if (process.env.WIFI_SSID || process.env.WIFI_PASSWORD) {
@@ -94,11 +97,11 @@ export class WifiConfigService {
     this.logger.debug('Final WiFi config', {
       ssid,
       hasPassword: !!password,
-      source
+      source,
     });
     this.logger.debug('Environment variables', {
       hasWifiSsid: !!process.env.WIFI_SSID,
-      hasWifiPassword: !!process.env.WIFI_PASSWORD
+      hasWifiPassword: !!process.env.WIFI_PASSWORD,
     });
 
     return { ssid, password, source };
@@ -127,7 +130,7 @@ export class WifiConfigService {
 
       this.logger.debug('Read hostapd config', {
         hasSsid: !!config.ssid,
-        hasPassword: !!config.password
+        hasPassword: !!config.password,
       });
       return config;
     } catch (error) {
@@ -135,14 +138,14 @@ export class WifiConfigService {
       if (error instanceof Error && error.message.includes('ENOENT')) {
         // File doesn't exist, which is normal in development environments
         this.logger.debug('Hostapd config file not found', {
-          path: this.hostapdPath
+          path: this.hostapdPath,
         });
         return {};
       }
       // Log other errors that might indicate real issues
       this.logger.warn('Could not read hostapd configuration', {
         path: this.hostapdPath,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return {};
     }
@@ -203,7 +206,7 @@ export class WifiConfigService {
       return networkInfo;
     } catch (error) {
       this.logger.error('Failed to get network information', {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return undefined;
     }
@@ -227,7 +230,7 @@ export class WifiConfigService {
       return undefined;
     } catch (error) {
       this.logger.error('Failed to get active WiFi interface', {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return undefined;
     }
@@ -236,7 +239,9 @@ export class WifiConfigService {
   /**
    * Get IP address and subnet mask for an interface
    */
-  private async getInterfaceIpInfo(interfaceName: string): Promise<{ ipAddress: string; subnetMask: string } | undefined> {
+  private async getInterfaceIpInfo(
+    interfaceName: string
+  ): Promise<{ ipAddress: string; subnetMask: string } | undefined> {
     try {
       const { stdout } = await execAsync(`nmcli -t -f IP4.ADDRESS dev show "${interfaceName}"`);
       const addressLine = stdout.trim();
@@ -256,7 +261,7 @@ export class WifiConfigService {
     } catch (error) {
       this.logger.error('Failed to get IP info for interface', {
         interface: interfaceName,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return undefined;
     }
@@ -279,7 +284,7 @@ export class WifiConfigService {
     } catch (error) {
       this.logger.error('Failed to get gateway for interface', {
         interface: interfaceName,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return undefined;
     }
@@ -291,7 +296,10 @@ export class WifiConfigService {
   private async getInterfaceDns(interfaceName: string): Promise<string[] | undefined> {
     try {
       const { stdout } = await execAsync(`nmcli -t -f IP4.DNS dev show "${interfaceName}"`);
-      const dnsLines = stdout.trim().split('\n').filter(line => line.includes(':'));
+      const dnsLines = stdout
+        .trim()
+        .split('\n')
+        .filter(line => line.includes(':'));
 
       const dnsServers = dnsLines
         .map(line => line.split(':')[1])
@@ -302,7 +310,7 @@ export class WifiConfigService {
     } catch (error) {
       this.logger.error('Failed to get DNS for interface', {
         interface: interfaceName,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return undefined;
     }
@@ -313,12 +321,7 @@ export class WifiConfigService {
    */
   private cidrToSubnetMask(cidr: number): string {
     const mask = (0xffffffff << (32 - cidr)) >>> 0;
-    return [
-      (mask >>> 24) & 0xff,
-      (mask >>> 16) & 0xff,
-      (mask >>> 8) & 0xff,
-      mask & 0xff,
-    ].join('.');
+    return [(mask >>> 24) & 0xff, (mask >>> 16) & 0xff, (mask >>> 8) & 0xff, mask & 0xff].join('.');
   }
 
   /**
@@ -335,4 +338,3 @@ export class WifiConfigService {
     throw new Error('WiFi configuration update not yet implemented');
   }
 }
-

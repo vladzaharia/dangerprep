@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 // React 19 use hook with fallback for older versions
-const useHook = (React as any).use || ((promise: Promise<any>) => {
-  throw promise; // Fallback behavior for Suspense
-});
+const useHook =
+  (React as any).use ||
+  ((promise: Promise<any>) => {
+    throw promise; // Fallback behavior for Suspense
+  });
 
 /**
  * Service metadata from the API
@@ -135,7 +137,7 @@ function getCachedServices(serviceType?: string, domain?: string): Promise<Servi
   const cacheKey = `services-${serviceType || 'all'}-${domain || 'default'}`;
 
   if (!servicesCache.has(cacheKey)) {
-    const promise = fetchServices(serviceType, domain).catch((error) => {
+    const promise = fetchServices(serviceType, domain).catch(error => {
       // Remove failed promise from cache so it can be retried
       servicesCache.delete(cacheKey);
 

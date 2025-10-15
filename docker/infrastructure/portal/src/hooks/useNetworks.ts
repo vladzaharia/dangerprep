@@ -1,16 +1,26 @@
 import React, { useState, useEffect } from 'react';
 
 // React 19 use hook with fallback for older versions
-const useHook = (React as any).use || ((promise: Promise<any>) => {
-  throw promise; // Fallback behavior for Suspense
-});
+const useHook =
+  (React as any).use ||
+  ((promise: Promise<any>) => {
+    throw promise; // Fallback behavior for Suspense
+  });
 
 /**
  * Base network interface information
  */
 export interface BaseNetworkInterface {
   name: string;
-  type: 'ethernet' | 'wifi' | 'tailscale' | 'bridge' | 'virtual' | 'hotspot' | 'loopback' | 'unknown';
+  type:
+    | 'ethernet'
+    | 'wifi'
+    | 'tailscale'
+    | 'bridge'
+    | 'virtual'
+    | 'hotspot'
+    | 'loopback'
+    | 'unknown';
   purpose: 'wan' | 'lan' | 'wlan' | 'docker' | 'loopback' | 'unknown';
   state: 'up' | 'down' | 'unknown';
   ipAddress?: string;
@@ -104,9 +114,12 @@ export interface HotspotInterface extends BaseNetworkInterface {
 /**
  * Network interface union type
  */
-export type NetworkInterface = EthernetInterface | WiFiInterface | TailscaleInterface | HotspotInterface | BaseNetworkInterface;
-
-
+export type NetworkInterface =
+  | EthernetInterface
+  | WiFiInterface
+  | TailscaleInterface
+  | HotspotInterface
+  | BaseNetworkInterface;
 
 /**
  * Network summary for listing interfaces
@@ -170,7 +183,8 @@ async function fetchNetworkInterface(interfaceName: string): Promise<NetworkInte
     throw new Error(`Failed to fetch network interface: ${response.status} ${response.statusText}`);
   }
 
-  const networkResponse: NetworkApiResponse<{ interface: NetworkInterface }> = await response.json();
+  const networkResponse: NetworkApiResponse<{ interface: NetworkInterface }> =
+    await response.json();
 
   if (!networkResponse.success) {
     throw new Error(networkResponse.error || 'Failed to retrieve network interface');
@@ -178,8 +192,6 @@ async function fetchNetworkInterface(interfaceName: string): Promise<NetworkInte
 
   return networkResponse.data.interface;
 }
-
-
 
 /**
  * Refresh network cache
@@ -205,7 +217,7 @@ function getCachedNetworkSummary(): Promise<NetworkSummary> {
   const cacheKey = 'network-summary';
 
   if (!networkCache.has(cacheKey)) {
-    const promise = fetchNetworkSummary().catch((error) => {
+    const promise = fetchNetworkSummary().catch(error => {
       // Remove failed promise from cache so it can be retried
       networkCache.delete(cacheKey);
       throw error;
@@ -224,7 +236,7 @@ function getCachedNetworkInterface(interfaceName: string): Promise<NetworkInterf
   const cacheKey = `network-interface-${interfaceName}`;
 
   if (!networkCache.has(cacheKey)) {
-    const promise = fetchNetworkInterface(interfaceName).catch((error) => {
+    const promise = fetchNetworkInterface(interfaceName).catch(error => {
       // Remove failed promise from cache so it can be retried
       networkCache.delete(cacheKey);
       throw error;
@@ -342,11 +354,11 @@ export function useNetworkInterfaceWithLoading(interfaceName: string) {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Clear cache and fetch fresh data
       const cacheKey = `network-interface-${interfaceName}`;
       networkCache.delete(cacheKey);
-      
+
       const data = await fetchNetworkInterface(interfaceName);
       setNetworkInterface(data);
     } catch (err) {

@@ -32,24 +32,26 @@ export interface HostapdWorkerOptions {
  * const connectedClients = hostapd.data?.connectedClients || 0;
  */
 export function useHostapdWorker(options: HostapdWorkerOptions = {}) {
-  const {
-    pollInterval = 5000,
-    autoStart = true,
-  } = options;
+  const { pollInterval = 5000, autoStart = true } = options;
 
-  const apiOptions: ApiWorkerOptions = useMemo(() => ({
-    endpoint: '/api/networks/hostapd/status',
-    pollInterval,
-    queryParams: {},
-    autoStart,
-  }), [pollInterval, autoStart]);
+  const apiOptions: ApiWorkerOptions = useMemo(
+    () => ({
+      endpoint: '/api/networks/hostapd/status',
+      pollInterval,
+      queryParams: {},
+      autoStart,
+    }),
+    [pollInterval, autoStart]
+  );
 
   const result = useApiWorker<{ hostapd: HostapdStatus }>(apiOptions);
 
   // Transform the result to extract hostapd data from the nested structure
-  return useMemo(() => ({
-    ...result,
-    data: result.data?.hostapd || null,
-  }), [result]);
+  return useMemo(
+    () => ({
+      ...result,
+      data: result.data?.hostapd || null,
+    }),
+    [result]
+  );
 }
-

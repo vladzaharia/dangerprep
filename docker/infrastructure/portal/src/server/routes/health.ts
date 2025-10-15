@@ -8,7 +8,7 @@ const health = new Hono<{ Variables: LoggerVariables }>();
  * GET /api/health
  * Health check endpoint
  */
-health.get('/', (c) => {
+health.get('/', c => {
   const logger = c.get('logger');
 
   const healthData = {
@@ -25,4 +25,3 @@ health.get('/', (c) => {
 });
 
 export default health;
-

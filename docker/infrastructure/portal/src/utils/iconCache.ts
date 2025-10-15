@@ -8,53 +8,53 @@ import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 export class IconCache {
   private static iconMap: Record<string, IconDefinition> = {
     // Media & Entertainment
-    'film': solidIcons.faFilm,
-    'music': solidIcons.faMusic,
-    'gamepad': solidIcons.faGamepad,
-    'book': solidIcons.faBook,
+    film: solidIcons.faFilm,
+    music: solidIcons.faMusic,
+    gamepad: solidIcons.faGamepad,
+    book: solidIcons.faBook,
     'book-open': solidIcons.faBookOpen,
     'play-circle': solidIcons.faPlayCircle,
 
     // Information & Emergency
-    'info': solidIcons.faInfo,
+    info: solidIcons.faInfo,
     'info-circle': solidIcons.faInfoCircle,
     'exclamation-triangle': solidIcons.faExclamationTriangle,
     'shield-alt': solidIcons.faShieldAlt,
     'first-aid': solidIcons.faFirstAid,
-    'radio': solidIcons.faRadio,
+    radio: solidIcons.faRadio,
 
     // System & Maintenance
     'screwdriver-wrench': solidIcons.faScrewdriverWrench,
-    'gear': solidIcons.faGear,
-    'server': solidIcons.faServer,
+    gear: solidIcons.faGear,
+    server: solidIcons.faServer,
     'network-wired': solidIcons.faNetworkWired,
-    'database': solidIcons.faDatabase,
+    database: solidIcons.faDatabase,
     'chart-line': solidIcons.faChartLine,
-    'box': solidIcons.faBox,
+    box: solidIcons.faBox,
 
     // Navigation & Connectivity
-    'wifi': solidIcons.faWifi,
-    'globe': solidIcons.faGlobe,
-    'map': solidIcons.faMap,
-    'compass': solidIcons.faCompass,
-    'satellite': solidIcons.faSatellite,
+    wifi: solidIcons.faWifi,
+    globe: solidIcons.faGlobe,
+    map: solidIcons.faMap,
+    compass: solidIcons.faCompass,
+    satellite: solidIcons.faSatellite,
 
     // Development & Documentation
     'code-branch': solidIcons.faCodeBranch,
     'file-text': solidIcons.faFileAlt,
-    'terminal': solidIcons.faTerminal,
-    'bug': solidIcons.faBug,
+    terminal: solidIcons.faTerminal,
+    bug: solidIcons.faBug,
 
     // Additional common icons
-    'activity': solidIcons.faChartLine, // Alias for chart-line
+    activity: solidIcons.faChartLine, // Alias for chart-line
     'git-branch': solidIcons.faCodeBranch, // Alias for code-branch
     'external-link': solidIcons.faExternalLinkAlt,
     'power-off': solidIcons.faPowerOff,
     'qr-code': solidIcons.faQrcode,
-    'home': solidIcons.faHome,
-    'cog': solidIcons.faCog, // Alternative to gear
-    'wrench': solidIcons.faWrench,
-    'tools': solidIcons.faTools,
+    home: solidIcons.faHome,
+    cog: solidIcons.faCog, // Alternative to gear
+    wrench: solidIcons.faWrench,
+    tools: solidIcons.faTools,
 
     // Fallback icon
     'question-circle': solidIcons.faQuestionCircle,
@@ -69,7 +69,9 @@ export class IconCache {
     // Normalize icon name (remove fa- prefix if present, convert to lowercase)
     const normalizedName = iconName.toLowerCase().replace(/^fa-/, '');
 
-    return this.iconMap[normalizedName] || this.iconMap['question-circle'] || solidIcons.faQuestionCircle;
+    return (
+      this.iconMap[normalizedName] || this.iconMap['question-circle'] || solidIcons.faQuestionCircle
+    );
   }
 
   /**
@@ -96,27 +98,38 @@ export class IconCache {
    */
   static getIconCategories() {
     return {
-      'Media & Entertainment': [
-        'film', 'music', 'gamepad', 'book', 'book-open', 'play-circle'
-      ],
+      'Media & Entertainment': ['film', 'music', 'gamepad', 'book', 'book-open', 'play-circle'],
       'Information & Emergency': [
-        'info', 'info-circle', 'exclamation-triangle', 'shield-alt', 'first-aid', 'radio'
+        'info',
+        'info-circle',
+        'exclamation-triangle',
+        'shield-alt',
+        'first-aid',
+        'radio',
       ],
       'System & Maintenance': [
-        'screwdriver-wrench', 'gear', 'server', 'network-wired', 'database', 'chart-line', 'box'
+        'screwdriver-wrench',
+        'gear',
+        'server',
+        'network-wired',
+        'database',
+        'chart-line',
+        'box',
       ],
-      'Navigation & Connectivity': [
-        'wifi', 'globe', 'map', 'compass', 'satellite'
+      'Navigation & Connectivity': ['wifi', 'globe', 'map', 'compass', 'satellite'],
+      'Development & Documentation': ['code-branch', 'file-text', 'terminal', 'bug'],
+      Common: [
+        'activity',
+        'git-branch',
+        'external-link',
+        'power-off',
+        'qr-code',
+        'home',
+        'cog',
+        'wrench',
+        'tools',
       ],
-      'Development & Documentation': [
-        'code-branch', 'file-text', 'terminal', 'bug'
-      ],
-      'Common': [
-        'activity', 'git-branch', 'external-link', 'power-off', 'qr-code', 'home', 'cog', 'wrench', 'tools'
-      ],
-      'Fallback': [
-        'question-circle'
-      ]
+      Fallback: ['question-circle'],
     };
   }
 }
