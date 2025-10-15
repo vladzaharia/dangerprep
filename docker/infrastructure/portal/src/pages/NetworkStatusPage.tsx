@@ -8,24 +8,28 @@ import { TailscaleTab } from '../components/TailscaleTab';
  */
 export const NetworkStatusPage: React.FC = () => {
   return (
-    <wa-scroller orientation="vertical" style={{ height: '100%' }}>
-      <wa-tab-group placement='bottom'>
-        <wa-tab panel='status'>Status</wa-tab>
-        <wa-tab panel='clients'>Connected Clients</wa-tab>
-        <wa-tab panel='tailscale'>Tailscale</wa-tab>
+    <wa-tab-group placement='bottom' style={{ height: "100%" }}>
+      <wa-tab panel='status'>Status</wa-tab>
+      <wa-tab panel='clients'>Connected Clients</wa-tab>
+      <wa-tab panel='tailscale'>Tailscale</wa-tab>
 
-        <wa-tab-panel name='status'>
+      <wa-tab-panel name='status'>
+        <wa-scroller orientation="vertical">
           <NetworkStatusTab />
-        </wa-tab-panel>
+        </wa-scroller>
+      </wa-tab-panel>
 
-        <wa-tab-panel name='clients'>
+      <wa-tab-panel name='clients'>
+        <wa-scroller orientation="vertical">
           <ConnectedClientsTab />
-        </wa-tab-panel>
+        </wa-scroller>
+      </wa-tab-panel>
 
-        <wa-tab-panel name='tailscale'>
+      <wa-tab-panel name='tailscale'>
+        <wa-scroller orientation="vertical">
           <TailscaleTab />
-        </wa-tab-panel>
-      </wa-tab-group>
-    </wa-scroller>
+        </wa-scroller>
+      </wa-tab-panel>
+    </wa-tab-group>
   );
 };
