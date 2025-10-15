@@ -323,7 +323,7 @@ body {
   background-color: var(--wa-color-surface-default) !important;
 }
 
-.tailscale-peer::part(base) {
+.tailscale-peer .body {
   width: 100%;
 }
 
