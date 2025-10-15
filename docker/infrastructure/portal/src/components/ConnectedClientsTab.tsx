@@ -35,6 +35,7 @@ export const ConnectedClientsTab: React.FC = () => {
 
   return (
     <div className='wa-stack wa-gap-s'>
+      <h2>Connected Clients</h2>
       {connectedClients.map((client: ConnectedClient, index: number) => (
         <wa-details
           key={client.macAddress || index}
@@ -62,16 +63,6 @@ export const ConnectedClientsTab: React.FC = () => {
             {client.txRate && (
               <div>
                 <strong>TX Rate:</strong> {client.txRate}
-              </div>
-            )}
-            {client.rxRate && (
-              <div>
-                <strong>RX Rate:</strong> {client.rxRate}
-              </div>
-            )}
-            {client.connectedTime && (
-              <div>
-                <strong>Last Activity:</strong> {client.connectedTime}
               </div>
             )}
           </div>

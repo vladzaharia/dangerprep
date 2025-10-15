@@ -15,21 +15,15 @@ export const NetworkStatusPage: React.FC = () => {
         <wa-tab panel='tailscale'>Tailscale</wa-tab>
 
         <wa-tab-panel name='status'>
-          <wa-scroller orientation="vertical" className="network-status-scroller">
-            <NetworkStatusTab />
-          </wa-scroller>
+          <NetworkStatusTab />
         </wa-tab-panel>
 
         <wa-tab-panel name='clients'>
-          <wa-scroller orientation="vertical" className="network-status-scroller">
-            <ConnectedClientsTab />
-          </wa-scroller>
+          <ConnectedClientsTab />
         </wa-tab-panel>
 
         <wa-tab-panel name='tailscale'>
-          <wa-scroller orientation="vertical" className="network-status-scroller">
-            <TailscaleTab />
-          </wa-scroller>
+          <TailscaleTab />
         </wa-tab-panel>
       </wa-tab-group>
     </div>

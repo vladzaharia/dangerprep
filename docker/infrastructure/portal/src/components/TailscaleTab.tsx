@@ -32,9 +32,8 @@ export const TailscaleTab: React.FC = () => {
   return (
     <div className='wa-stack wa-gap-l'>
       {/* Tailscale Status */}
-      <wa-card appearance='filled'>
+      <wa-card appearance='outlined'>
         <div className='wa-stack wa-gap-m'>
-          <h3 className='wa-heading-s'>Tailscale Status</h3>
           <div className='wa-stack wa-gap-xs'>
             <div>
               <strong>Status:</strong>{' '}
@@ -64,43 +63,45 @@ export const TailscaleTab: React.FC = () => {
       {/* Tailscale Peers */}
       <div className='wa-stack wa-gap-s'>
         <h3 className='wa-heading-s'>Peers ({peers.length})</h3>
-        {peers.length === 0 ? (
-          <wa-callout variant='neutral'>
-            <wa-icon name='info-circle' slot='icon'></wa-icon>
-            No peers connected.
-          </wa-callout>
-        ) : (
-          peers.map((peer: TailscalePeer, index: number) => (
-            <wa-details key={peer.ipAddress || index} summary={peer.hostname || peer.ipAddress}>
-              <div className='wa-stack wa-gap-xs'>
-                <div>
-                  <strong>IP Address:</strong> {peer.ipAddress}
+        <wa-scroller orientation='vertical'>
+          {peers.length === 0 ? (
+            <wa-callout variant='neutral'>
+              <wa-icon name='info-circle' slot='icon'></wa-icon>
+              No peers connected.
+            </wa-callout>
+          ) : (
+            peers.map((peer: TailscalePeer, index: number) => (
+              <wa-details key={peer.ipAddress || index} summary={peer.hostname || peer.ipAddress}>
+                <div className='wa-stack wa-gap-xs'>
+                  <div>
+                    <strong>IP Address:</strong> {peer.ipAddress}
+                  </div>
+                  <div>
+                    <strong>Status:</strong>{' '}
+                    <wa-badge variant={peer.online ? 'success' : 'neutral'}>
+                      {peer.online ? 'Online' : 'Offline'}
+                    </wa-badge>
+                  </div>
+                  {peer.os && (
+                    <div>
+                      <strong>OS:</strong> {peer.os}
+                    </div>
+                  )}
+                  {peer.lastSeen && (
+                    <div>
+                      <strong>Last Seen:</strong> {new Date(peer.lastSeen).toLocaleString()}
+                    </div>
+                  )}
+                  {peer.exitNode && (
+                    <div>
+                      <strong>Exit Node:</strong> Yes
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <strong>Status:</strong>{' '}
-                  <wa-badge variant={peer.online ? 'success' : 'neutral'}>
-                    {peer.online ? 'Online' : 'Offline'}
-                  </wa-badge>
-                </div>
-                {peer.os && (
-                  <div>
-                    <strong>OS:</strong> {peer.os}
-                  </div>
-                )}
-                {peer.lastSeen && (
-                  <div>
-                    <strong>Last Seen:</strong> {new Date(peer.lastSeen).toLocaleString()}
-                  </div>
-                )}
-                {peer.exitNode && (
-                  <div>
-                    <strong>Exit Node:</strong> Yes
-                  </div>
-                )}
-              </div>
-            </wa-details>
-          ))
-        )}
+              </wa-details>
+            ))
+          )}
+        </wa-scroller>
       </div>
     </div>
   );
