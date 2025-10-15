@@ -112,26 +112,28 @@ export const TailscaleTab: React.FC = () => {
             <div className='wa-stack wa-gap-xs'>
               {onlinePeers.map((peer: TailscalePeer, index: number) => (
                 <wa-card orientation="horizontal" key={`peer-${index}`}>
-                  <div className='wa-flank wa-gap-m'>
-                    <FontAwesomeIcon icon={faComputer} size='lg' />
+                  <div className='wa-flank wa-gap-m' style={{ width: "100%" }}>
+                    <div slot="body" style={{ width: "100%" }}>
+                      <FontAwesomeIcon icon={faComputer} size='lg' />
 
-                    <div className='wa-stack wa-body-s wa-gap-xs' style={{ paddingTop: '8px' }}>
-                      <span className='wa-body-s' style={{ fontWeight: 600 }}>
-                        {peer.hostname || peer.ipAddress}
-                      </span>
+                      <div className='wa-stack wa-body-s wa-gap-xs' style={{ paddingTop: '8px' }}>
+                        <span className='wa-body-s' style={{ fontWeight: 600 }}>
+                          {peer.hostname || peer.ipAddress}
+                        </span>
 
-                      <span className='wa-body-s'>
-                        {peer.ipAddress}
-                      </span>
+                        <span className='wa-body-s'>
+                          {peer.ipAddress}
+                        </span>
 
-                      {/* Tags */}
-                      <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
-                        {peer.exitNode && (
-                          <wa-tag variant='brand' size='small'>
-                            <wa-icon name='arrow-right-from-bracket' slot='prefix'></wa-icon>
-                            Exit Node
-                          </wa-tag>
-                        )}
+                        {/* Tags */}
+                        <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
+                          {peer.exitNode && (
+                            <wa-tag variant='brand' size='small'>
+                              <wa-icon name='arrow-right-from-bracket' slot='prefix'></wa-icon>
+                              Exit Node
+                            </wa-tag>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
