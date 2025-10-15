@@ -1,6 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faNetworkWired, faCircle } from '@fortawesome/free-solid-svg-icons';
+import { faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 import { useNetworkWorker, useTailscaleFromWorker } from '../hooks/useNetworkWorker';
 import type { TailscaleInterface, TailscalePeer } from '../hooks/useNetworks';
 
