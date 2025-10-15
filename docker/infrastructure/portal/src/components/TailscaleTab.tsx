@@ -49,7 +49,7 @@ export const TailscaleTab: React.FC = () => {
   return (
     <div
       className='wa-grid wa-gap-l'
-      style={{ '--min-column-size': '300px' } as React.CSSProperties}
+      style={{ '--min-column-size': '200px' } as React.CSSProperties}
     >
       {/* Left Column - Tailscale Status */}
       <div className='wa-stack wa-gap-m'>
@@ -145,19 +145,19 @@ export const TailscaleTab: React.FC = () => {
               {onlinePeers.map((peer: TailscalePeer, index: number) => (
                 <wa-details key={peer.ipAddress || index}>
                   <div slot='summary' className='wa-flank wa-gap-s'>
-                    <wa-icon name={getOSIcon(peer.os)}></wa-icon>
                     <div className='wa-stack wa-gap-3xs' style={{ flex: 1 }}>
                       <span className='wa-body-s' style={{ fontWeight: 600 }}>
                         {peer.hostname || peer.ipAddress}
                       </span>
                       <span className='wa-caption-s'>{peer.ipAddress}</span>
                     </div>
-                    <FontAwesomeIcon
-                      icon={faCircle}
-                      size='xs'
-                      style={{ color: 'var(--wa-color-success)' }}
-                    />
                   </div>
+
+                  <div slot='icon'><FontAwesomeIcon
+                    icon={faCircle}
+                    size='xs'
+                    style={{ color: 'var(--wa-color-success)' }}
+                  /></div>
 
                   <div className='wa-stack wa-gap-xs wa-body-s' style={{ paddingTop: '8px' }}>
                     {/* OS Information */}
