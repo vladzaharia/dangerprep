@@ -112,21 +112,17 @@ export const TailscaleTab: React.FC = () => {
           </wa-callout>
         ) : (
           <wa-scroller style={{ maxHeight: '500px' }}>
-            <div className='wa-stack wa-gap-s'>
+            <div className='wa-stack wa-gap-xs'>
               {onlinePeers.map((peer: TailscalePeer, index: number) => (
                 <wa-card orientation="horizontal" key={`peer-${index}`}>
-                  <div className='wa-stack wa-gap-xs wa-body-s' style={{ paddingTop: '8px' }}>
+                  <div className='wa-stack wa-body-s' style={{ paddingTop: '8px' }}>
                     <span className='wa-body-s' style={{ fontWeight: 600 }}>
                       {peer.hostname || peer.ipAddress}
                     </span>
 
-                    {/* OS Information */}
-                    {peer.os && (
-                      <div>
-                        <span style={{ fontWeight: 600 }}>Operating System:</span>{' '}
-                        <span className='wa-caption-s'>{peer.os}</span>
-                      </div>
-                    )}
+                    <span className='wa-body-s'>
+                      {peer.ipAddress}
+                    </span>
 
                     {/* Tags */}
                     <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
