@@ -327,7 +327,7 @@ body {
   --spacing: var(--wa-space-s);
 }
 
-.tailscale-peer .body {
+.tailscale-peer::part(body) {
   width: 100%;
 }
 
