@@ -91,7 +91,7 @@ export const NetworkStatusTab: React.FC = () => {
                         ? `${iface.ssid} (${iface.name})`
                         : iface.name}
                     </span>
-                    {iface.ipAddress && <span className='wa-caption-s'>{iface.ipAddress}</span>}
+                    {iface.ipAddress && <span className='wa-caption-s'><strong>IP:</strong> {iface.ipAddress}</span>}
                   </div>
                 </div>
               </div>
@@ -108,6 +108,9 @@ export const NetworkStatusTab: React.FC = () => {
             <div className='wa-flank wa-gap-s'>
               <FontAwesomeIcon icon={faServer} size='lg' />
               <div className='wa-stack wa-gap-3xs'>
+                <span className='wa-body-s' style={{ fontWeight: 600 }}>
+                  This Device
+                </span>
                 {deviceIPs.length > 0 && (
                   <div className='wa-stack wa-gap-3xs wa-align-items-center'>
                     {deviceIPs.filter(({ name }) => !name.startsWith("br")).map(({ name, ip }) => (

@@ -1,6 +1,22 @@
 import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faNetworkWired, faCircle } from '@fortawesome/free-solid-svg-icons';
 import { useNetworkWorker, useTailscaleFromWorker } from '../hooks/useNetworkWorker';
 import type { TailscaleInterface, TailscalePeer } from '../hooks/useNetworks';
+
+/**
+ * Get OS icon name for peer
+ */
+function getOSIcon(os?: string): string {
+  if (!os) return 'desktop';
+  const osLower = os.toLowerCase();
+  if (osLower.includes('windows')) return 'windows';
+  if (osLower.includes('mac') || osLower.includes('darwin')) return 'apple';
+  if (osLower.includes('linux')) return 'linux';
+  if (osLower.includes('android')) return 'android';
+  if (osLower.includes('ios') || osLower.includes('iphone')) return 'apple';
+  return 'desktop';
+}
 
 /**
  * Tailscale Tab Component
@@ -28,72 +44,155 @@ export const TailscaleTab: React.FC = () => {
 
   const tailscaleInterface = tailscale as TailscaleInterface;
   const peers = tailscaleInterface.peers || [];
+  const onlinePeers = peers.filter((peer: TailscalePeer) => peer.online);
 
   return (
-    <div className='wa-stack wa-gap-l'>
-      {/* Tailscale Status */}
-      <wa-card appearance='outlined'>
-        <div className='wa-stack wa-gap-m'>
-          <div className='wa-stack wa-gap-xs wa-body-s'>
-            <div>
-              <strong>Status:</strong>{' '}
-              <wa-badge variant={tailscaleInterface.status === 'connected' ? 'success' : 'danger'}>
-                {tailscaleInterface.status}
-              </wa-badge>
+    <div
+      className='wa-grid wa-gap-l'
+      style={{ '--min-column-size': '300px' } as React.CSSProperties}
+    >
+      {/* Left Column - Tailscale Status */}
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>Tailscale Status</h3>
+        <wa-card appearance='outlined'>
+          <div className='wa-stack wa-gap-m'>
+            <div className='wa-flank wa-gap-s'>
+              <FontAwesomeIcon icon={faNetworkWired} size='lg' />
+              <div className='wa-stack wa-gap-3xs'>
+                <span className='wa-body-s' style={{ fontWeight: 600 }}>
+                  {tailscaleInterface.name}
+                </span>
+                {tailscaleInterface.tailnetName && (
+                  <span className='wa-caption-s'>{tailscaleInterface.tailnetName}</span>
+                )}
+              </div>
             </div>
-            {tailscaleInterface.tailnetName && (
-              <div>
-                <strong>Tailnet:</strong> {tailscaleInterface.tailnetName}
-              </div>
-            )}
-            {tailscaleInterface.ipAddress && (
-              <div>
-                <strong>IP Address:</strong> {tailscaleInterface.ipAddress}
-              </div>
-            )}
-            {tailscaleInterface.exitNode !== undefined && (
-              <div>
-                <strong>Exit Node:</strong> {tailscaleInterface.exitNode ? 'Yes' : 'No'}
-              </div>
-            )}
-          </div>
-        </div>
-      </wa-card>
 
-      {/* Tailscale Peers */}
-      <div className='wa-stack wa-gap-s wa-body-s'>
-        <h3 className='wa-heading-s'>Peers ({peers.length})</h3>
-          {peers.length === 0 ? (
-            <wa-callout variant='neutral'>
-              <wa-icon name='info-circle' slot='icon'></wa-icon>
-              No peers connected.
-            </wa-callout>
-          ) : (
-            peers.filter((peer: TailscalePeer) => peer.online).map((peer: TailscalePeer, index: number) => (
-              <wa-details key={peer.ipAddress || index} summary={peer.hostname || peer.ipAddress}>
-                <div className='wa-stack wa-gap-xs'>
-                  <div>
-                    <strong>IP Address:</strong> {peer.ipAddress}
-                  </div>
-                  {peer.os && (
-                    <div>
-                      <strong>OS:</strong> {peer.os}
-                    </div>
-                  )}
-                  {peer.lastSeen && (
-                    <div>
-                      <strong>Last Seen:</strong> {new Date(peer.lastSeen).toLocaleString()}
-                    </div>
-                  )}
-                  {peer.exitNode && (
-                    <div>
-                      <strong>Exit Node:</strong> Yes
-                    </div>
-                  )}
+            <div className='wa-stack wa-gap-xs wa-body-s'>
+              {/* Status Badge */}
+              <div className='wa-flank wa-gap-xs'>
+                <span style={{ fontWeight: 600 }}>Status:</span>
+                <wa-badge
+                  variant={tailscaleInterface.status === 'connected' ? 'success' : 'danger'}
+                >
+                  {tailscaleInterface.status}
+                </wa-badge>
+              </div>
+
+              {/* IP Address */}
+              {tailscaleInterface.ipAddress && (
+                <div>
+                  <span style={{ fontWeight: 600 }}>IP Address:</span>{' '}
+                  <span className='wa-caption-s'>{tailscaleInterface.ipAddress}</span>
                 </div>
-              </wa-details>
-            ))
-          )}
+              )}
+
+              {/* Tags */}
+              <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
+                {tailscaleInterface.exitNode && (
+                  <wa-tag variant='brand' size='small'>
+                    <wa-icon name='arrow-right-from-bracket' slot='prefix'></wa-icon>
+                    Exit Node
+                  </wa-tag>
+                )}
+                {tailscaleInterface.routeAdvertising &&
+                  tailscaleInterface.routeAdvertising.length > 0 && (
+                    <wa-tag variant='brand' size='small'>
+                      <wa-icon name='route' slot='prefix'></wa-icon>
+                      Subnet Routes ({tailscaleInterface.routeAdvertising.length})
+                    </wa-tag>
+                  )}
+                {onlinePeers.length > 0 && (
+                  <wa-tag variant='success' size='small'>
+                    <wa-icon name='users' slot='prefix'></wa-icon>
+                    {onlinePeers.length} Peer{onlinePeers.length !== 1 ? 's' : ''}
+                  </wa-tag>
+                )}
+              </div>
+
+              {/* Advertised Routes */}
+              {tailscaleInterface.routeAdvertising &&
+                tailscaleInterface.routeAdvertising.length > 0 && (
+                  <div className='wa-stack wa-gap-3xs'>
+                    <span style={{ fontWeight: 600 }}>Advertised Routes:</span>
+                    <div className='wa-stack wa-gap-2xs'>
+                      {tailscaleInterface.routeAdvertising.map((route, idx) => (
+                        <span key={idx} className='wa-caption-s'>
+                          • {route}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+            </div>
+          </div>
+        </wa-card>
+      </div>
+
+      {/* Right Column - Peers */}
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>
+          Peers ({onlinePeers.length} online{peers.length > onlinePeers.length ? `, ${peers.length - onlinePeers.length} offline` : ''})
+        </h3>
+        {peers.length === 0 ? (
+          <wa-callout variant='neutral'>
+            <wa-icon name='info-circle' slot='icon'></wa-icon>
+            No peers connected.
+          </wa-callout>
+        ) : (
+          <wa-scroller style={{ maxHeight: '500px' }}>
+            <div className='wa-stack wa-gap-s'>
+              {onlinePeers.map((peer: TailscalePeer, index: number) => (
+                <wa-details key={peer.ipAddress || index}>
+                  <div slot='summary' className='wa-flank wa-gap-s'>
+                    <wa-icon name={getOSIcon(peer.os)}></wa-icon>
+                    <div className='wa-stack wa-gap-3xs' style={{ flex: 1 }}>
+                      <span className='wa-body-s' style={{ fontWeight: 600 }}>
+                        {peer.hostname || peer.ipAddress}
+                      </span>
+                      <span className='wa-caption-s'>{peer.ipAddress}</span>
+                    </div>
+                    <FontAwesomeIcon
+                      icon={faCircle}
+                      size='xs'
+                      style={{ color: 'var(--wa-color-success)' }}
+                    />
+                  </div>
+
+                  <div className='wa-stack wa-gap-xs wa-body-s' style={{ paddingTop: '8px' }}>
+                    {/* OS Information */}
+                    {peer.os && (
+                      <div>
+                        <span style={{ fontWeight: 600 }}>Operating System:</span>{' '}
+                        <span className='wa-caption-s'>{peer.os}</span>
+                      </div>
+                    )}
+
+                    {/* Last Seen */}
+                    {peer.lastSeen && (
+                      <div>
+                        <span style={{ fontWeight: 600 }}>Last Seen:</span>{' '}
+                        <span className='wa-caption-s'>
+                          {new Date(peer.lastSeen).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Tags */}
+                    <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
+                      {peer.exitNode && (
+                        <wa-tag variant='brand' size='small'>
+                          <wa-icon name='arrow-right-from-bracket' slot='prefix'></wa-icon>
+                          Exit Node
+                        </wa-tag>
+                      )}
+                    </div>
+                  </div>
+                </wa-details>
+              ))}
+            </div>
+          </wa-scroller>
+        )}
       </div>
     </div>
   );
