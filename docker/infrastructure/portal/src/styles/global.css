@@ -319,6 +319,10 @@ body {
   justify-content: center;
 }
 
+.interface-callout {
+  background-color: var(--wa-color-surface-default) !important;
+}
+
 /* =============================================================================
    RESPONSIVE LAYOUT
    ============================================================================= */
