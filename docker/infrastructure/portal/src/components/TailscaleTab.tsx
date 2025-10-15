@@ -155,16 +155,6 @@ export const TailscaleTab: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Last Seen */}
-                    {peer.lastSeen && (
-                      <div>
-                        <span style={{ fontWeight: 600 }}>Last Seen:</span>{' '}
-                        <span className='wa-caption-s'>
-                          {new Date(peer.lastSeen).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-
                     {/* Tags */}
                     <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
                       {peer.exitNode && (
