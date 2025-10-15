@@ -41,9 +41,9 @@ export const TailscaleTab: React.FC = () => {
       {/* Left Column - Tailscale Status */}
       <div className='wa-stack wa-gap-m'>
         <h3 className='wa-heading-s'>Tailscale Status</h3>
-        <wa-card appearance='outlined'>
+        <wa-callout appearance='outlined' variant={tailscaleInterface.state === "up" ? "success" : "danger"}>
           <div className='wa-stack wa-gap-m'>
-            <div className='wa-flank wa-gap-s'>
+            <div className='wa-flank wa-gap-m'>
               <FontAwesomeIcon icon={faNetworkWired} size='lg' />
               <div className='wa-stack wa-gap-3xs'>
                 <span className='wa-body-s' style={{ fontWeight: 600 }}>
@@ -56,16 +56,6 @@ export const TailscaleTab: React.FC = () => {
             </div>
 
             <div className='wa-stack wa-gap-xs wa-body-s'>
-              {/* Status Badge */}
-              <div className='wa-flank wa-gap-xs'>
-                <span style={{ fontWeight: 600 }}>Status:</span>
-                <wa-badge
-                  variant={tailscaleInterface.status === 'connected' ? 'success' : 'danger'}
-                >
-                  {tailscaleInterface.status}
-                </wa-badge>
-              </div>
-
               {/* IP Address */}
               {tailscaleInterface.ipAddress && (
                 <div>
@@ -89,12 +79,6 @@ export const TailscaleTab: React.FC = () => {
                       Subnet Routes ({tailscaleInterface.routeAdvertising.length})
                     </wa-tag>
                   )}
-                {onlinePeers.length > 0 && (
-                  <wa-tag variant='success' size='small'>
-                    <wa-icon name='users' slot='prefix'></wa-icon>
-                    {onlinePeers.length} Peer{onlinePeers.length !== 1 ? 's' : ''}
-                  </wa-tag>
-                )}
               </div>
 
               {/* Advertised Routes */}
@@ -113,7 +97,7 @@ export const TailscaleTab: React.FC = () => {
                 )}
             </div>
           </div>
-        </wa-card>
+        </wa-callout>
       </div>
 
       {/* Right Column - Peers */}
@@ -139,12 +123,6 @@ export const TailscaleTab: React.FC = () => {
                       <span className='wa-caption-s'>{peer.ipAddress}</span>
                     </div>
                   </div>
-
-                  <div slot='icon'><FontAwesomeIcon
-                    icon={faCircle}
-                    size='xs'
-                    style={{ color: 'var(--wa-color-success)' }}
-                  /></div>
 
                   <div className='wa-stack wa-gap-xs wa-body-s' style={{ paddingTop: '8px' }}>
                     {/* OS Information */}

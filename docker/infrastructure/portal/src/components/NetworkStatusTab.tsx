@@ -81,9 +81,9 @@ export const NetworkStatusTab: React.FC = () => {
           </wa-card>
         ) : (
           lanInterfaces.map(iface => (
-            <wa-card key={iface.name} appearance='outlined'>
+            <wa-callout key={iface.name} appearance='outlined' variant={iface.state === "up" ? "success" : "danger"}>
               <div className='wa-stack wa-gap-xs'>
-                <div className='wa-flank wa-gap-s'>
+                <div className='wa-flank wa-gap-m'>
                   <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />
                   <div className='wa-stack wa-gap-3xs'>
                     <span className='wa-body-s' style={{ fontWeight: 600 }}>
@@ -95,7 +95,7 @@ export const NetworkStatusTab: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </wa-card>
+            </wa-callout>
           ))
         )}
       </div>
@@ -105,14 +105,14 @@ export const NetworkStatusTab: React.FC = () => {
         <h3 className='wa-heading-s'>&nbsp;</h3>
         <wa-card appearance='outlined'>
           <div className='wa-stack wa-gap-xs'>
-            <div className='wa-flank wa-gap-s'>
+            <div className='wa-flank wa-gap-m'>
               <FontAwesomeIcon icon={faServer} size='lg' />
               <div className='wa-stack wa-gap-3xs'>
                 <span className='wa-body-s' style={{ fontWeight: 600 }}>
                   This Device
                 </span>
                 {deviceIPs.length > 0 && (
-                  <div className='wa-stack wa-gap-3xs wa-align-items-center'>
+                  <div className='wa-stack wa-gap-3xs'>
                     {deviceIPs.filter(({ name }) => !name.startsWith("br")).map(({ name, ip }) => (
                       <span key={name} className='wa-caption-s'>
                         <strong>{name}</strong>: {ip}
@@ -137,9 +137,9 @@ export const NetworkStatusTab: React.FC = () => {
           </wa-card>
         ) : (
           wanInterfaces.map(iface => (
-            <wa-card key={iface.name} appearance='outlined'>
+            <wa-callout key={iface.name} appearance='outlined' variant={iface.state === "up" ? "success" : "danger"}>
               <div className='wa-stack wa-gap-xs'>
-                <div className='wa-flank wa-gap-s'>
+                <div className='wa-flank wa-gap-m'>
                   <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />
                   <div className='wa-stack wa-gap-3xs'>
                     <span className='wa-body-s' style={{ fontWeight: 600 }}>
@@ -160,7 +160,7 @@ export const NetworkStatusTab: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </wa-card>
+            </wa-callout>
           ))
         )}
       </div>
