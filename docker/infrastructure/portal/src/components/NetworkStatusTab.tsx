@@ -88,7 +88,7 @@ export const NetworkStatusTab: React.FC = () => {
                   <div className='wa-stack wa-gap-3xs'>
                     <span className='wa-body-s' style={{ fontWeight: 600 }}>
                       {iface.type === 'wifi' && 'ssid' in iface && iface.ssid
-                        ? iface.ssid
+                        ? `${iface.ssid} (${iface.name})`
                         : iface.name}
                     </span>
                     {iface.ipAddress && <span className='wa-caption-s'>{iface.ipAddress}</span>}
