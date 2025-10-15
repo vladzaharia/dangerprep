@@ -13,7 +13,7 @@ export const ConnectedClientsTab: React.FC = () => {
   const connectedClients = useMemo(() => {
     if (!hotspot || hotspot.type !== 'wifi') return [];
     const wifiInterface = hotspot as WiFiInterface;
-    return wifiInterface.connectedClientsDetails || [];
+    return wifiInterface.connectedClients || [];
   }, [hotspot]);
 
   if (network.loading && !network.data) {
