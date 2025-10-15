@@ -41,7 +41,7 @@ export const TailscaleTab: React.FC = () => {
       {/* Left Column - Tailscale Status */}
       <div className='wa-stack wa-gap-m'>
         <h3 className='wa-heading-s'>Tailscale Status</h3>
-        <wa-callout appearance='outlined' variant={tailscaleInterface.state === "up" ? "success" : "danger"} className="interface-callout">
+        <wa-callout appearance='outlined' variant={tailscaleInterface.status === "connected" ? "success" : "danger"} className="interface-callout">
           <div className='wa-stack wa-gap-m'>
             <div className='wa-flank wa-gap-m'>
               <FontAwesomeIcon icon={faNetworkWired} size='lg' />
