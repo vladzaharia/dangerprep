@@ -1,8 +1,11 @@
 import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComputer, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 import { useNetworkWorker, useTailscaleFromWorker } from '../hooks/useNetworkWorker';
 import type { TailscaleInterface, TailscalePeer } from '../hooks/useNetworks';
+import { DeviceCard } from './DeviceCard';
+import { InterfaceCard } from './InterfaceCard';
+import type { DeviceCardTag } from './DeviceCard';
+import type { InterfaceCardField, InterfaceCardTag } from './InterfaceCard';
 
 
 /**
@@ -33,6 +36,24 @@ export const TailscaleTab: React.FC = () => {
   const peers = tailscaleInterface.peers || [];
   const onlinePeers = peers.filter((peer: TailscalePeer) => peer.online);
 
+  // Prepare Tailscale interface data
+  const tailscaleFields: InterfaceCardField[] = [];
+  if (tailscaleInterface.ipAddress) {
+    tailscaleFields.push({ label: 'IP', value: tailscaleInterface.ipAddress });
+  }
+
+  const tailscaleTags: InterfaceCardTag[] = [];
+  if (tailscaleInterface.exitNode) {
+    tailscaleTags.push({ label: 'Exit Node', icon: 'arrow-right-from-bracket', variant: 'brand' });
+  }
+  if (tailscaleInterface.routeAdvertising && tailscaleInterface.routeAdvertising.length > 0) {
+    tailscaleTags.push({
+      label: `Subnet Routes (${tailscaleInterface.routeAdvertising.length})`,
+      icon: 'route',
+      variant: 'brand'
+    });
+  }
+
   return (
     <div
       className='wa-grid wa-gap-l'
@@ -41,60 +62,17 @@ export const TailscaleTab: React.FC = () => {
       {/* Left Column - Tailscale Status */}
       <div className='wa-stack wa-gap-m'>
         <h3 className='wa-heading-s'>Tailscale Status</h3>
-        <wa-callout appearance='outlined' variant={tailscaleInterface.status === "connected" ? "success" : "danger"} className="interface-callout">
-          <div className='wa-stack wa-gap-m'>
-            <div className='wa-flank wa-gap-m'>
-              <FontAwesomeIcon icon={faNetworkWired} size='lg' />
-              <div className='wa-stack wa-gap-3xs'>
-                <span className='wa-body-s' style={{ fontWeight: 600 }}>
-                  {tailscaleInterface.name}
-                </span>
-                {tailscaleInterface.tailnetName && (
-                  <span className='wa-caption-s'>{tailscaleInterface.tailnetName}</span>
-                )}
-              </div>
-            </div>
-
-            <div className='wa-stack wa-gap-xs wa-body-s'>
-              {/* IP Address */}
-              {tailscaleInterface.ipAddress && (
-                <span className='wa-caption-s'><strong>IP:</strong> {tailscaleInterface.ipAddress}</span>
-              )}
-
-              {/* Tags */}
-              <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
-                {tailscaleInterface.exitNode && (
-                  <wa-tag variant='brand' size='small'>
-                    <wa-icon name='arrow-right-from-bracket' slot='prefix'></wa-icon>
-                    Exit Node
-                  </wa-tag>
-                )}
-                {tailscaleInterface.routeAdvertising &&
-                  tailscaleInterface.routeAdvertising.length > 0 && (
-                    <wa-tag variant='brand' size='small'>
-                      <wa-icon name='route' slot='prefix'></wa-icon>
-                      Subnet Routes ({tailscaleInterface.routeAdvertising.length})
-                    </wa-tag>
-                  )}
-              </div>
-
-              {/* Advertised Routes */}
-              {tailscaleInterface.routeAdvertising &&
-                tailscaleInterface.routeAdvertising.length > 0 && (
-                  <div className='wa-stack wa-gap-3xs'>
-                    <span style={{ fontWeight: 600 }}>Advertised Routes:</span>
-                    <div className='wa-stack wa-gap-2xs'>
-                      {tailscaleInterface.routeAdvertising.map((route, idx) => (
-                        <span key={idx} className='wa-caption-s'>
-                          • {route}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-            </div>
-          </div>
-        </wa-callout>
+        <InterfaceCard
+          type='callout'
+          variant={tailscaleInterface.status === "connected" ? "success" : "danger"}
+          icon={faNetworkWired}
+          title={tailscaleInterface.name}
+          subtitle={tailscaleInterface.tailnetName}
+          fields={tailscaleFields}
+          tags={tailscaleTags}
+          routes={tailscaleInterface.routeAdvertising}
+          className="interface-callout"
+        />
       </div>
 
       {/* Right Column - Peers */}
@@ -110,33 +88,23 @@ export const TailscaleTab: React.FC = () => {
         ) : (
           <wa-scroller style={{ maxHeight: '500px' }}>
             <div className='wa-stack wa-gap-xs'>
-              {onlinePeers.map((peer: TailscalePeer, index: number) => (
-                <wa-card orientation="horizontal" key={`peer-${index}`} className="tailscale-peer">
-                  <div className='wa-flank wa-gap-m'>
-                    <FontAwesomeIcon icon={faComputer} size='lg' />
+              {onlinePeers.map((peer: TailscalePeer, index: number) => {
+                const peerTags: DeviceCardTag[] = [];
+                if (peer.exitNode) {
+                  peerTags.push({ label: 'Exit Node', icon: 'arrow-right-from-bracket', variant: 'brand' });
+                }
 
-                    <div className='wa-stack wa-gap-3xs'>
-                      <span className='wa-body-s' style={{ fontWeight: 600 }}>
-                        {peer.hostname || peer.ipAddress}
-                      </span>
-
-                      <span className='wa-caption-s'>
-                        {peer.ipAddress}
-                      </span>
-
-                      {/* Tags */}
-                      <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
-                        {peer.exitNode && (
-                          <wa-tag variant='brand' size='small'>
-                            <wa-icon name='arrow-right-from-bracket' slot='prefix'></wa-icon>
-                            Exit Node
-                          </wa-tag>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </wa-card>
-              ))}
+                return (
+                  <DeviceCard
+                    key={`peer-${index}`}
+                    icon={faComputer}
+                    title={peer.hostname || peer.ipAddress}
+                    subtitle={peer.ipAddress}
+                    tags={peerTags}
+                    className="tailscale-peer"
+                  />
+                );
+              })}
             </div>
           </wa-scroller>
         )}

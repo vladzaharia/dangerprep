@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faWifi,
   faEthernet,
@@ -9,6 +8,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { useNetworkWorker } from '../hooks/useNetworkWorker';
 import type { NetworkInterface } from '../hooks/useNetworks';
+import { InterfaceCard } from './InterfaceCard';
+import type { InterfaceCardField } from './InterfaceCard';
 
 /**
  * Get icon for network interface type
@@ -80,50 +81,42 @@ export const NetworkStatusTab: React.FC = () => {
             </div>
           </wa-card>
         ) : (
-          lanInterfaces.map(iface => (
-            <wa-callout key={iface.name} appearance='outlined' variant={iface.state === "up" ? "success" : "danger"} className="interface-callout">
-              <div className='wa-stack wa-gap-xs'>
-                <div className='wa-flank wa-gap-m'>
-                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />
-                  <div className='wa-stack wa-gap-3xs'>
-                    <span className='wa-body-s' style={{ fontWeight: 600 }}>
-                      {iface.type === 'wifi' && 'ssid' in iface && iface.ssid
-                        ? `${iface.ssid} (${iface.name})`
-                        : iface.name}
-                    </span>
-                    {iface.ipAddress && <span className='wa-caption-s'><strong>IP:</strong> {iface.ipAddress}</span>}
-                  </div>
-                </div>
-              </div>
-            </wa-callout>
-          ))
+          lanInterfaces.map(iface => {
+            const title = iface.type === 'wifi' && 'ssid' in iface && iface.ssid
+              ? `${iface.ssid} (${iface.name})`
+              : iface.name;
+
+            const fields: InterfaceCardField[] = [];
+            if (iface.ipAddress) {
+              fields.push({ label: 'IP', value: iface.ipAddress });
+            }
+
+            return (
+              <InterfaceCard
+                key={iface.name}
+                type='callout'
+                variant={iface.state === "up" ? "success" : "danger"}
+                icon={getInterfaceIcon(iface)}
+                title={title}
+                fields={fields}
+                className="interface-callout"
+              />
+            );
+          })
         )}
       </div>
 
       {/* Middle Column - Router/Device */}
       <div className='wa-stack wa-gap-m'>
         <h3 className='wa-heading-s'>&nbsp;</h3>
-        <wa-card appearance='outlined'>
-          <div className='wa-stack wa-gap-xs'>
-            <div className='wa-flank wa-gap-m'>
-              <FontAwesomeIcon icon={faServer} size='lg' />
-              <div className='wa-stack wa-gap-3xs'>
-                <span className='wa-body-s' style={{ fontWeight: 600 }}>
-                  This Device
-                </span>
-                {deviceIPs.length > 0 && (
-                  <div className='wa-stack wa-gap-3xs'>
-                    {deviceIPs.filter(({ name }) => !name.startsWith("br")).map(({ name, ip }) => (
-                      <span key={name} className='wa-caption-s'>
-                        <strong>{name}</strong>: {ip}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </wa-card>
+        <InterfaceCard
+          type='card'
+          icon={faServer}
+          title="This Device"
+          fields={deviceIPs
+            .filter(({ name }) => !name.startsWith("br"))
+            .map(({ name, ip }) => ({ label: name, value: ip }))}
+        />
       </div>
 
       {/* Right Column - WAN Interfaces */}
@@ -136,32 +129,31 @@ export const NetworkStatusTab: React.FC = () => {
             </div>
           </wa-card>
         ) : (
-          wanInterfaces.map(iface => (
-            <wa-callout key={iface.name} appearance='outlined' variant={iface.state === "up" ? "success" : "danger"} className="interface-callout">
-              <div className='wa-stack wa-gap-xs'>
-                <div className='wa-flank wa-gap-m'>
-                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />
-                  <div className='wa-stack wa-gap-3xs'>
-                    <span className='wa-body-s' style={{ fontWeight: 600 }}>
-                      {iface.type === 'wifi' && 'ssid' in iface && iface.ssid
-                        ? `${iface.ssid} (${iface.name})`
-                        : iface.name}
-                    </span>
-                    {iface.ipAddress && (
-                      <span className='wa-caption-s'>
-                        <strong>IP:</strong> {iface.ipAddress}
-                      </span>
-                    )}
-                    {iface.gateway && (
-                      <span className='wa-caption-s'>
-                        <strong>Gateway:</strong> {iface.gateway}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </wa-callout>
-          ))
+          wanInterfaces.map(iface => {
+            const title = iface.type === 'wifi' && 'ssid' in iface && iface.ssid
+              ? `${iface.ssid} (${iface.name})`
+              : iface.name;
+
+            const fields: InterfaceCardField[] = [];
+            if (iface.ipAddress) {
+              fields.push({ label: 'IP', value: iface.ipAddress });
+            }
+            if (iface.gateway) {
+              fields.push({ label: 'Gateway', value: iface.gateway });
+            }
+
+            return (
+              <InterfaceCard
+                key={iface.name}
+                type='callout'
+                variant={iface.state === "up" ? "success" : "danger"}
+                icon={getInterfaceIcon(iface)}
+                title={title}
+                fields={fields}
+                className="interface-callout"
+              />
+            );
+          })
         )}
       </div>
     </div>
