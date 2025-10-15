@@ -4,19 +4,6 @@ import { faNetworkWired, faCircle } from '@fortawesome/free-solid-svg-icons';
 import { useNetworkWorker, useTailscaleFromWorker } from '../hooks/useNetworkWorker';
 import type { TailscaleInterface, TailscalePeer } from '../hooks/useNetworks';
 
-/**
- * Get OS icon name for peer
- */
-function getOSIcon(os?: string): string {
-  if (!os) return 'desktop';
-  const osLower = os.toLowerCase();
-  if (osLower.includes('windows')) return 'windows';
-  if (osLower.includes('mac') || osLower.includes('darwin')) return 'apple';
-  if (osLower.includes('linux')) return 'linux';
-  if (osLower.includes('android')) return 'android';
-  if (osLower.includes('ios') || osLower.includes('iphone')) return 'apple';
-  return 'desktop';
-}
 
 /**
  * Tailscale Tab Component
