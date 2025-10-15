@@ -112,8 +112,7 @@ export const TailscaleTab: React.FC = () => {
             <div className='wa-stack wa-gap-xs'>
               {onlinePeers.map((peer: TailscalePeer, index: number) => (
                 <wa-card orientation="horizontal" key={`peer-${index}`}>
-                  <div className='wa-flank wa-gap-m' style={{ width: "100%" }}>
-                    <div slot="body" style={{ width: "100%" }}>
+                  <div slot="body" className='wa-flank wa-gap-m' style={{ width: "100%" }}>
                       <FontAwesomeIcon icon={faComputer} size='lg' />
 
                       <div className='wa-stack wa-body-s wa-gap-xs' style={{ paddingTop: '8px' }}>
@@ -136,7 +135,6 @@ export const TailscaleTab: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
                 </wa-card>
               ))}
             </div>
