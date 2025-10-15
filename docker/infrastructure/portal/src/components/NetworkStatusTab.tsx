@@ -109,7 +109,7 @@ export const NetworkStatusTab: React.FC = () => {
             <div className='wa-stack wa-gap-xs wa-align-items-center'>
               {deviceIPs.length > 0 && (
                 <div className='wa-stack wa-gap-3xs wa-align-items-center'>
-                  {deviceIPs.map(({ name, ip }) => (
+                  {deviceIPs.filter(({ name }) => !name.startsWith("br")).map(({ name, ip }) => (
                     <span key={name} className='wa-caption-s'>
                       <strong>{name}</strong>: {ip}
                     </span>
