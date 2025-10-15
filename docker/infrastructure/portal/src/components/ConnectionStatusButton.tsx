@@ -36,7 +36,7 @@ export const ConnectionStatusButton: React.FC = () => {
     if (!network.lastUpdate) return false;
     const lastUpdateTime = new Date(network.lastUpdate).getTime();
     const now = Date.now();
-    const fiveMinutesInMs = 5 * 60 * 1000;
+    const fiveMinutesInMs = 30 * 1000;
     return now - lastUpdateTime < fiveMinutesInMs;
   }, [network.lastUpdate]);
 
