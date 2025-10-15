@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import { Navigation } from './components/Navigation';
 import { DefaultRoute } from './components/DefaultRoute';
-import { QRCodePage, ServicesPage, MaintenanceServicesPage, PowerPage } from './pages';
+import { QRCodePage, ServicesPage, MaintenanceServicesPage, PowerPage, NetworkStatusPage } from './pages';
 
 // Service configuration type
 export interface Service {
@@ -55,6 +55,7 @@ const App: React.FC = () => {
                 <Route path="/services" element={<ServicesPage />} />
                 <Route path="/maintenance" element={<MaintenanceServicesPage />} />
                 <Route path="/power" element={<PowerPage />} />
+                <Route path="/network" element={<NetworkStatusPage />} />
               </Routes>
             </Suspense>
           </div>
