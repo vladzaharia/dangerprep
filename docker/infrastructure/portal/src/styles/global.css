@@ -83,7 +83,6 @@ body {
 
 .network-status-tabs wa-tab-panel {
   height: 100%;
-  display: flex;
   flex-direction: column;
 }
 
