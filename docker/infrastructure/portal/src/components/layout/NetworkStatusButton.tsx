@@ -2,8 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faServer } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
-import { useNetworkWorker } from '../../hooks/useNetworkWorker';
-import { useHostapdWorker } from '../../hooks/useHostapdWorker';
+import { useNetworkSummary, useHostapdStatus } from '../../hooks/useSWRData';
 
 /**
  * Connection Status Button Component
@@ -19,35 +18,23 @@ export const NetworkStatusButton: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Use worker for real-time network updates
-  const network = useNetworkWorker({
-    pollInterval: 5000,
-    autoStart: true,
-  });
+  // Use SWR for real-time network updates with auto-reconnect
+  const { data: networkData, error: networkError } = useNetworkSummary();
 
-  // Use worker for real-time hostapd status updates
-  const hostapd = useHostapdWorker({
-    pollInterval: 5000,
-    autoStart: true,
-  });
+  // Use SWR for real-time hostapd status updates
+  const { data: hostapdData } = useHostapdStatus();
 
-  // Calculate connection status based on last update time
-  const isConnected = useMemo(() => {
-    if (!network.lastUpdate) return false;
-    const lastUpdateTime = new Date(network.lastUpdate).getTime();
-    const now = Date.now();
-    const fiveMinutesInMs = 30 * 1000;
-    return now - lastUpdateTime < fiveMinutesInMs;
-  }, [network.lastUpdate]);
+  // Calculate connection status - if we have data and no error, we're connected
+  const isConnected = !!networkData && !networkError;
 
   // Check if there are any internet (WAN) interfaces that are up
   const hasInternetInterface = useMemo(() => {
-    if (!network.data?.interfaces) return false;
-    return network.data.interfaces.some(iface => iface.purpose === 'wan' && iface.state === 'up');
-  }, [network.data]);
+    if (!networkData?.interfaces) return false;
+    return networkData.interfaces.some(iface => iface.purpose === 'wan' && iface.state === 'up');
+  }, [networkData]);
 
   // Get connected clients count
-  const connectedClients = hostapd.data?.connectedClients || 0;
+  const connectedClients = hostapdData?.hostapd?.connectedClients || 0;
 
   // Determine the variant based on connection state and internet availability
   const variant = useMemo(() => {

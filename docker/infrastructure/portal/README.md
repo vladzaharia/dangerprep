@@ -6,11 +6,13 @@ Modern React 19 portal for DangerPrep hotspot services, built with TypeScript, V
 
 - **WiFi Connection**: QR code generation for automatic WiFi connection with manual details toggle
 - **Service Discovery**: Cards for Jellyfin, Kiwix, and Romm services
+- **SWR Data Fetching**: Efficient data fetching with automatic revalidation on focus and network reconnect (perfect for WiFi hotspot!)
 - **Dynamic Configuration**: Runtime environment variable loading via API endpoints
 - **Responsive Design**: Optimized for both mobile (800x480 touchscreen) and desktop
 - **Kiosk Mode**: URL parameter `?kiosk=true` disables clicks for touchscreen display
+- **Auto-Reset**: Automatically returns to homepage after 5 minutes of inactivity
 - **Dark Theme**: WebAwesome Awesome theme with dark mode only
-- **Modern Stack**: React 19, TypeScript, Vite, Yarn v4
+- **Modern Stack**: React 19, TypeScript, Vite, Yarn v4, SWR
 
 ## Configuration
 
@@ -106,6 +108,14 @@ The portal is deployed as a Docker service with:
 - QR code toggle still works for touchscreen interaction
 - Service cards show URLs as text (no clicking)
 - Optimized for NanoPi M6 touchscreen display
+
+### Auto-Reset Feature
+The portal automatically returns to the homepage after 5 minutes of user inactivity. This feature:
+- Monitors user activity (mouse movement, touches, clicks, keyboard input, scrolling)
+- Preserves the kiosk mode state (if `?kiosk` is in the URL, it stays in kiosk mode)
+- Redirects to `/qr` in kiosk mode or `/services` in normal mode
+- Uses `react-idle-timer` library with event throttling for optimal performance
+- Ideal for public kiosk displays to reset to the default view
 
 ## Architecture
 

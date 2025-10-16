@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircleInfo } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 
 import { ServiceGrid } from '../components';
-import { useServices } from '../hooks/useServices';
+import { useServicesData } from '../hooks/useSWRData';
 
 /**
  * Loading skeleton for maintenance services page
@@ -59,10 +59,11 @@ function MaintenanceServicesPageSkeleton() {
 }
 
 /**
- * Maintenance services content component
+ * Maintenance services content component (wrapped in Suspense)
  */
 function MaintenanceServicesContent() {
-  const services = useServices('maintenance');
+  const { data } = useServicesData('maintenance');
+  const services = data?.services || [];
 
   return (
     <div className='wa-stack wa-gap-xl'>
@@ -82,6 +83,9 @@ function MaintenanceServicesContent() {
   );
 }
 
+/**
+ * Maintenance services page component with React 19 Suspense
+ */
 export const MaintenanceServicesPage: React.FC = () => {
   return (
     <Suspense fallback={<MaintenanceServicesPageSkeleton />}>

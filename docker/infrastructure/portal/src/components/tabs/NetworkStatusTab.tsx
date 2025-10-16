@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { faWifi, faServer, faGlobe, faLink, faShieldCheck, faHardDrive } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useNetworkWorker } from '../../hooks/useNetworkWorker';
+import { useNetworkSummary } from '../../hooks/useSWRData';
 import type { NetworkInterface } from '../../hooks/useNetworks';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
@@ -27,33 +27,34 @@ function getInterfaceIcon(iface: NetworkInterface) {
  * Status Tab Component - Shows network topology
  */
 export const NetworkStatusTab: React.FC = () => {
-  const network = useNetworkWorker({ pollInterval: 5000, autoStart: true });
+  const { data: networkData } = useNetworkSummary();
 
   // Get LAN interfaces (hotspot/wlan)
   const lanInterfaces = useMemo(() => {
-    if (!network.data?.interfaces) return [];
-    return network.data.interfaces.filter(
+    if (!networkData?.interfaces) return [];
+    return networkData.interfaces.filter(
       iface => iface.purpose === 'wlan' || iface.purpose === 'lan'
     );
-  }, [network.data]);
+  }, [networkData]);
 
   // Get WAN interfaces (internet)
   const wanInterfaces = useMemo(() => {
-    if (!network.data?.interfaces) return [];
-    return network.data.interfaces.filter(
+    if (!networkData?.interfaces) return [];
+    return networkData.interfaces.filter(
       iface => iface.purpose === 'wan' && iface.type !== 'tailscale'
     );
-  }, [network.data]);
+  }, [networkData]);
 
   // Get device IP addresses
   const deviceIPs = useMemo(() => {
-    if (!network.data?.interfaces) return [];
-    return network.data.interfaces
+    if (!networkData?.interfaces) return [];
+    return networkData.interfaces
       .filter(iface => iface.ipAddress && iface.state === 'up')
       .map(iface => ({ name: iface.name, ip: iface.ipAddress! }));
-  }, [network.data]);
+  }, [networkData]);
 
-  if (network.loading && !network.data) {
+  // Note: Loading state handled by parent Suspense boundary
+  if (!networkData) {
     return (
       <div className='wa-stack wa-gap-m'>
         <wa-skeleton effect='sheen' style={{ width: '100%', height: '200px' }}></wa-skeleton>

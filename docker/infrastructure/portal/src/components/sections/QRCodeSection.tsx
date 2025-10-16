@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
-import { useNetworkWorker, useHotspotFromWorker } from '../../hooks/useNetworkWorker';
+import React, { Suspense, useMemo } from 'react';
+import { useHotspotInterface } from '../../hooks/useSWRData';
+import type { WiFiInterface } from '../../hooks/useNetworks';
 
 /**
  * Loading skeleton for QR code section using Web Awesome components
@@ -48,27 +49,22 @@ function QRCodeSkeleton() {
 }
 
 /**
- * QR Code content component with real-time updates
+ * QR Code content component with real-time updates via SWR
  */
 function QRCodeContent() {
-  // Use worker for real-time network updates
-  const network = useNetworkWorker({
-    pollInterval: 5000,
-    autoStart: true,
-  });
-
-  const hotspotInterface = useHotspotFromWorker(network.data);
+  // Use SWR for real-time network updates with auto-reconnect
+  const { data: hotspotInterface } = useHotspotInterface();
 
   // Extract SSID and password from hotspot interface
   // Type guard to ensure we have a WiFi interface with the required properties
-  const ssid =
-    hotspotInterface?.type === 'wifi' && 'ssid' in hotspotInterface
-      ? hotspotInterface.ssid || 'DangerPrep'
-      : 'DangerPrep';
-  const password =
-    hotspotInterface?.type === 'wifi' && 'password' in hotspotInterface
-      ? hotspotInterface.password || 'change_me'
-      : 'change_me';
+  let ssid = 'DangerPrep';
+  let password = 'change_me';
+
+  if (hotspotInterface?.type === 'wifi') {
+    const wifiInterface = hotspotInterface as WiFiInterface;
+    ssid = wifiInterface.ssid || 'DangerPrep';
+    password = wifiInterface.password || 'change_me';
+  }
 
   // Generate WiFi QR code string
   const wifiQRString = useMemo(() => {
@@ -78,26 +74,8 @@ function QRCodeContent() {
     return `WIFI:T:WPA;S:${escapedSSID};P:${escapedPassword};H:false;;`;
   }, [ssid, password]);
 
-  // Show loading state while fetching initial data
-  if (network.loading && !network.data) {
-    return <QRCodeSkeleton />;
-  }
-
   return (
     <div className='wifi-connection-container'>
-      {/* Real-time update indicator */}
-      {network.isPolling && (
-        <div className='flex items-center gap-2 mb-4 text-sm text-green-600'>
-          <div className='w-2 h-2 rounded-full bg-green-500 animate-pulse'></div>
-          <span>Live updates active</span>
-          {network.lastUpdate && (
-            <span className='text-xs text-gray-500'>
-              Updated: {new Date(network.lastUpdate).toLocaleTimeString()}
-            </span>
-          )}
-        </div>
-      )}
-
       {/* Connection Details and QR Code Side by Side */}
       <div className='wifi-connection-content'>
         {/* Left Side - Connection Details */}
@@ -136,8 +114,12 @@ function QRCodeContent() {
 }
 
 /**
- * QR Code Section component with real-time updates via Web Worker
+ * QR Code Section component with React 19 Suspense
  */
 export const QRCodeSection: React.FC = () => {
-  return <QRCodeContent />;
+  return (
+    <Suspense fallback={<QRCodeSkeleton />}>
+      <QRCodeContent />
+    </Suspense>
+  );
 };

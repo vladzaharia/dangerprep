@@ -8,7 +8,7 @@ import {
   faCircleInfo,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useNetworkWorker, useHotspotFromWorker } from '../../hooks/useNetworkWorker';
+import { useHotspotInterface } from '../../hooks/useSWRData';
 import type { WiFiInterface, ConnectedClient } from '../../hooks/useNetworks';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
@@ -17,8 +17,7 @@ import type { StatusCardTag } from '../cards/StatusCard';
  * Connected Clients Tab Component
  */
 export const ConnectedClientsTab: React.FC = () => {
-  const network = useNetworkWorker({ pollInterval: 5000, autoStart: true });
-  const hotspot = useHotspotFromWorker(network.data);
+  const { data: hotspot } = useHotspotInterface();
 
   // Get connected clients from hotspot interface
   const connectedClients = useMemo(() => {
@@ -27,13 +26,7 @@ export const ConnectedClientsTab: React.FC = () => {
     return wifiInterface.connectedClients || [];
   }, [hotspot]);
 
-  if (network.loading && !network.data) {
-    return (
-      <div className='wa-stack wa-gap-m'>
-        <wa-skeleton effect='sheen' style={{ width: '100%', height: '150px' }}></wa-skeleton>
-      </div>
-    );
-  }
+  // Note: Loading state handled by parent Suspense boundary
 
   if (connectedClients.length === 0) {
     return (

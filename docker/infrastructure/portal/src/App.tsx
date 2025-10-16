@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useSearchParams } from 'react-router-dom';
+import { useIdleTimer } from 'react-idle-timer';
 
 import { Navigation, DefaultRoute } from './components';
 import {
@@ -45,9 +46,39 @@ function AppLoadingFallback() {
   );
 }
 
-const App: React.FC = () => {
+/**
+ * AppContent component that handles inactivity reset
+ * Must be inside Router to use navigation hooks
+ */
+function AppContent() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Auto-reset to homepage after 5 minutes (300000ms) of inactivity
+  useIdleTimer({
+    timeout: 300000, // 5 minutes
+    onIdle: () => {
+      // Preserve search params (including kiosk mode)
+      const queryString = searchParams.toString();
+      const searchParamString = queryString ? `?${queryString}` : '';
+      // Navigate to homepage (which will redirect to /qr or /services based on kiosk mode)
+      navigate(`/${searchParamString}`, { replace: true });
+    },
+    // Events to listen for user activity
+    events: [
+      'mousedown',
+      'mousemove',
+      'keypress',
+      'scroll',
+      'touchstart',
+      'click',
+    ],
+    // Throttle events to improve performance
+    eventsThrottle: 200,
+  });
+
   return (
-    <Router>
+    <>
       {/* Main Layout using wa-flank for sidebar + content */}
       <div className='wa-flank app-layout'>
         {/* Navigation Sidebar - Background Layer */}
@@ -71,6 +102,14 @@ const App: React.FC = () => {
           </div>
         </main>
       </div>
+    </>
+  );
+}
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 };

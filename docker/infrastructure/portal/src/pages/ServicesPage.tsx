@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircleInfo } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 
 import { ServiceGrid } from '../components';
-import { useServices } from '../hooks/useServices';
+import { useServicesData } from '../hooks/useSWRData';
 
 /**
  * Loading skeleton for services page using Web Awesome components
@@ -62,8 +62,8 @@ function ServicesPageSkeleton() {
  * Services content component (wrapped in Suspense)
  */
 function ServicesContent() {
-  // Use modern Suspense-compatible hook
-  const services = useServices('public');
+  const { data } = useServicesData('public');
+  const services = data?.services || [];
 
   return (
     <div className='wa-stack wa-gap-xl'>
@@ -83,6 +83,9 @@ function ServicesContent() {
   );
 }
 
+/**
+ * Services page component with React 19 Suspense
+ */
 export const ServicesPage: React.FC = () => {
   return (
     <Suspense fallback={<ServicesPageSkeleton />}>
