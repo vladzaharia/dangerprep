@@ -1,5 +1,12 @@
 import React from 'react';
-import { faComputer, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
+import {
+  faComputer,
+  faNetworkWired,
+  faInfoCircle,
+  faArrowRightFromBracket,
+  faRoute
+} from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkWorker, useTailscaleFromWorker } from '../hooks/useNetworkWorker';
 import type { TailscaleInterface, TailscalePeer } from '../hooks/useNetworks';
 import { DeviceCard } from './DeviceCard';
@@ -26,7 +33,9 @@ export const TailscaleTab: React.FC = () => {
   if (!tailscale) {
     return (
       <wa-callout variant='neutral'>
-        <wa-icon name='info-circle' slot='icon'></wa-icon>
+        <span slot='icon'>
+          <FontAwesomeIcon icon={faInfoCircle} />
+        </span>
         Tailscale is not configured or not running.
       </wa-callout>
     );
@@ -44,7 +53,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleTags.push({
       label: 'IP',
       value: tailscaleInterface.ipAddress,
-      icon: 'network-wired',
+      icon: faNetworkWired,
       variant: 'neutral'
     });
   }
@@ -53,7 +62,7 @@ export const TailscaleTab: React.FC = () => {
   if (tailscaleInterface.exitNode) {
     tailscaleTags.push({
       label: 'Exit Node',
-      icon: 'arrow-right-from-bracket',
+      icon: faArrowRightFromBracket,
       variant: 'brand'
     });
   }
@@ -63,7 +72,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleTags.push({
       label: 'Subnet Routes',
       value: tailscaleInterface.routeAdvertising.length,
-      icon: 'route',
+      icon: faRoute,
       variant: 'brand'
     });
   }
@@ -95,16 +104,18 @@ export const TailscaleTab: React.FC = () => {
         </h3>
         {peers.length === 0 ? (
           <wa-callout variant='neutral'>
-            <wa-icon name='info-circle' slot='icon'></wa-icon>
+            <span slot='icon'>
+              <FontAwesomeIcon icon={faInfoCircle} />
+            </span>
             No peers connected.
           </wa-callout>
         ) : (
           <wa-scroller style={{ maxHeight: '500px' }}>
             <div className='wa-grid wa-gap-xs'>
-              {onlinePeers.map((peer: TailscalePeer, index: number) => {
+              {peers.map((peer: TailscalePeer, index: number) => {
                 const peerTags: DeviceCardTag[] = [];
                 if (peer.exitNode) {
-                  peerTags.push({ label: 'Exit Node', icon: 'arrow-right-from-bracket', variant: 'brand' });
+                  peerTags.push({ label: 'Exit Node', icon: faArrowRightFromBracket, variant: 'brand' });
                 }
 
                 return (
@@ -114,7 +125,7 @@ export const TailscaleTab: React.FC = () => {
                     title={peer.hostname || peer.ipAddress}
                     subtitle={peer.ipAddress}
                     tags={peerTags}
-                    className="tailscale-peer"
+                    className={`tailscale-peer ${peer.online ? 'wa-success' : 'wa-danger'}`}
                   />
                 );
               })}

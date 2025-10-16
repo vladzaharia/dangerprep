@@ -1,4 +1,6 @@
 import React, { Suspense } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 
 import { ServiceGrid } from '../components/ServiceGrid';
 import { useServices } from '../hooks/useServices';
@@ -68,7 +70,9 @@ function MaintenanceServicesContent() {
 
       {services.length === 0 ? (
         <wa-callout variant='neutral'>
-          <wa-icon name='info-circle' slot='icon'></wa-icon>
+          <span slot='icon'>
+            <FontAwesomeIcon icon={faInfoCircle} />
+          </span>
           No maintenance services are currently available.
         </wa-callout>
       ) : (

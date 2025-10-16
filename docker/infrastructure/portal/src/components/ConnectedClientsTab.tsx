@@ -1,5 +1,13 @@
 import React, { useMemo } from 'react';
-import { faComputer } from '@fortawesome/free-solid-svg-icons';
+import {
+  faComputer,
+  faFingerprint,
+  faSignal,
+  faArrowUp,
+  faArrowDown,
+  faInfoCircle
+} from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkWorker, useHotspotFromWorker } from '../hooks/useNetworkWorker';
 import type { WiFiInterface, ConnectedClient } from '../hooks/useNetworks';
 import { DeviceCard } from './DeviceCard';
@@ -30,7 +38,9 @@ export const ConnectedClientsTab: React.FC = () => {
   if (connectedClients.length === 0) {
     return (
       <wa-callout variant='neutral'>
-        <wa-icon name='info-circle' slot='icon'></wa-icon>
+        <span slot='icon'>
+          <FontAwesomeIcon icon={faInfoCircle} />
+        </span>
         No clients currently connected to the hotspot.
       </wa-callout>
     );
@@ -47,7 +57,7 @@ export const ConnectedClientsTab: React.FC = () => {
           tags.push({
             label: 'MAC',
             value: client.macAddress,
-            icon: 'fingerprint',
+            icon: faFingerprint,
             variant: 'neutral'
           });
 
@@ -56,7 +66,7 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'Signal',
               value: `${client.signalStrength} dBm`,
-              icon: 'signal',
+              icon: faSignal,
               variant: 'neutral'
             });
           }
@@ -66,7 +76,7 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'TX',
               value: client.txRate,
-              icon: 'arrow-up',
+              icon: faArrowUp,
               variant: 'neutral'
             });
           }
@@ -76,7 +86,7 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'RX',
               value: client.rxRate,
-              icon: 'arrow-down',
+              icon: faArrowDown,
               variant: 'neutral'
             });
           }

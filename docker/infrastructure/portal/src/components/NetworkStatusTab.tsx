@@ -5,6 +5,7 @@ import {
   faServer,
   faGlobe,
   faNetworkWired,
+  faRoute,
 } from '@fortawesome/free-solid-svg-icons';
 import { useNetworkWorker } from '../hooks/useNetworkWorker';
 import type { NetworkInterface } from '../hooks/useNetworks';
@@ -91,7 +92,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: 'network-wired',
+                icon: faNetworkWired,
                 variant: 'neutral'
               });
             }
@@ -123,7 +124,7 @@ export const NetworkStatusTab: React.FC = () => {
             .map(({ name, ip }) => ({
               label: name,
               value: ip,
-              icon: 'network-wired',
+              icon: faNetworkWired,
               variant: 'neutral' as const
             }))}
         />
@@ -149,7 +150,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: 'network-wired',
+                icon: faNetworkWired,
                 variant: 'neutral'
               });
             }
@@ -157,7 +158,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'Gateway',
                 value: iface.gateway,
-                icon: 'router',
+                icon: faRoute,
                 variant: 'neutral'
               });
             }

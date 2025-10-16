@@ -38,12 +38,21 @@ export class IconCache {
     map: solidIcons.faMap,
     compass: solidIcons.faCompass,
     satellite: solidIcons.faSatellite,
+    signal: solidIcons.faSignal,
+    ethernet: solidIcons.faEthernet,
 
     // Development & Documentation
     'code-branch': solidIcons.faCodeBranch,
     'file-text': solidIcons.faFileAlt,
     terminal: solidIcons.faTerminal,
     bug: solidIcons.faBug,
+
+    // Network & Device Information
+    fingerprint: solidIcons.faFingerprint,
+    'arrow-up': solidIcons.faArrowUp,
+    'arrow-down': solidIcons.faArrowDown,
+    'arrow-right-from-bracket': solidIcons.faArrowRightFromBracket,
+    route: solidIcons.faRoute,
 
     // Additional common icons
     activity: solidIcons.faChartLine, // Alias for chart-line

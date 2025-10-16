@@ -5,7 +5,7 @@ import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 export interface InterfaceCardTag {
   label: string;
   value?: string | number | undefined;
-  icon?: string | undefined;
+  icon?: IconDefinition | undefined;
   variant?: 'brand' | 'success' | 'danger' | 'warning' | 'neutral' | undefined;
 }
 
@@ -55,8 +55,12 @@ export const InterfaceCard: React.FC<InterfaceCardProps> = ({
             <div className='wa-cluster wa-gap-xs'>
               {tags.map((tag, idx) => (
                 <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
-                  {tag.icon && <wa-icon name={tag.icon} slot='prefix'></wa-icon>}
-                  {tag.value ? `${tag.label}: ${tag.value}` : tag.label}
+                  {tag.icon && (
+                    <span slot='prefix'>
+                      <FontAwesomeIcon icon={tag.icon} />
+                    </span>
+                  )}
+                  {tag.value ? !tag.icon ? `${tag.label}: ${tag.value}` : tag.value : tag.label}
                 </wa-tag>
               ))}
             </div>
