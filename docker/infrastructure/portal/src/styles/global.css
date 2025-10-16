@@ -323,6 +323,10 @@ body {
   background-color: var(--wa-color-surface-default) !important;
 }
 
+.tailscale-status {
+  max-width: 33%;
+}
+
 .tailscale-peer {
   --spacing: var(--wa-space-s);
 }
@@ -422,5 +426,9 @@ body {
 
   .connected-client {
     max-width: 100%;
+  }
+  
+  .tailscale-status {
+    max-width: 100%
   }
 }
