@@ -84,7 +84,7 @@ export const TailscaleTab: React.FC = () => {
     >
       {/* Left Column - Tailscale Status */}
       <div className='wa-split:column'>
-        <div className='wa-stack wa-gap-m tailscale-status'>
+        <div className='wa-stack wa-gap-m'>
           <h3 className='wa-heading-s'>Tailscale Status</h3>
           <InterfaceCard
             type='callout'
