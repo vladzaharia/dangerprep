@@ -331,6 +331,10 @@ body {
   width: 100%;
 }
 
+.connected-client {
+  max-width: 33%;
+}
+
 /* =============================================================================
    RESPONSIVE LAYOUT
    ============================================================================= */
@@ -397,10 +401,7 @@ body {
   .wifi-detail-value {
     width: 100%;
   }
-}
 
-/* Responsive adjustments for WiFi connection page */
-@media (max-width: 767px) {
   .wifi-connection-content {
     flex-direction: column;
     gap: var(--wa-space-xl);
@@ -417,5 +418,9 @@ body {
 
   .wifi-detail-item {
     align-items: center;
+  }
+
+  .connected-client {
+    max-width: 100%;
   }
 }

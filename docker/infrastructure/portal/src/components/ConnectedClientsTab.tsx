@@ -88,6 +88,7 @@ export const ConnectedClientsTab: React.FC = () => {
               title={client.hostname || client.ipAddress || client.macAddress}
               subtitle={client.ipAddress && client.hostname ? client.ipAddress : undefined}
               tags={tags}
+              className='connected-client'
             />
           );
         })}
