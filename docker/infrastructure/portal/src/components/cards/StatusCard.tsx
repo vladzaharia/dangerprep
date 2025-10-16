@@ -53,7 +53,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
       {tags.map((tag, idx) => (
         <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
           {tag.icon ? (
-            <div className='wa-flank wa-gap-3xs'>
+            <div className='wa-flank wa-gap-xs'>
               {tag.icon}
               <span>{tag.value || tag.label}</span>
             </div>
