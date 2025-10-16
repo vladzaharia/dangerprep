@@ -31,9 +31,9 @@ export const TailscaleTab: React.FC = () => {
   if (!tailscale) {
     return (
       <wa-callout variant='neutral'>
-        <span slot='icon'>
+        <div slot='icon'>
           <FontAwesomeIcon icon={faInfoCircle} />
-        </span>
+        </div>
         Tailscale is not configured or not running.
       </wa-callout>
     );
@@ -105,9 +105,9 @@ export const TailscaleTab: React.FC = () => {
         </h3>
         {peers.length === 0 ? (
           <wa-callout variant='neutral'>
-            <span slot='icon'>
+            <div slot='icon'>
               <FontAwesomeIcon icon={faInfoCircle} />
-            </span>
+            </div>
             No peers connected.
           </wa-callout>
         ) : (

@@ -57,11 +57,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
         <div className='wa-cluster wa-gap-xs' style={layout === 'horizontal' ? { paddingTop: 'var(--wa-space-s)' } : undefined}>
           {tags.map((tag, idx) => (
             <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
-              {tag.icon && (
-                <span slot='prefix'>
-                  {tag.icon}
-                </span>
-              )}
+              {tag.icon && <span slot='prefix'>{tag.icon}</span>}
               {tag.value ? !tag.icon ? `${tag.label}: ${tag.value}` : tag.value : tag.label}
             </wa-tag>
           ))}

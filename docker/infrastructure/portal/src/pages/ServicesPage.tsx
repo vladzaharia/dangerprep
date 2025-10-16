@@ -71,9 +71,9 @@ function ServicesContent() {
 
       {services.length === 0 ? (
         <wa-callout variant='neutral'>
-          <span slot='icon'>
+          <div slot='icon'>
             <FontAwesomeIcon icon={faInfoCircle} />
-          </span>
+          </div>
           No public services are currently available.
         </wa-callout>
       ) : (
