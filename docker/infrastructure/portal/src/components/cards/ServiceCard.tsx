@@ -28,7 +28,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
   return (
     <wa-card appearance='outlined'>
       <div
-        className={`wa-stack service-card ${isClickable ? 'service-card--clickable' : ''}`}
+        className={`wa-stack wa-gap-m ${isClickable ? 'service-card--clickable' : ''}`}
         onClick={isClickable ? handleClick : undefined}
         onKeyDown={isClickable ? handleKeyDown : undefined}
         role={isClickable ? 'button' : undefined}
@@ -39,33 +39,30 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
             : `${service.name} - ${service.description}`
         }
       >
-        <div className='service-card-header'>
-          <div className='service-icon'>
-            <FontAwesomeIcon
-              icon={getIcon(service.icon)}
-              size='2x'
-              style={{ color: 'var(--wa-color-neutral-text-subtle)' }}
-            />
-          </div>
-          <div className='wa-stack service-info'>
-            <h3 className='service-name'>{service.name}</h3>
-            <p className='service-description'>{service.description}</p>
+        {/* Service Header */}
+        <div className='wa-flank wa-gap-m'>
+          <FontAwesomeIcon
+            icon={getIcon(service.icon)}
+            size='2xl'
+            style={{ color: 'var(--wa-color-neutral-text-subtle)' }}
+          />
+          <div className='wa-stack wa-gap-3xs'>
+            <span className='wa-body-m' style={{ fontWeight: 600 }}>
+              {service.name}
+            </span>
+            <span className='wa-caption-s'>{service.description}</span>
           </div>
         </div>
 
         {/* Service URL at the bottom - only show if URL exists */}
         {service.url && (
-          <div className='service-card-footer'>
-            <div className='service-url-display'>
-              <div className='service-url service-url--split'>
-                <span className='service-url-text'>{service.url}</span>
-                <FontAwesomeIcon
-                  icon={getIcon('external-link')}
-                  size='sm'
-                  className='service-url-icon'
-                />
-              </div>
-            </div>
+          <div className='service-url service-url--split'>
+            <span className='service-url-text'>{service.url}</span>
+            <FontAwesomeIcon
+              icon={getIcon('external-link')}
+              size='lg'
+              className='service-url-icon'
+            />
           </div>
         )}
       </div>

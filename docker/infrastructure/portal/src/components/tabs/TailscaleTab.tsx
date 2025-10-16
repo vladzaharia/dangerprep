@@ -23,7 +23,7 @@ export const TailscaleTab: React.FC = () => {
 
   if (!tailscale) {
     return (
-      <wa-callout variant='neutral'>
+      <wa-callout variant='neutral' className="wa-gap-s">
         <div slot='icon' style={{ display: 'contents' }}>
           <FontAwesomeIcon icon={faCircleInfo} />
         </div>
