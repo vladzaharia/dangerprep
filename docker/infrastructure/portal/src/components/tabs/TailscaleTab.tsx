@@ -40,7 +40,7 @@ export const TailscaleTab: React.FC = () => {
   }
 
   const tailscaleInterface = tailscale as TailscaleInterface;
-  const peers = tailscaleInterface.peers || [];
+  const peers = tailscaleInterface.peers?.sort((peer: TailscalePeer) => peer.online ? -1 : 1) || [];
   const onlinePeers = peers.filter((peer: TailscalePeer) => peer.online);
 
   // Prepare Tailscale interface data
@@ -86,7 +86,7 @@ export const TailscaleTab: React.FC = () => {
           <h3 className='wa-heading-s'>Tailscale Status</h3>
           <StatusCard
             type='callout'
-            variant={tailscaleInterface.status === "connected" ? "success" : "danger"}
+            variant={tailscaleInterface.status === "connected" ? "success" : "neutral"}
             layout='vertical'
             icon={faNetworkWired}
             title={tailscaleInterface.name}
