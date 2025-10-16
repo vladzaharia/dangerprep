@@ -14,6 +14,7 @@ import networks from './routes/networks';
 import services from './routes/services';
 import config from './routes/config';
 import health from './routes/health';
+import power from './routes/power';
 
 // Create main app with optimized configuration
 const app = new Hono();
@@ -75,6 +76,7 @@ app.route('/api/health', health);
 app.route('/api/networks', networks);
 app.route('/api/services', services);
 app.route('/api/config', config);
+app.route('/api/power', power);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
