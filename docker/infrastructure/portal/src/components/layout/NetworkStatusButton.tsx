@@ -15,7 +15,7 @@ import { useHostapdWorker } from '../../hooks/useHostapdWorker';
  *
  * Clicking the button navigates to the Network Status page
  */
-export const ConnectionStatusButton: React.FC = () => {
+export const NetworkStatusButton: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 

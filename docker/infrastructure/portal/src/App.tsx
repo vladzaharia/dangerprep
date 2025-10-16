@@ -8,6 +8,7 @@ import {
   MaintenanceServicesPage,
   PowerPage,
   NetworkStatusPage,
+  SettingsPage,
 } from './pages';
 
 // Service configuration type
@@ -64,6 +65,7 @@ const App: React.FC = () => {
                 <Route path='/maintenance' element={<MaintenanceServicesPage />} />
                 <Route path='/power' element={<PowerPage />} />
                 <Route path='/network' element={<NetworkStatusPage />} />
+                <Route path='/settings' element={<SettingsPage />} />
               </Routes>
             </Suspense>
           </div>

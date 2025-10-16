@@ -1,4 +1,4 @@
 export { Navigation } from './Navigation';
-export { ConnectionStatusButton } from './ConnectionStatusButton';
+export { NetworkStatusButton } from './NetworkStatusButton';
 export { DefaultRoute } from './DefaultRoute';
 
