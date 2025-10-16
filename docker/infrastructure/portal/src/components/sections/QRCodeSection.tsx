@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useNetworkWorker, useHotspotFromWorker } from '../hooks/useNetworkWorker';
+import { useNetworkWorker, useHotspotFromWorker } from '../../hooks/useNetworkWorker';
 
 /**
  * Loading skeleton for QR code section using Web Awesome components

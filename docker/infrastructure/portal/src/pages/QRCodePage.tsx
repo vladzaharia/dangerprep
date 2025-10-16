@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { QRCodeSection } from '../components/QRCodeSection';
+import { QRCodeSection } from '../components';
 
 export const QRCodePage: React.FC = () => {
   return (

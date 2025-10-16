@@ -1,8 +1,8 @@
 import React from 'react';
 
-import type { Service } from '../App';
+import type { Service } from '../../App';
 
-import { ServiceCard } from './ServiceCard';
+import { ServiceCard } from '../cards/ServiceCard';
 
 interface ServiceGridProps {
   services: Service[];

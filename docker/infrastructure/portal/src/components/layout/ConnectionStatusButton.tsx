@@ -2,8 +2,8 @@ import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
-import { useNetworkWorker } from '../hooks/useNetworkWorker';
-import { useHostapdWorker } from '../hooks/useHostapdWorker';
+import { useNetworkWorker } from '../../hooks/useNetworkWorker';
+import { useHostapdWorker } from '../../hooks/useHostapdWorker';
 
 /**
  * Connection Status Button Component

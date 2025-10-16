@@ -8,10 +8,10 @@ import {
   faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useNetworkWorker, useHotspotFromWorker } from '../hooks/useNetworkWorker';
-import type { WiFiInterface, ConnectedClient } from '../hooks/useNetworks';
-import { DeviceCard } from './DeviceCard';
-import type { DeviceCardTag } from './DeviceCard';
+import { useNetworkWorker, useHotspotFromWorker } from '../../hooks/useNetworkWorker';
+import type { WiFiInterface, ConnectedClient } from '../../hooks/useNetworks';
+import { StatusCard } from '../cards/StatusCard';
+import type { StatusCardTag } from '../cards/StatusCard';
 
 /**
  * Connected Clients Tab Component
@@ -51,7 +51,7 @@ export const ConnectedClientsTab: React.FC = () => {
       <h2>Connected Clients</h2>
       <div className='wa-grid'>
         {connectedClients.map((client: ConnectedClient, index: number) => {
-          const tags: DeviceCardTag[] = [];
+          const tags: StatusCardTag[] = [];
 
           // MAC Address tag
           tags.push({
@@ -92,8 +92,10 @@ export const ConnectedClientsTab: React.FC = () => {
           }
 
           return (
-            <DeviceCard
+            <StatusCard
               key={client.macAddress || index}
+              type='card'
+              layout='horizontal'
               icon={faComputer}
               title={client.hostname || client.ipAddress || client.macAddress}
               subtitle={client.ipAddress && client.hostname ? client.ipAddress : undefined}

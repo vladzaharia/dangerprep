@@ -7,12 +7,10 @@ import {
   faRoute
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useNetworkWorker, useTailscaleFromWorker } from '../hooks/useNetworkWorker';
-import type { TailscaleInterface, TailscalePeer } from '../hooks/useNetworks';
-import { DeviceCard } from './DeviceCard';
-import { InterfaceCard } from './InterfaceCard';
-import type { DeviceCardTag } from './DeviceCard';
-import type { InterfaceCardTag } from './InterfaceCard';
+import { useNetworkWorker, useTailscaleFromWorker } from '../../hooks/useNetworkWorker';
+import type { TailscaleInterface, TailscalePeer } from '../../hooks/useNetworks';
+import { StatusCard } from '../cards/StatusCard';
+import type { StatusCardTag } from '../cards/StatusCard';
 
 
 /**
@@ -46,7 +44,7 @@ export const TailscaleTab: React.FC = () => {
   const onlinePeers = peers.filter((peer: TailscalePeer) => peer.online);
 
   // Prepare Tailscale interface data
-  const tailscaleTags: InterfaceCardTag[] = [];
+  const tailscaleTags: StatusCardTag[] = [];
 
   // IP Address tag
   if (tailscaleInterface.ipAddress) {
@@ -86,9 +84,10 @@ export const TailscaleTab: React.FC = () => {
       <div className='wa-split:column'>
         <div className='wa-stack wa-gap-m tailscale-status'>
           <h3 className='wa-heading-s'>Tailscale Status</h3>
-          <InterfaceCard
+          <StatusCard
             type='callout'
             variant={tailscaleInterface.status === "connected" ? "success" : "danger"}
+            layout='vertical'
             icon={faNetworkWired}
             title={tailscaleInterface.name}
             subtitle={tailscaleInterface.tailnetName}
@@ -115,19 +114,22 @@ export const TailscaleTab: React.FC = () => {
           <wa-scroller style={{ maxHeight: '500px' }}>
             <div className='wa-grid wa-gap-xs'>
               {peers.map((peer: TailscalePeer, index: number) => {
-                const peerTags: DeviceCardTag[] = [];
+                const peerTags: StatusCardTag[] = [];
                 if (peer.exitNode) {
                   peerTags.push({ label: 'Exit Node', icon: faArrowRightFromBracket, variant: 'brand' });
                 }
 
                 return (
-                  <DeviceCard
+                  <StatusCard
                     key={`peer-${index}`}
+                    type='callout'
+                    variant={peer.online ? 'success' : 'danger'}
+                    layout='horizontal'
                     icon={faComputer}
                     title={peer.hostname || peer.ipAddress}
                     subtitle={peer.ipAddress}
                     tags={peerTags}
-                    className={`tailscale-peer ${peer.online ? 'wa-success' : 'wa-danger'}`}
+                    className='tailscale-peer'
                   />
                 );
               })}

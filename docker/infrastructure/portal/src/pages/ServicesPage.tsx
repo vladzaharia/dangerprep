@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 
-import { ServiceGrid } from '../components/ServiceGrid';
+import { ServiceGrid } from '../components';
 import { useServices } from '../hooks/useServices';
 
 /**

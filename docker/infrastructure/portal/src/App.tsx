@@ -1,8 +1,7 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-import { Navigation } from './components/Navigation';
-import { DefaultRoute } from './components/DefaultRoute';
+import { Navigation, DefaultRoute } from './components';
 import {
   QRCodePage,
   ServicesPage,

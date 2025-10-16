@@ -7,10 +7,10 @@ import {
   faNetworkWired,
   faRoute,
 } from '@fortawesome/free-solid-svg-icons';
-import { useNetworkWorker } from '../hooks/useNetworkWorker';
-import type { NetworkInterface } from '../hooks/useNetworks';
-import { InterfaceCard } from './InterfaceCard';
-import type { InterfaceCardTag } from './InterfaceCard';
+import { useNetworkWorker } from '../../hooks/useNetworkWorker';
+import type { NetworkInterface } from '../../hooks/useNetworks';
+import { StatusCard } from '../cards/StatusCard';
+import type { StatusCardTag } from '../cards/StatusCard';
 
 /**
  * Get icon for network interface type
@@ -87,7 +87,7 @@ export const NetworkStatusTab: React.FC = () => {
               ? `${iface.ssid} (${iface.name})`
               : iface.name;
 
-            const tags: InterfaceCardTag[] = [];
+            const tags: StatusCardTag[] = [];
             if (iface.ipAddress) {
               tags.push({
                 label: 'IP',
@@ -98,10 +98,11 @@ export const NetworkStatusTab: React.FC = () => {
             }
 
             return (
-              <InterfaceCard
+              <StatusCard
                 key={iface.name}
                 type='callout'
                 variant={iface.state === "up" ? "success" : "danger"}
+                layout='vertical'
                 icon={getInterfaceIcon(iface)}
                 title={title}
                 tags={tags}
@@ -115,8 +116,9 @@ export const NetworkStatusTab: React.FC = () => {
       {/* Middle Column - Router/Device */}
       <div className='wa-stack wa-gap-m'>
         <h3 className='wa-heading-s'>&nbsp;</h3>
-        <InterfaceCard
+        <StatusCard
           type='card'
+          layout='vertical'
           icon={faServer}
           title="This Device"
           tags={deviceIPs
@@ -145,7 +147,7 @@ export const NetworkStatusTab: React.FC = () => {
               ? `${iface.ssid} (${iface.name})`
               : iface.name;
 
-            const tags: InterfaceCardTag[] = [];
+            const tags: StatusCardTag[] = [];
             if (iface.ipAddress) {
               tags.push({
                 label: 'IP',
@@ -164,10 +166,11 @@ export const NetworkStatusTab: React.FC = () => {
             }
 
             return (
-              <InterfaceCard
+              <StatusCard
                 key={iface.name}
                 type='callout'
                 variant={iface.state === "up" ? "success" : "danger"}
+                layout='vertical'
                 icon={getInterfaceIcon(iface)}
                 title={title}
                 tags={tags}

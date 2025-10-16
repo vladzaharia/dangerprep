@@ -1,8 +1,8 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-import type { Service } from '../App';
-import { getIcon } from '../utils/iconCache';
+import type { Service } from '../../App';
+import { getIcon } from '../../utils/iconCache';
 
 interface ServiceCardProps {
   service: Service;

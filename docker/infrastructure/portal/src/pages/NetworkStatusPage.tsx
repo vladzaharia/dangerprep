@@ -1,7 +1,5 @@
 import React from 'react';
-import { NetworkStatusTab } from '../components/NetworkStatusTab';
-import { ConnectedClientsTab } from '../components/ConnectedClientsTab';
-import { TailscaleTab } from '../components/TailscaleTab';
+import { NetworkStatusTab, ConnectedClientsTab, TailscaleTab } from '../components';
 
 /**
  * Network Status Page Component
