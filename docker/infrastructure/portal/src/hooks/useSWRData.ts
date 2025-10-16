@@ -1,7 +1,7 @@
 import useSWR, { type SWRConfiguration } from 'swr';
 import { useSearchParams } from 'react-router-dom';
-import type { NetworkSummary, NetworkInterface } from './useNetworks';
-import type { ServiceMetadata } from './useServices';
+import type { NetworkSummary, NetworkInterface } from '../types/network';
+import type { ServiceMetadata } from '../types/service';
 
 /**
  * Generic fetcher for API endpoints

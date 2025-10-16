@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { faWifi, faServer, faGlobe, faLink, faShieldCheck, faHardDrive } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkSummary } from '../../hooks/useSWRData';
-import type { NetworkInterface } from '../../hooks/useNetworks';
+import type { NetworkInterface } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 

@@ -1,6 +1,6 @@
 import React, { Suspense, useMemo } from 'react';
 import { useHotspotInterface } from '../../hooks/useSWRData';
-import type { WiFiInterface } from '../../hooks/useNetworks';
+import type { WiFiInterface } from '../../types/network';
 
 /**
  * Loading skeleton for QR code section using Web Awesome components

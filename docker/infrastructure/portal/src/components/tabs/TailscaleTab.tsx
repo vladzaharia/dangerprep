@@ -8,7 +8,7 @@ import {
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useTailscaleInterface } from '../../hooks/useSWRData';
-import type { TailscaleInterface, TailscalePeer } from '../../hooks/useNetworks';
+import type { TailscaleInterface, TailscalePeer } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 

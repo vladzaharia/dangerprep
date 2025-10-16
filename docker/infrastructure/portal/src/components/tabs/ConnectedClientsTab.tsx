@@ -9,7 +9,7 @@ import {
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useHotspotInterface } from '../../hooks/useSWRData';
-import type { WiFiInterface, ConnectedClient } from '../../hooks/useNetworks';
+import type { WiFiInterface, ConnectedClient } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 
