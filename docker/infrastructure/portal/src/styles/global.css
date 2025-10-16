@@ -324,7 +324,7 @@ body {
 }
 
 .tailscale-status {
-  min-width: 33vw;
+  min-width: 20vw;
 }
 
 .tailscale-peer {
@@ -429,6 +429,6 @@ body {
   }
   
   .tailscale-status {
-    max-width: 100%
+    min-width: 100%
   }
 }
