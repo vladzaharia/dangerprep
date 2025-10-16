@@ -79,22 +79,24 @@ export const TailscaleTab: React.FC = () => {
 
   return (
     <div
-      className='wa-grid wa-gap-l'
+      className='wa-flank wa-gap-l'
       style={{ '--min-column-size': '200px' } as React.CSSProperties}
     >
       {/* Left Column - Tailscale Status */}
-      <div className='wa-stack wa-gap-m tailscale-status'>
-        <h3 className='wa-heading-s'>Tailscale Status</h3>
-        <InterfaceCard
-          type='callout'
-          variant={tailscaleInterface.status === "connected" ? "success" : "danger"}
-          icon={faNetworkWired}
-          title={tailscaleInterface.name}
-          subtitle={tailscaleInterface.tailnetName}
-          tags={tailscaleTags}
-          routes={tailscaleInterface.routeAdvertising}
-          className="interface-callout"
-        />
+      <div className='wa-split:column'>
+        <div className='wa-stack wa-gap-m tailscale-status'>
+          <h3 className='wa-heading-s'>Tailscale Status</h3>
+          <InterfaceCard
+            type='callout'
+            variant={tailscaleInterface.status === "connected" ? "success" : "danger"}
+            icon={faNetworkWired}
+            title={tailscaleInterface.name}
+            subtitle={tailscaleInterface.tailnetName}
+            tags={tailscaleTags}
+            routes={tailscaleInterface.routeAdvertising}
+            className="interface-callout"
+          />
+        </div>
       </div>
 
       {/* Right Column - Peers */}
