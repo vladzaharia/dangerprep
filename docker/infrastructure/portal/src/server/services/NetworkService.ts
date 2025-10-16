@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { WifiConfigService } from './WifiConfigService';
-import { LoggerFactory, LogLevel } from '../../../../../../packages/logging/dist/index';
+import { LoggerFactory, LogLevel } from '@dangerprep/logging';
 
 const execAsync = promisify(exec);
 

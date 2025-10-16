@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { faWifi, faServer, faGlobe, faLink, faShieldCheck, faHardDrive } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import { faWifi, faGlobe, faShieldCheck, faHardDrive } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import { faEthernet, faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkSummary } from '../../hooks/useSWRData';
 import type { NetworkInterface } from '../../types/network';
@@ -15,7 +16,7 @@ function getInterfaceIcon(iface: NetworkInterface) {
     case 'hotspot':
       return faWifi;
     case 'ethernet':
-      return faLink;
+      return faEthernet;
     case 'tailscale':
       return faShieldCheck;
     default:

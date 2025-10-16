@@ -1,5 +1,5 @@
 import Docker from 'dockerode';
-import { LoggerFactory, LogLevel } from '../../../../../../packages/logging/dist/index';
+import { LoggerFactory, LogLevel } from '@dangerprep/logging';
 
 /**
  * Service metadata for portal display

@@ -104,7 +104,7 @@ export const TailscaleTab: React.FC = () => {
             No peers connected.
           </wa-callout>
         ) : (
-          <wa-scroller style={{ maxHeight: '500px' }}>
+          <wa-scroller orientation="vertical" style={{ maxHeight: '500px' }}>
             <div className='wa-grid wa-gap-xs'>
               {peers.map((peer: TailscalePeer, index: number) => {
                 const peerTags: StatusCardTag[] = [];

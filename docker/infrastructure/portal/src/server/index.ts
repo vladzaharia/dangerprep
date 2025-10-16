@@ -4,6 +4,10 @@ import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { requestId } from 'hono/request-id';
+
+// Import middleware
+import { structuredLogging } from './middleware/logging';
 
 // Import routes
 import networks from './routes/networks';
@@ -22,6 +26,12 @@ if (isDevelopment) {
   app.use('*', logger());
   app.use('*', prettyJSON());
 }
+
+// Request ID middleware (must come before structured logging)
+app.use('*', requestId());
+
+// Structured logging middleware
+app.use('*', structuredLogging());
 
 app.use(
   '*',

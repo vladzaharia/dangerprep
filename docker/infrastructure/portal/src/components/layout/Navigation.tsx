@@ -1,15 +1,92 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { NavLink, useSearchParams, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGrid2, faGear, faBolt, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
-import { faQrcode } from '@awesome.me/kit-a765fc5647/icons/duotone/regular';
+import { faGear, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import { faPowerOff, faBrowser, faQrcode } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { NetworkStatusButton } from './NetworkStatusButton';
 
+/**
+ * Navigation item configuration
+ */
 interface NavItem {
-  path: string;
-  icon: any;
+  path?: string;
+  icon?: any;
   label: string;
+  /** Function to determine if this item should be visible */
+  isVisible: (context: NavigationContext) => boolean;
+  /** Position in navigation: 'top' or 'bottom' */
+  position: 'top' | 'bottom';
+  /** Custom component to render (optional, for special items like NetworkStatusButton) */
+  customComponent?: React.ComponentType;
 }
+
+/**
+ * Context for determining navigation visibility
+ */
+interface NavigationContext {
+  isKioskMode: boolean;
+  isOnManagePage: boolean;
+  currentPath: string;
+}
+
+/**
+ * List of management pages
+ */
+const MANAGEMENT_PAGES = ['/network', '/maintenance', '/settings', '/power'];
+
+/**
+ * Navigation items configuration
+ * This is the single source of truth for all navigation items and their visibility rules
+ */
+const NAV_ITEMS: NavItem[] = [
+  {
+    path: '/services',
+    icon: faBrowser,
+    label: 'Services',
+    position: 'top',
+    // Always visible (public and kiosk)
+    isVisible: () => true,
+  },
+  {
+    path: '/maintenance',
+    icon: faWrench,
+    label: 'Maintenance',
+    position: 'top',
+    // Kiosk-only, visible only when on management pages
+    isVisible: ({ isKioskMode, isOnManagePage }) => isKioskMode && isOnManagePage,
+  },
+  {
+    path: '/qr',
+    icon: faQrcode,
+    label: 'QR Code',
+    position: 'bottom',
+    // Kiosk-only, always visible in kiosk mode
+    isVisible: ({ isKioskMode }) => isKioskMode,
+  },
+  {
+    label: 'Network Status',
+    position: 'bottom',
+    customComponent: NetworkStatusButton,
+    // Kiosk-only, always visible in kiosk mode
+    isVisible: ({ isKioskMode }) => isKioskMode,
+  },
+  {
+    path: '/settings',
+    icon: faGear,
+    label: 'Settings',
+    position: 'bottom',
+    // Kiosk-only, visible only when on management pages
+    isVisible: ({ isKioskMode, isOnManagePage }) => isKioskMode && isOnManagePage,
+  },
+  {
+    path: '/power',
+    icon: faPowerOff,
+    label: 'Power',
+    position: 'bottom',
+    // Kiosk-only, visible only when on management pages
+    isVisible: ({ isKioskMode, isOnManagePage }) => isKioskMode && isOnManagePage,
+  },
+];
 
 export const Navigation: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -23,81 +100,75 @@ export const Navigation: React.FC = () => {
     return queryString ? `${path}?${queryString}` : path;
   };
 
-  // Determine if we're on a manage page
-  const isOnManagePage = ['/network', '/maintenance', '/settings', '/power'].includes(
-    location.pathname
+  // Determine if we're on a management page
+  const isOnManagePage = MANAGEMENT_PAGES.includes(location.pathname);
+
+  // Create navigation context
+  const navContext: NavigationContext = useMemo(
+    () => ({
+      isKioskMode,
+      isOnManagePage,
+      currentPath: location.pathname,
+    }),
+    [isKioskMode, isOnManagePage, location.pathname]
   );
 
-  // Determine which navigation items to show
-  const showAllNavigation = isKioskMode || isOnManagePage;
+  // Filter visible items by position
+  const topNavItems = useMemo(
+    () => NAV_ITEMS.filter(item => item.position === 'top' && item.isVisible(navContext)),
+    [navContext]
+  );
 
-  // Top navigation items (always shown when showAllNavigation is true)
-  const topNavItems: NavItem[] = [
-    { path: '/services', icon: faGrid2, label: 'Services' },
-    { path: '/maintenance', icon: faWrench, label: 'Maintenance' },
-  ];
+  const bottomNavItems = useMemo(
+    () => NAV_ITEMS.filter(item => item.position === 'bottom' && item.isVisible(navContext)),
+    [navContext]
+  );
 
-  // Bottom navigation items (shown when showAllNavigation is true)
-  const bottomNavItems: NavItem[] = [
-    { path: '/qr', icon: faQrcode, label: 'QR Code' },
-    { path: '/settings', icon: faGear, label: 'Settings' },
-    { path: '/power', icon: faBolt, label: 'Power' },
-  ];
+  /**
+   * Render a navigation item - either a standard NavLink or a custom component
+   */
+  const renderNavItem = (item: NavItem, index: number) => {
+    // If it's a custom component, render it directly
+    if (item.customComponent) {
+      const CustomComponent = item.customComponent;
+      return <CustomComponent key={`custom-${item.label}-${index}`} />;
+    }
+
+    // Otherwise render a standard NavLink
+    if (!item.path || !item.icon) {
+      console.warn(`NavItem "${item.label}" is missing path or icon`);
+      return null;
+    }
+
+    return (
+      <NavLink
+        key={item.path}
+        to={getNavLinkTo(item.path)}
+        className={({ isActive }) =>
+          `navigation-item ${isActive ? 'navigation-item--active' : ''}`
+        }
+        aria-label={item.label}
+      >
+        <wa-button appearance='plain'>
+          <FontAwesomeIcon icon={item.icon} size='xl' />
+        </wa-button>
+      </NavLink>
+    );
+  };
 
   return (
     <div className='app-navigation wa-split:column'>
-      {/* Top section - Services (and Maintenance when showing all) */}
-      <div className='wa-stack app-navigation-list'>
-        {showAllNavigation ? (
-          // Show Services and Maintenance
-          topNavItems.map(item => (
-            <NavLink
-              key={item.path}
-              to={getNavLinkTo(item.path)}
-              className={({ isActive }) =>
-                `navigation-item ${isActive ? 'navigation-item--active' : ''}`
-              }
-              aria-label={item.label}
-            >
-              <wa-button appearance='plain'>
-                <FontAwesomeIcon icon={item.icon} size='xl' />
-              </wa-button>
-            </NavLink>
-          ))
-        ) : (
-          // Show only Services by default
-          <NavLink
-            to={getNavLinkTo('/services')}
-            className={({ isActive }) =>
-              `navigation-item ${isActive ? 'navigation-item--active' : ''}`
-            }
-            aria-label='Services'
-          >
-            <wa-button appearance='plain'>
-              <FontAwesomeIcon icon={faGrid2} size='xl' />
-            </wa-button>
-          </NavLink>
-        )}
-      </div>
-
-      {/* Bottom section - QR Code, Manage/Network Status, Settings, Power */}
-      {showAllNavigation && (
+      {/* Top navigation section */}
+      {topNavItems.length > 0 && (
         <div className='wa-stack app-navigation-list'>
-          {bottomNavItems.map(item => (
-            <NavLink
-              key={item.path}
-              to={getNavLinkTo(item.path)}
-              className={({ isActive }) =>
-                `navigation-item ${isActive ? 'navigation-item--active' : ''}`
-              }
-              aria-label={item.label}
-            >
-              <wa-button appearance='plain'>
-                <FontAwesomeIcon icon={item.icon} size='xl' />
-              </wa-button>
-            </NavLink>
-          ))}
-          <NetworkStatusButton />
+          {topNavItems.map((item, index) => renderNavItem(item, index))}
+        </div>
+      )}
+
+      {/* Bottom navigation section */}
+      {bottomNavItems.length > 0 && (
+        <div className='wa-stack app-navigation-list'>
+          {bottomNavItems.map((item, index) => renderNavItem(item, index))}
         </div>
       )}
     </div>

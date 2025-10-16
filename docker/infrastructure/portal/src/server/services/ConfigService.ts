@@ -1,4 +1,4 @@
-import { LoggerFactory, LogLevel } from '../../../../../../packages/logging/dist/index';
+import { LoggerFactory, LogLevel } from '@dangerprep/logging';
 
 /**
  * Application configuration data - only app-level settings

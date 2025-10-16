@@ -192,7 +192,7 @@ export default defineConfig(({ command, mode }) => {
     // SSR configuration for Hono
     ssr: {
       external: ['react', 'react-dom'],
-      noExternal: ['@awesome.me/webawesome'],
+      noExternal: ['@awesome.me/webawesome', '@dangerprep/logging'],
     },
   }
 })

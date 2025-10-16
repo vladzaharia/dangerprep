@@ -1,9 +1,27 @@
+// Duotone Solid icons (preferred for services and specific use cases)
 import {
+  faEthernet,
+  faPowerOff,
+  faQrcode,
+  faBrowser,
+  faRocket,
+  faCodeBranch,
+  faFolderTree,
+  faCloudArrowDown as faCloudArrowDownSolid,
+  faRotate,
+  faCertificate,
+  faNetworkWired,
   faFilm,
-  faMusic,
   faGamepadModern,
   faBook,
   faBookOpen,
+  faBox,
+  faServer,
+} from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+
+// Utility Duotone Semibold icons (primary icon set)
+import {
+  faMusic,
   faPlay,
   faCircleInfo,
   faCircleExclamation,
@@ -11,11 +29,9 @@ import {
   faShieldCheck,
   faRadio,
   faGear,
-  faServer,
   faWifi,
   faDatabase,
   faChartPie,
-  faBox,
   faGlobe,
   faMap,
   faCompass,
@@ -34,13 +50,18 @@ import {
   faComputerClassic,
   faLink,
   faBolt,
+  faKey,
+  faCloudArrowUp,
+  faCloudArrowDown,
+  faHardDrive,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 
 /**
- * Comprehensive FontAwesome icon cache for emergency/travel use case
- * Pre-caches commonly used icons to ensure they're available offline
- * Using FontAwesome Pro Utility Duotone icons
+ * FontAwesome icon cache
+ * Pre-caches all icons used across the UI to ensure they're available offline
+ * Prefers Utility Duotone icons, falls back to Duotone Solid when needed
  */
 export class IconCache {
   private static iconMap: Record<string, IconDefinition> = {
@@ -50,66 +71,95 @@ export class IconCache {
     gamepad: faGamepadModern,
     book: faBook,
     'book-open': faBookOpen,
-    'play-circle': faPlay, // Using play as fallback for play-circle
     play: faPlay,
 
-    // Information & Emergency
-    info: faCircleInfo, // Using circle-info as fallback for info
-    'info-circle': faCircleInfo,
-    'exclamation-triangle': faCircleExclamation, // Using circle-exclamation as fallback
-    'shield-alt': faShieldHalved,
+    // Information & Status
+    info: faCircleInfo,
+    'exclamation-triangle': faCircleExclamation,
+    'question-circle': faCircleQuestion,
+
+    // Security & Protection
     'shield-check': faShieldCheck,
-    'first-aid': faCircleExclamation, // Using circle-exclamation as fallback for first-aid
+    'shield-halved': faShieldHalved,
+    'first-aid': faCircleExclamation,
     radio: faRadio,
 
-    // System & Maintenance
-    'screwdriver-wrench': faWrench, // Using wrench as fallback
+    // System & Infrastructure
     gear: faGear,
     server: faServer,
-    'network-wired': faWifi, // Using wifi as fallback for network-wired
     database: faDatabase,
-    'chart-line': faChartPie, // Using chart-pie as fallback for chart-line
     box: faBox,
+    wrench: faWrench,
+    bug: faBug,
+    rocket: faRocket,
+    'hard-drive': faHardDrive,
 
-    // Navigation & Connectivity
+    // Network & Connectivity
     wifi: faWifi,
+    ethernet: faEthernet,
+    link: faLink,
     globe: faGlobe,
+    signal: faSignal,
+
+    // Navigation & Location
     map: faMap,
     compass: faCompass,
     'location-dot': faLocationDot,
-    satellite: faSignal, // Using signal as fallback for satellite
-    signal: faSignal,
-    ethernet: faLink,
-    link: faLink,
+    home: faHouse,
 
-    // Development & Documentation
-    'code-branch': faCircle, // Using circle as fallback for code-branch
-    'file-text': faCircle, // Using circle as fallback for file-text
-    terminal: faCircle, // Using circle as fallback for terminal
-    bug: faBug,
+    // Data & Analytics
+    'chart-pie': faChartPie,
 
-    // Network & Device Information
-    fingerprint: faUser, // Using user as fallback for fingerprint
+    // Devices & Computers
+    computer: faComputerClassic,
+    user: faUser,
+
+    // Arrows & Directions
     'arrow-up': faArrowUp,
     'arrow-down': faArrowDown,
-    'arrow-right-from-bracket': faArrowRightFromBracket,
-    route: faCompass, // Using compass as fallback for route
-    computer: faComputerClassic,
+    'external-link': faArrowRightFromBracket,
 
-    // Additional common icons
-    activity: faChartPie, // Alias for chart-line (using chart-pie as fallback)
-    'git-branch': faCircle, // Alias for code-branch (using circle as fallback)
-    'external-link': faArrowRightFromBracket, // Using arrow-right-from-bracket as fallback
-    'power-off': faBolt,
+    // Cloud & Transfer
+    'cloud-arrow-up': faCloudArrowUp,
+    'cloud-arrow-down': faCloudArrowDown,
+    key: faKey,
+
+    // UI Elements
+    'power-off': faPowerOff,
     bolt: faBolt,
-    'qr-code': faGrid2, // Using grid-2 as fallback for qr-code
-    home: faHouse,
-    cog: faGear, // Alternative to gear
-    wrench: faWrench,
-    tools: faWrench, // Using wrench as fallback for tools
+    'qr-code': faQrcode,
+    'grid-2': faGrid2,
+    browser: faBrowser,
+    circle: faCircle,
 
-    // Fallback icon
-    'question-circle': faCircleQuestion,
+    // Service-specific icons (from Docker labels)
+    // Media Services
+    jellyfin: faFilm, // Media streaming server
+    komga: faBook, // Comic and ebook server (using book icon)
+
+    // Content & Knowledge
+    kiwix: faBook, // Offline Wikipedia
+    'kiwix-sync': faCloudArrowDownSolid, // Kiwix sync service
+    docmost: faBookOpen, // Documentation and knowledge base
+
+    // Gaming
+    romm: faGamepadModern, // ROM management for retro gaming
+
+    // Development & Infrastructure
+    onedev: faCodeBranch, // Git repository and CI/CD platform
+    traefik: faNetworkWired, // Reverse proxy and load balancer
+    komodo: faBox, // Docker container management
+
+    // System Services
+    wishlist: faServer, // SSH directory and frontdoor
+    watchtower: faRotate, // Automatic container updates
+    'step-ca': faCertificate, // Internal certificate authority
+    cdn: faRocket, // Content delivery network
+    dns: faServer, // DNS server (CoreDNS)
+
+    // Sync Services
+    'nfs-sync': faFolderTree, // Network file system synchronization
+    'offline-sync': faCloudArrowDownSolid, // Offline content synchronization
   };
 
   /**
@@ -140,47 +190,6 @@ export class IconCache {
    */
   static getAvailableIcons(): string[] {
     return Object.keys(this.iconMap);
-  }
-
-  /**
-   * Get icon categories for documentation/debugging
-   * @returns Object with categorized icon names
-   */
-  static getIconCategories() {
-    return {
-      'Media & Entertainment': ['film', 'music', 'gamepad', 'book', 'book-open', 'play-circle'],
-      'Information & Emergency': [
-        'info',
-        'info-circle',
-        'exclamation-triangle',
-        'shield-alt',
-        'first-aid',
-        'radio',
-      ],
-      'System & Maintenance': [
-        'screwdriver-wrench',
-        'gear',
-        'server',
-        'network-wired',
-        'database',
-        'chart-line',
-        'box',
-      ],
-      'Navigation & Connectivity': ['wifi', 'globe', 'map', 'compass', 'satellite'],
-      'Development & Documentation': ['code-branch', 'file-text', 'terminal', 'bug'],
-      Common: [
-        'activity',
-        'git-branch',
-        'external-link',
-        'power-off',
-        'qr-code',
-        'home',
-        'cog',
-        'wrench',
-        'tools',
-      ],
-      Fallback: ['question-circle'],
-    };
   }
 }
 
