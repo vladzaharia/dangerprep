@@ -1,11 +1,9 @@
 import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 
 export interface StatusCardTag {
   label: string;
   value?: string | number | undefined;
-  icon?: IconDefinition | undefined;
+  icon?: React.ReactNode | undefined;
   variant?: 'brand' | 'success' | 'danger' | 'warning' | 'neutral' | undefined;
 }
 
@@ -13,9 +11,9 @@ export interface StatusCardProps {
   type?: 'callout' | 'card' | undefined;
   variant?: 'success' | 'danger' | 'neutral' | 'warning' | undefined;
   layout?: 'vertical' | 'horizontal' | undefined;
-  icon: IconDefinition;
+  icon: React.ReactNode;
   title: string;
-  subtitle?: string | undefined;
+  subtitle?: string | number | undefined;
   tags?: StatusCardTag[] | undefined;
   routes?: string[] | undefined;
   className?: string | undefined;
@@ -39,7 +37,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   // Header content (icon + title/subtitle)
   const header = (
     <div className='wa-flank wa-gap-m'>
-      <FontAwesomeIcon icon={icon} size='lg' />
+      {icon}
       <div className='wa-stack wa-gap-3xs'>
         <span className='wa-body-s' style={{ fontWeight: 600 }}>
           {title}
@@ -61,7 +59,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
             <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
               {tag.icon && (
                 <span slot='prefix'>
-                  <FontAwesomeIcon icon={tag.icon} />
+                  {tag.icon}
                 </span>
               )}
               {tag.value ? !tag.icon ? `${tag.label}: ${tag.value}` : tag.value : tag.label}
@@ -94,7 +92,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
     </div>
   ) : (
     <div className='wa-flank wa-gap-m'>
-      <FontAwesomeIcon icon={icon} size='lg' />
+      {icon}
       <div className='wa-stack wa-gap-3xs'>
         <span className='wa-body-s' style={{ fontWeight: 600 }}>
           {title}

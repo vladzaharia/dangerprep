@@ -57,7 +57,7 @@ export const ConnectedClientsTab: React.FC = () => {
           tags.push({
             label: 'MAC',
             value: client.macAddress,
-            icon: faFingerprint,
+            icon: <FontAwesomeIcon icon={faFingerprint} />,
             variant: 'neutral'
           });
 
@@ -66,7 +66,7 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'Signal',
               value: `${client.signalStrength} dBm`,
-              icon: faSignal,
+              icon: <FontAwesomeIcon icon={faSignal} />,
               variant: 'neutral'
             });
           }
@@ -76,7 +76,7 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'TX',
               value: client.txRate,
-              icon: faArrowUp,
+              icon: <FontAwesomeIcon icon={faArrowUp} />,
               variant: 'neutral'
             });
           }
@@ -86,7 +86,7 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'RX',
               value: client.rxRate,
-              icon: faArrowDown,
+              icon: <FontAwesomeIcon icon={faArrowDown} />,
               variant: 'neutral'
             });
           }
@@ -96,7 +96,7 @@ export const ConnectedClientsTab: React.FC = () => {
               key={client.macAddress || index}
               type='card'
               layout='horizontal'
-              icon={faComputer}
+              icon={<FontAwesomeIcon icon={faComputer} size='lg' />}
               title={client.hostname || client.ipAddress || client.macAddress}
               subtitle={client.ipAddress && client.hostname ? client.ipAddress : undefined}
               tags={tags}

@@ -7,6 +7,7 @@ import {
   faNetworkWired,
   faRoute,
 } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkWorker } from '../../hooks/useNetworkWorker';
 import type { NetworkInterface } from '../../hooks/useNetworks';
 import { StatusCard } from '../cards/StatusCard';
@@ -92,7 +93,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: faNetworkWired,
+                icon: <FontAwesomeIcon icon={faNetworkWired} />,
                 variant: 'neutral'
               });
             }
@@ -103,7 +104,7 @@ export const NetworkStatusTab: React.FC = () => {
                 type='callout'
                 variant={iface.state === "up" ? "success" : "danger"}
                 layout='vertical'
-                icon={getInterfaceIcon(iface)}
+                icon={<FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />}
                 title={title}
                 tags={tags}
                 className="interface-callout"
@@ -119,14 +120,13 @@ export const NetworkStatusTab: React.FC = () => {
         <StatusCard
           type='card'
           layout='vertical'
-          icon={faServer}
+          icon={<FontAwesomeIcon icon={faServer} size='lg' />}
           title="This Device"
           tags={deviceIPs
             .filter(({ name }) => !name.startsWith("br"))
             .map(({ name, ip }) => ({
               label: name,
               value: ip,
-              icon: faNetworkWired,
               variant: 'neutral' as const
             }))}
         />
@@ -152,7 +152,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: faNetworkWired,
+                icon: <FontAwesomeIcon icon={faNetworkWired} />,
                 variant: 'neutral'
               });
             }
@@ -160,7 +160,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'Gateway',
                 value: iface.gateway,
-                icon: faRoute,
+                icon: <FontAwesomeIcon icon={faRoute} />,
                 variant: 'neutral'
               });
             }
@@ -171,7 +171,7 @@ export const NetworkStatusTab: React.FC = () => {
                 type='callout'
                 variant={iface.state === "up" ? "success" : "danger"}
                 layout='vertical'
-                icon={getInterfaceIcon(iface)}
+                icon={<FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />}
                 title={title}
                 tags={tags}
                 className="interface-callout"

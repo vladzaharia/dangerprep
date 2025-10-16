@@ -51,7 +51,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleTags.push({
       label: 'IP',
       value: tailscaleInterface.ipAddress,
-      icon: faNetworkWired,
+      icon: <FontAwesomeIcon icon={faNetworkWired} />,
       variant: 'neutral'
     });
   }
@@ -60,7 +60,7 @@ export const TailscaleTab: React.FC = () => {
   if (tailscaleInterface.exitNode) {
     tailscaleTags.push({
       label: 'Exit Node',
-      icon: faArrowRightFromBracket,
+      icon: <FontAwesomeIcon icon={faArrowRightFromBracket} />,
       variant: 'brand'
     });
   }
@@ -70,7 +70,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleTags.push({
       label: 'Subnet Routes',
       value: tailscaleInterface.routeAdvertising.length,
-      icon: faRoute,
+      icon: <FontAwesomeIcon icon={faRoute} />,
       variant: 'brand'
     });
   }
@@ -86,9 +86,9 @@ export const TailscaleTab: React.FC = () => {
           <h3 className='wa-heading-s'>Tailscale Status</h3>
           <StatusCard
             type='callout'
-            variant={tailscaleInterface.status === "connected" ? "success" : "neutral"}
+            variant={tailscaleInterface.status === "connected" ? "success" : "danger"}
             layout='vertical'
-            icon={faNetworkWired}
+            icon={<FontAwesomeIcon icon={faNetworkWired} size='lg' />}
             title={tailscaleInterface.name}
             subtitle={tailscaleInterface.tailnetName}
             tags={tailscaleTags}
@@ -116,16 +116,16 @@ export const TailscaleTab: React.FC = () => {
               {peers.map((peer: TailscalePeer, index: number) => {
                 const peerTags: StatusCardTag[] = [];
                 if (peer.exitNode) {
-                  peerTags.push({ label: 'Exit Node', icon: faArrowRightFromBracket, variant: 'brand' });
+                  peerTags.push({ label: 'Exit Node', icon: <FontAwesomeIcon icon={faArrowRightFromBracket} />, variant: 'brand' });
                 }
 
                 return (
                   <StatusCard
                     key={`peer-${index}`}
                     type='callout'
-                    variant={peer.online ? 'success' : 'danger'}
+                    variant={peer.online ? 'success' : 'neutral'}
                     layout='horizontal'
-                    icon={faComputer}
+                    icon={<FontAwesomeIcon icon={faComputer} size='lg' />}
                     title={peer.hostname || peer.ipAddress}
                     subtitle={peer.ipAddress}
                     tags={peerTags}
