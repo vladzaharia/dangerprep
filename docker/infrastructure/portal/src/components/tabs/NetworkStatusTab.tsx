@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { faWifi, faServer, faGlobe, faLocationDot, faLink, faShieldCheck } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import { faWifi, faServer, faGlobe, faLink, faShieldCheck, faHardDrive } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkWorker } from '../../hooks/useNetworkWorker';
 import type { NetworkInterface } from '../../hooks/useNetworks';
@@ -86,7 +86,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: <FontAwesomeIcon icon={faLocationDot} />,
+                icon: <FontAwesomeIcon icon={faGlobe} />,
                 variant: 'neutral'
               });
             }
@@ -145,7 +145,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: <FontAwesomeIcon icon={faLocationDot} />,
+                icon: <FontAwesomeIcon icon={faGlobe} />,
                 variant: 'neutral'
               });
             }
@@ -153,7 +153,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'Gateway',
                 value: iface.gateway,
-                icon: <FontAwesomeIcon icon={faLocationDot} />,
+                icon: <FontAwesomeIcon icon={faHardDrive} />,
                 variant: 'neutral'
               });
             }

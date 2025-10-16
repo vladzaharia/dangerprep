@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import {
   faComputerClassic,
-  faUser,
+  faKey,
   faSignal,
-  faArrowUp,
-  faArrowDown,
+  faCloudArrowUp,
+  faCloudArrowDown,
   faCircleInfo,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -57,7 +57,7 @@ export const ConnectedClientsTab: React.FC = () => {
           tags.push({
             label: 'MAC',
             value: client.macAddress,
-            icon: <FontAwesomeIcon icon={faUser} />,
+            icon: <FontAwesomeIcon icon={faKey} />,
             variant: 'neutral'
           });
 
@@ -76,7 +76,7 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'TX',
               value: client.txRate,
-              icon: <FontAwesomeIcon icon={faArrowUp} />,
+              icon: <FontAwesomeIcon icon={faCloudArrowUp} />,
               variant: 'neutral'
             });
           }
@@ -86,7 +86,7 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'RX',
               value: client.rxRate,
-              icon: <FontAwesomeIcon icon={faArrowDown} />,
+              icon: <FontAwesomeIcon icon={faCloudArrowDown} />,
               variant: 'neutral'
             });
           }

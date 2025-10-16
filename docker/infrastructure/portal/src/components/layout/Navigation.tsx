@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGrid2, faGear, faBolt } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import { faQrcode } from '@awesome.me/kit-a765fc5647/icons/duotone/regular';
 import { ConnectionStatusButton } from './ConnectionStatusButton';
 
 interface NavItem {
@@ -24,7 +25,7 @@ export const Navigation: React.FC = () => {
   const mainNavItems: NavItem[] = [{ path: '/services', icon: faGrid2, label: 'Services' }];
 
   const powerNavItems: NavItem[] = [
-    { path: '/qr', icon: faGrid2, label: 'QR Code' },
+    { path: '/qr', icon: faQrcode, label: 'QR Code' },
     { path: '/maintenance', icon: faGear, label: 'Maintenance' },
     { path: '/power', icon: faBolt, label: 'Power' },
   ];
