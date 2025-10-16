@@ -9,7 +9,7 @@ import {
 import { useNetworkWorker } from '../hooks/useNetworkWorker';
 import type { NetworkInterface } from '../hooks/useNetworks';
 import { InterfaceCard } from './InterfaceCard';
-import type { InterfaceCardField } from './InterfaceCard';
+import type { InterfaceCardTag } from './InterfaceCard';
 
 /**
  * Get icon for network interface type
@@ -86,9 +86,14 @@ export const NetworkStatusTab: React.FC = () => {
               ? `${iface.ssid} (${iface.name})`
               : iface.name;
 
-            const fields: InterfaceCardField[] = [];
+            const tags: InterfaceCardTag[] = [];
             if (iface.ipAddress) {
-              fields.push({ label: 'IP', value: iface.ipAddress });
+              tags.push({
+                label: 'IP',
+                value: iface.ipAddress,
+                icon: 'network-wired',
+                variant: 'neutral'
+              });
             }
 
             return (
@@ -98,7 +103,7 @@ export const NetworkStatusTab: React.FC = () => {
                 variant={iface.state === "up" ? "success" : "danger"}
                 icon={getInterfaceIcon(iface)}
                 title={title}
-                fields={fields}
+                tags={tags}
                 className="interface-callout"
               />
             );
@@ -113,9 +118,14 @@ export const NetworkStatusTab: React.FC = () => {
           type='card'
           icon={faServer}
           title="This Device"
-          fields={deviceIPs
+          tags={deviceIPs
             .filter(({ name }) => !name.startsWith("br"))
-            .map(({ name, ip }) => ({ label: name, value: ip }))}
+            .map(({ name, ip }) => ({
+              label: name,
+              value: ip,
+              icon: 'network-wired',
+              variant: 'neutral' as const
+            }))}
         />
       </div>
 
@@ -134,12 +144,22 @@ export const NetworkStatusTab: React.FC = () => {
               ? `${iface.ssid} (${iface.name})`
               : iface.name;
 
-            const fields: InterfaceCardField[] = [];
+            const tags: InterfaceCardTag[] = [];
             if (iface.ipAddress) {
-              fields.push({ label: 'IP', value: iface.ipAddress });
+              tags.push({
+                label: 'IP',
+                value: iface.ipAddress,
+                icon: 'network-wired',
+                variant: 'neutral'
+              });
             }
             if (iface.gateway) {
-              fields.push({ label: 'Gateway', value: iface.gateway });
+              tags.push({
+                label: 'Gateway',
+                value: iface.gateway,
+                icon: 'router',
+                variant: 'neutral'
+              });
             }
 
             return (
@@ -149,7 +169,7 @@ export const NetworkStatusTab: React.FC = () => {
                 variant={iface.state === "up" ? "success" : "danger"}
                 icon={getInterfaceIcon(iface)}
                 title={title}
-                fields={fields}
+                tags={tags}
                 className="interface-callout"
               />
             );

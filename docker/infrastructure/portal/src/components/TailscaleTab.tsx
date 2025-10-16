@@ -5,7 +5,7 @@ import type { TailscaleInterface, TailscalePeer } from '../hooks/useNetworks';
 import { DeviceCard } from './DeviceCard';
 import { InterfaceCard } from './InterfaceCard';
 import type { DeviceCardTag } from './DeviceCard';
-import type { InterfaceCardField, InterfaceCardTag } from './InterfaceCard';
+import type { InterfaceCardTag } from './InterfaceCard';
 
 
 /**
@@ -37,18 +37,32 @@ export const TailscaleTab: React.FC = () => {
   const onlinePeers = peers.filter((peer: TailscalePeer) => peer.online);
 
   // Prepare Tailscale interface data
-  const tailscaleFields: InterfaceCardField[] = [];
+  const tailscaleTags: InterfaceCardTag[] = [];
+
+  // IP Address tag
   if (tailscaleInterface.ipAddress) {
-    tailscaleFields.push({ label: 'IP', value: tailscaleInterface.ipAddress });
+    tailscaleTags.push({
+      label: 'IP',
+      value: tailscaleInterface.ipAddress,
+      icon: 'network-wired',
+      variant: 'neutral'
+    });
   }
 
-  const tailscaleTags: InterfaceCardTag[] = [];
+  // Exit Node tag
   if (tailscaleInterface.exitNode) {
-    tailscaleTags.push({ label: 'Exit Node', icon: 'arrow-right-from-bracket', variant: 'brand' });
+    tailscaleTags.push({
+      label: 'Exit Node',
+      icon: 'arrow-right-from-bracket',
+      variant: 'brand'
+    });
   }
+
+  // Subnet Routes tag
   if (tailscaleInterface.routeAdvertising && tailscaleInterface.routeAdvertising.length > 0) {
     tailscaleTags.push({
-      label: `Subnet Routes (${tailscaleInterface.routeAdvertising.length})`,
+      label: 'Subnet Routes',
+      value: tailscaleInterface.routeAdvertising.length,
       icon: 'route',
       variant: 'brand'
     });
@@ -68,7 +82,6 @@ export const TailscaleTab: React.FC = () => {
           icon={faNetworkWired}
           title={tailscaleInterface.name}
           subtitle={tailscaleInterface.tailnetName}
-          fields={tailscaleFields}
           tags={tailscaleTags}
           routes={tailscaleInterface.routeAdvertising}
           className="interface-callout"
@@ -87,7 +100,7 @@ export const TailscaleTab: React.FC = () => {
           </wa-callout>
         ) : (
           <wa-scroller style={{ maxHeight: '500px' }}>
-            <div className='wa-stack wa-gap-xs'>
+            <div className='wa-grid wa-gap-xs'>
               {onlinePeers.map((peer: TailscalePeer, index: number) => {
                 const peerTags: DeviceCardTag[] = [];
                 if (peer.exitNode) {

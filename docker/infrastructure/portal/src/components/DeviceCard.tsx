@@ -2,35 +2,29 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 
-export interface DeviceCardField {
-  label: string;
-  value: string | number;
-}
-
 export interface DeviceCardTag {
   label: string;
-  icon?: string;
-  variant?: 'brand' | 'success' | 'danger' | 'warning' | 'neutral';
+  value?: string | number | undefined;
+  icon?: string | undefined;
+  variant?: 'brand' | 'success' | 'danger' | 'warning' | 'neutral' | undefined;
 }
 
 export interface DeviceCardProps {
   icon: IconDefinition;
   title: string;
   subtitle?: string | undefined;
-  fields?: DeviceCardField[] | undefined;
   tags?: DeviceCardTag[] | undefined;
   className?: string | undefined;
 }
 
 /**
  * Reusable device card component for displaying peers, clients, and other devices
- * Based on the Tailscale peer card design
+ * Uses a cluster of tags to display information with icons
  */
 export const DeviceCard: React.FC<DeviceCardProps> = ({
   icon,
   title,
   subtitle,
-  fields = [],
   tags = [],
   className = '',
 }) => {
@@ -50,24 +44,13 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
             </span>
           )}
 
-          {/* Fields */}
-          {fields.length > 0 && (
-            <div className='wa-stack wa-gap-2xs'>
-              {fields.map((field, idx) => (
-                <span key={idx} className='wa-caption-s'>
-                  <strong>{field.label}:</strong> {field.value}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Tags */}
+          {/* Tags in a cluster */}
           {tags.length > 0 && (
-            <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
+            <div className='wa-cluster wa-gap-xs'>
               {tags.map((tag, idx) => (
-                <wa-tag key={idx} variant={tag.variant || 'brand'} size='small'>
+                <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
                   {tag.icon && <wa-icon name={tag.icon} slot='prefix'></wa-icon>}
-                  {tag.label}
+                  {tag.value ? `${tag.label}: ${tag.value}` : tag.label}
                 </wa-tag>
               ))}
             </div>

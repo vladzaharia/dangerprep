@@ -2,15 +2,11 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 
-export interface InterfaceCardField {
-  label: string;
-  value: string | number;
-}
-
 export interface InterfaceCardTag {
   label: string;
-  icon?: string;
-  variant?: 'brand' | 'success' | 'danger' | 'warning' | 'neutral';
+  value?: string | number | undefined;
+  icon?: string | undefined;
+  variant?: 'brand' | 'success' | 'danger' | 'warning' | 'neutral' | undefined;
 }
 
 export interface InterfaceCardProps {
@@ -19,7 +15,6 @@ export interface InterfaceCardProps {
   icon: IconDefinition;
   title: string;
   subtitle?: string | undefined;
-  fields?: InterfaceCardField[] | undefined;
   tags?: InterfaceCardTag[] | undefined;
   routes?: string[] | undefined;
   className?: string | undefined;
@@ -27,7 +22,7 @@ export interface InterfaceCardProps {
 
 /**
  * Reusable interface card component for displaying network interfaces
- * Supports both callout (with status variant) and card styles
+ * Uses a cluster of tags to display information with icons
  */
 export const InterfaceCard: React.FC<InterfaceCardProps> = ({
   type = 'callout',
@@ -35,7 +30,6 @@ export const InterfaceCard: React.FC<InterfaceCardProps> = ({
   icon,
   title,
   subtitle,
-  fields = [],
   tags = [],
   routes = [],
   className = '',
@@ -54,22 +48,15 @@ export const InterfaceCard: React.FC<InterfaceCardProps> = ({
         </div>
       </div>
 
-      {(fields.length > 0 || tags.length > 0 || routes.length > 0) && (
+      {(tags.length > 0 || routes.length > 0) && (
         <div className='wa-stack wa-gap-xs wa-body-s'>
-          {/* Fields */}
-          {fields.map((field, idx) => (
-            <span key={idx} className='wa-caption-s'>
-              <strong>{field.label}:</strong> {field.value}
-            </span>
-          ))}
-
-          {/* Tags */}
+          {/* Tags in a cluster */}
           {tags.length > 0 && (
-            <div className='wa-flank wa-gap-xs' style={{ flexWrap: 'wrap' }}>
+            <div className='wa-cluster wa-gap-xs'>
               {tags.map((tag, idx) => (
-                <wa-tag key={idx} variant={tag.variant || 'brand'} size='small'>
+                <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
                   {tag.icon && <wa-icon name={tag.icon} slot='prefix'></wa-icon>}
-                  {tag.label}
+                  {tag.value ? `${tag.label}: ${tag.value}` : tag.label}
                 </wa-tag>
               ))}
             </div>
