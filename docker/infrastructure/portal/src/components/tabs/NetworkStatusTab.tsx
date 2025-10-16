@@ -1,12 +1,5 @@
 import React, { useMemo } from 'react';
-import {
-  faWifi,
-  faEthernet,
-  faServer,
-  faGlobe,
-  faNetworkWired,
-  faRoute,
-} from '@fortawesome/free-solid-svg-icons';
+import { faWifi, faServer, faGlobe, faLocationDot, faLink, faShieldCheck } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkWorker } from '../../hooks/useNetworkWorker';
 import type { NetworkInterface } from '../../hooks/useNetworks';
@@ -22,9 +15,9 @@ function getInterfaceIcon(iface: NetworkInterface) {
     case 'hotspot':
       return faWifi;
     case 'ethernet':
-      return faEthernet;
+      return faLink;
     case 'tailscale':
-      return faNetworkWired;
+      return faShieldCheck;
     default:
       return faGlobe;
   }
@@ -93,7 +86,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: <FontAwesomeIcon icon={faNetworkWired} />,
+                icon: <FontAwesomeIcon icon={faLocationDot} />,
                 variant: 'neutral'
               });
             }
@@ -152,7 +145,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: <FontAwesomeIcon icon={faNetworkWired} />,
+                icon: <FontAwesomeIcon icon={faLocationDot} />,
                 variant: 'neutral'
               });
             }
@@ -160,7 +153,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'Gateway',
                 value: iface.gateway,
-                icon: <FontAwesomeIcon icon={faRoute} />,
+                icon: <FontAwesomeIcon icon={faLocationDot} />,
                 variant: 'neutral'
               });
             }

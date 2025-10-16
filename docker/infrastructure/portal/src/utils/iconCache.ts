@@ -1,72 +1,115 @@
-import * as solidIcons from '@fortawesome/free-solid-svg-icons';
+import {
+  faFilm,
+  faMusic,
+  faGamepadModern,
+  faBook,
+  faBookOpen,
+  faPlay,
+  faCircleInfo,
+  faCircleExclamation,
+  faShieldHalved,
+  faShieldCheck,
+  faRadio,
+  faGear,
+  faServer,
+  faWifi,
+  faDatabase,
+  faChartPie,
+  faBox,
+  faGlobe,
+  faMap,
+  faCompass,
+  faLocationDot,
+  faSignal,
+  faBug,
+  faUser,
+  faArrowUp,
+  faArrowDown,
+  faArrowRightFromBracket,
+  faCircle,
+  faGrid2,
+  faHouse,
+  faWrench,
+  faCircleQuestion,
+  faComputerClassic,
+  faLink,
+  faBolt,
+} from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 
 /**
  * Comprehensive FontAwesome icon cache for emergency/travel use case
  * Pre-caches commonly used icons to ensure they're available offline
+ * Using FontAwesome Pro Utility Duotone icons
  */
 export class IconCache {
   private static iconMap: Record<string, IconDefinition> = {
     // Media & Entertainment
-    film: solidIcons.faFilm,
-    music: solidIcons.faMusic,
-    gamepad: solidIcons.faGamepad,
-    book: solidIcons.faBook,
-    'book-open': solidIcons.faBookOpen,
-    'play-circle': solidIcons.faPlayCircle,
+    film: faFilm,
+    music: faMusic,
+    gamepad: faGamepadModern,
+    book: faBook,
+    'book-open': faBookOpen,
+    'play-circle': faPlay, // Using play as fallback for play-circle
+    play: faPlay,
 
     // Information & Emergency
-    info: solidIcons.faInfo,
-    'info-circle': solidIcons.faInfoCircle,
-    'exclamation-triangle': solidIcons.faExclamationTriangle,
-    'shield-alt': solidIcons.faShieldAlt,
-    'first-aid': solidIcons.faFirstAid,
-    radio: solidIcons.faRadio,
+    info: faCircleInfo, // Using circle-info as fallback for info
+    'info-circle': faCircleInfo,
+    'exclamation-triangle': faCircleExclamation, // Using circle-exclamation as fallback
+    'shield-alt': faShieldHalved,
+    'shield-check': faShieldCheck,
+    'first-aid': faCircleExclamation, // Using circle-exclamation as fallback for first-aid
+    radio: faRadio,
 
     // System & Maintenance
-    'screwdriver-wrench': solidIcons.faScrewdriverWrench,
-    gear: solidIcons.faGear,
-    server: solidIcons.faServer,
-    'network-wired': solidIcons.faNetworkWired,
-    database: solidIcons.faDatabase,
-    'chart-line': solidIcons.faChartLine,
-    box: solidIcons.faBox,
+    'screwdriver-wrench': faWrench, // Using wrench as fallback
+    gear: faGear,
+    server: faServer,
+    'network-wired': faWifi, // Using wifi as fallback for network-wired
+    database: faDatabase,
+    'chart-line': faChartPie, // Using chart-pie as fallback for chart-line
+    box: faBox,
 
     // Navigation & Connectivity
-    wifi: solidIcons.faWifi,
-    globe: solidIcons.faGlobe,
-    map: solidIcons.faMap,
-    compass: solidIcons.faCompass,
-    satellite: solidIcons.faSatellite,
-    signal: solidIcons.faSignal,
-    ethernet: solidIcons.faEthernet,
+    wifi: faWifi,
+    globe: faGlobe,
+    map: faMap,
+    compass: faCompass,
+    'location-dot': faLocationDot,
+    satellite: faSignal, // Using signal as fallback for satellite
+    signal: faSignal,
+    ethernet: faLink,
+    link: faLink,
 
     // Development & Documentation
-    'code-branch': solidIcons.faCodeBranch,
-    'file-text': solidIcons.faFileAlt,
-    terminal: solidIcons.faTerminal,
-    bug: solidIcons.faBug,
+    'code-branch': faCircle, // Using circle as fallback for code-branch
+    'file-text': faCircle, // Using circle as fallback for file-text
+    terminal: faCircle, // Using circle as fallback for terminal
+    bug: faBug,
 
     // Network & Device Information
-    fingerprint: solidIcons.faFingerprint,
-    'arrow-up': solidIcons.faArrowUp,
-    'arrow-down': solidIcons.faArrowDown,
-    'arrow-right-from-bracket': solidIcons.faArrowRightFromBracket,
-    route: solidIcons.faRoute,
+    fingerprint: faUser, // Using user as fallback for fingerprint
+    'arrow-up': faArrowUp,
+    'arrow-down': faArrowDown,
+    'arrow-right-from-bracket': faArrowRightFromBracket,
+    route: faCompass, // Using compass as fallback for route
+    computer: faComputerClassic,
 
     // Additional common icons
-    activity: solidIcons.faChartLine, // Alias for chart-line
-    'git-branch': solidIcons.faCodeBranch, // Alias for code-branch
-    'external-link': solidIcons.faExternalLinkAlt,
-    'power-off': solidIcons.faPowerOff,
-    'qr-code': solidIcons.faQrcode,
-    home: solidIcons.faHome,
-    cog: solidIcons.faCog, // Alternative to gear
-    wrench: solidIcons.faWrench,
-    tools: solidIcons.faTools,
+    activity: faChartPie, // Alias for chart-line (using chart-pie as fallback)
+    'git-branch': faCircle, // Alias for code-branch (using circle as fallback)
+    'external-link': faArrowRightFromBracket, // Using arrow-right-from-bracket as fallback
+    'power-off': faBolt,
+    bolt: faBolt,
+    'qr-code': faGrid2, // Using grid-2 as fallback for qr-code
+    home: faHouse,
+    cog: faGear, // Alternative to gear
+    wrench: faWrench,
+    tools: faWrench, // Using wrench as fallback for tools
 
     // Fallback icon
-    'question-circle': solidIcons.faQuestionCircle,
+    'question-circle': faCircleQuestion,
   };
 
   /**
@@ -78,9 +121,7 @@ export class IconCache {
     // Normalize icon name (remove fa- prefix if present, convert to lowercase)
     const normalizedName = iconName.toLowerCase().replace(/^fa-/, '');
 
-    return (
-      this.iconMap[normalizedName] || this.iconMap['question-circle'] || solidIcons.faQuestionCircle
-    );
+    return this.iconMap[normalizedName] || this.iconMap['question-circle'] || faCircleQuestion;
   }
 
   /**

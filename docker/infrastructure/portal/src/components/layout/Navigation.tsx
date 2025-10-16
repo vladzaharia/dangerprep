@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQrcode, faGrip, faCog, faPowerOff } from '@fortawesome/free-solid-svg-icons';
+import { faGrid2, faGear, faBolt } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { ConnectionStatusButton } from './ConnectionStatusButton';
 
 interface NavItem {
@@ -21,12 +21,12 @@ export const Navigation: React.FC = () => {
     return queryString ? `${path}?${queryString}` : path;
   };
 
-  const mainNavItems: NavItem[] = [{ path: '/services', icon: faGrip, label: 'Services' }];
+  const mainNavItems: NavItem[] = [{ path: '/services', icon: faGrid2, label: 'Services' }];
 
   const powerNavItems: NavItem[] = [
-    { path: '/qr', icon: faQrcode, label: 'QR Code' },
-    { path: '/maintenance', icon: faCog, label: 'Maintenance' },
-    { path: '/power', icon: faPowerOff, label: 'Power' },
+    { path: '/qr', icon: faGrid2, label: 'QR Code' },
+    { path: '/maintenance', icon: faGear, label: 'Maintenance' },
+    { path: '/power', icon: faBolt, label: 'Power' },
   ];
 
   return (

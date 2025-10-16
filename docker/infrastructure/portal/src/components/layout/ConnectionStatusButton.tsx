@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faWifi } from '@fortawesome/free-solid-svg-icons';
+import { faServer } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { useNetworkWorker } from '../../hooks/useNetworkWorker';
 import { useHostapdWorker } from '../../hooks/useHostapdWorker';
 
@@ -83,7 +83,7 @@ export const ConnectionStatusButton: React.FC = () => {
       aria-label='View network status'
     >
       <wa-button appearance='outlined' variant={variant}>
-        <FontAwesomeIcon icon={faWifi} size='xl' />
+        <FontAwesomeIcon icon={faServer} size='xl' />
         <wa-badge variant={variant} attention={shouldPulse ? 'pulse' : 'none'}>
           {isConnected ? connectedClients : '!'}
         </wa-badge>

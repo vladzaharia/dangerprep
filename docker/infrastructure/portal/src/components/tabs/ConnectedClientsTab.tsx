@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
 import {
-  faComputer,
-  faFingerprint,
+  faComputerClassic,
+  faUser,
   faSignal,
   faArrowUp,
   faArrowDown,
-  faInfoCircle
-} from '@fortawesome/free-solid-svg-icons';
+  faCircleInfo,
+} from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkWorker, useHotspotFromWorker } from '../../hooks/useNetworkWorker';
 import type { WiFiInterface, ConnectedClient } from '../../hooks/useNetworks';
@@ -39,7 +39,7 @@ export const ConnectedClientsTab: React.FC = () => {
     return (
       <wa-callout variant='neutral'>
         <div slot='icon' style={{ display: 'contents' }}>
-          <FontAwesomeIcon icon={faInfoCircle} />
+          <FontAwesomeIcon icon={faCircleInfo} />
         </div>
         No clients currently connected to the hotspot.
       </wa-callout>
@@ -57,7 +57,7 @@ export const ConnectedClientsTab: React.FC = () => {
           tags.push({
             label: 'MAC',
             value: client.macAddress,
-            icon: <FontAwesomeIcon icon={faFingerprint} />,
+            icon: <FontAwesomeIcon icon={faUser} />,
             variant: 'neutral'
           });
 
@@ -96,7 +96,7 @@ export const ConnectedClientsTab: React.FC = () => {
               key={client.macAddress || index}
               type='card'
               layout='horizontal'
-              icon={<FontAwesomeIcon icon={faComputer} size='lg' />}
+              icon={<FontAwesomeIcon icon={faComputerClassic} size='lg' />}
               title={client.hostname || client.ipAddress || client.macAddress}
               subtitle={client.ipAddress && client.hostname ? client.ipAddress : undefined}
               tags={tags}

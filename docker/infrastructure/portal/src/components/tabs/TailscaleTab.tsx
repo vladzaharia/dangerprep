@@ -1,11 +1,11 @@
 import React from 'react';
 import {
-  faComputer,
-  faNetworkWired,
-  faInfoCircle,
+  faComputerClassic,
+  faShieldCheck,
+  faCircleInfo,
   faArrowRightFromBracket,
-  faRoute
-} from '@fortawesome/free-solid-svg-icons';
+  faLocationDot,
+} from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkWorker, useTailscaleFromWorker } from '../../hooks/useNetworkWorker';
 import type { TailscaleInterface, TailscalePeer } from '../../hooks/useNetworks';
@@ -32,7 +32,7 @@ export const TailscaleTab: React.FC = () => {
     return (
       <wa-callout variant='neutral'>
         <div slot='icon' style={{ display: 'contents' }}>
-          <FontAwesomeIcon icon={faInfoCircle} />
+          <FontAwesomeIcon icon={faCircleInfo} />
         </div>
         Tailscale is not configured or not running.
       </wa-callout>
@@ -51,7 +51,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleTags.push({
       label: 'IP',
       value: tailscaleInterface.ipAddress,
-      icon: <FontAwesomeIcon icon={faNetworkWired} />,
+      icon: <FontAwesomeIcon icon={faLocationDot} />,
       variant: 'neutral'
     });
   }
@@ -70,7 +70,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleInterface.routeAdvertising.forEach((route) => {
       tailscaleTags.push({
         label: route,
-        icon: <FontAwesomeIcon icon={faRoute} />,
+        icon: <FontAwesomeIcon icon={faLocationDot} />,
         variant: 'neutral'
       });
     });
@@ -89,7 +89,7 @@ export const TailscaleTab: React.FC = () => {
             type='callout'
             variant={tailscaleInterface.status === "connected" ? "success" : "danger"}
             layout='vertical'
-            icon={<FontAwesomeIcon icon={faNetworkWired} size='lg' />}
+            icon={<FontAwesomeIcon icon={faShieldCheck} size='lg' />}
             title={tailscaleInterface.name}
             subtitle={tailscaleInterface.tailnetName}
             tags={tailscaleTags}
@@ -106,7 +106,7 @@ export const TailscaleTab: React.FC = () => {
         {peers.length === 0 ? (
           <wa-callout variant='neutral'>
             <div slot='icon' style={{ display: 'contents' }}>
-              <FontAwesomeIcon icon={faInfoCircle} />
+              <FontAwesomeIcon icon={faCircleInfo} />
             </div>
             No peers connected.
           </wa-callout>
@@ -125,7 +125,7 @@ export const TailscaleTab: React.FC = () => {
                     type='callout'
                     variant={peer.online ? 'success' : 'neutral'}
                     layout='horizontal'
-                    icon={<FontAwesomeIcon icon={faComputer} size='lg' />}
+                    icon={<FontAwesomeIcon icon={faComputerClassic} size='lg' />}
                     title={peer.hostname || peer.ipAddress}
                     subtitle={peer.ipAddress}
                     tags={peerTags}

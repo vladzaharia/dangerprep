@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCircleInfo } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 
 import { ServiceGrid } from '../components';
 import { useServices } from '../hooks/useServices';
@@ -72,7 +72,7 @@ function ServicesContent() {
       {services.length === 0 ? (
         <wa-callout variant='neutral'>
           <div slot='icon' style={{ display: 'contents' }}>
-            <FontAwesomeIcon icon={faInfoCircle} />
+            <FontAwesomeIcon icon={faCircleInfo} />
           </div>
           No public services are currently available.
         </wa-callout>

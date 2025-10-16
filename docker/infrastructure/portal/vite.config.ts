@@ -142,7 +142,7 @@ export default defineConfig(({ command, mode }) => {
         'react-dom',
         'react-router-dom',
         '@fortawesome/react-fontawesome',
-        '@fortawesome/free-solid-svg-icons',
+        '@awesome.me/kit-a765fc5647',
         '@awesome.me/webawesome',
       ],
       exclude: ['@vite/client', '@vite/env'],
