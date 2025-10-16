@@ -15,7 +15,6 @@ export interface StatusCardProps {
   title: string;
   subtitle?: string | number | undefined;
   tags?: StatusCardTag[] | undefined;
-  routes?: string[] | undefined;
   className?: string | undefined;
 }
 
@@ -31,7 +30,6 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   title,
   subtitle,
   tags = [],
-  routes = [],
   className = '',
 }) => {
   // Header content (icon + title/subtitle)
@@ -49,34 +47,15 @@ export const StatusCard: React.FC<StatusCardProps> = ({
     </div>
   );
 
-  // Tags and routes content
-  const tagsAndRoutes = (tags.length > 0 || routes.length > 0) && (
-    <div className='wa-stack wa-gap-xs wa-body-s'>
-      {/* Tags in a cluster */}
-      {tags.length > 0 && (
-        <div className='wa-cluster wa-gap-xs' style={layout === 'horizontal' ? { paddingTop: 'var(--wa-space-s)' } : undefined}>
-          {tags.map((tag, idx) => (
-            <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
-              {tag.icon && <span slot='prefix'>{tag.icon}</span>}
-              {tag.value ? !tag.icon ? `${tag.label}: ${tag.value}` : tag.value : tag.label}
-            </wa-tag>
-          ))}
-        </div>
-      )}
-
-      {/* Advertised Routes */}
-      {routes.length > 0 && (
-        <div className='wa-stack wa-gap-3xs'>
-          <span style={{ fontWeight: 600 }}>Advertised Routes:</span>
-          <div className='wa-stack wa-gap-2xs'>
-            {routes.map((route, idx) => (
-              <span key={idx} className='wa-caption-s'>
-                • {route}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+  // Tags content
+  const tagsContent = tags.length > 0 && (
+    <div className='wa-cluster wa-gap-xs' style={layout === 'horizontal' ? { paddingTop: 'var(--wa-space-s)' } : undefined}>
+      {tags.map((tag, idx) => (
+        <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
+          {tag.icon && <span slot='prefix' style={{ display: 'contents' }}>{tag.icon}</span>}
+          {tag.value ? !tag.icon ? `${tag.label}: ${tag.value}` : tag.value : tag.label}
+        </wa-tag>
+      ))}
     </div>
   );
 
@@ -84,7 +63,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   const content = layout === 'vertical' ? (
     <div className='wa-stack wa-gap-m'>
       {header}
-      {tagsAndRoutes}
+      {tagsContent}
     </div>
   ) : (
     <div className='wa-flank wa-gap-m'>
@@ -96,7 +75,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
         {subtitle && (
           <span className='wa-caption-s'>{subtitle}</span>
         )}
-        {tagsAndRoutes}
+        {tagsContent}
       </div>
     </div>
   );

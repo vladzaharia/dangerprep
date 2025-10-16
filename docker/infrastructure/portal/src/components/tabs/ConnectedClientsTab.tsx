@@ -38,7 +38,7 @@ export const ConnectedClientsTab: React.FC = () => {
   if (connectedClients.length === 0) {
     return (
       <wa-callout variant='neutral'>
-        <div slot='icon'>
+        <div slot='icon' style={{ display: 'contents' }}>
           <FontAwesomeIcon icon={faInfoCircle} />
         </div>
         No clients currently connected to the hotspot.

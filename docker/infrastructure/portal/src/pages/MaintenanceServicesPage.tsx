@@ -70,7 +70,7 @@ function MaintenanceServicesContent() {
 
       {services.length === 0 ? (
         <wa-callout variant='neutral'>
-          <div slot='icon'>
+          <div slot='icon' style={{ display: 'contents' }}>
             <FontAwesomeIcon icon={faInfoCircle} />
           </div>
           No maintenance services are currently available.

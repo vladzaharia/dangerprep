@@ -31,7 +31,7 @@ export const TailscaleTab: React.FC = () => {
   if (!tailscale) {
     return (
       <wa-callout variant='neutral'>
-        <div slot='icon'>
+        <div slot='icon' style={{ display: 'contents' }}>
           <FontAwesomeIcon icon={faInfoCircle} />
         </div>
         Tailscale is not configured or not running.
@@ -65,13 +65,14 @@ export const TailscaleTab: React.FC = () => {
     });
   }
 
-  // Subnet Routes tag
+  // Advertised Routes as individual tags
   if (tailscaleInterface.routeAdvertising && tailscaleInterface.routeAdvertising.length > 0) {
-    tailscaleTags.push({
-      label: 'Subnet Routes',
-      value: tailscaleInterface.routeAdvertising.length,
-      icon: <FontAwesomeIcon icon={faRoute} />,
-      variant: 'brand'
+    tailscaleInterface.routeAdvertising.forEach((route) => {
+      tailscaleTags.push({
+        label: route,
+        icon: <FontAwesomeIcon icon={faRoute} />,
+        variant: 'neutral'
+      });
     });
   }
 
@@ -92,7 +93,6 @@ export const TailscaleTab: React.FC = () => {
             title={tailscaleInterface.name}
             subtitle={tailscaleInterface.tailnetName}
             tags={tailscaleTags}
-            routes={tailscaleInterface.routeAdvertising}
             className="interface-callout"
           />
         </div>
@@ -105,7 +105,7 @@ export const TailscaleTab: React.FC = () => {
         </h3>
         {peers.length === 0 ? (
           <wa-callout variant='neutral'>
-            <div slot='icon'>
+            <div slot='icon' style={{ display: 'contents' }}>
               <FontAwesomeIcon icon={faInfoCircle} />
             </div>
             No peers connected.
