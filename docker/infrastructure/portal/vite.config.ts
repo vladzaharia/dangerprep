@@ -138,39 +138,29 @@ export default defineConfig(({ command, mode }) => {
       rollupOptions: {
         output: {
           manualChunks: (id): string | undefined => {
-            // React core libraries - rarely change, cache separately
-            if (id.includes('node_modules/react/') ||
-                id.includes('node_modules/react-dom/') ||
-                id.includes('node_modules/react-router-dom/') ||
-                id.includes('node_modules/scheduler/')) {
+            // React ecosystem - keep React and all React-dependent libraries together
+            // to avoid dependency ordering issues
+            if (id.includes('react') ||
+                id.includes('node_modules/swr/')) {
               return 'vendor-react';
             }
 
-            // WebAwesome UI components - large library
-            if (id.includes('node_modules/@awesome.me/webawesome/')) {
+            // WebAwesome UI components - large standalone library
+            if (id.includes('node_modules/@awesome.me/webawesome/') ||
+                id.includes('node_modules/lit/') ||
+                id.includes('node_modules/@lit/')) {
               return 'vendor-ui';
             }
 
-            // FontAwesome icons - separate chunk for icon library
+            // FontAwesome icons (core library, not react wrapper)
             if (id.includes('node_modules/@awesome.me/kit-') ||
-                id.includes('node_modules/@fortawesome/')) {
+                id.includes('node_modules/@fortawesome/fontawesome-')) {
               return 'vendor-icons';
-            }
-
-            // SWR and other utilities
-            if (id.includes('node_modules/swr/') ||
-                id.includes('node_modules/react-idle-timer/')) {
-              return 'vendor-utils';
             }
 
             // Font files - separate chunk
             if (id.includes('node_modules/@fontsource/')) {
               return 'vendor-fonts';
-            }
-
-            // All other node_modules go into vendor chunk
-            if (id.includes('node_modules/')) {
-              return 'vendor';
             }
 
             // Return undefined for non-vendor code (will be in main bundle or route chunks)
