@@ -458,40 +458,6 @@ function TailscaleSettingsContent() {
           </div>
         </wa-card>
 
-        {/* Shields Up Card */}
-        <wa-card appearance='outlined'>
-          <div
-            slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              {...(settings.shieldsUp ? { checked: true } : {})}
-              onchange={() => handleToggleSetting('shieldsUp', settings.shieldsUp)}
-              disabled={loading !== null}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
-            <FontAwesomeIcon
-              icon={faShield}
-              size='4x'
-              style={createIconStyle(ICON_STYLES.danger)}
-            />
-            <h3 className='wa-heading-s'>Shields Up</h3>
-            <p className='wa-body-s' style={{ textAlign: 'center' }}>
-              Block all incoming connections from Tailscale
-            </p>
-            {loading === 'shieldsUp' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
-          </div>
-        </wa-card>
-
         {/* Advertise Subnets Card with Advanced Settings */}
         <wa-card appearance='outlined'>
           <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
@@ -545,34 +511,7 @@ function TailscaleSettingsContent() {
               }}
             ></wa-input>
 
-            {/* Advanced subnet settings */}
-            <div className='wa-stack wa-gap-s'>
-              <p className='wa-body-xs' style={{ fontWeight: 'bold' }}>
-                Advanced Subnet Settings
-              </p>
-              <wa-switch
-                checked={settings.snatSubnetRoutes}
-                onchange={() =>
-                  handleToggleSetting('snatSubnetRoutes', settings.snatSubnetRoutes)
-                }
-                disabled={loading !== null || !settings.running}
-              >
-                SNAT Subnet Routes
-              </wa-switch>
-              <wa-switch
-                checked={settings.statefulFiltering}
-                onchange={() =>
-                  handleToggleSetting('statefulFiltering', settings.statefulFiltering)
-                }
-                disabled={loading !== null || !settings.running}
-              >
-                Stateful Filtering
-              </wa-switch>
-            </div>
-
-            {(loading === 'advertiseRoutes' ||
-              loading === 'snatSubnetRoutes' ||
-              loading === 'statefulFiltering') && (
+            {loading === 'advertiseRoutes' && (
               <div style={{ textAlign: 'center' }}>
                 <wa-spinner></wa-spinner>
               </div>
@@ -689,6 +628,78 @@ function TailscaleSettingsContent() {
               Allow LAN access while using an exit node
             </p>
             {loading === 'exitNodeAllowLAN' && (
+              <div style={{ textAlign: 'center' }}>
+                <wa-spinner></wa-spinner>
+              </div>
+            )}
+          </div>
+        </wa-card>
+
+        {/* SNAT Subnet Routes Card */}
+        <wa-card appearance='outlined'>
+          <div
+            slot='header'
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <wa-switch
+              checked={settings.snatSubnetRoutes}
+              onchange={() =>
+                handleToggleSetting('snatSubnetRoutes', settings.snatSubnetRoutes)
+              }
+              disabled={loading !== null || !settings.running}
+            ></wa-switch>
+          </div>
+          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            <FontAwesomeIcon
+              icon={faNetworkWired}
+              size='4x'
+              style={createIconStyle(ICON_STYLES.warning)}
+            />
+            <h3 className='wa-heading-s'>SNAT Subnet Routes</h3>
+            <p className='wa-body-s' style={{ textAlign: 'center' }}>
+              Apply source NAT to subnet traffic
+            </p>
+            {loading === 'snatSubnetRoutes' && (
+              <div style={{ textAlign: 'center' }}>
+                <wa-spinner></wa-spinner>
+              </div>
+            )}
+          </div>
+        </wa-card>
+
+        {/* Stateful Filtering Card */}
+        <wa-card appearance='outlined'>
+          <div
+            slot='header'
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <wa-switch
+              checked={settings.statefulFiltering}
+              onchange={() =>
+                handleToggleSetting('statefulFiltering', settings.statefulFiltering)
+              }
+              disabled={loading !== null || !settings.running}
+            ></wa-switch>
+          </div>
+          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            <FontAwesomeIcon
+              icon={faShield}
+              size='4x'
+              style={createIconStyle(ICON_STYLES.brand)}
+            />
+            <h3 className='wa-heading-s'>Stateful Filtering</h3>
+            <p className='wa-body-s' style={{ textAlign: 'center' }}>
+              Enable stateful packet filtering for subnet routes
+            </p>
+            {loading === 'statefulFiltering' && (
               <div style={{ textAlign: 'center' }}>
                 <wa-spinner></wa-spinner>
               </div>
