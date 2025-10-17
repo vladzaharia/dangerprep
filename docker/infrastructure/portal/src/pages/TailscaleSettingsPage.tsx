@@ -285,10 +285,9 @@ function TailscaleSettingsContent() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h3 className='wa-heading-s' style={{ margin: 0 }}>Accept DNS</h3>
             <wa-switch
               checked={settings.acceptDNS}
               onchange={() => handleToggleSetting('acceptDNS', settings.acceptDNS)}
@@ -301,6 +300,7 @@ function TailscaleSettingsContent() {
               size='4x'
               style={createIconStyle(ICON_STYLES.success)}
             />
+            <h3 className='wa-heading-s'>Accept DNS</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Use Tailscale's DNS settings including MagicDNS
             </p>
@@ -319,10 +319,9 @@ function TailscaleSettingsContent() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h3 className='wa-heading-s' style={{ margin: 0 }}>Accept Routes</h3>
             <wa-switch
               checked={settings.acceptRoutes}
               onchange={() => handleToggleSetting('acceptRoutes', settings.acceptRoutes)}
@@ -335,6 +334,7 @@ function TailscaleSettingsContent() {
               size='4x'
               style={createIconStyle(ICON_STYLES.warning)}
             />
+            <h3 className='wa-heading-s'>Accept Routes</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Accept subnet routes advertised by other nodes
             </p>
@@ -353,10 +353,9 @@ function TailscaleSettingsContent() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h3 className='wa-heading-s' style={{ margin: 0 }}>Tailscale SSH</h3>
             <wa-switch
               checked={settings.ssh}
               onchange={() => handleToggleSetting('ssh', settings.ssh)}
@@ -369,6 +368,7 @@ function TailscaleSettingsContent() {
               size='4x'
               style={createIconStyle(ICON_STYLES.tailscale)}
             />
+            <h3 className='wa-heading-s'>Tailscale SSH</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Enable SSH access via Tailscale
             </p>
@@ -399,10 +399,9 @@ function TailscaleSettingsContent() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h3 className='wa-heading-s' style={{ margin: 0 }}>Advertise Exit Node</h3>
             <wa-switch
               checked={settings.advertiseExitNode}
               onchange={() =>
@@ -413,6 +412,7 @@ function TailscaleSettingsContent() {
           </div>
           <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
             <FontAwesomeIcon icon={faWifi} size='4x' style={createIconStyle(ICON_STYLES.brand)} />
+            <h3 className='wa-heading-s'>Advertise Exit Node</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Offer this device as an exit node for others
             </p>
@@ -431,10 +431,9 @@ function TailscaleSettingsContent() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h3 className='wa-heading-s' style={{ margin: 0 }}>Exit Node LAN Access</h3>
             <wa-switch
               {...(settings.exitNodeAllowLAN ? { checked: true } : {})}
               onchange={() => handleToggleSetting('exitNodeAllowLAN', settings.exitNodeAllowLAN)}
@@ -447,6 +446,7 @@ function TailscaleSettingsContent() {
               size='4x'
               style={createIconStyle(ICON_STYLES.success)}
             />
+            <h3 className='wa-heading-s'>Exit Node LAN Access</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Allow LAN access while using an exit node
             </p>
@@ -465,10 +465,9 @@ function TailscaleSettingsContent() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h3 className='wa-heading-s' style={{ margin: 0 }}>Shields Up</h3>
             <wa-switch
               {...(settings.shieldsUp ? { checked: true } : {})}
               onchange={() => handleToggleSetting('shieldsUp', settings.shieldsUp)}
@@ -481,6 +480,7 @@ function TailscaleSettingsContent() {
               size='4x'
               style={createIconStyle(ICON_STYLES.danger)}
             />
+            <h3 className='wa-heading-s'>Shields Up</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Block all incoming connections from Tailscale
             </p>
@@ -587,10 +587,9 @@ function TailscaleSettingsContent() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h3 className='wa-heading-s' style={{ margin: 0 }}>Advertise Connector</h3>
             <wa-switch
               checked={settings.advertiseConnector}
               onchange={() =>
@@ -605,6 +604,7 @@ function TailscaleSettingsContent() {
               size='4x'
               style={createIconStyle(ICON_STYLES.success)}
             />
+            <h3 className='wa-heading-s'>Advertise Connector</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Advertise this node as an app connector
             </p>
@@ -635,10 +635,9 @@ function TailscaleSettingsContent() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h3 className='wa-heading-s' style={{ margin: 0 }}>Shields Up</h3>
             <wa-switch
               checked={settings.shieldsUp}
               onchange={() => handleToggleSetting('shieldsUp', settings.shieldsUp)}
@@ -651,6 +650,7 @@ function TailscaleSettingsContent() {
               size='4x'
               style={createIconStyle(ICON_STYLES.danger)}
             />
+            <h3 className='wa-heading-s'>Shields Up</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Block all incoming connections from Tailscale
             </p>
@@ -669,10 +669,9 @@ function TailscaleSettingsContent() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h3 className='wa-heading-s' style={{ margin: 0 }}>Exit Node LAN Access</h3>
             <wa-switch
               checked={settings.exitNodeAllowLAN}
               onchange={() => handleToggleSetting('exitNodeAllowLAN', settings.exitNodeAllowLAN)}
@@ -685,6 +684,7 @@ function TailscaleSettingsContent() {
               size='4x'
               style={createIconStyle(ICON_STYLES.success)}
             />
+            <h3 className='wa-heading-s'>Exit Node LAN Access</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Allow LAN access while using an exit node
             </p>
