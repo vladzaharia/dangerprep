@@ -125,4 +125,3 @@ export interface NetworkSummary {
   tailscaleInterface?: string;
   totalInterfaces: number;
 }
-

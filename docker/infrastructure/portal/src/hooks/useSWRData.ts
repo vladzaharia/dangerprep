@@ -266,4 +266,3 @@ export function useTailscaleInterface(config?: SWRConfiguration) {
     ...rest,
   };
 }
-

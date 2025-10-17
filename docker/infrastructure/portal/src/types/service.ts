@@ -14,4 +14,3 @@ export interface ServiceMetadata {
   status: 'healthy' | 'warning' | 'error';
   version?: string;
 }
-

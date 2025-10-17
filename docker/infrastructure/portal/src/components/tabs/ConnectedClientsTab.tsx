@@ -30,9 +30,18 @@ export const ConnectedClientsTab: React.FC = () => {
 
   if (connectedClients.length === 0) {
     return (
-      <wa-callout variant='neutral' className="wa-gap-s">
+      <wa-callout variant='neutral' className='wa-gap-s'>
         <div slot='icon' style={{ display: 'contents' }}>
-          <FontAwesomeIcon icon={faCircleInfo} />
+          <FontAwesomeIcon
+            icon={faCircleInfo}
+            style={
+              {
+                '--fa-primary-color': '#3b82f6', // Blue for info
+                '--fa-primary-opacity': 1,
+                '--fa-secondary-opacity': 0.4,
+              } as React.CSSProperties
+            }
+          />
         </div>
         No clients currently connected to the hotspot.
       </wa-callout>
@@ -50,8 +59,19 @@ export const ConnectedClientsTab: React.FC = () => {
           tags.push({
             label: 'MAC',
             value: client.macAddress,
-            icon: <FontAwesomeIcon icon={faKey} />,
-            variant: 'neutral'
+            icon: (
+              <FontAwesomeIcon
+                icon={faKey}
+                style={
+                  {
+                    '--fa-primary-color': '#a855f7', // Purple for security/key
+                    '--fa-primary-opacity': 0.9,
+                    '--fa-secondary-opacity': 0.8,
+                  } as React.CSSProperties
+                }
+              />
+            ),
+            variant: 'neutral',
           });
 
           // Signal Strength tag
@@ -59,8 +79,19 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'Signal',
               value: `${client.signalStrength} dBm`,
-              icon: <FontAwesomeIcon icon={faSignal} />,
-              variant: 'neutral'
+              icon: (
+                <FontAwesomeIcon
+                  icon={faSignal}
+                  style={
+                    {
+                      '--fa-primary-color': '#10b981', // Green for signal
+                      '--fa-primary-opacity': 0.9,
+                      '--fa-secondary-opacity': 0.8,
+                    } as React.CSSProperties
+                  }
+                />
+              ),
+              variant: 'neutral',
             });
           }
 
@@ -69,8 +100,19 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'TX',
               value: client.txRate,
-              icon: <FontAwesomeIcon icon={faCloudArrowUp} />,
-              variant: 'neutral'
+              icon: (
+                <FontAwesomeIcon
+                  icon={faCloudArrowUp}
+                  style={
+                    {
+                      '--fa-primary-color': '#3b82f6', // Blue for upload
+                      '--fa-primary-opacity': 0.9,
+                      '--fa-secondary-opacity': 0.8,
+                    } as React.CSSProperties
+                  }
+                />
+              ),
+              variant: 'neutral',
             });
           }
 
@@ -79,8 +121,19 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'RX',
               value: client.rxRate,
-              icon: <FontAwesomeIcon icon={faCloudArrowDown} />,
-              variant: 'neutral'
+              icon: (
+                <FontAwesomeIcon
+                  icon={faCloudArrowDown}
+                  style={
+                    {
+                      '--fa-primary-color': '#f59e0b', // Amber for download
+                      '--fa-primary-opacity': 0.9,
+                      '--fa-secondary-opacity': 0.8,
+                    } as React.CSSProperties
+                  }
+                />
+              ),
+              variant: 'neutral',
             });
           }
 
@@ -89,7 +142,19 @@ export const ConnectedClientsTab: React.FC = () => {
               key={client.macAddress || index}
               type='card'
               layout='horizontal'
-              icon={<FontAwesomeIcon icon={faComputerClassic} size='lg' />}
+              icon={
+                <FontAwesomeIcon
+                  icon={faComputerClassic}
+                  size='lg'
+                  style={
+                    {
+                      '--fa-primary-color': '#6366f1', // Indigo for client device
+                      '--fa-primary-opacity': 0.9,
+                      '--fa-secondary-opacity': 0.8,
+                    } as React.CSSProperties
+                  }
+                />
+              }
               title={client.hostname || client.ipAddress || client.macAddress}
               subtitle={client.ipAddress && client.hostname ? client.ipAddress : undefined}
               tags={tags}

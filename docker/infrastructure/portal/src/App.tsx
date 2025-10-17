@@ -1,5 +1,11 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom';
 import { useIdleTimer } from 'react-idle-timer';
 
 import { Navigation, DefaultRoute } from './components';
@@ -65,14 +71,7 @@ function AppContent() {
       navigate(`/${searchParamString}`, { replace: true });
     },
     // Events to listen for user activity
-    events: [
-      'mousedown',
-      'mousemove',
-      'keypress',
-      'scroll',
-      'touchstart',
-      'click',
-    ],
+    events: ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'],
     // Throttle events to improve performance
     eventsThrottle: 200,
   });

@@ -18,6 +18,29 @@ interface PowerAction {
   variant: 'brand' | 'danger' | 'warning' | 'success';
 }
 
+/**
+ * Icon color configurations for power actions
+ * Each icon colors only one layer (primary or secondary) for a selective duotone effect
+ */
+const POWER_ICON_COLORS = {
+  brand: {
+    layer: 'primary', // Color the browser outline
+    color: '#3b82f6', // Blue
+  },
+  warning: {
+    layer: 'primary', // Color the rotation arrows details
+    color: '#f59e0b', // Amber
+  },
+  danger: {
+    layer: 'primary', // Color the power symbol details
+    color: '#ef4444', // Red
+  },
+  success: {
+    layer: 'primary', // Color the desktop outline
+    color: '#10b981', // Green
+  },
+};
+
 const powerActions: PowerAction[] = [
   {
     id: 'kiosk-restart',
@@ -35,7 +58,8 @@ const powerActions: PowerAction[] = [
     label: 'Reboot System',
     icon: faArrowsRotate,
     endpoint: '/api/power/reboot',
-    confirmMessage: 'Are you sure you want to reboot the system? This will restart the entire device.',
+    confirmMessage:
+      'Are you sure you want to reboot the system? This will restart the entire device.',
     variant: 'warning',
   },
   {
@@ -43,7 +67,8 @@ const powerActions: PowerAction[] = [
     label: 'Shutdown System',
     icon: faPowerOff,
     endpoint: '/api/power/shutdown',
-    confirmMessage: 'Are you sure you want to shutdown the system? You will need to manually power it back on.',
+    confirmMessage:
+      'Are you sure you want to shutdown the system? You will need to manually power it back on.',
     variant: 'danger',
   },
   {
@@ -111,58 +136,71 @@ export const PowerPage: React.FC = () => {
         className='wa-grid wa-gap-m'
         style={{ '--min-column-size': '250px' } as React.CSSProperties}
       >
-        {powerActions.map(action => (
-          <wa-card key={action.id} appearance='outlined'>
-            <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
-              <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
-                {action.stackedIcon ? (
-                  <span className='fa-stack fa-2x'>
-                    <FontAwesomeIcon
-                      icon={action.stackedIcon.base}
-                      className='fa-stack-2x'
-                    />
-                    <FontAwesomeIcon
-                      icon={action.stackedIcon.overlay}
-                      className='fa-stack-1x'
-                      transform='shrink-2 down-10 right-12'
-                    />
-                  </span>
-                ) : (
-                  <FontAwesomeIcon icon={action.icon} size='4x' />
-                )}
-              </div>
-              <div
-                onClick={() => loading === null && handlePowerAction(action)}
-                style={{ cursor: loading === null ? 'pointer' : 'not-allowed' }}
-                role='button'
-                tabIndex={loading === null ? 0 : -1}
-                onKeyDown={e => {
-                  if (loading === null && (e.key === 'Enter' || e.key === ' ')) {
-                    e.preventDefault();
-                    handlePowerAction(action);
-                  }
-                }}
-                aria-label={action.label}
-              >
-                <wa-button
-                  appearance='filled'
-                  variant={action.variant}
-                  disabled={loading !== null}
-                  style={{ width: '100%', pointerEvents: 'none' }}
-                >
-                  {loading === action.id ? (
-                    <>
-                      <wa-spinner></wa-spinner>
-                      <span style={{ marginLeft: 'var(--wa-space-xs)' }}>Processing...</span>
-                    </>
+        {powerActions.map(action => {
+          const colorConfig = POWER_ICON_COLORS[action.variant];
+
+          // Build style object - only color the specified layer
+          const iconStyle = {
+            [`--fa-${colorConfig.layer}-color`]: colorConfig.color,
+            '--fa-primary-opacity': 0.9,
+            '--fa-secondary-opacity': 0.8,
+          } as React.CSSProperties;
+
+          return (
+            <wa-card key={action.id} appearance='outlined'>
+              <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
+                <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
+                  {action.stackedIcon ? (
+                    <span className='fa-stack fa-2x'>
+                      <FontAwesomeIcon
+                        icon={action.stackedIcon.base}
+                        className='fa-stack-2x'
+                        style={iconStyle}
+                      />
+                      <FontAwesomeIcon
+                        icon={action.stackedIcon.overlay}
+                        className='fa-stack-1x'
+                        transform='shrink-2 down-10 right-12'
+                        style={iconStyle}
+                      />
+                    </span>
                   ) : (
-                    action.label
+                    <FontAwesomeIcon icon={action.icon} size='4x' style={iconStyle} />
                   )}
-                </wa-button>
+                </div>
+                <div
+                  onClick={() => loading === null && handlePowerAction(action)}
+                  style={{ cursor: loading === null ? 'pointer' : 'not-allowed' }}
+                  role='button'
+                  tabIndex={loading === null ? 0 : -1}
+                  onKeyDown={e => {
+                    if (loading === null && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      handlePowerAction(action);
+                    }
+                  }}
+                  aria-label={action.label}
+                >
+                  <wa-button
+                    appearance='filled'
+                    variant={action.variant}
+                    disabled={loading !== null}
+                    style={{ width: '100%', pointerEvents: 'none' }}
+                  >
+                    {loading === action.id ? (
+                      <>
+                        <wa-spinner></wa-spinner>
+                        <span style={{ marginLeft: 'var(--wa-space-xs)' }}>Processing...</span>
+                      </>
+                    ) : (
+                      action.label
+                    )}
+                  </wa-button>
+                </div>
               </div>
-            </div>
-          </wa-card>
-        ))}
+            </wa-card>
+          );
+        })}
       </div>
     </div>
   );

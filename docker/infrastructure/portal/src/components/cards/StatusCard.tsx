@@ -40,16 +40,17 @@ export const StatusCard: React.FC<StatusCardProps> = ({
         <span className='wa-body-s' style={{ fontWeight: 600 }}>
           {title}
         </span>
-        {subtitle && (
-          <span className='wa-caption-s'>{subtitle}</span>
-        )}
+        {subtitle && <span className='wa-caption-s'>{subtitle}</span>}
       </div>
     </div>
   );
 
   // Tags content
   const tagsContent = tags.length > 0 && (
-    <div className='wa-cluster wa-gap-xs' style={layout === 'horizontal' ? { paddingTop: 'var(--wa-space-s)' } : undefined}>
+    <div
+      className='wa-cluster wa-gap-xs'
+      style={layout === 'horizontal' ? { paddingTop: 'var(--wa-space-s)' } : undefined}
+    >
       {tags.map((tag, idx) => (
         <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
           {tag.icon ? (
@@ -57,8 +58,10 @@ export const StatusCard: React.FC<StatusCardProps> = ({
               {tag.icon}
               <span>{tag.value || tag.label}</span>
             </div>
+          ) : tag.value ? (
+            `${tag.label}: ${tag.value}`
           ) : (
-            tag.value ? `${tag.label}: ${tag.value}` : tag.label
+            tag.label
           )}
         </wa-tag>
       ))}
@@ -66,31 +69,30 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   );
 
   // Combine content based on layout
-  const content = layout === 'vertical' ? (
-    <div className='wa-stack wa-gap-m'>
-      {header}
-      {tagsContent}
-    </div>
-  ) : (
-    <div className='wa-flank wa-gap-m'>
-      {icon}
-      <div className='wa-stack wa-gap-3xs'>
-        <span className='wa-body-s' style={{ fontWeight: 600 }}>
-          {title}
-        </span>
-        {subtitle && (
-          <span className='wa-caption-s'>{subtitle}</span>
-        )}
+  const content =
+    layout === 'vertical' ? (
+      <div className='wa-stack wa-gap-m'>
+        {header}
         {tagsContent}
       </div>
-    </div>
-  );
+    ) : (
+      <div className='wa-flank wa-gap-m'>
+        {icon}
+        <div className='wa-stack wa-gap-3xs'>
+          <span className='wa-body-s' style={{ fontWeight: 600 }}>
+            {title}
+          </span>
+          {subtitle && <span className='wa-caption-s'>{subtitle}</span>}
+          {tagsContent}
+        </div>
+      </div>
+    );
 
   if (type === 'card') {
     const cardProps = {
       appearance: 'outlined' as const,
       className,
-      ...(layout === 'horizontal' && { orientation: 'horizontal' as const })
+      ...(layout === 'horizontal' && { orientation: 'horizontal' as const }),
     };
 
     return (
@@ -107,4 +109,3 @@ export const StatusCard: React.FC<StatusCardProps> = ({
     </wa-callout>
   );
 };
-

@@ -365,8 +365,8 @@ body {
   .connected-client {
     max-width: 100%;
   }
-  
+
   .tailscale-status {
-    min-width: 100%
+    min-width: 100%;
   }
 }

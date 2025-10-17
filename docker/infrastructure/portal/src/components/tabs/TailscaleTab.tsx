@@ -12,7 +12,6 @@ import type { TailscaleInterface, TailscalePeer } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 
-
 /**
  * Tailscale Tab Component
  */
@@ -23,9 +22,18 @@ export const TailscaleTab: React.FC = () => {
 
   if (!tailscale) {
     return (
-      <wa-callout variant='neutral' className="wa-gap-s">
+      <wa-callout variant='neutral' className='wa-gap-s'>
         <div slot='icon' style={{ display: 'contents' }}>
-          <FontAwesomeIcon icon={faCircleInfo} />
+          <FontAwesomeIcon
+            icon={faCircleInfo}
+            style={
+              {
+                '--fa-primary-color': '#3b82f6', // Blue for info
+                '--fa-primary-opacity': 1,
+                '--fa-secondary-opacity': 0.4,
+              } as React.CSSProperties
+            }
+          />
         </div>
         Tailscale is not configured or not running.
       </wa-callout>
@@ -33,7 +41,8 @@ export const TailscaleTab: React.FC = () => {
   }
 
   const tailscaleInterface = tailscale as TailscaleInterface;
-  const peers = tailscaleInterface.peers?.sort((peer: TailscalePeer) => peer.online ? -1 : 1) || [];
+  const peers =
+    tailscaleInterface.peers?.sort((peer: TailscalePeer) => (peer.online ? -1 : 1)) || [];
   const onlinePeers = peers.filter((peer: TailscalePeer) => peer.online);
 
   // Prepare Tailscale interface data
@@ -44,8 +53,19 @@ export const TailscaleTab: React.FC = () => {
     tailscaleTags.push({
       label: 'IP',
       value: tailscaleInterface.ipAddress,
-      icon: <FontAwesomeIcon icon={faLocationDot} />,
-      variant: 'neutral'
+      icon: (
+        <FontAwesomeIcon
+          icon={faLocationDot}
+          style={
+            {
+              '--fa-primary-color': '#10b981', // Green for location/IP
+              '--fa-primary-opacity': 0.9,
+              '--fa-secondary-opacity': 0.8,
+            } as React.CSSProperties
+          }
+        />
+      ),
+      variant: 'neutral',
     });
   }
 
@@ -53,18 +73,40 @@ export const TailscaleTab: React.FC = () => {
   if (tailscaleInterface.exitNode) {
     tailscaleTags.push({
       label: 'Exit Node',
-      icon: <FontAwesomeIcon icon={faArrowRightFromBracket} />,
-      variant: 'brand'
+      icon: (
+        <FontAwesomeIcon
+          icon={faArrowRightFromBracket}
+          style={
+            {
+              '--fa-primary-color': '#3b82f6', // Blue for exit node
+              '--fa-primary-opacity': 0.9,
+              '--fa-secondary-opacity': 0.8,
+            } as React.CSSProperties
+          }
+        />
+      ),
+      variant: 'brand',
     });
   }
 
   // Advertised Routes as individual tags
   if (tailscaleInterface.routeAdvertising && tailscaleInterface.routeAdvertising.length > 0) {
-    tailscaleInterface.routeAdvertising.forEach((route) => {
+    tailscaleInterface.routeAdvertising.forEach(route => {
       tailscaleTags.push({
         label: route,
-        icon: <FontAwesomeIcon icon={faLocationDot} />,
-        variant: 'neutral'
+        icon: (
+          <FontAwesomeIcon
+            icon={faLocationDot}
+            style={
+              {
+                '--fa-primary-color': '#10b981', // Green for routes
+                '--fa-primary-opacity': 0.9,
+                '--fa-secondary-opacity': 0.8,
+              } as React.CSSProperties
+            }
+          />
+        ),
+        variant: 'neutral',
       });
     });
   }
@@ -80,13 +122,25 @@ export const TailscaleTab: React.FC = () => {
           <h3 className='wa-heading-s'>Tailscale Status</h3>
           <StatusCard
             type='callout'
-            variant={tailscaleInterface.status === "connected" ? "success" : "danger"}
+            variant={tailscaleInterface.status === 'connected' ? 'success' : 'danger'}
             layout='vertical'
-            icon={<FontAwesomeIcon icon={faShieldCheck} size='lg' />}
+            icon={
+              <FontAwesomeIcon
+                icon={faShieldCheck}
+                size='lg'
+                style={
+                  {
+                    '--fa-primary-color': '#a855f7', // Purple for Tailscale/security
+                    '--fa-primary-opacity': 0.9,
+                    '--fa-secondary-opacity': 0.8,
+                  } as React.CSSProperties
+                }
+              />
+            }
             title={tailscaleInterface.name}
             subtitle={tailscaleInterface.tailnetName}
             tags={tailscaleTags}
-            className="interface-callout"
+            className='interface-callout'
           />
         </div>
       </div>
@@ -94,22 +148,50 @@ export const TailscaleTab: React.FC = () => {
       {/* Right Column - Peers */}
       <div className='wa-stack wa-gap-m'>
         <h3 className='wa-heading-s'>
-          Peers ({onlinePeers.length} online{peers.length > onlinePeers.length ? `, ${peers.length - onlinePeers.length} offline` : ''})
+          Peers ({onlinePeers.length} online
+          {peers.length > onlinePeers.length
+            ? `, ${peers.length - onlinePeers.length} offline`
+            : ''}
+          )
         </h3>
         {peers.length === 0 ? (
           <wa-callout variant='neutral'>
             <div slot='icon' style={{ display: 'contents' }}>
-              <FontAwesomeIcon icon={faCircleInfo} />
+              <FontAwesomeIcon
+                icon={faCircleInfo}
+                style={
+                  {
+                    '--fa-primary-color': '#3b82f6', // Blue for info
+                    '--fa-primary-opacity': 1,
+                    '--fa-secondary-opacity': 0.4,
+                  } as React.CSSProperties
+                }
+              />
             </div>
             No peers connected.
           </wa-callout>
         ) : (
-          <wa-scroller orientation="vertical" style={{ maxHeight: '500px' }}>
+          <wa-scroller orientation='vertical' style={{ maxHeight: '500px' }}>
             <div className='wa-grid wa-gap-xs'>
               {peers.map((peer: TailscalePeer, index: number) => {
                 const peerTags: StatusCardTag[] = [];
                 if (peer.exitNode) {
-                  peerTags.push({ label: 'Exit Node', icon: <FontAwesomeIcon icon={faArrowRightFromBracket} />, variant: 'brand' });
+                  peerTags.push({
+                    label: 'Exit Node',
+                    icon: (
+                      <FontAwesomeIcon
+                        icon={faArrowRightFromBracket}
+                        style={
+                          {
+                            '--fa-primary-color': '#3b82f6', // Blue for exit node
+                            '--fa-primary-opacity': 0.9,
+                            '--fa-secondary-opacity': 0.8,
+                          } as React.CSSProperties
+                        }
+                      />
+                    ),
+                    variant: 'brand',
+                  });
                 }
 
                 return (
@@ -118,7 +200,19 @@ export const TailscaleTab: React.FC = () => {
                     type='callout'
                     variant={peer.online ? 'success' : 'neutral'}
                     layout='horizontal'
-                    icon={<FontAwesomeIcon icon={faComputerClassic} size='lg' />}
+                    icon={
+                      <FontAwesomeIcon
+                        icon={faComputerClassic}
+                        size='lg'
+                        style={
+                          {
+                            '--fa-primary-color': peer.online ? '#10b981' : '#6b7280', // Green if online, gray if offline
+                            '--fa-primary-opacity': 0.9,
+                            '--fa-secondary-opacity': 0.8,
+                          } as React.CSSProperties
+                        }
+                      />
+                    }
                     title={peer.hostname || peer.ipAddress}
                     subtitle={peer.ipAddress}
                     tags={peerTags}

@@ -242,4 +242,3 @@ power.get('/kiosk/status', async c => {
 });
 
 export default power;
-

@@ -46,6 +46,13 @@ export const NetworkStatusButton: React.FC = () => {
   // Only pulse when fully connected (backend + internet) and has clients
   const shouldPulse = isConnected && hasInternetInterface && connectedClients > 0;
 
+  // Get icon color based on status
+  const iconColor = useMemo(() => {
+    if (!isConnected) return '#ef4444'; // Red
+    if (!hasInternetInterface) return '#f59e0b'; // Amber
+    return '#10b981'; // Green
+  }, [isConnected, hasInternetInterface]);
+
   // Handle click to navigate to network status page
   const handleClick = () => {
     const params = new URLSearchParams(searchParams);
@@ -70,7 +77,17 @@ export const NetworkStatusButton: React.FC = () => {
       aria-label='View network status'
     >
       <wa-button appearance='outlined' variant={variant}>
-        <FontAwesomeIcon icon={faServer} size='xl' />
+        <FontAwesomeIcon
+          icon={faServer}
+          size='xl'
+          style={
+            {
+              '--fa-primary-color': iconColor,
+              '--fa-primary-opacity': 0.9,
+              '--fa-secondary-opacity': 0.8,
+            } as React.CSSProperties
+          }
+        />
         <wa-badge variant={variant} attention={shouldPulse ? 'pulse' : 'none'}>
           {isConnected ? connectedClients : '!'}
         </wa-badge>

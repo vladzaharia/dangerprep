@@ -35,6 +35,33 @@ interface NavigationContext {
 const MANAGEMENT_PAGES = ['/network', '/maintenance', '/settings', '/power'];
 
 /**
+ * Icon color configurations for navigation items
+ * Each icon colors only one layer (primary or secondary) for a selective duotone effect
+ */
+const ICON_COLORS = {
+  services: {
+    layer: 'primary', // Color the browser outline
+    color: '#3b82f6', // Blue
+  },
+  maintenance: {
+    layer: 'primary', // Color the wrench outline
+    color: '#f59e0b', // Amber
+  },
+  qr: {
+    layer: 'primary', // Color the QR pattern details
+    color: '#a855f7', // Purple
+  },
+  settings: {
+    layer: 'primary', // Color the gear outline
+    color: '#10b981', // Green
+  },
+  power: {
+    layer: 'primary', // Color the power symbol details
+    color: '#ef4444', // Red
+  },
+};
+
+/**
  * Navigation items configuration
  * This is the single source of truth for all navigation items and their visibility rules
  */
@@ -125,6 +152,16 @@ export const Navigation: React.FC = () => {
   );
 
   /**
+   * Get icon colors based on the navigation path
+   */
+  const getIconColors = (path?: string) => {
+    if (!path) return undefined;
+
+    const colorKey = path.replace('/', '') as keyof typeof ICON_COLORS;
+    return ICON_COLORS[colorKey];
+  };
+
+  /**
    * Render a navigation item - either a standard NavLink or a custom component
    */
   const renderNavItem = (item: NavItem, index: number) => {
@@ -140,17 +177,26 @@ export const Navigation: React.FC = () => {
       return null;
     }
 
+    const colorConfig = getIconColors(item.path);
+
+    // Build style object - only color the specified layer
+    const iconStyle = colorConfig
+      ? ({
+          [`--fa-${colorConfig.layer}-color`]: colorConfig.color,
+          '--fa-primary-opacity': 0.8,
+          '--fa-secondary-opacity': 0.5,
+        } as React.CSSProperties)
+      : undefined;
+
     return (
       <NavLink
         key={item.path}
         to={getNavLinkTo(item.path)}
-        className={({ isActive }) =>
-          `navigation-item ${isActive ? 'navigation-item--active' : ''}`
-        }
+        className={({ isActive }) => `navigation-item ${isActive ? 'navigation-item--active' : ''}`}
         aria-label={item.label}
       >
         <wa-button appearance='plain'>
-          <FontAwesomeIcon icon={item.icon} size='xl' />
+          <FontAwesomeIcon icon={item.icon} size='xl' style={iconStyle} />
         </wa-button>
       </NavLink>
     );

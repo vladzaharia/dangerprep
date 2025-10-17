@@ -6,8 +6,8 @@ import { NetworkStatusTab, ConnectedClientsTab, TailscaleTab } from '../componen
  */
 export const NetworkStatusPage: React.FC = () => {
   return (
-    <div className="network-status-page">
-      <wa-tab-group placement='bottom' className="network-status-tabs">
+    <div className='network-status-page'>
+      <wa-tab-group placement='bottom' className='network-status-tabs'>
         <wa-tab panel='status'>Status</wa-tab>
         <wa-tab panel='clients'>Connected Clients</wa-tab>
         <wa-tab panel='tailscale'>Tailscale</wa-tab>

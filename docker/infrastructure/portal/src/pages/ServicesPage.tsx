@@ -72,7 +72,16 @@ function ServicesContent() {
       {services.length === 0 ? (
         <wa-callout variant='neutral'>
           <div slot='icon' style={{ display: 'contents' }}>
-            <FontAwesomeIcon icon={faCircleInfo} />
+            <FontAwesomeIcon
+              icon={faCircleInfo}
+              style={
+                {
+                  '--fa-primary-color': '#3b82f6', // Blue for info
+                  '--fa-primary-opacity': 1,
+                  '--fa-secondary-opacity': 0.4,
+                } as React.CSSProperties
+              }
+            />
           </div>
           No public services are currently available.
         </wa-callout>

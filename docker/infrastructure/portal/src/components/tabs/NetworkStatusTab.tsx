@@ -1,5 +1,10 @@
 import React, { useMemo } from 'react';
-import { faWifi, faGlobe, faShieldCheck, faHardDrive } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import {
+  faWifi,
+  faGlobe,
+  faShieldCheck,
+  faHardDrive,
+} from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { faEthernet, faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNetworkSummary } from '../../hooks/useSWRData';
@@ -21,6 +26,25 @@ function getInterfaceIcon(iface: NetworkInterface) {
       return faShieldCheck;
     default:
       return faGlobe;
+  }
+}
+
+/**
+ * Get icon color based on interface type and state
+ */
+function getInterfaceIconColor(iface: NetworkInterface): string | undefined {
+  if (iface.state !== 'up') return undefined;
+
+  switch (iface.type) {
+    case 'wifi':
+    case 'hotspot':
+      return '#3b82f6'; // Blue for WiFi
+    case 'ethernet':
+      return '#10b981'; // Green for Ethernet
+    case 'tailscale':
+      return '#a855f7'; // Purple for Tailscale
+    default:
+      return '#6b7280'; // Gray for other
   }
 }
 
@@ -79,30 +103,52 @@ export const NetworkStatusTab: React.FC = () => {
           </wa-card>
         ) : (
           lanInterfaces.map(iface => {
-            const title = iface.type === 'wifi' && 'ssid' in iface && iface.ssid
-              ? `${iface.ssid} (${iface.name})`
-              : iface.name;
+            const title =
+              iface.type === 'wifi' && 'ssid' in iface && iface.ssid
+                ? `${iface.ssid} (${iface.name})`
+                : iface.name;
 
             const tags: StatusCardTag[] = [];
             if (iface.ipAddress) {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: <FontAwesomeIcon icon={faGlobe} />,
-                variant: 'neutral'
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faGlobe}
+                    style={
+                      {
+                        '--fa-secondary-color': '#10b981', // Green for IP/network
+                        '--fa-primary-opacity': 0.6,
+                        '--fa-secondary-opacity': 0.8,
+                      } as React.CSSProperties
+                    }
+                  />
+                ),
+                variant: 'neutral',
               });
             }
+
+            const iconColor = getInterfaceIconColor(iface);
+            const iconStyle = iconColor
+              ? ({
+                  '--fa-primary-color': iconColor,
+                  '--fa-primary-opacity': 0.9,
+                } as React.CSSProperties)
+              : undefined;
 
             return (
               <StatusCard
                 key={iface.name}
                 type='callout'
-                variant={iface.state === "up" ? "success" : "danger"}
+                variant={iface.state === 'up' ? 'success' : 'danger'}
                 layout='vertical'
-                icon={<FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />}
+                icon={
+                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' style={iconStyle} />
+                }
                 title={title}
                 tags={tags}
-                className="interface-callout"
+                className='interface-callout'
               />
             );
           })
@@ -115,14 +161,24 @@ export const NetworkStatusTab: React.FC = () => {
         <StatusCard
           type='card'
           layout='vertical'
-          icon={<FontAwesomeIcon icon={faServer} size='lg' />}
-          title="This Device"
+          icon={
+            <FontAwesomeIcon
+              icon={faServer}
+              size='lg'
+              style={
+                {
+                  '--fa-primary-color': '#6366f1', // Indigo for device
+                } as React.CSSProperties
+              }
+            />
+          }
+          title='This Device'
           tags={deviceIPs
-            .filter(({ name }) => !name.startsWith("br"))
+            .filter(({ name }) => !name.startsWith('br'))
             .map(({ name, ip }) => ({
               label: name,
               value: ip,
-              variant: 'neutral' as const
+              variant: 'neutral' as const,
             }))}
         />
       </div>
@@ -138,38 +194,70 @@ export const NetworkStatusTab: React.FC = () => {
           </wa-card>
         ) : (
           wanInterfaces.map(iface => {
-            const title = iface.type === 'wifi' && 'ssid' in iface && iface.ssid
-              ? `${iface.ssid} (${iface.name})`
-              : iface.name;
+            const title =
+              iface.type === 'wifi' && 'ssid' in iface && iface.ssid
+                ? `${iface.ssid} (${iface.name})`
+                : iface.name;
 
             const tags: StatusCardTag[] = [];
             if (iface.ipAddress) {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: <FontAwesomeIcon icon={faGlobe} />,
-                variant: 'neutral'
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faGlobe}
+                    style={
+                      {
+                        '--fa-primary-color': '#10b981', // Green for IP/network
+                        '--fa-primary-opacity': 0.9,
+                      } as React.CSSProperties
+                    }
+                  />
+                ),
+                variant: 'neutral',
               });
             }
             if (iface.gateway) {
               tags.push({
                 label: 'Gateway',
                 value: iface.gateway,
-                icon: <FontAwesomeIcon icon={faHardDrive} />,
-                variant: 'neutral'
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faHardDrive}
+                    style={
+                      {
+                        '--fa-primary-color': '#ef4444', // Gray for gateway
+                        '--fa-primary-opacity': 0.9,
+                        '--fa-secondary-opacity': 0.8,
+                      } as React.CSSProperties
+                    }
+                  />
+                ),
+                variant: 'neutral',
               });
             }
+
+            const iconColor = getInterfaceIconColor(iface);
+            const iconStyle = iconColor
+              ? ({
+                  '--fa-primary-color': iconColor,
+                  '--fa-primary-opacity': 0.9,
+                } as React.CSSProperties)
+              : undefined;
 
             return (
               <StatusCard
                 key={iface.name}
                 type='callout'
-                variant={iface.state === "up" ? "success" : "danger"}
+                variant={iface.state === 'up' ? 'success' : 'danger'}
                 layout='vertical'
-                icon={<FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' />}
+                icon={
+                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' style={iconStyle} />
+                }
                 title={title}
                 tags={tags}
-                className="interface-callout"
+                className='interface-callout'
               />
             );
           })
