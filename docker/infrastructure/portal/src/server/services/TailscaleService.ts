@@ -30,7 +30,11 @@ export class TailscaleService {
       const status = JSON.parse(stdout);
 
       // Parse settings from status
+      // BackendState can be: Running, Stopped, NeedsLogin, NeedsMachineAuth, etc.
+      const running = status.BackendState === 'Running';
+
       const settings: TailscaleSettings = {
+        running,
         acceptDNS: status.Self?.CapMap?.['accept-dns'] !== false,
         acceptRoutes: status.Self?.CapMap?.['accept-routes'] !== false,
         ssh: status.Self?.CapMap?.ssh !== false,
@@ -39,8 +43,6 @@ export class TailscaleService {
         advertiseExitNode: status.Self?.CapMap?.['advertise-exit-node'] !== false,
         advertiseRoutes: status.Self?.PrimaryRoutes || [],
         shieldsUp: status.Self?.CapMap?.['shields-up'] !== false,
-        hostname: status.Self?.HostName || null,
-        advertiseTags: status.Self?.Tags || [],
         advertiseConnector: status.Self?.CapMap?.['advertise-connector'] !== false,
         snatSubnetRoutes: status.Self?.CapMap?.['snat-subnet-routes'] !== false,
         statefulFiltering: status.Self?.CapMap?.['stateful-filtering'] !== false,
@@ -438,12 +440,6 @@ export class TailscaleService {
       }
       if (settings.advertiseRoutes !== undefined) {
         flags.push(`--advertise-routes=${settings.advertiseRoutes.join(',')}`);
-      }
-      if (settings.hostname !== undefined) {
-        flags.push(`--hostname=${settings.hostname || ''}`);
-      }
-      if (settings.advertiseTags !== undefined) {
-        flags.push(`--advertise-tags=${settings.advertiseTags.join(',')}`);
       }
       if (settings.advertiseConnector !== undefined) {
         flags.push(`--advertise-connector=${settings.advertiseConnector}`);

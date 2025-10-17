@@ -99,6 +99,7 @@ export interface TailscaleExitNode {
  * Tailscale settings
  */
 export interface TailscaleSettings {
+  running: boolean;
   acceptDNS: boolean;
   acceptRoutes: boolean;
   ssh: boolean;
@@ -107,8 +108,6 @@ export interface TailscaleSettings {
   advertiseExitNode: boolean;
   advertiseRoutes: string[];
   shieldsUp: boolean;
-  hostname: string | null;
-  advertiseTags: string[];
   advertiseConnector: boolean;
   snatSubnetRoutes: boolean;
   statefulFiltering: boolean;

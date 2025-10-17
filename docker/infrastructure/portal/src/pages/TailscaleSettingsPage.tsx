@@ -5,9 +5,8 @@ import {
   faArrowRightFromBracket,
   faShield,
   faPowerOff,
-  faTag,
-  faServer,
   faGears,
+  faNetworkWired,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { faWifi } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -131,49 +130,140 @@ function TailscaleSettingsContent() {
         </wa-callout>
       )}
 
-      {/* Settings cards grid */}
+      {/* On/Off Control - Stateful based on running state */}
+      <wa-card appearance='outlined'>
+        <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
+          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
+            <FontAwesomeIcon
+              icon={faPowerOff}
+              size='4x'
+              style={createIconStyle(settings.running ? ICON_STYLES.success : ICON_STYLES.danger)}
+            />
+            <h3 className='wa-heading-s'>Tailscale Status</h3>
+          </div>
+          <div className='wa-stack wa-gap-m'>
+            <p className='wa-body-s' style={{ textAlign: 'center' }}>
+              {settings.running ? 'Tailscale is running' : 'Tailscale is stopped'}
+            </p>
+            {settings.running ? (
+              <wa-button
+                appearance='outlined'
+                variant='danger'
+                {...({
+                  onclick: async () => {
+                    setLoading('tailscale-stop');
+                    setMessage(null);
+                    try {
+                      const response = await fetch('/api/tailscale/stop', { method: 'POST' });
+                      const result = await response.json();
+                      if (result.success) {
+                        setMessage({ type: 'success', text: result.message });
+                        await mutateSettings();
+                      } else {
+                        setMessage({ type: 'error', text: result.message });
+                      }
+                    } catch (error) {
+                      setMessage({
+                        type: 'error',
+                        text: error instanceof Error ? error.message : 'Failed to stop',
+                      });
+                    } finally {
+                      setLoading(null);
+                    }
+                  },
+                } as Record<string, unknown>)}
+                disabled={loading !== null}
+              >
+                Stop Tailscale
+              </wa-button>
+            ) : (
+              <wa-button
+                appearance='outlined'
+                variant='success'
+                {...({
+                  onclick: async () => {
+                    setLoading('tailscale-start');
+                    setMessage(null);
+                    try {
+                      const response = await fetch('/api/tailscale/start', { method: 'POST' });
+                      const result = await response.json();
+                      if (result.success) {
+                        setMessage({ type: 'success', text: result.message });
+                        await mutateSettings();
+                      } else {
+                        setMessage({ type: 'error', text: result.message });
+                      }
+                    } catch (error) {
+                      setMessage({
+                        type: 'error',
+                        text: error instanceof Error ? error.message : 'Failed to start',
+                      });
+                    } finally {
+                      setLoading(null);
+                    }
+                  },
+                } as Record<string, unknown>)}
+                disabled={loading !== null}
+              >
+                Start Tailscale
+              </wa-button>
+            )}
+            {(loading === 'tailscale-start' || loading === 'tailscale-stop') && (
+              <div style={{ textAlign: 'center' }}>
+                <wa-spinner></wa-spinner>
+              </div>
+            )}
+          </div>
+        </div>
+      </wa-card>
+
+      {/* Exit Node Card */}
+      <wa-card appearance='outlined'>
+        <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
+          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
+            <FontAwesomeIcon
+              icon={faArrowRightFromBracket}
+              size='4x'
+              style={createIconStyle(ICON_STYLES.brand)}
+            />
+            <h3 className='wa-heading-s'>Exit Node</h3>
+          </div>
+          <div className='wa-stack wa-gap-m'>
+            <p className='wa-body-s' style={{ textAlign: 'center' }}>
+              Route all traffic through another Tailscale node
+            </p>
+            <wa-select
+              value={settings.exitNode || ''}
+              placeholder='No exit node'
+              {...({ clearable: true } as Record<string, unknown>)}
+              onchange={(e: Event) => {
+                const target = e.target as HTMLSelectElement;
+                handleSetExitNode(target.value || null);
+              }}
+              disabled={loading !== null || !settings.running}
+            >
+              {exitNodes?.map((node: TailscaleExitNode) => (
+                <wa-option key={node.id} value={node.id}>
+                  {node.name} {node.location ? `(${node.location})` : ''}
+                  {node.suggested ? ' ⭐' : ''}
+                </wa-option>
+              ))}
+            </wa-select>
+            {loading === 'exitNode' && (
+              <div style={{ textAlign: 'center' }}>
+                <wa-spinner></wa-spinner>
+              </div>
+            )}
+          </div>
+        </div>
+      </wa-card>
+
+      {/* Basic Settings Section */}
+      <h3 className='wa-heading-m'>Basic Settings</h3>
       <div
         className='wa-grid wa-gap-m'
         style={{ '--min-column-size': '250px' } as React.CSSProperties}
       >
-        {/* Exit Node Card */}
-        <wa-card appearance='outlined'>
-          <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
-            <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
-              <FontAwesomeIcon
-                icon={faArrowRightFromBracket}
-                size='4x'
-                style={createIconStyle(ICON_STYLES.brand)}
-              />
-              <h3 className='wa-heading-s'>Exit Node</h3>
-            </div>
-            <div className='wa-stack wa-gap-m'>
-              <wa-select
-                value={settings.exitNode || ''}
-                placeholder='No exit node'
-                {...({ clearable: true } as Record<string, unknown>)}
-                onchange={(e: Event) => {
-                  const target = e.target as HTMLSelectElement;
-                  handleSetExitNode(target.value || null);
-                }}
-                disabled={loading !== null}
-              >
-                {exitNodes?.map((node: TailscaleExitNode) => (
-                  <wa-option key={node.id} value={node.id}>
-                    {node.name} {node.location ? `(${node.location})` : ''}
-                    {node.suggested ? ' ⭐' : ''}
-                  </wa-option>
-                ))}
-              </wa-select>
-              {loading === 'exitNode' && (
-                <div style={{ textAlign: 'center' }}>
-                  <wa-spinner></wa-spinner>
-                </div>
-              )}
-            </div>
-          </div>
-        </wa-card>
-
         {/* DNS Card */}
         <wa-card appearance='outlined'>
           <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
@@ -190,9 +280,9 @@ function TailscaleSettingsContent() {
                 Use Tailscale's DNS settings including MagicDNS
               </p>
               <wa-switch
-                {...(settings.acceptDNS ? { checked: true } : {})}
+                checked={settings.acceptDNS}
                 onchange={() => handleToggleSetting('acceptDNS', settings.acceptDNS)}
-                disabled={loading !== null}
+                disabled={loading !== null || !settings.running}
               >
                 {settings.acceptDNS ? 'Enabled' : 'Disabled'}
               </wa-switch>
@@ -221,9 +311,9 @@ function TailscaleSettingsContent() {
                 Accept subnet routes advertised by other nodes
               </p>
               <wa-switch
-                {...(settings.acceptRoutes ? { checked: true } : {})}
+                checked={settings.acceptRoutes}
                 onchange={() => handleToggleSetting('acceptRoutes', settings.acceptRoutes)}
-                disabled={loading !== null}
+                disabled={loading !== null || !settings.running}
               >
                 {settings.acceptRoutes ? 'Enabled' : 'Disabled'}
               </wa-switch>
@@ -252,9 +342,9 @@ function TailscaleSettingsContent() {
                 Enable SSH access via Tailscale
               </p>
               <wa-switch
-                {...(settings.ssh ? { checked: true } : {})}
+                checked={settings.ssh}
                 onchange={() => handleToggleSetting('ssh', settings.ssh)}
-                disabled={loading !== null}
+                disabled={loading !== null || !settings.running}
               >
                 {settings.ssh ? 'Enabled' : 'Disabled'}
               </wa-switch>
@@ -266,7 +356,14 @@ function TailscaleSettingsContent() {
             </div>
           </div>
         </wa-card>
+      </div>
 
+      {/* Advertise Settings Section */}
+      <h3 className='wa-heading-m'>Advertise Settings</h3>
+      <div
+        className='wa-grid wa-gap-m'
+        style={{ '--min-column-size': '250px' } as React.CSSProperties}
+      >
         {/* Advertise Exit Node Card */}
         <wa-card appearance='outlined'>
           <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
@@ -279,11 +376,11 @@ function TailscaleSettingsContent() {
                 Offer this device as an exit node for others
               </p>
               <wa-switch
-                {...(settings.advertiseExitNode ? { checked: true } : {})}
+                checked={settings.advertiseExitNode}
                 onchange={() =>
                   handleToggleSetting('advertiseExitNode', settings.advertiseExitNode)
                 }
-                disabled={loading !== null}
+                disabled={loading !== null || !settings.running}
               >
                 {settings.advertiseExitNode ? 'Enabled' : 'Disabled'}
               </wa-switch>
@@ -358,25 +455,28 @@ function TailscaleSettingsContent() {
           </div>
         </wa-card>
 
-        {/* Advertise Routes Card */}
+        {/* Advertise Subnets Card with Advanced Settings */}
         <wa-card appearance='outlined'>
           <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
             <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
               <FontAwesomeIcon
-                icon={faRoute}
+                icon={faNetworkWired}
                 size='4x'
-                style={createIconStyle(ICON_STYLES.tailscale)}
+                style={createIconStyle(ICON_STYLES.warning)}
               />
-              <h3 className='wa-heading-s'>Advertise Routes</h3>
+              <h3 className='wa-heading-s'>Advertise Subnets</h3>
             </div>
             <div className='wa-stack wa-gap-m'>
               <p className='wa-body-s' style={{ textAlign: 'center' }}>
-                Expose subnet routes to your Tailscale network (comma-separated CIDRs)
+                Expose subnet routes (comma-separated CIDRs)
               </p>
               <wa-input
                 value={settings.advertiseRoutes?.join(',') || ''}
                 placeholder='192.168.1.0/24,10.0.0.0/8'
-                {...({ disabled: loading !== null } as Record<string, unknown>)}
+                {...({ disabled: loading !== null || !settings.running } as Record<
+                  string,
+                  unknown
+                >)}
                 onchange={async (e: Event) => {
                   const target = e.target as HTMLInputElement;
                   const routes = target.value
@@ -408,121 +508,35 @@ function TailscaleSettingsContent() {
                   }
                 }}
               ></wa-input>
-              {loading === 'advertiseRoutes' && (
-                <div style={{ textAlign: 'center' }}>
-                  <wa-spinner></wa-spinner>
-                </div>
-              )}
-            </div>
-          </div>
-        </wa-card>
 
-        {/* Hostname Card */}
-        <wa-card appearance='outlined'>
-          <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
-            <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
-              <FontAwesomeIcon
-                icon={faServer}
-                size='4x'
-                style={createIconStyle(ICON_STYLES.tailscale)}
-              />
-              <h3 className='wa-heading-s'>Hostname</h3>
-            </div>
-            <div className='wa-stack wa-gap-m'>
-              <p className='wa-body-s' style={{ textAlign: 'center' }}>
-                Custom hostname for this device in Tailscale
-              </p>
-              <wa-input
-                value={settings.hostname || ''}
-                placeholder='my-device'
-                {...({ disabled: loading !== null } as Record<string, unknown>)}
-                onchange={async (e: Event) => {
-                  const target = e.target as HTMLInputElement;
-                  setLoading('hostname');
-                  setMessage(null);
-                  try {
-                    const response = await fetch('/api/tailscale/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ hostname: target.value || null }),
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                      setMessage({ type: 'success', text: result.message });
-                      await mutateSettings();
-                    } else {
-                      setMessage({ type: 'error', text: result.message });
-                    }
-                  } catch (error) {
-                    setMessage({
-                      type: 'error',
-                      text: error instanceof Error ? error.message : 'Failed to update',
-                    });
-                  } finally {
-                    setLoading(null);
+              {/* Advanced subnet settings */}
+              <div className='wa-stack wa-gap-s'>
+                <p className='wa-body-xs' style={{ fontWeight: 'bold' }}>
+                  Advanced Subnet Settings
+                </p>
+                <wa-switch
+                  checked={settings.snatSubnetRoutes}
+                  onchange={() =>
+                    handleToggleSetting('snatSubnetRoutes', settings.snatSubnetRoutes)
                   }
-                }}
-              ></wa-input>
-              {loading === 'hostname' && (
-                <div style={{ textAlign: 'center' }}>
-                  <wa-spinner></wa-spinner>
-                </div>
-              )}
-            </div>
-          </div>
-        </wa-card>
+                  disabled={loading !== null || !settings.running}
+                >
+                  SNAT Subnet Routes
+                </wa-switch>
+                <wa-switch
+                  checked={settings.statefulFiltering}
+                  onchange={() =>
+                    handleToggleSetting('statefulFiltering', settings.statefulFiltering)
+                  }
+                  disabled={loading !== null || !settings.running}
+                >
+                  Stateful Filtering
+                </wa-switch>
+              </div>
 
-        {/* Advertise Tags Card */}
-        <wa-card appearance='outlined'>
-          <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
-            <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
-              <FontAwesomeIcon
-                icon={faTag}
-                size='4x'
-                style={createIconStyle(ICON_STYLES.tailscale)}
-              />
-              <h3 className='wa-heading-s'>Advertise Tags</h3>
-            </div>
-            <div className='wa-stack wa-gap-m'>
-              <p className='wa-body-s' style={{ textAlign: 'center' }}>
-                ACL tags for this device (comma-separated, e.g., tag:server,tag:prod)
-              </p>
-              <wa-input
-                value={settings.advertiseTags?.join(',') || ''}
-                placeholder='tag:server,tag:prod'
-                {...({ disabled: loading !== null } as Record<string, unknown>)}
-                onchange={async (e: Event) => {
-                  const target = e.target as HTMLInputElement;
-                  const tags = target.value
-                    .split(',')
-                    .map(t => t.trim())
-                    .filter(t => t.length > 0);
-                  setLoading('advertiseTags');
-                  setMessage(null);
-                  try {
-                    const response = await fetch('/api/tailscale/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ advertiseTags: tags }),
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                      setMessage({ type: 'success', text: result.message });
-                      await mutateSettings();
-                    } else {
-                      setMessage({ type: 'error', text: result.message });
-                    }
-                  } catch (error) {
-                    setMessage({
-                      type: 'error',
-                      text: error instanceof Error ? error.message : 'Failed to update',
-                    });
-                  } finally {
-                    setLoading(null);
-                  }
-                }}
-              ></wa-input>
-              {loading === 'advertiseTags' && (
+              {(loading === 'advertiseRoutes' ||
+                loading === 'snatSubnetRoutes' ||
+                loading === 'statefulFiltering') && (
                 <div style={{ textAlign: 'center' }}>
                   <wa-spinner></wa-spinner>
                 </div>
@@ -536,7 +550,7 @@ function TailscaleSettingsContent() {
           <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
             <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
               <FontAwesomeIcon
-                icon={faServer}
+                icon={faGears}
                 size='4x'
                 style={createIconStyle(ICON_STYLES.success)}
               />
@@ -547,11 +561,11 @@ function TailscaleSettingsContent() {
                 Advertise this node as an app connector
               </p>
               <wa-switch
-                {...(settings.advertiseConnector ? { checked: true } : {})}
+                checked={settings.advertiseConnector}
                 onchange={() =>
                   handleToggleSetting('advertiseConnector', settings.advertiseConnector)
                 }
-                disabled={loading !== null}
+                disabled={loading !== null || !settings.running}
               >
                 {settings.advertiseConnector ? 'Enabled' : 'Disabled'}
               </wa-switch>
@@ -563,43 +577,37 @@ function TailscaleSettingsContent() {
             </div>
           </div>
         </wa-card>
+      </div>
 
-        {/* Advanced Settings Card */}
+      {/* Advanced Settings Section */}
+      <h3 className='wa-heading-m'>Advanced Settings</h3>
+      <div
+        className='wa-grid wa-gap-m'
+        style={{ '--min-column-size': '250px' } as React.CSSProperties}
+      >
+        {/* Shields Up Card */}
         <wa-card appearance='outlined'>
           <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
             <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
               <FontAwesomeIcon
-                icon={faGears}
+                icon={faShield}
                 size='4x'
-                style={createIconStyle(ICON_STYLES.warning)}
+                style={createIconStyle(ICON_STYLES.danger)}
               />
-              <h3 className='wa-heading-s'>Advanced Settings</h3>
+              <h3 className='wa-heading-s'>Shields Up</h3>
             </div>
             <div className='wa-stack wa-gap-m'>
               <p className='wa-body-s' style={{ textAlign: 'center' }}>
-                Advanced networking options (Linux only)
+                Block all incoming connections from Tailscale
               </p>
-              <div className='wa-stack wa-gap-s'>
-                <wa-switch
-                  {...(settings.snatSubnetRoutes ? { checked: true } : {})}
-                  onchange={() =>
-                    handleToggleSetting('snatSubnetRoutes', settings.snatSubnetRoutes)
-                  }
-                  disabled={loading !== null}
-                >
-                  SNAT Subnet Routes: {settings.snatSubnetRoutes ? 'Enabled' : 'Disabled'}
-                </wa-switch>
-                <wa-switch
-                  {...(settings.statefulFiltering ? { checked: true } : {})}
-                  onchange={() =>
-                    handleToggleSetting('statefulFiltering', settings.statefulFiltering)
-                  }
-                  disabled={loading !== null}
-                >
-                  Stateful Filtering: {settings.statefulFiltering ? 'Enabled' : 'Disabled'}
-                </wa-switch>
-              </div>
-              {(loading === 'snatSubnetRoutes' || loading === 'statefulFiltering') && (
+              <wa-switch
+                checked={settings.shieldsUp}
+                onchange={() => handleToggleSetting('shieldsUp', settings.shieldsUp)}
+                disabled={loading !== null || !settings.running}
+              >
+                {settings.shieldsUp ? 'Enabled' : 'Disabled'}
+              </wa-switch>
+              {loading === 'shieldsUp' && (
                 <div style={{ textAlign: 'center' }}>
                   <wa-spinner></wa-spinner>
                 </div>
@@ -608,84 +616,29 @@ function TailscaleSettingsContent() {
           </div>
         </wa-card>
 
-        {/* Tailscale Power Card */}
+        {/* Exit Node Allow LAN Card */}
         <wa-card appearance='outlined'>
           <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
             <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
               <FontAwesomeIcon
-                icon={faPowerOff}
+                icon={faGlobe}
                 size='4x'
-                style={createIconStyle(ICON_STYLES.warning)}
+                style={createIconStyle(ICON_STYLES.success)}
               />
-              <h3 className='wa-heading-s'>Tailscale Power</h3>
+              <h3 className='wa-heading-s'>Exit Node LAN Access</h3>
             </div>
             <div className='wa-stack wa-gap-m'>
               <p className='wa-body-s' style={{ textAlign: 'center' }}>
-                Start or stop the Tailscale service
+                Allow LAN access while using an exit node
               </p>
-              <div className='wa-cluster wa-gap-s' style={{ justifyContent: 'center' }}>
-                <wa-button
-                  appearance='outlined'
-                  variant='success'
-                  {...({
-                    onclick: async () => {
-                      setLoading('tailscale-start');
-                      setMessage(null);
-                      try {
-                        const response = await fetch('/api/tailscale/start', { method: 'POST' });
-                        const result = await response.json();
-                        if (result.success) {
-                          setMessage({ type: 'success', text: result.message });
-                          await mutateSettings();
-                        } else {
-                          setMessage({ type: 'error', text: result.message });
-                        }
-                      } catch (error) {
-                        setMessage({
-                          type: 'error',
-                          text: error instanceof Error ? error.message : 'Failed to start',
-                        });
-                      } finally {
-                        setLoading(null);
-                      }
-                    },
-                  } as Record<string, unknown>)}
-                  disabled={loading !== null}
-                >
-                  Start
-                </wa-button>
-                <wa-button
-                  appearance='outlined'
-                  variant='danger'
-                  {...({
-                    onclick: async () => {
-                      setLoading('tailscale-stop');
-                      setMessage(null);
-                      try {
-                        const response = await fetch('/api/tailscale/stop', { method: 'POST' });
-                        const result = await response.json();
-                        if (result.success) {
-                          setMessage({ type: 'success', text: result.message });
-                          await mutateSettings();
-                        } else {
-                          setMessage({ type: 'error', text: result.message });
-                        }
-                      } catch (error) {
-                        setMessage({
-                          type: 'error',
-                          text: error instanceof Error ? error.message : 'Failed to stop',
-                        });
-                      } finally {
-                        setLoading(null);
-                      }
-                    },
-                  } as Record<string, unknown>)}
-                  disabled={loading !== null}
-                >
-                  Stop
-                </wa-button>
-              </div>
-              {(loading === 'tailscale-start' || loading === 'tailscale-stop') && (
+              <wa-switch
+                checked={settings.exitNodeAllowLAN}
+                onchange={() => handleToggleSetting('exitNodeAllowLAN', settings.exitNodeAllowLAN)}
+                disabled={loading !== null || !settings.running}
+              >
+                {settings.exitNodeAllowLAN ? 'Enabled' : 'Disabled'}
+              </wa-switch>
+              {loading === 'exitNodeAllowLAN' && (
                 <div style={{ textAlign: 'center' }}>
                   <wa-spinner></wa-spinner>
                 </div>
