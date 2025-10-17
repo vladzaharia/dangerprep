@@ -41,6 +41,7 @@
     "@types/react-router-dom": "^5.3.3",
     "@vitejs/plugin-legacy": "^7.2.1",
     "@vitejs/plugin-react": "^5.0.4",
+    "esbuild": "^0.25.11",
     "eslint": "^9.37.0",
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5.0.0",
@@ -77,8 +78,8 @@
   "private": true,
   "scripts": {
     "build": "tsc && vite build && yarn build:server",
-    "build:server": "tsc --target es2020 --module commonjs --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck --outDir src/server/dist src/server/app.ts src/server/middleware/*.ts src/server/routes/*.ts src/server/services/*.ts && node scripts/build-server.cjs",
-    "clean": "rimraf dist build src/server/dist",
+    "build:server": "node scripts/build-server.cjs",
+    "clean": "rimraf dist build src/server/dist src/server/app.cjs",
     "dev": "vite",
     "docker:build": "docker compose build",
     "docker:down": "docker compose down",
