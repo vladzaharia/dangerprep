@@ -149,8 +149,8 @@ export const ConnectedClientsTab: React.FC = () => {
                   style={
                     {
                       '--fa-primary-color': '#6366f1', // Indigo for client device
-                      '--fa-primary-opacity': 0.9,
-                      '--fa-secondary-opacity': 0.8,
+                      '--fa-primary-opacity': 1,
+                      '--fa-secondary-opacity': 0.7,
                     } as React.CSSProperties
                   }
                 />

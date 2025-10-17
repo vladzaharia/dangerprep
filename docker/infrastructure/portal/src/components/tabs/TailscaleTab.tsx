@@ -4,13 +4,14 @@ import {
   faShieldCheck,
   faCircleInfo,
   faArrowRightFromBracket,
-  faLocationDot,
+  faGlobe,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useTailscaleInterface } from '../../hooks/useSWRData';
 import type { TailscaleInterface, TailscalePeer } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
+import { faNetworkWired } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 
 /**
  * Tailscale Tab Component
@@ -55,12 +56,12 @@ export const TailscaleTab: React.FC = () => {
       value: tailscaleInterface.ipAddress,
       icon: (
         <FontAwesomeIcon
-          icon={faLocationDot}
+          icon={faGlobe}
           style={
             {
-              '--fa-primary-color': '#10b981', // Green for location/IP
-              '--fa-primary-opacity': 0.9,
-              '--fa-secondary-opacity': 0.8,
+              '--fa-secondary-color': '#10b981', // Green for IP/network
+                        '--fa-primary-opacity': 0.6,
+                        '--fa-secondary-opacity': 0.8,
             } as React.CSSProperties
           }
         />
@@ -96,7 +97,7 @@ export const TailscaleTab: React.FC = () => {
         label: route,
         icon: (
           <FontAwesomeIcon
-            icon={faLocationDot}
+            icon={faNetworkWired}
             style={
               {
                 '--fa-primary-color': '#10b981', // Green for routes
@@ -207,7 +208,7 @@ export const TailscaleTab: React.FC = () => {
                         style={
                           {
                             '--fa-primary-color': peer.online ? '#10b981' : '#6b7280', // Green if online, gray if offline
-                            '--fa-primary-opacity': 0.9,
+                            '--fa-primary-opacity': 0.7,
                             '--fa-secondary-opacity': 0.8,
                           } as React.CSSProperties
                         }
