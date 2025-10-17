@@ -5,6 +5,7 @@
 compose.env
 .env.*
 setup-config.conf
+!.envrc
 
 # Local configuration files
 nfs-mounts.conf
