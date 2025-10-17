@@ -1,14 +1,11 @@
-import {
-  faPowerOff,
-  faBrowser,
-  faQrcode,
-  faShieldCheck,
-} from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import { faPowerOff, faBrowser, faQrcode } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { faGear, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo } from 'react';
 import { NavLink, useSearchParams, useLocation } from 'react-router-dom';
+
+import { createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 
 import { NetworkStatusButton } from './NetworkStatusButton';
 
@@ -40,37 +37,6 @@ interface NavigationContext {
  * List of management pages
  */
 const MANAGEMENT_PAGES = ['/network', '/maintenance', '/settings', '/tailscale', '/power'];
-
-/**
- * Icon color configurations for navigation items
- * Each icon colors only one layer (primary or secondary) for a selective duotone effect
- */
-const ICON_COLORS = {
-  services: {
-    layer: 'primary', // Color the browser outline
-    color: '#3b82f6', // Blue
-  },
-  maintenance: {
-    layer: 'primary', // Color the wrench outline
-    color: '#f59e0b', // Amber
-  },
-  qr: {
-    layer: 'primary', // Color the QR pattern details
-    color: '#a855f7', // Purple
-  },
-  tailscale: {
-    layer: 'primary', // Color the shield outline
-    color: '#a855f7', // Purple
-  },
-  settings: {
-    layer: 'primary', // Color the gear outline
-    color: '#10b981', // Green
-  },
-  power: {
-    layer: 'primary', // Color the power symbol details
-    color: '#ef4444', // Red
-  },
-};
 
 /**
  * Navigation items configuration
@@ -112,14 +78,6 @@ const NAV_ITEMS: NavItem[] = [
     path: '/settings',
     icon: faGear,
     label: 'Settings',
-    position: 'bottom',
-    // Kiosk-only, visible only when on management pages
-    isVisible: ({ isKioskMode, isOnManagePage }) => isKioskMode && isOnManagePage,
-  },
-  {
-    path: '/tailscale',
-    icon: faShieldCheck,
-    label: 'Tailscale',
     position: 'bottom',
     // Kiosk-only, visible only when on management pages
     isVisible: ({ isKioskMode, isOnManagePage }) => isKioskMode && isOnManagePage,
@@ -171,13 +129,26 @@ export const Navigation: React.FC = () => {
   );
 
   /**
-   * Get icon colors based on the navigation path
+   * Get icon style based on the navigation path
    */
-  const getIconColors = (path?: string) => {
+  const getIconStyle = (path?: string) => {
     if (!path) return undefined;
 
-    const colorKey = path.replace('/', '') as keyof typeof ICON_COLORS;
-    return ICON_COLORS[colorKey];
+    const pathKey = path.replace('/', '');
+    switch (pathKey) {
+      case 'services':
+        return createIconStyle(ICON_STYLES.brand);
+      case 'maintenance':
+        return createIconStyle(ICON_STYLES.warning);
+      case 'qr':
+        return createIconStyle(ICON_STYLES.tailscale);
+      case 'settings':
+        return createIconStyle(ICON_STYLES.success);
+      case 'power':
+        return createIconStyle(ICON_STYLES.danger);
+      default:
+        return undefined;
+    }
   };
 
   /**
@@ -196,16 +167,7 @@ export const Navigation: React.FC = () => {
       return null;
     }
 
-    const colorConfig = getIconColors(item.path);
-
-    // Build style object - only color the specified layer
-    const iconStyle = colorConfig
-      ? ({
-          [`--fa-${colorConfig.layer}-color`]: colorConfig.color,
-          '--fa-primary-opacity': 0.8,
-          '--fa-secondary-opacity': 0.5,
-        } as React.CSSProperties)
-      : undefined;
+    const iconStyle = getIconStyle(item.path);
 
     return (
       <NavLink

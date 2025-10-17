@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useNetworkSummary, useHostapdStatus } from '../../hooks/useSWRData';
+import { createIconStyle } from '../../utils/iconStyles';
 
 /**
  * Connection Status Button Component
@@ -81,13 +82,11 @@ export const NetworkStatusButton: React.FC = () => {
         <FontAwesomeIcon
           icon={faServer}
           size='xl'
-          style={
-            {
-              '--fa-primary-color': iconColor,
-              '--fa-primary-opacity': 0.9,
-              '--fa-secondary-opacity': 0.8,
-            } as React.CSSProperties
-          }
+          style={createIconStyle({
+            primaryColor: iconColor,
+            primaryOpacity: 0.9,
+            secondaryOpacity: 0.8,
+          })}
         />
         <wa-badge variant={variant} attention={shouldPulse ? 'pulse' : 'none'}>
           {isConnected ? connectedClients : '!'}

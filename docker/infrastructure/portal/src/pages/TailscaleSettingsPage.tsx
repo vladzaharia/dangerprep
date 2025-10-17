@@ -9,28 +9,7 @@ import React, { useState, Suspense } from 'react';
 
 import { useTailscaleSettings, useTailscaleExitNodes } from '../hooks/useSWRData';
 import type { TailscaleExitNode } from '../types/network';
-
-/**
- * Icon color configurations for Tailscale settings
- */
-const TAILSCALE_ICON_COLORS = {
-  exitNode: {
-    layer: 'primary',
-    color: '#3b82f6', // Blue
-  },
-  dns: {
-    layer: 'primary',
-    color: '#10b981', // Green
-  },
-  routes: {
-    layer: 'primary',
-    color: '#f59e0b', // Amber
-  },
-  ssh: {
-    layer: 'primary',
-    color: '#a855f7', // Purple
-  },
-};
+import { createIconStyle, ICON_STYLES } from '../utils/iconStyles';
 
 /**
  * Loading skeleton for settings page
@@ -139,13 +118,6 @@ function TailscaleSettingsContent() {
     );
   }
 
-  const iconStyle = (colorConfig: { layer: string; color: string }) =>
-    ({
-      [`--fa-${colorConfig.layer}-color`]: colorConfig.color,
-      '--fa-primary-opacity': 0.9,
-      '--fa-secondary-opacity': 0.8,
-    }) as React.CSSProperties;
-
   return (
     <div className='wa-stack wa-gap-xl'>
       <h2>Tailscale Settings</h2>
@@ -169,7 +141,7 @@ function TailscaleSettingsContent() {
               <FontAwesomeIcon
                 icon={faArrowRightFromBracket}
                 size='4x'
-                style={iconStyle(TAILSCALE_ICON_COLORS.exitNode)}
+                style={createIconStyle(ICON_STYLES.brand)}
               />
               <h3 className='wa-heading-s'>Exit Node</h3>
             </div>
@@ -206,7 +178,7 @@ function TailscaleSettingsContent() {
               <FontAwesomeIcon
                 icon={faGlobe}
                 size='4x'
-                style={iconStyle(TAILSCALE_ICON_COLORS.dns)}
+                style={createIconStyle(ICON_STYLES.success)}
               />
               <h3 className='wa-heading-s'>Accept DNS</h3>
             </div>
@@ -239,7 +211,7 @@ function TailscaleSettingsContent() {
               <FontAwesomeIcon
                 icon={faRoute}
                 size='4x'
-                style={iconStyle(TAILSCALE_ICON_COLORS.routes)}
+                style={createIconStyle(ICON_STYLES.warning)}
               />
               <h3 className='wa-heading-s'>Accept Routes</h3>
             </div>
@@ -276,7 +248,7 @@ function TailscaleSettingsContent() {
               <FontAwesomeIcon
                 icon={faTerminal}
                 size='4x'
-                style={iconStyle(TAILSCALE_ICON_COLORS.ssh)}
+                style={createIconStyle(ICON_STYLES.tailscale)}
               />
               <h3 className='wa-heading-s'>Tailscale SSH</h3>
             </div>

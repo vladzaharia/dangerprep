@@ -11,6 +11,7 @@ import React, { useMemo } from 'react';
 
 import { useHotspotInterface } from '../../hooks/useSWRData';
 import type { WiFiInterface, ConnectedClient } from '../../types/network';
+import { createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 
@@ -60,18 +61,7 @@ export const ConnectedClientsTab: React.FC = () => {
           tags.push({
             label: 'MAC',
             value: client.macAddress,
-            icon: (
-              <FontAwesomeIcon
-                icon={faKey}
-                style={
-                  {
-                    '--fa-secondary-color': '#a855f7', // Purple for security/key
-                    '--fa-primary-opacity': 0.7,
-                    '--fa-secondary-opacity': 0.5,
-                  } as React.CSSProperties
-                }
-              />
-            ),
+            icon: <FontAwesomeIcon icon={faKey} style={createIconStyle(ICON_STYLES.security)} />,
             variant: 'neutral',
           });
 
@@ -80,18 +70,7 @@ export const ConnectedClientsTab: React.FC = () => {
             tags.push({
               label: 'Signal',
               value: `${client.signalStrength} dBm`,
-              icon: (
-                <FontAwesomeIcon
-                  icon={faSignal}
-                  style={
-                    {
-                      '--fa-secondary-color': '#10b981', // Green for signal
-                      '--fa-primary-opacity': 0.9,
-                      '--fa-secondary-opacity': 0.55,
-                    } as React.CSSProperties
-                  }
-                />
-              ),
+              icon: <FontAwesomeIcon icon={faSignal} style={createIconStyle(ICON_STYLES.signal)} />,
               variant: 'neutral',
             });
           }

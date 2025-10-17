@@ -3,6 +3,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import { createIconStyle, ICON_STYLES } from '../utils/iconStyles';
+
 export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -13,12 +15,6 @@ export const SettingsPage: React.FC = () => {
     const queryString = params.toString();
     return queryString ? `${path}?${queryString}` : path;
   };
-
-  const iconStyle = {
-    '--fa-primary-color': '#a855f7', // Purple for Tailscale
-    '--fa-primary-opacity': 0.9,
-    '--fa-secondary-opacity': 0.8,
-  } as React.CSSProperties;
 
   return (
     <div className='wa-stack wa-gap-xl'>
@@ -33,7 +29,11 @@ export const SettingsPage: React.FC = () => {
         <wa-card appearance='outlined'>
           <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
             <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
-              <FontAwesomeIcon icon={faShieldCheck} size='4x' style={iconStyle} />
+              <FontAwesomeIcon
+                icon={faShieldCheck}
+                size='4x'
+                style={createIconStyle(ICON_STYLES.tailscale)}
+              />
               <h3 className='wa-heading-s'>Tailscale Settings</h3>
             </div>
             <div

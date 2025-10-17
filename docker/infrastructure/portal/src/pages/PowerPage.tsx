@@ -9,6 +9,8 @@ import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState } from 'react';
 
+import { createIconStyle, ICON_STYLES } from '../utils/iconStyles';
+
 interface PowerAction {
   id: string;
   label: string;
@@ -18,29 +20,6 @@ interface PowerAction {
   confirmMessage: string;
   variant: 'brand' | 'danger' | 'warning' | 'success';
 }
-
-/**
- * Icon color configurations for power actions
- * Each icon colors only one layer (primary or secondary) for a selective duotone effect
- */
-const POWER_ICON_COLORS = {
-  brand: {
-    layer: 'primary', // Color the browser outline
-    color: '#3b82f6', // Blue
-  },
-  warning: {
-    layer: 'primary', // Color the rotation arrows details
-    color: '#f59e0b', // Amber
-  },
-  danger: {
-    layer: 'primary', // Color the power symbol details
-    color: '#ef4444', // Red
-  },
-  success: {
-    layer: 'primary', // Color the desktop outline
-    color: '#10b981', // Green
-  },
-};
 
 const powerActions: PowerAction[] = [
   {
@@ -138,14 +117,7 @@ export const PowerPage: React.FC = () => {
         style={{ '--min-column-size': '250px' } as React.CSSProperties}
       >
         {powerActions.map(action => {
-          const colorConfig = POWER_ICON_COLORS[action.variant];
-
-          // Build style object - only color the specified layer
-          const iconStyle = {
-            [`--fa-${colorConfig.layer}-color`]: colorConfig.color,
-            '--fa-primary-opacity': 0.9,
-            '--fa-secondary-opacity': 0.8,
-          } as React.CSSProperties;
+          const iconStyle = createIconStyle(ICON_STYLES[action.variant]);
 
           return (
             <wa-card key={action.id} appearance='outlined'>

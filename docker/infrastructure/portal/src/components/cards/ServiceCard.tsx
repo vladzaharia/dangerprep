@@ -3,6 +3,7 @@ import React from 'react';
 
 import type { Service } from '../../App';
 import { getIcon } from '../../utils/iconCache';
+import { createIconStyle } from '../../utils/iconStyles';
 
 interface ServiceCardProps {
   service: Service;
@@ -48,13 +49,11 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, pageType = 's
           <FontAwesomeIcon
             icon={getIcon(service.icon)}
             size='2xl'
-            style={
-              {
-                '--fa-primary-color': iconColor,
-                '--fa-primary-opacity': 0.9,
-                '--fa-secondary-opacity': 0.8,
-              } as React.CSSProperties
-            }
+            style={createIconStyle({
+              primaryColor: iconColor,
+              primaryOpacity: 0.9,
+              secondaryOpacity: 0.8,
+            })}
           />
           <div className='wa-stack wa-gap-3xs'>
             <span className='wa-body-m' style={{ fontWeight: 600 }}>

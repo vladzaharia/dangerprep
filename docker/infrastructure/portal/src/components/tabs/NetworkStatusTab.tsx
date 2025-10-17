@@ -10,6 +10,7 @@ import React, { useMemo } from 'react';
 
 import { useNetworkSummary } from '../../hooks/useSWRData';
 import type { NetworkInterface } from '../../types/network';
+import { createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 
@@ -122,27 +123,25 @@ export const NetworkStatusTab: React.FC = () => {
                 label: 'IP',
                 value: iface.ipAddress,
                 icon: (
-                  <FontAwesomeIcon
-                    icon={faGlobe}
-                    style={
-                      {
-                        '--fa-primary-color': '#10b981', // Green for IP/network
-                        '--fa-primary-opacity': 0.9,
-                      } as React.CSSProperties
-                    }
-                  />
+                  <FontAwesomeIcon icon={faGlobe} style={createIconStyle(ICON_STYLES.network)} />
                 ),
                 variant: 'neutral',
               });
             }
 
             const iconColor = getInterfaceIconColor(iface);
-            const iconStyle = iconColor
-              ? ({
-                  '--fa-primary-color': iconColor,
-                  '--fa-primary-opacity': 0.9,
-                } as React.CSSProperties)
-              : undefined;
+            let iconStyle;
+            if (iconColor) {
+              if (iface.type === 'wifi' || iface.type === 'hotspot') {
+                iconStyle = createIconStyle(ICON_STYLES.wifi);
+              } else if (iface.type === 'ethernet') {
+                iconStyle = createIconStyle(ICON_STYLES.ethernet);
+              } else if (iface.type === 'tailscale') {
+                iconStyle = createIconStyle(ICON_STYLES.tailscale);
+              } else {
+                iconStyle = createIconStyle(ICON_STYLES.neutral);
+              }
+            }
 
             return (
               <StatusCard
@@ -232,26 +231,12 @@ export const NetworkStatusTab: React.FC = () => {
                 icon: (
                   <FontAwesomeIcon
                     icon={faHardDrive}
-                    style={
-                      {
-                        '--fa-secondary-color': '#ef4444', // Gray for gateway
-                        '--fa-primary-opacity': 0.9,
-                        '--fa-secondary-opacity': 0.7,
-                      } as React.CSSProperties
-                    }
+                    style={createIconStyle(ICON_STYLES.gateway)}
                   />
                 ),
                 variant: 'neutral',
               });
             }
-
-            const iconColor = getInterfaceIconColor(iface);
-            const iconStyle = iconColor
-              ? ({
-                  '--fa-primary-color': iconColor,
-                  '--fa-primary-opacity': 0.9,
-                } as React.CSSProperties)
-              : undefined;
 
             return (
               <StatusCard
@@ -260,7 +245,7 @@ export const NetworkStatusTab: React.FC = () => {
                 variant={iface.state === 'up' ? 'success' : 'danger'}
                 layout='vertical'
                 icon={
-                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' style={iconStyle} />
+                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' style={createIconStyle(ICON_STYLES[iface.type])} />
                 }
                 title={title}
                 tags={tags}
