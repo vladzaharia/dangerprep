@@ -229,7 +229,7 @@ function TailscaleSettingsContent() {
 
         {/* Exit Node Card */}
         <wa-card appearance='outlined'>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faArrowRightFromBracket}
               size='4x'
@@ -258,11 +258,7 @@ function TailscaleSettingsContent() {
                 </wa-option>
               ))}
             </wa-select>
-            {loading === 'exitNode' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'exitNode' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
       </div>
@@ -280,21 +276,13 @@ function TailscaleSettingsContent() {
       >
         {/* DNS Card */}
         <wa-card appearance='outlined'>
-          <div
+          <wa-switch
             slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              checked={settings.acceptDNS}
-              onchange={() => handleToggleSetting('acceptDNS', settings.acceptDNS)}
-              disabled={loading !== null || !settings.running}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            checked={settings.acceptDNS}
+            onchange={() => handleToggleSetting('acceptDNS', settings.acceptDNS)}
+            disabled={loading !== null || !settings.running}
+          ></wa-switch>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faGlobe}
               size='4x'
@@ -304,31 +292,19 @@ function TailscaleSettingsContent() {
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Use Tailscale's DNS settings including MagicDNS
             </p>
-            {loading === 'acceptDNS' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'acceptDNS' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
 
         {/* Routes Card */}
         <wa-card appearance='outlined'>
-          <div
+          <wa-switch
             slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              checked={settings.acceptRoutes}
-              onchange={() => handleToggleSetting('acceptRoutes', settings.acceptRoutes)}
-              disabled={loading !== null || !settings.running}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            checked={settings.acceptRoutes}
+            onchange={() => handleToggleSetting('acceptRoutes', settings.acceptRoutes)}
+            disabled={loading !== null || !settings.running}
+          ></wa-switch>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faRoute}
               size='4x'
@@ -338,31 +314,19 @@ function TailscaleSettingsContent() {
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Accept subnet routes advertised by other nodes
             </p>
-            {loading === 'acceptRoutes' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'acceptRoutes' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
 
         {/* SSH Card */}
         <wa-card appearance='outlined'>
-          <div
+          <wa-switch
             slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              checked={settings.ssh}
-              onchange={() => handleToggleSetting('ssh', settings.ssh)}
-              disabled={loading !== null || !settings.running}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            checked={settings.ssh}
+            onchange={() => handleToggleSetting('ssh', settings.ssh)}
+            disabled={loading !== null || !settings.running}
+          ></wa-switch>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faTerminal}
               size='4x'
@@ -372,11 +336,7 @@ function TailscaleSettingsContent() {
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Enable SSH access via Tailscale
             </p>
-            {loading === 'ssh' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'ssh' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
       </div>
@@ -394,73 +354,27 @@ function TailscaleSettingsContent() {
       >
         {/* Advertise Exit Node Card */}
         <wa-card appearance='outlined'>
-          <div
+          <wa-switch
             slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              checked={settings.advertiseExitNode}
-              onchange={() =>
-                handleToggleSetting('advertiseExitNode', settings.advertiseExitNode)
-              }
-              disabled={loading !== null || !settings.running}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            checked={settings.advertiseExitNode}
+            onchange={() =>
+              handleToggleSetting('advertiseExitNode', settings.advertiseExitNode)
+            }
+            disabled={loading !== null || !settings.running}
+          ></wa-switch>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon icon={faWifi} size='4x' style={createIconStyle(ICON_STYLES.brand)} />
             <h3 className='wa-heading-s'>Advertise Exit Node</h3>
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Offer this device as an exit node for others
             </p>
-            {loading === 'advertiseExitNode' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
-          </div>
-        </wa-card>
-
-        {/* Exit Node Allow LAN Card */}
-        <wa-card appearance='outlined'>
-          <div
-            slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              {...(settings.exitNodeAllowLAN ? { checked: true } : {})}
-              onchange={() => handleToggleSetting('exitNodeAllowLAN', settings.exitNodeAllowLAN)}
-              disabled={loading !== null}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
-            <FontAwesomeIcon
-              icon={faGlobe}
-              size='4x'
-              style={createIconStyle(ICON_STYLES.success)}
-            />
-            <h3 className='wa-heading-s'>Exit Node LAN Access</h3>
-            <p className='wa-body-s' style={{ textAlign: 'center' }}>
-              Allow LAN access while using an exit node
-            </p>
-            {loading === 'exitNodeAllowLAN' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'advertiseExitNode' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
 
         {/* Advertise Subnets Card with Advanced Settings */}
         <wa-card appearance='outlined'>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faNetworkWired}
               size='4x'
@@ -510,34 +424,21 @@ function TailscaleSettingsContent() {
                 }
               }}
             ></wa-input>
-
-            {loading === 'advertiseRoutes' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'advertiseRoutes' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
 
         {/* Advertise Connector Card */}
         <wa-card appearance='outlined'>
-          <div
+          <wa-switch
             slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              checked={settings.advertiseConnector}
-              onchange={() =>
-                handleToggleSetting('advertiseConnector', settings.advertiseConnector)
-              }
-              disabled={loading !== null || !settings.running}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            checked={settings.advertiseConnector}
+            onchange={() =>
+              handleToggleSetting('advertiseConnector', settings.advertiseConnector)
+            }
+            disabled={loading !== null || !settings.running}
+          ></wa-switch>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faGears}
               size='4x'
@@ -547,11 +448,7 @@ function TailscaleSettingsContent() {
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Advertise this node as an app connector
             </p>
-            {loading === 'advertiseConnector' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'advertiseConnector' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
       </div>
@@ -569,21 +466,13 @@ function TailscaleSettingsContent() {
       >
         {/* Shields Up Card */}
         <wa-card appearance='outlined'>
-          <div
+          <wa-switch
             slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              checked={settings.shieldsUp}
-              onchange={() => handleToggleSetting('shieldsUp', settings.shieldsUp)}
-              disabled={loading !== null || !settings.running}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            checked={settings.shieldsUp}
+            onchange={() => handleToggleSetting('shieldsUp', settings.shieldsUp)}
+            disabled={loading !== null || !settings.running}
+          ></wa-switch>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faShield}
               size='4x'
@@ -593,31 +482,19 @@ function TailscaleSettingsContent() {
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Block all incoming connections from Tailscale
             </p>
-            {loading === 'shieldsUp' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'shieldsUp' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
 
         {/* Exit Node Allow LAN Card */}
         <wa-card appearance='outlined'>
-          <div
+          <wa-switch
             slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              checked={settings.exitNodeAllowLAN}
-              onchange={() => handleToggleSetting('exitNodeAllowLAN', settings.exitNodeAllowLAN)}
-              disabled={loading !== null || !settings.running}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            checked={settings.exitNodeAllowLAN}
+            onchange={() => handleToggleSetting('exitNodeAllowLAN', settings.exitNodeAllowLAN)}
+            disabled={loading !== null || !settings.running}
+          ></wa-switch>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faGlobe}
               size='4x'
@@ -627,33 +504,21 @@ function TailscaleSettingsContent() {
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Allow LAN access while using an exit node
             </p>
-            {loading === 'exitNodeAllowLAN' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'exitNodeAllowLAN' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
 
         {/* SNAT Subnet Routes Card */}
         <wa-card appearance='outlined'>
-          <div
+          <wa-switch
             slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              checked={settings.snatSubnetRoutes}
-              onchange={() =>
-                handleToggleSetting('snatSubnetRoutes', settings.snatSubnetRoutes)
-              }
-              disabled={loading !== null || !settings.running}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            checked={settings.snatSubnetRoutes}
+            onchange={() =>
+              handleToggleSetting('snatSubnetRoutes', settings.snatSubnetRoutes)
+            }
+            disabled={loading !== null || !settings.running}
+          ></wa-switch>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faNetworkWired}
               size='4x'
@@ -663,33 +528,21 @@ function TailscaleSettingsContent() {
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Apply source NAT to subnet traffic
             </p>
-            {loading === 'snatSubnetRoutes' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'snatSubnetRoutes' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
 
         {/* Stateful Filtering Card */}
         <wa-card appearance='outlined'>
-          <div
+          <wa-switch
             slot='header'
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <wa-switch
-              checked={settings.statefulFiltering}
-              onchange={() =>
-                handleToggleSetting('statefulFiltering', settings.statefulFiltering)
-              }
-              disabled={loading !== null || !settings.running}
-            ></wa-switch>
-          </div>
-          <div className='wa-stack wa-gap-s' style={{ alignItems: 'center', padding: 'var(--wa-space-m)' }}>
+            checked={settings.statefulFiltering}
+            onchange={() =>
+              handleToggleSetting('statefulFiltering', settings.statefulFiltering)
+            }
+            disabled={loading !== null || !settings.running}
+          ></wa-switch>
+          <div className='wa-stack wa-gap-s wa-align-items-center'>
             <FontAwesomeIcon
               icon={faShield}
               size='4x'
@@ -699,11 +552,7 @@ function TailscaleSettingsContent() {
             <p className='wa-body-s' style={{ textAlign: 'center' }}>
               Enable stateful packet filtering for subnet routes
             </p>
-            {loading === 'statefulFiltering' && (
-              <div style={{ textAlign: 'center' }}>
-                <wa-spinner></wa-spinner>
-              </div>
-            )}
+            {loading === 'statefulFiltering' && <wa-spinner></wa-spinner>}
           </div>
         </wa-card>
       </div>
