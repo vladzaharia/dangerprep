@@ -14,6 +14,7 @@ import health from './routes/health';
 import networks from './routes/networks';
 import power from './routes/power';
 import services from './routes/services';
+import tailscale from './routes/tailscale';
 
 // Create main app with typed variables
 const app = new Hono<{ Variables: LoggerVariables }>();
@@ -76,6 +77,7 @@ app.route('/api/networks', networks);
 app.route('/api/services', services);
 app.route('/api/config', config);
 app.route('/api/power', power);
+app.route('/api/tailscale', tailscale);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
