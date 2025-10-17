@@ -64,9 +64,9 @@ export const ConnectedClientsTab: React.FC = () => {
                 icon={faKey}
                 style={
                   {
-                    '--fa-primary-color': '#a855f7', // Purple for security/key
-                    '--fa-primary-opacity': 0.9,
-                    '--fa-secondary-opacity': 0.8,
+                    '--fa-secondary-color': '#a855f7', // Purple for security/key
+                    '--fa-primary-opacity': 0.7,
+                    '--fa-secondary-opacity': 0.5,
                   } as React.CSSProperties
                 }
               />
@@ -84,9 +84,9 @@ export const ConnectedClientsTab: React.FC = () => {
                   icon={faSignal}
                   style={
                     {
-                      '--fa-primary-color': '#10b981', // Green for signal
+                      '--fa-secondary-color': '#10b981', // Green for signal
                       '--fa-primary-opacity': 0.9,
-                      '--fa-secondary-opacity': 0.8,
+                      '--fa-secondary-opacity': 0.55,
                     } as React.CSSProperties
                   }
                 />

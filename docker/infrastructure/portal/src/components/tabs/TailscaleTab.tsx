@@ -59,9 +59,8 @@ export const TailscaleTab: React.FC = () => {
           icon={faGlobe}
           style={
             {
-              '--fa-secondary-color': '#10b981', // Green for IP/network
-                        '--fa-primary-opacity': 0.6,
-                        '--fa-secondary-opacity': 0.8,
+              '--fa-primary-color': '#10b981', // Green for IP/network
+              '--fa-primary-opacity': 0.9,
             } as React.CSSProperties
           }
         />

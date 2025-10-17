@@ -118,9 +118,8 @@ export const NetworkStatusTab: React.FC = () => {
                     icon={faGlobe}
                     style={
                       {
-                        '--fa-secondary-color': '#10b981', // Green for IP/network
-                        '--fa-primary-opacity': 0.6,
-                        '--fa-secondary-opacity': 0.8,
+                        '--fa-primary-color': '#10b981', // Green for IP/network
+                        '--fa-primary-opacity': 0.9,
                       } as React.CSSProperties
                     }
                   />
@@ -227,9 +226,9 @@ export const NetworkStatusTab: React.FC = () => {
                     icon={faHardDrive}
                     style={
                       {
-                        '--fa-primary-color': '#ef4444', // Gray for gateway
+                        '--fa-secondary-color': '#ef4444', // Gray for gateway
                         '--fa-primary-opacity': 0.9,
-                        '--fa-secondary-opacity': 0.8,
+                        '--fa-secondary-opacity': 0.7,
                       } as React.CSSProperties
                     }
                   />
