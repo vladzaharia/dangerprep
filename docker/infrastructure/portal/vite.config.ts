@@ -133,6 +133,62 @@ export default defineConfig(({ command, mode }) => {
       sourcemap: isDevelopment,
       minify: isProduction ? 'esbuild' : false,
       cssMinify: isProduction,
+
+      // Manual chunking strategy for better code splitting and caching
+      rollupOptions: {
+        output: {
+          manualChunks: (id): string | undefined => {
+            // React core libraries - rarely change, cache separately
+            if (id.includes('node_modules/react/') ||
+                id.includes('node_modules/react-dom/') ||
+                id.includes('node_modules/react-router-dom/') ||
+                id.includes('node_modules/scheduler/')) {
+              return 'vendor-react';
+            }
+
+            // WebAwesome UI components - large library
+            if (id.includes('node_modules/@awesome.me/webawesome/')) {
+              return 'vendor-ui';
+            }
+
+            // FontAwesome icons - separate chunk for icon library
+            if (id.includes('node_modules/@awesome.me/kit-') ||
+                id.includes('node_modules/@fortawesome/')) {
+              return 'vendor-icons';
+            }
+
+            // SWR and other utilities
+            if (id.includes('node_modules/swr/') ||
+                id.includes('node_modules/react-idle-timer/')) {
+              return 'vendor-utils';
+            }
+
+            // Font files - separate chunk
+            if (id.includes('node_modules/@fontsource/')) {
+              return 'vendor-fonts';
+            }
+
+            // All other node_modules go into vendor chunk
+            if (id.includes('node_modules/')) {
+              return 'vendor';
+            }
+
+            // Return undefined for non-vendor code (will be in main bundle or route chunks)
+            return undefined;
+          },
+
+          // Optimize chunk file names for better caching
+          chunkFileNames: isProduction
+            ? 'assets/[name]-[hash].js'
+            : 'assets/[name].js',
+          entryFileNames: isProduction
+            ? 'assets/[name]-[hash].js'
+            : 'assets/[name].js',
+          assetFileNames: isProduction
+            ? 'assets/[name]-[hash].[ext]'
+            : 'assets/[name].[ext]',
+        },
+      },
     },
 
     // Dependency optimization
