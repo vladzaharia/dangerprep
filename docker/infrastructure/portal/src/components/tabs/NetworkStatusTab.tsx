@@ -63,10 +63,13 @@ export const NetworkStatusTab: React.FC = () => {
   }, [networkData]);
 
   // Get WAN interfaces (internet)
+  // Include Tailscale IF it's being used as an exit node
   const wanInterfaces = useMemo(() => {
     if (!networkData?.interfaces) return [];
     return networkData.interfaces.filter(
-      iface => iface.purpose === 'wan' && iface.type !== 'tailscale'
+      iface =>
+        iface.purpose === 'wan' &&
+        (iface.type !== 'tailscale' || (iface.type === 'tailscale' && 'exitNode' in iface && iface.exitNode))
     );
   }, [networkData]);
 

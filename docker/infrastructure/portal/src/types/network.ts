@@ -75,6 +75,36 @@ export interface TailscalePeer {
   lastSeen?: string;
   os?: string;
   exitNode?: boolean;
+  exitNodeOption?: boolean; // Can be used as exit node
+  sshEnabled?: boolean; // SSH is enabled on this peer
+  subnetRoutes?: string[]; // Advertised subnet routes
+  relay?: string; // Relay server being used
+  tags?: string[]; // Tailscale tags
+}
+
+/**
+ * Tailscale exit node information
+ */
+export interface TailscaleExitNode {
+  id: string;
+  name: string;
+  location?: string;
+  online: boolean;
+  suggested?: boolean;
+}
+
+/**
+ * Tailscale settings
+ */
+export interface TailscaleSettings {
+  acceptDNS: boolean;
+  acceptRoutes: boolean;
+  ssh: boolean;
+  exitNode: string | null;
+  exitNodeAllowLAN: boolean;
+  advertiseExitNode: boolean;
+  advertiseRoutes: string[];
+  shieldsUp: boolean;
 }
 
 /**
@@ -86,8 +116,14 @@ export interface TailscaleInterface extends BaseNetworkInterface {
   tailnetName?: string;
   nodeKey?: string;
   peers?: TailscalePeer[];
-  exitNode?: boolean;
+  exitNode?: boolean; // Currently using an exit node
+  exitNodeId?: string; // ID of current exit node
   routeAdvertising?: string[];
+  // Current settings
+  acceptDNS?: boolean;
+  acceptRoutes?: boolean;
+  sshEnabled?: boolean;
+  shieldsUp?: boolean;
 }
 
 /**

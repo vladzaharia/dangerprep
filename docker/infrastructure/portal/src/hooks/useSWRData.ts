@@ -1,6 +1,11 @@
 import useSWR, { type SWRConfiguration } from 'swr';
 import { useSearchParams } from 'react-router-dom';
-import type { NetworkSummary, NetworkInterface } from '../types/network';
+import type {
+  NetworkSummary,
+  NetworkInterface,
+  TailscaleSettings,
+  TailscaleExitNode,
+} from '../types/network';
 import type { ServiceMetadata } from '../types/service';
 
 /**
@@ -265,4 +270,34 @@ export function useTailscaleInterface(config?: SWRConfiguration) {
     data: tailscale,
     ...rest,
   };
+}
+
+// =============================================================================
+// Tailscale Hooks
+// =============================================================================
+
+/**
+ * Hook for fetching Tailscale settings
+ *
+ * @example
+ * const { data, error, isLoading, mutate } = useTailscaleSettings();
+ */
+export function useTailscaleSettings(config?: SWRConfiguration) {
+  return useSWR<TailscaleSettings>('/api/tailscale/settings', fetcher, {
+    ...defaultConfig,
+    ...config,
+  });
+}
+
+/**
+ * Hook for fetching available Tailscale exit nodes
+ *
+ * @example
+ * const { data, error, isLoading } = useTailscaleExitNodes();
+ */
+export function useTailscaleExitNodes(config?: SWRConfiguration) {
+  return useSWR<TailscaleExitNode[]>('/api/tailscale/exit-nodes', fetcher, {
+    ...defaultConfig,
+    ...config,
+  });
 }

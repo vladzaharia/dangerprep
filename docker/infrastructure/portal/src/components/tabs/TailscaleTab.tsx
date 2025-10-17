@@ -1,23 +1,35 @@
 import React from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   faComputerClassic,
   faShieldCheck,
   faCircleInfo,
   faArrowRightFromBracket,
   faGlobe,
+  faGear,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useTailscaleInterface } from '../../hooks/useSWRData';
-import type { TailscaleInterface, TailscalePeer } from '../../types/network';
+import { useTailscaleInterface, useTailscaleExitNodes } from '../../hooks/useSWRData';
+import type { TailscaleInterface, TailscalePeer, TailscaleExitNode } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
-import { faNetworkWired } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import { faNetworkWired, faTerminal, faRoute } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 
 /**
  * Tailscale Tab Component
  */
 export const TailscaleTab: React.FC = () => {
   const { data: tailscale } = useTailscaleInterface();
+  const { data: exitNodes } = useTailscaleExitNodes();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Helper function to preserve search params in navigation
+  const getNavLinkTo = (path: string) => {
+    const params = new URLSearchParams(searchParams);
+    const queryString = params.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
 
   // Note: Loading state handled by parent Suspense boundary
 
@@ -142,6 +154,57 @@ export const TailscaleTab: React.FC = () => {
             tags={tailscaleTags}
             className='interface-callout'
           />
+
+          {/* Current Settings Tags */}
+          {tailscaleInterface.status === 'connected' && (
+            <div className='wa-stack wa-gap-xs'>
+              <h4 className='wa-heading-xs'>Current Settings</h4>
+              <div className='wa-cluster wa-gap-xs'>
+                {tailscaleInterface.acceptDNS && (
+                  <wa-tag variant='success' size='small'>
+                    <FontAwesomeIcon icon={faGlobe} style={{ marginRight: '4px' }} />
+                    DNS
+                  </wa-tag>
+                )}
+                {tailscaleInterface.acceptRoutes && (
+                  <wa-tag variant='success' size='small'>
+                    <FontAwesomeIcon icon={faRoute} style={{ marginRight: '4px' }} />
+                    Routes
+                  </wa-tag>
+                )}
+                {tailscaleInterface.sshEnabled && (
+                  <wa-tag variant='success' size='small'>
+                    <FontAwesomeIcon icon={faTerminal} style={{ marginRight: '4px' }} />
+                    SSH
+                  </wa-tag>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tailscale Settings Button */}
+          <div
+            onClick={() => navigate(getNavLinkTo('/tailscale'))}
+            style={{ cursor: 'pointer' }}
+            role='button'
+            tabIndex={0}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate(getNavLinkTo('/tailscale'));
+              }
+            }}
+            aria-label='Tailscale Settings'
+          >
+            <wa-button
+              appearance='outlined'
+              variant='brand'
+              style={{ width: '100%', pointerEvents: 'none' }}
+            >
+              <FontAwesomeIcon icon={faGear} style={{ marginRight: '8px' }} />
+              Tailscale Settings
+            </wa-button>
+          </div>
         </div>
       </div>
 
@@ -175,6 +238,8 @@ export const TailscaleTab: React.FC = () => {
             <div className='wa-grid wa-gap-xs'>
               {peers.map((peer: TailscalePeer, index: number) => {
                 const peerTags: StatusCardTag[] = [];
+
+                // Exit Node (currently being used)
                 if (peer.exitNode) {
                   peerTags.push({
                     label: 'Exit Node',
@@ -191,6 +256,65 @@ export const TailscaleTab: React.FC = () => {
                       />
                     ),
                     variant: 'brand',
+                  });
+                }
+
+                // Exit Node Option (can be used as exit node)
+                if (peer.exitNodeOption && !peer.exitNode) {
+                  peerTags.push({
+                    label: 'Can Exit',
+                    icon: (
+                      <FontAwesomeIcon
+                        icon={faArrowRightFromBracket}
+                        style={
+                          {
+                            '--fa-primary-color': '#6b7280', // Gray for available
+                            '--fa-primary-opacity': 0.7,
+                          } as React.CSSProperties
+                        }
+                      />
+                    ),
+                    variant: 'neutral',
+                  });
+                }
+
+                // SSH Enabled
+                if (peer.sshEnabled) {
+                  peerTags.push({
+                    label: 'SSH',
+                    icon: (
+                      <FontAwesomeIcon
+                        icon={faTerminal}
+                        style={
+                          {
+                            '--fa-primary-color': '#a855f7', // Purple for SSH
+                            '--fa-primary-opacity': 0.9,
+                          } as React.CSSProperties
+                        }
+                      />
+                    ),
+                    variant: 'neutral',
+                  });
+                }
+
+                // Subnet Routes
+                if (peer.subnetRoutes && peer.subnetRoutes.length > 0) {
+                  peer.subnetRoutes.forEach(route => {
+                    peerTags.push({
+                      label: route,
+                      icon: (
+                        <FontAwesomeIcon
+                          icon={faRoute}
+                          style={
+                            {
+                              '--fa-primary-color': '#10b981', // Green for routes
+                              '--fa-primary-opacity': 0.9,
+                            } as React.CSSProperties
+                          }
+                        />
+                      ),
+                      variant: 'neutral',
+                    });
                   });
                 }
 

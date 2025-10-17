@@ -1098,8 +1098,18 @@ export class NetworkService {
         tailscaleInfo.status = status.BackendState === 'Running' ? 'connected' : 'disconnected';
         tailscaleInfo.tailnetName = status.CurrentTailnet?.Name;
         tailscaleInfo.exitNode = status.ExitNodeStatus?.Online || false;
+        tailscaleInfo.exitNodeId = status.ExitNodeStatus?.TailscaleIPs?.[0] || undefined;
 
-        // Parse peers
+        // Parse current settings from Self
+        if (status.Self) {
+          tailscaleInfo.acceptDNS = status.Self.CapMap?.['accept-dns'] !== false;
+          tailscaleInfo.acceptRoutes = status.Self.CapMap?.['accept-routes'] !== false;
+          tailscaleInfo.sshEnabled = status.Self.CapMap?.ssh !== false;
+          tailscaleInfo.shieldsUp = status.Self.CapMap?.['shields-up'] !== false;
+          tailscaleInfo.routeAdvertising = status.Self.PrimaryRoutes || [];
+        }
+
+        // Parse peers with enhanced information
         if (status.Peer) {
           tailscaleInfo.peers = Object.values(status.Peer).map((peer: any) => ({
             hostname: peer.HostName,
@@ -1108,6 +1118,11 @@ export class NetworkService {
             lastSeen: peer.LastSeen,
             os: peer.OS,
             exitNode: peer.ExitNode || false,
+            exitNodeOption: peer.ExitNodeOption || false,
+            sshEnabled: peer.CapMap?.ssh !== false,
+            subnetRoutes: peer.PrimaryRoutes || [],
+            relay: peer.Relay || undefined,
+            tags: peer.Tags || [],
           }));
         }
       } catch (error) {

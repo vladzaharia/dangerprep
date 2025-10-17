@@ -10,6 +10,7 @@ import services from './routes/services';
 import config from './routes/config';
 import health from './routes/health';
 import power from './routes/power';
+import tailscale from './routes/tailscale';
 
 // Import custom middleware
 import { structuredLogging, type LoggerVariables } from './middleware/logging';
@@ -65,6 +66,7 @@ app.route('/api/networks', networks);
 app.route('/api/services', services);
 app.route('/api/config', config);
 app.route('/api/power', power);
+app.route('/api/tailscale', tailscale);
 
 // Note: Root endpoint removed - now handled by Vite dev server for frontend
 // API routes are mounted under /api prefix

@@ -16,6 +16,7 @@ import {
   PowerPage,
   NetworkStatusPage,
   SettingsPage,
+  TailscaleSettingsPage,
 } from './pages';
 
 // Service configuration type
@@ -96,6 +97,7 @@ function AppContent() {
                 <Route path='/power' element={<PowerPage />} />
                 <Route path='/network' element={<NetworkStatusPage />} />
                 <Route path='/settings' element={<SettingsPage />} />
+                <Route path='/tailscale' element={<TailscaleSettingsPage />} />
               </Routes>
             </Suspense>
           </div>

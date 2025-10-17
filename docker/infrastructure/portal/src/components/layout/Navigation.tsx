@@ -2,7 +2,12 @@ import React, { useMemo } from 'react';
 import { NavLink, useSearchParams, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGear, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
-import { faPowerOff, faBrowser, faQrcode } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import {
+  faPowerOff,
+  faBrowser,
+  faQrcode,
+  faShieldCheck,
+} from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { NetworkStatusButton } from './NetworkStatusButton';
 
 /**
@@ -32,7 +37,7 @@ interface NavigationContext {
 /**
  * List of management pages
  */
-const MANAGEMENT_PAGES = ['/network', '/maintenance', '/settings', '/power'];
+const MANAGEMENT_PAGES = ['/network', '/maintenance', '/settings', '/tailscale', '/power'];
 
 /**
  * Icon color configurations for navigation items
@@ -49,6 +54,10 @@ const ICON_COLORS = {
   },
   qr: {
     layer: 'primary', // Color the QR pattern details
+    color: '#a855f7', // Purple
+  },
+  tailscale: {
+    layer: 'primary', // Color the shield outline
     color: '#a855f7', // Purple
   },
   settings: {
@@ -101,6 +110,14 @@ const NAV_ITEMS: NavItem[] = [
     path: '/settings',
     icon: faGear,
     label: 'Settings',
+    position: 'bottom',
+    // Kiosk-only, visible only when on management pages
+    isVisible: ({ isKioskMode, isOnManagePage }) => isKioskMode && isOnManagePage,
+  },
+  {
+    path: '/tailscale',
+    icon: faShieldCheck,
+    label: 'Tailscale',
     position: 'bottom',
     // Kiosk-only, visible only when on management pages
     isVisible: ({ isKioskMode, isOnManagePage }) => isKioskMode && isOnManagePage,
