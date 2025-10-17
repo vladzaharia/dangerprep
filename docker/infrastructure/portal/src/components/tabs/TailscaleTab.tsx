@@ -1,5 +1,8 @@
-import React from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  faNetworkWired,
+  faTerminal,
+  faRoute,
+} from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
   faComputerClassic,
   faShieldCheck,
@@ -9,18 +12,19 @@ import {
   faGear,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useTailscaleInterface, useTailscaleExitNodes } from '../../hooks/useSWRData';
-import type { TailscaleInterface, TailscalePeer, TailscaleExitNode } from '../../types/network';
+import React from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
+import { useTailscaleInterface } from '../../hooks/useSWRData';
+import type { TailscaleInterface, TailscalePeer } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
-import { faNetworkWired, faTerminal, faRoute } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 
 /**
  * Tailscale Tab Component
  */
 export const TailscaleTab: React.FC = () => {
   const { data: tailscale } = useTailscaleInterface();
-  const { data: exitNodes } = useTailscaleExitNodes();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 

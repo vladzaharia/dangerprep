@@ -1,12 +1,13 @@
-import React, { useMemo } from 'react';
+import { faEthernet, faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
   faWifi,
   faGlobe,
   faShieldCheck,
   faHardDrive,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
-import { faEthernet, faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import React, { useMemo } from 'react';
+
 import { useNetworkSummary } from '../../hooks/useSWRData';
 import type { NetworkInterface } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
@@ -69,7 +70,8 @@ export const NetworkStatusTab: React.FC = () => {
     return networkData.interfaces.filter(
       iface =>
         iface.purpose === 'wan' &&
-        (iface.type !== 'tailscale' || (iface.type === 'tailscale' && 'exitNode' in iface && iface.exitNode))
+        (iface.type !== 'tailscale' ||
+          (iface.type === 'tailscale' && 'exitNode' in iface && iface.exitNode))
     );
   }, [networkData]);
 

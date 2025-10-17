@@ -1,13 +1,14 @@
-import React, { useMemo } from 'react';
-import { NavLink, useSearchParams, useLocation } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGear, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import {
   faPowerOff,
   faBrowser,
   faQrcode,
   faShieldCheck,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import { faGear, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import React, { useMemo } from 'react';
+import { NavLink, useSearchParams, useLocation } from 'react-router-dom';
+
 import { NetworkStatusButton } from './NetworkStatusButton';
 
 /**

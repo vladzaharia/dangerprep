@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { useIdleTimer } from 'react-idle-timer';
 import {
   BrowserRouter as Router,
   Routes,
@@ -6,7 +7,6 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router-dom';
-import { useIdleTimer } from 'react-idle-timer';
 
 import { Navigation, DefaultRoute } from './components';
 import {

@@ -1,5 +1,6 @@
-import useSWR, { type SWRConfiguration } from 'swr';
 import { useSearchParams } from 'react-router-dom';
+import useSWR, { type SWRConfiguration } from 'swr';
+
 import type {
   NetworkSummary,
   NetworkInterface,

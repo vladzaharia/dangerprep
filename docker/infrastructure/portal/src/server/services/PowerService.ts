@@ -1,5 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
+
 import { LoggerFactory, LogLevel } from '@dangerprep/logging';
 
 const execAsync = promisify(exec);

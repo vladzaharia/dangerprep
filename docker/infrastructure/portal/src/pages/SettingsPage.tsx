@@ -1,7 +1,7 @@
+import { faShieldCheck } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShieldCheck } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 
 export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();

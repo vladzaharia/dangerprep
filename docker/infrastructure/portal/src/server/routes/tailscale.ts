@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { TailscaleService } from '../services/TailscaleService';
+
 import type { LoggerVariables } from '../middleware/logging';
+import { TailscaleService } from '../services/TailscaleService';
 
 // Initialize service
 const tailscaleService = new TailscaleService();
@@ -19,7 +20,7 @@ tailscale.get('/settings', async c => {
     logger.debug('Getting Tailscale settings');
     const settings = await tailscaleService.getSettings();
 
-    logger.info('Tailscale settings retrieved', settings);
+    logger.info('Tailscale settings retrieved', { settings });
 
     return c.json({
       success: true,
@@ -144,7 +145,7 @@ tailscale.get('/exit-nodes/suggest', async c => {
     logger.debug('Getting suggested exit node');
     const suggestedNode = await tailscaleService.getSuggestedExitNode();
 
-    logger.info('Suggested exit node retrieved', suggestedNode);
+    logger.info('Suggested exit node retrieved', { suggestedNode });
 
     return c.json({
       success: true,
@@ -379,4 +380,3 @@ tailscale.post('/ssh', async c => {
 });
 
 export default tailscale;
-

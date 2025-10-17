@@ -1,5 +1,5 @@
-import type { Context, Next } from 'hono';
 import { LoggerFactory, LogLevel } from '@dangerprep/logging';
+import type { Context, Next } from 'hono';
 
 // Define typed context variables for the logger
 export type LoggerVariables = {

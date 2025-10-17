@@ -1,6 +1,7 @@
-import { readFileSync } from 'fs';
 import { exec } from 'child_process';
+import { readFileSync } from 'fs';
 import { promisify } from 'util';
+
 import { LoggerFactory, LogLevel } from '@dangerprep/logging';
 
 const execAsync = promisify(exec);

@@ -1,12 +1,12 @@
-import React, { useState, Suspense } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faShieldCheck,
   faGlobe,
   faRoute,
   faTerminal,
   faArrowRightFromBracket,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import React, { useState, Suspense } from 'react';
+
 import { useTailscaleSettings, useTailscaleExitNodes } from '../hooks/useSWRData';
 import type { TailscaleExitNode } from '../types/network';
 
@@ -39,9 +39,16 @@ function TailscaleSettingsSkeleton() {
   return (
     <div className='wa-stack wa-gap-xl'>
       <wa-skeleton effect='sheen' style={{ width: '300px', height: '36px' }}></wa-skeleton>
-      <div className='wa-grid wa-gap-m' style={{ '--min-column-size': '250px' } as React.CSSProperties}>
+      <div
+        className='wa-grid wa-gap-m'
+        style={{ '--min-column-size': '250px' } as React.CSSProperties}
+      >
         {[1, 2, 3, 4].map(i => (
-          <wa-skeleton key={i} effect='sheen' style={{ width: '100%', height: '200px' }}></wa-skeleton>
+          <wa-skeleton
+            key={i}
+            effect='sheen'
+            style={{ width: '100%', height: '200px' }}
+          ></wa-skeleton>
         ))}
       </div>
     </div>
@@ -169,7 +176,7 @@ function TailscaleSettingsContent() {
             <div className='wa-stack wa-gap-m'>
               <wa-select
                 value={settings.exitNode || ''}
-                onWaChange={(e: any) => handleSetExitNode(e.target.value || null)}
+                onchange={(e: any) => handleSetExitNode(e.target.value || null)}
                 disabled={loading !== null}
               >
                 <option value=''>No Exit Node</option>
@@ -206,7 +213,7 @@ function TailscaleSettingsContent() {
               </p>
               <wa-switch
                 checked={settings.acceptDNS}
-                onWaChange={() =>
+                onchange={() =>
                   handleToggleSetting('acceptDNS', '/api/tailscale/accept-dns', settings.acceptDNS)
                 }
                 disabled={loading !== null}
@@ -239,7 +246,7 @@ function TailscaleSettingsContent() {
               </p>
               <wa-switch
                 checked={settings.acceptRoutes}
-                onWaChange={() =>
+                onchange={() =>
                   handleToggleSetting(
                     'acceptRoutes',
                     '/api/tailscale/accept-routes',
@@ -276,7 +283,7 @@ function TailscaleSettingsContent() {
               </p>
               <wa-switch
                 checked={settings.ssh}
-                onWaChange={() => handleToggleSetting('ssh', '/api/tailscale/ssh', settings.ssh)}
+                onchange={() => handleToggleSetting('ssh', '/api/tailscale/ssh', settings.ssh)}
                 disabled={loading !== null}
               >
                 {settings.ssh ? 'Enabled' : 'Disabled'}
@@ -304,4 +311,3 @@ export const TailscaleSettingsPage: React.FC = () => {
     </Suspense>
   );
 };
-

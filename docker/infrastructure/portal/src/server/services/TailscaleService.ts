@@ -1,6 +1,8 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
+
 import { LoggerFactory, LogLevel } from '@dangerprep/logging';
+
 import type { TailscaleSettings, TailscaleExitNode } from '../../types/network';
 
 const execAsync = promisify(exec);
@@ -39,7 +41,7 @@ export class TailscaleService {
         shieldsUp: status.Self?.CapMap?.['shields-up'] !== false,
       };
 
-      this.logger.debug('Tailscale settings retrieved', settings);
+      this.logger.debug('Tailscale settings retrieved', { settings });
       return settings;
     } catch (error) {
       this.logger.error('Failed to get Tailscale settings', {
@@ -60,11 +62,11 @@ export class TailscaleService {
       try {
         const { stdout } = await execAsync('tailscale exit-node list --json 2>/dev/null');
         const exitNodes = JSON.parse(stdout);
-        
+
         this.logger.debug('Exit nodes retrieved from list command', {
           count: exitNodes.length,
         });
-        
+
         return exitNodes.map((node: any) => ({
           id: node.ID || node.TailscaleIPs?.[0],
           name: node.Name || node.HostName,
@@ -78,7 +80,7 @@ export class TailscaleService {
         const status = JSON.parse(stdout);
 
         const exitNodes: TailscaleExitNode[] = [];
-        
+
         if (status.Peer) {
           Object.values(status.Peer).forEach((peer: any) => {
             if (peer.ExitNodeOption) {
@@ -114,12 +116,12 @@ export class TailscaleService {
 
     try {
       const { stdout } = await execAsync('tailscale exit-node suggest 2>/dev/null');
-      
+
       // Parse the output (format varies, may need adjustment)
       const lines = stdout.trim().split('\n');
-      if (lines.length > 0) {
+      if (lines.length > 0 && lines[0]) {
         const match = lines[0].match(/(\S+)\s+\(([^)]+)\)/);
-        if (match) {
+        if (match && match[1] && match[2]) {
           return {
             id: match[1],
             name: match[1],
@@ -146,9 +148,7 @@ export class TailscaleService {
     this.logger.info('Setting exit node', { nodeId });
 
     try {
-      const command = nodeId
-        ? `tailscale set --exit-node=${nodeId}`
-        : 'tailscale set --exit-node=';
+      const command = nodeId ? `tailscale set --exit-node=${nodeId}` : 'tailscale set --exit-node=';
 
       await execAsync(command);
 
@@ -331,4 +331,3 @@ export class TailscaleService {
     }
   }
 }
-

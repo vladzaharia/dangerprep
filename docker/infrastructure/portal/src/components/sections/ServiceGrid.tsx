@@ -1,7 +1,6 @@
 import React from 'react';
 
 import type { Service } from '../../App';
-
 import { ServiceCard } from '../cards/ServiceCard';
 
 interface ServiceGridProps {

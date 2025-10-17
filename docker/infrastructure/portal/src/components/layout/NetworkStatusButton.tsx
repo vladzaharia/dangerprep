@@ -1,7 +1,8 @@
+import { faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+
 import { useNetworkSummary, useHostapdStatus } from '../../hooks/useSWRData';
 
 /**

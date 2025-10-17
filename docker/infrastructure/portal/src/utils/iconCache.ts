@@ -55,7 +55,6 @@ import {
   faCloudArrowDown,
   faHardDrive,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
-
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 
 /**

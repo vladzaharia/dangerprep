@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { PowerService } from '../services/PowerService';
+
 import type { LoggerVariables } from '../middleware/logging';
+import { PowerService } from '../services/PowerService';
 
 // Initialize service
 const powerService = new PowerService();

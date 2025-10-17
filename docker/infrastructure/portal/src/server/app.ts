@@ -1,19 +1,19 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { prettyJSON } from 'hono/pretty-json';
-import { secureHeaders } from 'hono/secure-headers';
 import { requestId } from 'hono/request-id';
+import { secureHeaders } from 'hono/secure-headers';
 
 // Import routes
-import networks from './routes/networks';
-import services from './routes/services';
+import { structuredLogging, type LoggerVariables } from './middleware/logging';
 import config from './routes/config';
 import health from './routes/health';
+import networks from './routes/networks';
 import power from './routes/power';
+import services from './routes/services';
 import tailscale from './routes/tailscale';
 
 // Import custom middleware
-import { structuredLogging, type LoggerVariables } from './middleware/logging';
 
 // Create main app with typed variables
 const app = new Hono<{ Variables: LoggerVariables }>();

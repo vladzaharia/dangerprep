@@ -1,5 +1,3 @@
-import React, { useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faRotate,
   faPowerOff,
@@ -7,6 +5,8 @@ import {
   faDesktop,
   faBrowser,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import React, { useState } from 'react';
 
 interface PowerAction {
   id: string;

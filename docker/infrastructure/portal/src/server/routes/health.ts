@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+
 import type { LoggerVariables } from '../middleware/logging';
 
 // Create router with typed variables

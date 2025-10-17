@@ -1,6 +1,6 @@
-import React, { Suspense } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircleInfo } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import React, { Suspense } from 'react';
 
 import { ServiceGrid } from '../components';
 import { useServicesData } from '../hooks/useSWRData';

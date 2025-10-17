@@ -1,8 +1,12 @@
-import { readFileSync } from 'fs';
 import { exec } from 'child_process';
+import { readFileSync } from 'fs';
 import { promisify } from 'util';
-import { WifiConfigService } from './WifiConfigService';
+
 import { LoggerFactory, LogLevel } from '@dangerprep/logging';
+
+import type { TailscaleInterface } from '../../types/network';
+
+import { WifiConfigService } from './WifiConfigService';
 
 const execAsync = promisify(exec);
 
@@ -49,19 +53,6 @@ export interface WiFiInterface extends BaseNetworkInterface {
 }
 
 /**
- * Tailscale interface information
- */
-export interface TailscaleInterface extends BaseNetworkInterface {
-  type: 'tailscale';
-  status: 'connected' | 'disconnected' | 'starting' | 'stopped';
-  tailnetName?: string;
-  nodeKey?: string;
-  peers?: TailscalePeer[];
-  exitNode?: boolean;
-  routeAdvertising?: string[];
-}
-
-/**
  * Connected client information for WiFi hotspots
  */
 export interface ConnectedClient {
@@ -72,18 +63,6 @@ export interface ConnectedClient {
   connectedTime?: string | undefined; // duration or timestamp
   txRate?: string | undefined;
   rxRate?: string | undefined;
-}
-
-/**
- * Tailscale peer information
- */
-export interface TailscalePeer {
-  hostname: string;
-  ipAddress: string;
-  online: boolean;
-  lastSeen?: string;
-  os?: string;
-  exitNode?: boolean;
 }
 
 /**
@@ -1085,11 +1064,11 @@ export class NetworkService {
       execAsync('tailscale status --json 2>/dev/null'),
     ]);
 
-    const tailscaleInfo: TailscaleInterface = {
+    const tailscaleInfo = {
       ...baseInfo,
       type: 'tailscale',
       status: 'disconnected',
-    };
+    } as TailscaleInterface;
 
     // Parse status
     if (statusResult.status === 'fulfilled') {

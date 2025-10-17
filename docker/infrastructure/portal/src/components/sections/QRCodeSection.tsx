@@ -1,4 +1,5 @@
 import React, { Suspense, useMemo } from 'react';
+
 import { useHotspotInterface } from '../../hooks/useSWRData';
 import type { WiFiInterface } from '../../types/network';
 

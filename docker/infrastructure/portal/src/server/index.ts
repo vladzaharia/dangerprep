@@ -1,20 +1,20 @@
+import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
-import { secureHeaders } from 'hono/secure-headers';
-import { serveStatic } from '@hono/node-server/serve-static';
 import { requestId } from 'hono/request-id';
+import { secureHeaders } from 'hono/secure-headers';
 
 // Import middleware
 import { structuredLogging } from './middleware/logging';
 
 // Import routes
-import networks from './routes/networks';
-import services from './routes/services';
 import config from './routes/config';
 import health from './routes/health';
+import networks from './routes/networks';
 import power from './routes/power';
+import services from './routes/services';
 
 // Create main app with optimized configuration
 const app = new Hono();

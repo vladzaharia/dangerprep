@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { NetworkService } from '../services/NetworkService';
+
 import type { LoggerVariables } from '../middleware/logging';
+import { NetworkService } from '../services/NetworkService';
 
 // Initialize service
 const networkService = new NetworkService();

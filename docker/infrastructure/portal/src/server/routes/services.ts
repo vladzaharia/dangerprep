@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
-import { ServiceDiscoveryService } from '../services/ServiceDiscoveryService';
 import NodeCache from 'node-cache';
+
 import type { LoggerVariables } from '../middleware/logging';
+import { ServiceDiscoveryService } from '../services/ServiceDiscoveryService';
 
 // Initialize cache (TTL: 30 seconds)
 const cache = new NodeCache({ stdTTL: 30 });
