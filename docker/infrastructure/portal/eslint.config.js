@@ -2,6 +2,10 @@ import config from '@dangerprep/eslint';
 
 export default [
   ...config,
+  // Ignore generated/bundled files
+  {
+    ignores: ['src/server/app.cjs'],
+  },
   // CommonJS files configuration
   {
     files: ['**/*.cjs'],

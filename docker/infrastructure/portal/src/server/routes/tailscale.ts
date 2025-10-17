@@ -172,42 +172,39 @@ tailscale.get('/exit-nodes/suggest', async c => {
 });
 
 /**
- * POST /api/tailscale/exit-node
- * Set exit node
+ * POST /api/tailscale/start
+ * Start Tailscale
  */
-tailscale.post('/exit-node', async c => {
+tailscale.post('/start', async c => {
   const logger = c.get('logger');
 
   try {
-    const body = await c.req.json();
-    const { nodeId } = body;
-
-    logger.debug('Setting exit node', { nodeId });
-    const result = await tailscaleService.setExitNode(nodeId);
+    logger.info('Starting Tailscale');
+    const result = await tailscaleService.startTailscale();
 
     if (result.success) {
-      logger.info('Exit node set', { nodeId, message: result.message });
+      logger.info('Tailscale started', { message: result.message });
       return c.json({
         success: true,
         message: result.message,
         metadata: {
           timestamp: new Date().toISOString(),
-          action: 'exit-node-set',
+          action: 'tailscale-start',
         },
       });
     } else {
-      logger.error('Exit node set failed', { nodeId, message: result.message });
+      logger.error('Tailscale start failed', { message: result.message });
       return c.json(
         {
           success: false,
-          error: 'Exit node set failed',
+          error: 'Tailscale start failed',
           message: result.message,
         },
         500
       );
     }
   } catch (error) {
-    logger.error('Exit node set error', {
+    logger.error('Tailscale start error', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -215,7 +212,7 @@ tailscale.post('/exit-node', async c => {
     return c.json(
       {
         success: false,
-        error: 'Failed to set exit node',
+        error: 'Failed to start Tailscale',
         message: error instanceof Error ? error.message : 'Unknown error',
       },
       500
@@ -224,42 +221,39 @@ tailscale.post('/exit-node', async c => {
 });
 
 /**
- * POST /api/tailscale/accept-dns
- * Set accept DNS
+ * POST /api/tailscale/stop
+ * Stop Tailscale
  */
-tailscale.post('/accept-dns', async c => {
+tailscale.post('/stop', async c => {
   const logger = c.get('logger');
 
   try {
-    const body = await c.req.json();
-    const { accept } = body;
-
-    logger.debug('Setting accept DNS', { accept });
-    const result = await tailscaleService.setAcceptDNS(accept);
+    logger.warn('Stopping Tailscale');
+    const result = await tailscaleService.stopTailscale();
 
     if (result.success) {
-      logger.info('Accept DNS set', { accept, message: result.message });
+      logger.warn('Tailscale stopped', { message: result.message });
       return c.json({
         success: true,
         message: result.message,
         metadata: {
           timestamp: new Date().toISOString(),
-          action: 'accept-dns-set',
+          action: 'tailscale-stop',
         },
       });
     } else {
-      logger.error('Accept DNS set failed', { accept, message: result.message });
+      logger.error('Tailscale stop failed', { message: result.message });
       return c.json(
         {
           success: false,
-          error: 'Accept DNS set failed',
+          error: 'Tailscale stop failed',
           message: result.message,
         },
         500
       );
     }
   } catch (error) {
-    logger.error('Accept DNS set error', {
+    logger.error('Tailscale stop error', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -267,111 +261,7 @@ tailscale.post('/accept-dns', async c => {
     return c.json(
       {
         success: false,
-        error: 'Failed to set accept DNS',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      500
-    );
-  }
-});
-
-/**
- * POST /api/tailscale/accept-routes
- * Set accept routes
- */
-tailscale.post('/accept-routes', async c => {
-  const logger = c.get('logger');
-
-  try {
-    const body = await c.req.json();
-    const { accept } = body;
-
-    logger.debug('Setting accept routes', { accept });
-    const result = await tailscaleService.setAcceptRoutes(accept);
-
-    if (result.success) {
-      logger.info('Accept routes set', { accept, message: result.message });
-      return c.json({
-        success: true,
-        message: result.message,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          action: 'accept-routes-set',
-        },
-      });
-    } else {
-      logger.error('Accept routes set failed', { accept, message: result.message });
-      return c.json(
-        {
-          success: false,
-          error: 'Accept routes set failed',
-          message: result.message,
-        },
-        500
-      );
-    }
-  } catch (error) {
-    logger.error('Accept routes set error', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-
-    return c.json(
-      {
-        success: false,
-        error: 'Failed to set accept routes',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      500
-    );
-  }
-});
-
-/**
- * POST /api/tailscale/ssh
- * Set SSH
- */
-tailscale.post('/ssh', async c => {
-  const logger = c.get('logger');
-
-  try {
-    const body = await c.req.json();
-    const { enabled } = body;
-
-    logger.debug('Setting SSH', { enabled });
-    const result = await tailscaleService.setSSH(enabled);
-
-    if (result.success) {
-      logger.info('SSH set', { enabled, message: result.message });
-      return c.json({
-        success: true,
-        message: result.message,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          action: 'ssh-set',
-        },
-      });
-    } else {
-      logger.error('SSH set failed', { enabled, message: result.message });
-      return c.json(
-        {
-          success: false,
-          error: 'SSH set failed',
-          message: result.message,
-        },
-        500
-      );
-    }
-  } catch (error) {
-    logger.error('SSH set error', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-
-    return c.json(
-      {
-        success: false,
-        error: 'Failed to set SSH',
+        error: 'Failed to stop Tailscale',
         message: error instanceof Error ? error.message : 'Unknown error',
       },
       500

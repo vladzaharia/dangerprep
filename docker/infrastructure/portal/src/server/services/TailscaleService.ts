@@ -39,6 +39,11 @@ export class TailscaleService {
         advertiseExitNode: status.Self?.CapMap?.['advertise-exit-node'] !== false,
         advertiseRoutes: status.Self?.PrimaryRoutes || [],
         shieldsUp: status.Self?.CapMap?.['shields-up'] !== false,
+        hostname: status.Self?.HostName || null,
+        advertiseTags: status.Self?.Tags || [],
+        advertiseConnector: status.Self?.CapMap?.['advertise-connector'] !== false,
+        snatSubnetRoutes: status.Self?.CapMap?.['snat-subnet-routes'] !== false,
+        statefulFiltering: status.Self?.CapMap?.['stateful-filtering'] !== false,
       };
 
       this.logger.debug('Tailscale settings retrieved', { settings });
@@ -296,6 +301,110 @@ export class TailscaleService {
   }
 
   /**
+   * Set advertise exit node
+   */
+  async setAdvertiseExitNode(advertise: boolean): Promise<{ success: boolean; message: string }> {
+    this.logger.info('Setting advertise exit node', { advertise });
+
+    try {
+      const command = `tailscale set --advertise-exit-node=${advertise}`;
+      await execAsync(command);
+
+      this.logger.info('Advertise exit node set successfully', { advertise });
+      return {
+        success: true,
+        message: `Exit node advertising ${advertise ? 'enabled' : 'disabled'}`,
+      };
+    } catch (error) {
+      this.logger.error('Failed to set advertise exit node', {
+        advertise,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        success: false,
+        message: `Failed to set advertise exit node: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  /**
+   * Set shields up
+   */
+  async setShieldsUp(enabled: boolean): Promise<{ success: boolean; message: string }> {
+    this.logger.info('Setting shields up', { enabled });
+
+    try {
+      const command = `tailscale set --shields-up=${enabled}`;
+      await execAsync(command);
+
+      this.logger.info('Shields up set successfully', { enabled });
+      return {
+        success: true,
+        message: `Shields up ${enabled ? 'enabled' : 'disabled'}`,
+      };
+    } catch (error) {
+      this.logger.error('Failed to set shields up', {
+        enabled,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        success: false,
+        message: `Failed to set shields up: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  /**
+   * Start Tailscale (tailscale up)
+   */
+  async startTailscale(): Promise<{ success: boolean; message: string }> {
+    this.logger.info('Starting Tailscale');
+
+    try {
+      await execAsync('tailscale up');
+
+      this.logger.info('Tailscale started successfully');
+      return {
+        success: true,
+        message: 'Tailscale started successfully',
+      };
+    } catch (error) {
+      this.logger.error('Failed to start Tailscale', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        success: false,
+        message: `Failed to start Tailscale: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  /**
+   * Stop Tailscale (tailscale down)
+   */
+  async stopTailscale(): Promise<{ success: boolean; message: string }> {
+    this.logger.info('Stopping Tailscale');
+
+    try {
+      await execAsync('tailscale down');
+
+      this.logger.info('Tailscale stopped successfully');
+      return {
+        success: true,
+        message: 'Tailscale stopped successfully',
+      };
+    } catch (error) {
+      this.logger.error('Failed to stop Tailscale', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        success: false,
+        message: `Failed to stop Tailscale: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  /**
    * Update multiple settings at once
    */
   async updateSettings(
@@ -320,6 +429,30 @@ export class TailscaleService {
       }
       if (settings.ssh !== undefined) {
         flags.push(settings.ssh ? '--ssh' : '--ssh=false');
+      }
+      if (settings.advertiseExitNode !== undefined) {
+        flags.push(`--advertise-exit-node=${settings.advertiseExitNode}`);
+      }
+      if (settings.shieldsUp !== undefined) {
+        flags.push(`--shields-up=${settings.shieldsUp}`);
+      }
+      if (settings.advertiseRoutes !== undefined) {
+        flags.push(`--advertise-routes=${settings.advertiseRoutes.join(',')}`);
+      }
+      if (settings.hostname !== undefined) {
+        flags.push(`--hostname=${settings.hostname || ''}`);
+      }
+      if (settings.advertiseTags !== undefined) {
+        flags.push(`--advertise-tags=${settings.advertiseTags.join(',')}`);
+      }
+      if (settings.advertiseConnector !== undefined) {
+        flags.push(`--advertise-connector=${settings.advertiseConnector}`);
+      }
+      if (settings.snatSubnetRoutes !== undefined) {
+        flags.push(`--snat-subnet-routes=${settings.snatSubnetRoutes}`);
+      }
+      if (settings.statefulFiltering !== undefined) {
+        flags.push(`--stateful-filtering=${settings.statefulFiltering}`);
       }
 
       if (flags.length === 0) {

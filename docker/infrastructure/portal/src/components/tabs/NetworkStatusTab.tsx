@@ -245,7 +245,11 @@ export const NetworkStatusTab: React.FC = () => {
                 variant={iface.state === 'up' ? 'success' : 'danger'}
                 layout='vertical'
                 icon={
-                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' style={createIconStyle(ICON_STYLES[iface.type])} />
+                  <FontAwesomeIcon
+                    icon={getInterfaceIcon(iface)}
+                    size='lg'
+                    style={createIconStyle(ICON_STYLES[iface.type])}
+                  />
                 }
                 title={title}
                 tags={tags}

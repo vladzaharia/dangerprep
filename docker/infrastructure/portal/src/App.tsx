@@ -12,12 +12,22 @@ import { Navigation, DefaultRoute } from './components';
 
 // Lazy load page components for better code splitting
 const QRCodePage = lazy(() => import('./pages/QRCodePage').then(m => ({ default: m.QRCodePage })));
-const ServicesPage = lazy(() => import('./pages/ServicesPage').then(m => ({ default: m.ServicesPage })));
-const MaintenanceServicesPage = lazy(() => import('./pages/MaintenanceServicesPage').then(m => ({ default: m.MaintenanceServicesPage })));
+const ServicesPage = lazy(() =>
+  import('./pages/ServicesPage').then(m => ({ default: m.ServicesPage }))
+);
+const MaintenanceServicesPage = lazy(() =>
+  import('./pages/MaintenanceServicesPage').then(m => ({ default: m.MaintenanceServicesPage }))
+);
 const PowerPage = lazy(() => import('./pages/PowerPage').then(m => ({ default: m.PowerPage })));
-const NetworkStatusPage = lazy(() => import('./pages/NetworkStatusPage').then(m => ({ default: m.NetworkStatusPage })));
-const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
-const TailscaleSettingsPage = lazy(() => import('./pages/TailscaleSettingsPage').then(m => ({ default: m.TailscaleSettingsPage })));
+const NetworkStatusPage = lazy(() =>
+  import('./pages/NetworkStatusPage').then(m => ({ default: m.NetworkStatusPage }))
+);
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage }))
+);
+const TailscaleSettingsPage = lazy(() =>
+  import('./pages/TailscaleSettingsPage').then(m => ({ default: m.TailscaleSettingsPage }))
+);
 
 // Service configuration type
 export interface Service {

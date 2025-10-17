@@ -107,6 +107,11 @@ export interface TailscaleSettings {
   advertiseExitNode: boolean;
   advertiseRoutes: string[];
   shieldsUp: boolean;
+  hostname: string | null;
+  advertiseTags: string[];
+  advertiseConnector: boolean;
+  snatSubnetRoutes: boolean;
+  statefulFiltering: boolean;
 }
 
 /**
