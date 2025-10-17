@@ -5,14 +5,15 @@ import {
   faDesktop,
   faBrowser,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState } from 'react';
 
 interface PowerAction {
   id: string;
   label: string;
-  icon?: any;
-  stackedIcon?: { base: any; overlay: any };
+  icon?: IconDefinition;
+  stackedIcon?: { base: IconDefinition; overlay: IconDefinition };
   endpoint: string;
   confirmMessage: string;
   variant: 'brand' | 'danger' | 'warning' | 'success';
@@ -164,9 +165,9 @@ export const PowerPage: React.FC = () => {
                         style={iconStyle}
                       />
                     </span>
-                  ) : (
+                  ) : action.icon ? (
                     <FontAwesomeIcon icon={action.icon} size='4x' style={iconStyle} />
-                  )}
+                  ) : null}
                 </div>
                 <div
                   onClick={() => loading === null && handlePowerAction(action)}

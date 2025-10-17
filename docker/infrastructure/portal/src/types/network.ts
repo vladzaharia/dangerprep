@@ -63,6 +63,8 @@ export interface WiFiInterface extends BaseNetworkInterface {
   mode?: 'managed' | 'ap' | 'monitor' | 'unknown';
   password?: string; // For AP mode (hotspot) only
   connectedClients?: ConnectedClient[]; // For AP mode - detailed client information
+  maxClients?: number; // For AP mode - maximum number of clients
+  hidden?: boolean; // For AP mode - whether SSID is hidden
 }
 
 /**

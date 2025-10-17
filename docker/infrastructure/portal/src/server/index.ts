@@ -7,8 +7,7 @@ import { requestId } from 'hono/request-id';
 import { secureHeaders } from 'hono/secure-headers';
 
 // Import middleware
-import { structuredLogging } from './middleware/logging';
-
+import { structuredLogging, type LoggerVariables } from './middleware/logging';
 // Import routes
 import config from './routes/config';
 import health from './routes/health';
@@ -16,8 +15,8 @@ import networks from './routes/networks';
 import power from './routes/power';
 import services from './routes/services';
 
-// Create main app with optimized configuration
-const app = new Hono();
+// Create main app with typed variables
+const app = new Hono<{ Variables: LoggerVariables }>();
 
 // Environment-specific middleware
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -109,7 +108,18 @@ app.notFound(c => {
 
 // Error handler
 app.onError((err, c) => {
-  console.error('API Error:', err);
+  const logger = c.get('logger');
+  const requestId = c.get('requestId');
+
+  // Log error with structured metadata
+  logger.error('API Error', {
+    error: err.message,
+    stack: err.stack,
+    requestId,
+    path: c.req.path,
+    method: c.req.method,
+  });
+
   return c.json(
     {
       success: false,

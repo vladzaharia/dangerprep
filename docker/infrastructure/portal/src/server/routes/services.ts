@@ -43,7 +43,7 @@ services.get('/', async c => {
     logger.debug('Cache miss - fetching from service discovery');
 
     // Get services from discovery service
-    const options: any = {};
+    const options: { baseDomain?: string; serviceType?: string } = {};
     if (domain) options.baseDomain = domain;
     if (type) options.serviceType = type;
 

@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import useSWR, { type SWRConfiguration } from 'swr';
 
+import type { AppConfig } from '../server/services/ConfigService';
 import type {
   NetworkSummary,
   NetworkInterface,
@@ -8,6 +9,24 @@ import type {
   TailscaleExitNode,
 } from '../types/network';
 import type { ServiceMetadata } from '../types/service';
+
+/**
+ * Hostapd status response type
+ */
+export interface HostapdStatus {
+  isConfigured: boolean;
+  isRunning: boolean;
+  configuredInterface?: string;
+  activeInterface?: string;
+  ssid?: string;
+  actualSSID?: string;
+  channel?: number;
+  connectedClients?: number;
+  security?: string;
+  countryCode?: string;
+  maxClients?: number;
+  hidden?: boolean;
+}
 
 /**
  * Generic fetcher for API endpoints
@@ -91,7 +110,7 @@ export function useNetworkInterface(interfaceName: string | null, config?: SWRCo
  * const { data, error, isLoading } = useHostapdStatus();
  */
 export function useHostapdStatus(config?: SWRConfiguration) {
-  return useSWR<{ hostapd: any }>('/api/networks/hostapd/status', fetcher, {
+  return useSWR<{ hostapd: HostapdStatus }>('/api/networks/hostapd/status', fetcher, {
     ...defaultConfig,
     ...config,
   });
@@ -213,17 +232,12 @@ function getFallbackServices(serviceType: string, baseDomain: string): ServiceMe
  * const { data, error, isLoading } = useAppConfigData();
  */
 export function useAppConfigData(config?: SWRConfiguration) {
-  return useSWR<any>('/api/config', fetcher, {
+  return useSWR<AppConfig>('/api/config', fetcher, {
     ...defaultConfig,
     refreshInterval: 0, // Don't poll config (it rarely changes)
     revalidateOnFocus: false, // Don't refetch on focus
     revalidateOnReconnect: false, // Don't refetch on reconnect
     ...config,
-    // Fallback to environment variables
-    fallbackData: {
-      baseDomain: import.meta.env.VITE_BASE_DOMAIN || 'danger.diy',
-      kioskMode: import.meta.env.VITE_KIOSK_MODE === 'true',
-    },
   });
 }
 

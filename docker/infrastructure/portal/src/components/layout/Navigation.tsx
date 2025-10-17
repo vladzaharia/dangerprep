@@ -5,6 +5,7 @@ import {
   faShieldCheck,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { faGear, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo } from 'react';
 import { NavLink, useSearchParams, useLocation } from 'react-router-dom';
@@ -16,7 +17,7 @@ import { NetworkStatusButton } from './NetworkStatusButton';
  */
 interface NavItem {
   path?: string;
-  icon?: any;
+  icon?: IconDefinition;
   label: string;
   /** Function to determine if this item should be visible */
   isVisible: (context: NavigationContext) => boolean;
@@ -191,7 +192,7 @@ export const Navigation: React.FC = () => {
 
     // Otherwise render a standard NavLink
     if (!item.path || !item.icon) {
-      console.warn(`NavItem "${item.label}" is missing path or icon`);
+      // Skip rendering items without required properties
       return null;
     }
 

@@ -50,6 +50,8 @@ export interface WiFiInterface extends BaseNetworkInterface {
   mode?: 'managed' | 'ap' | 'monitor' | 'unknown' | undefined;
   password?: string | undefined; // For AP mode (hotspot) only
   connectedClients?: ConnectedClient[] | undefined; // For AP mode - detailed client information
+  maxClients?: number | undefined; // For AP mode - maximum number of clients
+  hidden?: boolean | undefined; // For AP mode - whether SSID is hidden
 }
 
 /**
@@ -1090,19 +1092,50 @@ export class NetworkService {
 
         // Parse peers with enhanced information
         if (status.Peer) {
-          tailscaleInfo.peers = Object.values(status.Peer).map((peer: any) => ({
-            hostname: peer.HostName,
-            ipAddress: peer.TailscaleIPs?.[0] || '',
-            online: peer.Online,
-            lastSeen: peer.LastSeen,
-            os: peer.OS,
-            exitNode: peer.ExitNode || false,
-            exitNodeOption: peer.ExitNodeOption || false,
-            sshEnabled: peer.CapMap?.ssh !== false,
-            subnetRoutes: peer.PrimaryRoutes || [],
-            relay: peer.Relay || undefined,
-            tags: peer.Tags || [],
-          }));
+          type TailscalePeerRaw = {
+            HostName: string;
+            TailscaleIPs?: string[];
+            Online: boolean;
+            LastSeen?: string;
+            OS?: string;
+            ExitNode?: boolean;
+            ExitNodeOption?: boolean;
+            CapMap?: { ssh?: boolean };
+            PrimaryRoutes?: string[];
+            Relay?: string;
+            Tags?: string[];
+          };
+
+          tailscaleInfo.peers = (Object.values(status.Peer) as TailscalePeerRaw[]).map(peer => {
+            const mappedPeer: {
+              hostname: string;
+              ipAddress: string;
+              online: boolean;
+              lastSeen?: string;
+              os?: string;
+              exitNode?: boolean;
+              exitNodeOption?: boolean;
+              sshEnabled?: boolean;
+              subnetRoutes?: string[];
+              relay?: string;
+              tags?: string[];
+            } = {
+              hostname: peer.HostName,
+              ipAddress: peer.TailscaleIPs?.[0] || '',
+              online: peer.Online,
+            };
+
+            if (peer.LastSeen !== undefined) mappedPeer.lastSeen = peer.LastSeen;
+            if (peer.OS !== undefined) mappedPeer.os = peer.OS;
+            if (peer.ExitNode !== undefined) mappedPeer.exitNode = peer.ExitNode;
+            if (peer.ExitNodeOption !== undefined) mappedPeer.exitNodeOption = peer.ExitNodeOption;
+            if (peer.CapMap?.ssh !== undefined) mappedPeer.sshEnabled = peer.CapMap.ssh;
+            if (peer.PrimaryRoutes !== undefined) mappedPeer.subnetRoutes = peer.PrimaryRoutes;
+            if (peer.Relay !== undefined) mappedPeer.relay = peer.Relay;
+            if (peer.Tags !== undefined) mappedPeer.tags = peer.Tags;
+
+            return mappedPeer;
+          });
         }
       } catch (error) {
         this.logger.warn('Failed to parse Tailscale status JSON', {
@@ -1205,13 +1238,11 @@ export class NetworkService {
       }
 
       if (hostapdConfig.max_num_sta) {
-        // This would require extending the WiFiInterface to include maxClients
-        // For now, we'll add it as a custom property
-        (hotspotWifi as any).maxClients = parseInt(hostapdConfig.max_num_sta);
+        hotspotWifi.maxClients = parseInt(hostapdConfig.max_num_sta);
       }
 
       if (hostapdConfig.ignore_broadcast_ssid === '1') {
-        (hotspotWifi as any).hidden = true;
+        hotspotWifi.hidden = true;
       }
 
       this.logger.info('Returning hotspot WiFi with client information', {
@@ -1282,7 +1313,12 @@ export class NetworkService {
     activeInterface?: string;
     actualSSID?: string;
     connectedClients?: number;
-    runtimeInfo?: Record<string, any>;
+    runtimeInfo?: {
+      type?: string;
+      channel?: number;
+      txpower?: number;
+      macAddress?: string;
+    };
   }> {
     const config = this.readHostapdConfig();
 
@@ -1294,7 +1330,14 @@ export class NetworkService {
       let activeInterface: string | undefined;
       let actualSSID: string | undefined;
       let connectedClients: number | undefined;
-      let runtimeInfo: Record<string, any> | undefined;
+      let runtimeInfo:
+        | {
+            type?: string;
+            channel?: number;
+            txpower?: number;
+            macAddress?: string;
+          }
+        | undefined;
 
       if (isRunning) {
         // Get active interface from running hostapd process
@@ -1370,8 +1413,18 @@ export class NetworkService {
   /**
    * Parse iw info output into structured data
    */
-  private parseIwInfo(iwOutput: string): Record<string, any> {
-    const info: Record<string, any> = {};
+  private parseIwInfo(iwOutput: string): {
+    type?: string;
+    channel?: number;
+    txpower?: number;
+    macAddress?: string;
+  } {
+    const info: {
+      type?: string;
+      channel?: number;
+      txpower?: number;
+      macAddress?: string;
+    } = {};
 
     const lines = iwOutput.split('\n');
     for (const line of lines) {
@@ -1380,7 +1433,7 @@ export class NetworkService {
       // Parse various fields
       if (trimmed.includes('type ')) {
         const typeMatch = trimmed.match(/type (\w+)/);
-        if (typeMatch) info.type = typeMatch[1];
+        if (typeMatch && typeMatch[1]) info.type = typeMatch[1];
       }
 
       if (trimmed.includes('channel ')) {
@@ -1395,7 +1448,7 @@ export class NetworkService {
 
       if (trimmed.includes('addr ')) {
         const addrMatch = trimmed.match(/addr ([a-f0-9:]{17})/);
-        if (addrMatch) info.macAddress = addrMatch[1];
+        if (addrMatch && addrMatch[1]) info.macAddress = addrMatch[1];
       }
     }
 
@@ -1483,7 +1536,7 @@ export class NetworkService {
     const dnsServers: string[] = [];
 
     // Try to parse from systemd-resolve output
-    const systemdMatch = output.match(/DNS Servers:\s*([\d\.\s]+)/);
+    const systemdMatch = output.match(/DNS Servers:\s*([\d.\s]+)/);
     if (systemdMatch && systemdMatch[1]) {
       const servers = systemdMatch[1].trim().split(/\s+/);
       dnsServers.push(...servers.filter(ip => /^\d+\.\d+\.\d+\.\d+$/.test(ip)));
@@ -1526,52 +1579,65 @@ export class NetworkService {
       const hostapdInfo = await this.getHostapdInfo();
       const config = hostapdInfo.config;
 
-      const status = {
+      const status: {
+        isConfigured: boolean;
+        isRunning: boolean;
+        configuredInterface?: string;
+        activeInterface?: string;
+        ssid?: string;
+        actualSSID?: string;
+        channel?: number;
+        connectedClients?: number;
+        security?: string;
+        countryCode?: string;
+        maxClients?: number;
+        hidden?: boolean;
+      } = {
         isConfigured: Object.keys(config).length > 0,
         isRunning: hostapdInfo.isRunning,
       };
 
       // Add configuration information
       if (config.interface) {
-        (status as any).configuredInterface = config.interface;
+        status.configuredInterface = config.interface;
       }
 
       if (config.ssid) {
-        (status as any).ssid = config.ssid;
+        status.ssid = config.ssid;
       }
 
       if (config.channel) {
-        (status as any).channel = parseInt(config.channel);
+        status.channel = parseInt(config.channel);
       }
 
       if (config.wpa) {
-        (status as any).security = config.wpa === '3' ? 'WPA3' : 'WPA2';
+        status.security = config.wpa === '3' ? 'WPA3' : 'WPA2';
       }
 
       if (config.country_code) {
-        (status as any).countryCode = config.country_code;
+        status.countryCode = config.country_code;
       }
 
       if (config.max_num_sta) {
-        (status as any).maxClients = parseInt(config.max_num_sta);
+        status.maxClients = parseInt(config.max_num_sta);
       }
 
       if (config.ignore_broadcast_ssid === '1') {
-        (status as any).hidden = true;
+        status.hidden = true;
       }
 
       // Add runtime information if available
       if (hostapdInfo.isRunning) {
         if (hostapdInfo.activeInterface) {
-          (status as any).activeInterface = hostapdInfo.activeInterface;
+          status.activeInterface = hostapdInfo.activeInterface;
         }
 
         if (hostapdInfo.actualSSID) {
-          (status as any).actualSSID = hostapdInfo.actualSSID;
+          status.actualSSID = hostapdInfo.actualSSID;
         }
 
         if (hostapdInfo.connectedClients !== undefined) {
-          (status as any).connectedClients = hostapdInfo.connectedClients;
+          status.connectedClients = hostapdInfo.connectedClients;
         }
       }
 

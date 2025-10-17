@@ -1,15 +1,3 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-
-import App from './App';
-import './styles/global.css';
-
-// Import fonts locally
-import '@fontsource/sansation/400.css';
-import '@fontsource/sansation/700.css';
-import '@fontsource/geist-mono/400.css';
-import '@fontsource/geist-mono/500.css';
-
 // Import WebAwesome CSS files locally
 import '@awesome.me/webawesome/dist/styles/webawesome.css';
 import '@awesome.me/webawesome/dist/styles/themes/default.css';
@@ -29,6 +17,18 @@ import '@awesome.me/webawesome/dist/components/tag/tag.js';
 
 // Set default icon family for WebAwesome
 import { setDefaultIconFamily } from '@awesome.me/webawesome';
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+
+import App from './App';
+import './styles/global.css';
+
+// Import fonts locally
+import '@fontsource/sansation/400.css';
+import '@fontsource/sansation/700.css';
+import '@fontsource/geist-mono/400.css';
+import '@fontsource/geist-mono/500.css';
+
 setDefaultIconFamily('duotone');
 
 const container = document.getElementById('root');

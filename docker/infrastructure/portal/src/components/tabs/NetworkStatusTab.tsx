@@ -79,8 +79,11 @@ export const NetworkStatusTab: React.FC = () => {
   const deviceIPs = useMemo(() => {
     if (!networkData?.interfaces) return [];
     return networkData.interfaces
-      .filter(iface => iface.ipAddress && iface.state === 'up')
-      .map(iface => ({ name: iface.name, ip: iface.ipAddress! }));
+      .filter(
+        (iface): iface is typeof iface & { ipAddress: string } =>
+          iface.ipAddress !== undefined && iface.ipAddress !== null && iface.state === 'up'
+      )
+      .map(iface => ({ name: iface.name, ip: iface.ipAddress }));
   }, [networkData]);
 
   // Note: Loading state handled by parent Suspense boundary

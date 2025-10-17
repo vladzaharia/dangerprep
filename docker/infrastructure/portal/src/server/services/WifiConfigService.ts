@@ -304,8 +304,8 @@ export class WifiConfigService {
 
       const dnsServers = dnsLines
         .map(line => line.split(':')[1])
-        .filter(dns => dns && dns.trim())
-        .map(dns => dns!.trim());
+        .filter((dns): dns is string => dns !== undefined && dns !== null && dns.trim() !== '')
+        .map(dns => dns.trim());
 
       return dnsServers.length > 0 ? dnsServers : undefined;
     } catch (error) {

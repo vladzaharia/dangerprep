@@ -176,7 +176,10 @@ function TailscaleSettingsContent() {
             <div className='wa-stack wa-gap-m'>
               <wa-select
                 value={settings.exitNode || ''}
-                onchange={(e: any) => handleSetExitNode(e.target.value || null)}
+                onchange={(e: Event) => {
+                  const target = e.target as HTMLSelectElement;
+                  handleSetExitNode(target.value || null);
+                }}
                 disabled={loading !== null}
               >
                 <option value=''>No Exit Node</option>

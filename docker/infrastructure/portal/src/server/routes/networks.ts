@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import type { WiFiInterface } from '../../types/network';
 import type { LoggerVariables } from '../middleware/logging';
 import { NetworkService } from '../services/NetworkService';
 
@@ -185,7 +186,7 @@ networks.get('/:interface', async c => {
     // Return the interface with type-specific information (already included by NetworkService)
     // Log connected clients info if this is a WiFi interface
     if (networkInterface.type === 'wifi') {
-      const wifiInterface = networkInterface as any;
+      const wifiInterface = networkInterface as WiFiInterface;
       logger.info('Returning WiFi interface data', {
         interfaceName,
         mode: wifiInterface.mode,

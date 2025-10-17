@@ -67,13 +67,22 @@ export class TailscaleService {
           count: exitNodes.length,
         });
 
-        return exitNodes.map((node: any) => ({
-          id: node.ID || node.TailscaleIPs?.[0],
-          name: node.Name || node.HostName,
-          location: node.Location,
-          online: node.Online !== false,
-          suggested: false,
-        }));
+        return exitNodes.map(
+          (node: {
+            ID?: string;
+            TailscaleIPs?: string[];
+            Name?: string;
+            HostName?: string;
+            Location?: string;
+            Online?: boolean;
+          }) => ({
+            id: node.ID || node.TailscaleIPs?.[0] || '',
+            name: node.Name || node.HostName || '',
+            location: node.Location,
+            online: node.Online !== false,
+            suggested: false,
+          })
+        );
       } catch {
         // Fallback: parse from status
         const { stdout } = await execAsync('tailscale status --json 2>/dev/null');
@@ -82,11 +91,20 @@ export class TailscaleService {
         const exitNodes: TailscaleExitNode[] = [];
 
         if (status.Peer) {
-          Object.values(status.Peer).forEach((peer: any) => {
+          type TailscalePeerRaw = {
+            ExitNodeOption?: boolean;
+            TailscaleIPs?: string[];
+            ID?: string;
+            HostName?: string;
+            DNSName?: string;
+            Online?: boolean;
+          };
+
+          (Object.values(status.Peer) as TailscalePeerRaw[]).forEach(peer => {
             if (peer.ExitNodeOption) {
               exitNodes.push({
-                id: peer.TailscaleIPs?.[0] || peer.ID,
-                name: peer.HostName || peer.DNSName,
+                id: peer.TailscaleIPs?.[0] || peer.ID || '',
+                name: peer.HostName || peer.DNSName || '',
                 online: peer.Online !== false,
                 suggested: false,
               });
