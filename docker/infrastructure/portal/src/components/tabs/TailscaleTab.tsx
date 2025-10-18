@@ -160,7 +160,7 @@ export const TailscaleTab: React.FC = () => {
   return (
     <div
       className='wa-flank wa-gap-l'
-      style={{ '--min-column-size': '200px' } as React.CSSProperties}
+      style={{ '--min-column-size': '18rem' } as React.CSSProperties}
     >
       {/* Left Column - Tailscale Status */}
       <div className='wa-split:column'>

@@ -1,14 +1,22 @@
-import { faEthernet, faRouter, faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import {
+  faEthernet,
+  faRouter,
+  faServer,
+  faNetworkWired,
+} from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
   faWifi,
   faGlobe,
   faShieldCheck,
+  faArrowRightFromBracket,
+  faGear,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { useNetworkSummary } from '../../hooks/useSWRData';
-import type { NetworkInterface } from '../../types/network';
+import { useNetworkSummary, useTailscaleSettings, useTailscalePeers } from '../../hooks/useSWRData';
+import type { NetworkInterface, TailscaleInterface } from '../../types/network';
 import { createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
@@ -54,6 +62,17 @@ function getInterfaceIconColor(iface: NetworkInterface): string | undefined {
  */
 export const NetworkStatusTab: React.FC = () => {
   const { data: networkData } = useNetworkSummary();
+  const { data: tailscaleSettings } = useTailscaleSettings();
+  const { data: tailscalePeers } = useTailscalePeers();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Helper function to preserve search params in navigation
+  const getNavLinkTo = (path: string) => {
+    const params = new URLSearchParams(searchParams);
+    const queryString = params.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
 
   // Get LAN interfaces (hotspot/wlan)
   const lanInterfaces = useMemo(() => {
@@ -64,16 +83,25 @@ export const NetworkStatusTab: React.FC = () => {
   }, [networkData]);
 
   // Get WAN interfaces (internet)
-  // Include Tailscale IF it's being used as an exit node
+  // Include Tailscale IF it's being used as an exit node OR accepting subnet routes
   const wanInterfaces = useMemo(() => {
     if (!networkData?.interfaces) return [];
-    return networkData.interfaces.filter(
-      iface =>
-        iface.purpose === 'wan' &&
-        (iface.type !== 'tailscale' ||
-          (iface.type === 'tailscale' && 'exitNode' in iface && iface.exitNode))
-    );
-  }, [networkData]);
+    return networkData.interfaces.filter(iface => {
+      if (iface.purpose === 'wan' && iface.type !== 'tailscale') {
+        return true;
+      }
+
+      // Include Tailscale if it has exit node or accepting routes
+      if (iface.type === 'tailscale') {
+        const tsInterface = iface as TailscaleInterface;
+        const hasExitNode = tsInterface.exitNode;
+        const acceptingRoutes = tailscaleSettings?.acceptRoutes && tsInterface.state === 'up';
+        return hasExitNode || acceptingRoutes;
+      }
+
+      return false;
+    });
+  }, [networkData, tailscaleSettings]);
 
   // Get device IP addresses
   const deviceIPs = useMemo(() => {
@@ -98,7 +126,7 @@ export const NetworkStatusTab: React.FC = () => {
   return (
     <div
       className='wa-grid wa-gap-l'
-      style={{ '--min-column-size': '200px' } as React.CSSProperties}
+      style={{ '--min-column-size': '18rem' } as React.CSSProperties}
     >
       {/* Left Column - LAN Interfaces */}
       <div className='wa-stack wa-gap-m'>
@@ -234,6 +262,85 @@ export const NetworkStatusTab: React.FC = () => {
               });
             }
 
+            // Add Tailscale-specific tags and action button
+            let tailscaleActionButton: React.ReactNode | undefined;
+            if (iface.type === 'tailscale') {
+              const tsInterface = iface as TailscaleInterface;
+
+              // Add exit node tag if using one
+              if (tsInterface.exitNode && tailscaleSettings?.exitNode) {
+                // Find the exit node name from settings
+                const exitNodeName = tailscaleSettings.exitNode;
+                tags.push({
+                  label: 'Exit Node',
+                  value: exitNodeName,
+                  icon: (
+                    <FontAwesomeIcon
+                      icon={faArrowRightFromBracket}
+                      style={
+                        {
+                          '--fa-primary-color': '#a855f7', // Purple for Tailscale
+                          '--fa-primary-opacity': 0.9,
+                        } as React.CSSProperties
+                      }
+                    />
+                  ),
+                  variant: 'neutral',
+                });
+              }
+
+              // Add accepted subnet route tags from peers
+              if (tailscaleSettings?.acceptRoutes && tailscalePeers) {
+                // Collect all subnet routes from peers
+                const subnetRoutes = new Set<string>();
+                tailscalePeers.forEach(peer => {
+                  if (peer.subnetRoutes && peer.subnetRoutes.length > 0) {
+                    peer.subnetRoutes.forEach(route => subnetRoutes.add(route));
+                  }
+                });
+
+                // Add tags for each unique subnet route
+                subnetRoutes.forEach(route => {
+                  tags.push({
+                    label: route,
+                    icon: (
+                      <FontAwesomeIcon
+                        icon={faNetworkWired}
+                        style={
+                          {
+                            '--fa-primary-color': '#10b981', // Green for routes
+                            '--fa-primary-opacity': 0.9,
+                          } as React.CSSProperties
+                        }
+                      />
+                    ),
+                    variant: 'neutral',
+                  });
+                });
+              }
+
+              // Add gear button for Tailscale settings
+              tailscaleActionButton = (
+                <div
+                  onClick={() => navigate(getNavLinkTo('/tailscale'))}
+                  style={{ cursor: 'pointer' }}
+                  role='button'
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(getNavLinkTo('/tailscale'));
+                    }
+                  }}
+                  aria-label='Tailscale Settings'
+                >
+                  <wa-button appearance='plain' size='small' style={{ pointerEvents: 'none' }}>
+                    <FontAwesomeIcon icon={faGear} style={createIconStyle(ICON_STYLES.settings)} />
+                  </wa-button>
+                </div>
+              );
+            }
+
             return (
               <StatusCard
                 key={iface.name}
@@ -249,6 +356,7 @@ export const NetworkStatusTab: React.FC = () => {
                 }
                 title={title}
                 tags={tags}
+                actionButton={tailscaleActionButton}
                 className='interface-callout'
               />
             );

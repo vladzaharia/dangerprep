@@ -16,6 +16,7 @@ export interface StatusCardProps {
   subtitle?: string | number | undefined;
   tags?: StatusCardTag[] | undefined;
   className?: string | undefined;
+  actionButton?: React.ReactNode | undefined;
 }
 
 /**
@@ -31,17 +32,19 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   subtitle,
   tags = [],
   className = '',
+  actionButton,
 }) => {
-  // Header content (icon + title/subtitle)
+  // Header content (icon + title/subtitle + optional action button)
   const header = (
-    <div className='wa-flank wa-gap-m'>
+    <div className='wa-flank wa-gap-m' style={{ width: '100%' }}>
       {icon}
-      <div className='wa-stack wa-gap-3xs'>
+      <div className='wa-stack wa-gap-3xs' style={{ flex: 1 }}>
         <span className='wa-body-s' style={{ fontWeight: 600 }}>
           {title}
         </span>
         {subtitle && <span className='wa-caption-s'>{subtitle}</span>}
       </div>
+      {actionButton && <div style={{ marginLeft: 'auto' }}>{actionButton}</div>}
     </div>
   );
 

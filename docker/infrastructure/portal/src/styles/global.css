@@ -281,7 +281,7 @@ body {
 }
 
 .tailscale-status {
-  min-width: 20vw;
+  min-width: 24rem;
 }
 
 .tailscale-peer {
