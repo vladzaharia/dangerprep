@@ -100,13 +100,13 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
           icon={faArrowRightFromBracket}
           style={
             {
-              '--fa-primary-color': peer.exitNode ? '#fb923c' : '#6b7280', // Bright orange if active, gray if available
+              '--fa-primary-color': '#fb923c',
               '--fa-primary-opacity': 0.9,
               '--fa-secondary-opacity': 0.8,
               fontSize: '0.875em',
             } as React.CSSProperties
           }
-          title={peer.exitNode ? 'Active Exit Node' : 'Available Exit Node'}
+          title={peer.exitNode ? 'Active Exit Node' : 'Exit Node'}
         />
       </wa-tag>
     );
@@ -197,7 +197,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
 
             {/* Mini-tags cluster - right-aligned */}
             <div style={{ maxWidth: '8rem', flexShrink: 0 }}>
-              <div className='wa-cluster wa-gap-3xs wa-justify-content-end'>{miniTags}</div>
+              <div className='wa-cluster wa-gap-3xs' style={{ justifyContent: 'flex-end' }}>{miniTags}</div>
             </div>
           </div>
         </wa-callout>
@@ -238,29 +238,11 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                     </div>
                   </wa-tag>
 
-                  {/* Exit node with label */}
-                  {peer.exitNode && (
-                    <wa-tag variant='brand' size='small'>
-                      <div className='wa-flank wa-gap-xs'>
-                        <FontAwesomeIcon
-                          icon={faArrowRightFromBracket}
-                          style={
-                            {
-                              '--fa-primary-color': '#fb923c',
-                              '--fa-primary-opacity': 0.9,
-                            } as React.CSSProperties
-                          }
-                        />
-                        <span>Active Exit Node</span>
-                      </div>
-                    </wa-tag>
-                  )}
-
-                  {peer.exitNodeOption && !peer.exitNode && (
+                  {peer.exitNodeOption && (
                     <wa-tag variant='neutral' size='small'>
                       <div className='wa-flank wa-gap-xs'>
                         <FontAwesomeIcon icon={faArrowRightFromBracket} />
-                        <span>Exit Node Available</span>
+                        <span>Exit Node</span>
                       </div>
                     </wa-tag>
                   )}

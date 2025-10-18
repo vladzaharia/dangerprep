@@ -88,9 +88,9 @@ export const ICON_STYLES = {
     primaryOpacity: 0.9,
     secondaryOpacity: 0.8,
   },
-  /** Settings - Green */
+  /** Settings - Blue */
   settings: {
-    primaryColor: '#10b981',
+    primaryColor: '#3b82f6',
     primaryOpacity: 0.9,
     secondaryOpacity: 0.4,
   },
