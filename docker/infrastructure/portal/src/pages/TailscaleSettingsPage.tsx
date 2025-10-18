@@ -7,8 +7,10 @@ import {
   faPowerOff,
   faGears,
   faNetworkWired,
+  faArrowTurnDownLeft,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { faWifi } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState, Suspense } from 'react';
 
 import { SettingsCard } from '../components/cards';
@@ -341,38 +343,46 @@ function TailscaleSettingsContent() {
             <wa-input
               value={settings.advertiseRoutes?.join(',') || ''}
               placeholder='192.168.1.0/24,10.0.0.0/8'
-              {...({ disabled: loading !== null || !settings.running } as Record<string, unknown>)}
-              onchange={async (e: Event) => {
-                const target = e.target as HTMLInputElement;
-                const routes = target.value
-                  .split(',')
-                  .map(r => r.trim())
-                  .filter(r => r.length > 0);
-                setLoading('advertiseRoutes');
-                setMessage(null);
-                try {
-                  const response = await fetch('/api/tailscale/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ advertiseRoutes: routes }),
-                  });
-                  const result = await response.json();
-                  if (result.success) {
-                    setMessage({ type: 'success', text: result.message });
-                    await mutateSettings();
-                  } else {
-                    setMessage({ type: 'error', text: result.message });
+              {...({
+                disabled: loading !== null || !settings.running,
+                onkeydown: async (e: KeyboardEvent) => {
+                  if (e.key === 'Enter') {
+                    const target = e.target as HTMLInputElement;
+                    const routes = target.value
+                      .split(',')
+                      .map(r => r.trim())
+                      .filter(r => r.length > 0);
+                    setLoading('advertiseRoutes');
+                    setMessage(null);
+                    try {
+                      const response = await fetch('/api/tailscale/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ advertiseRoutes: routes }),
+                      });
+                      const result = await response.json();
+                      if (result.success) {
+                        setMessage({ type: 'success', text: result.message });
+                        await mutateSettings();
+                      } else {
+                        setMessage({ type: 'error', text: result.message });
+                      }
+                    } catch (error) {
+                      setMessage({
+                        type: 'error',
+                        text: error instanceof Error ? error.message : 'Failed to update',
+                      });
+                    } finally {
+                      setLoading(null);
+                    }
                   }
-                } catch (error) {
-                  setMessage({
-                    type: 'error',
-                    text: error instanceof Error ? error.message : 'Failed to update',
-                  });
-                } finally {
-                  setLoading(null);
-                }
-              }}
-            ></wa-input>
+                },
+              } as Record<string, unknown>)}
+            >
+              <span slot='end' style={{ opacity: 0.5, fontSize: '0.875rem' }}>
+                <FontAwesomeIcon icon={faArrowTurnDownLeft} />
+              </span>
+            </wa-input>
           }
         />
 

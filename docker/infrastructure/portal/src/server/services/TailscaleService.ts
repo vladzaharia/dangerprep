@@ -33,13 +33,23 @@ export class TailscaleService {
       // BackendState can be: Running, Stopped, NeedsLogin, NeedsMachineAuth, etc.
       const running = status.BackendState === 'Running';
 
+      // Try to get exitNodeAllowLAN from Prefs if available, otherwise check CapMap
+      let exitNodeAllowLAN = false;
+      if (status.Self?.Prefs?.ExitNodeAllowLANAccess !== undefined) {
+        exitNodeAllowLAN = status.Self.Prefs.ExitNodeAllowLANAccess;
+      } else if (status.Prefs?.ExitNodeAllowLANAccess !== undefined) {
+        exitNodeAllowLAN = status.Prefs.ExitNodeAllowLANAccess;
+      } else if (status.Self?.CapMap?.['exit-node-allow-lan-access'] !== undefined) {
+        exitNodeAllowLAN = status.Self.CapMap['exit-node-allow-lan-access'];
+      }
+
       const settings: TailscaleSettings = {
         running,
         acceptDNS: status.Self?.CapMap?.['accept-dns'] !== false,
         acceptRoutes: status.Self?.CapMap?.['accept-routes'] !== false,
         ssh: status.Self?.CapMap?.ssh !== false,
         exitNode: status.ExitNodeStatus?.TailscaleIPs?.[0] || null,
-        exitNodeAllowLAN: status.Self?.AllowedIPs?.includes('0.0.0.0/0') || false,
+        exitNodeAllowLAN,
         advertiseExitNode: status.Self?.CapMap?.['advertise-exit-node'] !== false,
         advertiseRoutes: status.Self?.PrimaryRoutes || [],
         shieldsUp: status.Self?.CapMap?.['shields-up'] !== false,
