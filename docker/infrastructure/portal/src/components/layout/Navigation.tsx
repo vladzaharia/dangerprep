@@ -143,7 +143,7 @@ export const Navigation: React.FC = () => {
       case 'qr':
         return createIconStyle(ICON_STYLES.tailscale);
       case 'settings':
-        return createIconStyle(ICON_STYLES.success);
+        return createIconStyle(ICON_STYLES.settings);
       case 'power':
         return createIconStyle(ICON_STYLES.danger);
       default:

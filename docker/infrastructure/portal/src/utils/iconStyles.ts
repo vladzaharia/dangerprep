@@ -88,6 +88,12 @@ export const ICON_STYLES = {
     primaryOpacity: 0.9,
     secondaryOpacity: 0.8,
   },
+  /** Settings - Green */
+  settings: {
+    primaryColor: '#10b981',
+    primaryOpacity: 0.9,
+    secondaryOpacity: 0.4,
+  },
   /** Loopback - Gray */
   loopback: {
     primaryColor: '#6b7280',

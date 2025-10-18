@@ -60,9 +60,15 @@ export const TailscaleTab: React.FC = () => {
 
   const tailscaleInterface = tailscale as TailscaleInterface;
   // Use peers from dedicated endpoint, fallback to interface peers
-  const peers = (peersData || tailscaleInterface.peers || []).sort((peer: TailscalePeer) =>
-    peer.online ? -1 : 1
-  );
+  const peers = (peersData || tailscaleInterface.peers || []).sort((peer1: TailscalePeer, peer2: TailscalePeer) => {
+    if ((peer1.online && peer2.online) || (!peer1.online && !peer2.online)) {
+      return peer1.hostname.localeCompare(peer2.hostname)
+    } else if (peer1.online && !peer2.online) {
+      return -1;
+    } else if (!peer1.online && peer2.online) {
+      return 1;
+    }
+  });
   const onlinePeers = peers.filter((peer: TailscalePeer) => peer.online);
 
   // Prepare Tailscale interface data
