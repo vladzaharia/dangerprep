@@ -10,6 +10,7 @@ import {
   faArrowRightFromBracket,
   faGlobe,
   faGear,
+  faTag,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
@@ -338,16 +339,6 @@ export const TailscaleTab: React.FC = () => {
                   });
                 }
 
-                // Tailscale tags
-                if (peer.tags && peer.tags.length > 0) {
-                  peer.tags.forEach(tag => {
-                    peerTags.push({
-                      label: tag.replace('tag:', ''),
-                      variant: 'neutral',
-                    });
-                  });
-                }
-
                 // Subnet Routes
                 if (peer.subnetRoutes && peer.subnetRoutes.length > 0) {
                   peer.subnetRoutes.forEach(route => {
@@ -369,6 +360,31 @@ export const TailscaleTab: React.FC = () => {
                   });
                 }
 
+                // Tailscale tags (after system-level tags)
+                if (peer.tags && peer.tags.length > 0) {
+                  peer.tags.forEach(tag => {
+                    const tagName = tag.replace('tag:', '');
+                    // Filter out exit-node tag
+                    if (tagName === 'exit-node') return;
+
+                    peerTags.push({
+                      label: tagName,
+                      icon: (
+                        <FontAwesomeIcon
+                          icon={faTag}
+                          style={
+                            {
+                              '--fa-primary-color': '#8b5cf6', // Purple for tags
+                              '--fa-primary-opacity': 0.8,
+                            } as React.CSSProperties
+                          }
+                        />
+                      ),
+                      variant: 'neutral',
+                    });
+                  });
+                }
+
                 // Expired key warning
                 if (peer.expired) {
                   peerTags.push({
@@ -379,9 +395,6 @@ export const TailscaleTab: React.FC = () => {
 
                 // Build subtitle with IP and relay info
                 let subtitle = peer.ipAddress;
-                if (peer.relay) {
-                  subtitle += ` • Relay: ${peer.relay}`;
-                }
                 if (peer.lastSeen && !peer.online) {
                   subtitle += ` • Last seen: ${new Date(peer.lastSeen).toLocaleDateString()}`;
                 }
