@@ -90,7 +90,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
 
   // OS tag (icon only)
   miniTags.push(
-    <wa-tag key='os' variant='success' size='small'>
+    <wa-tag key='os' variant='neutral' size='small'>
       <wa-icon
         family='brands'
         name={osInfo.icon}
@@ -103,18 +103,18 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
   // Exit node tag (icon only)
   if (peer.exitNode || peer.exitNodeOption) {
     miniTags.push(
-      <wa-tag key='exit-node' variant={peer.exitNode ? 'warning' : 'neutral'} size='small'>
+      <wa-tag key='exit-node' variant={peer.exitNode ? 'success' : 'neutral'} size='small'>
         <FontAwesomeIcon
           icon={faArrowRightFromBracket}
           style={
             {
-              '--fa-primary-color': peer.exitNode ? '#fb923c' : '#6b7280',
+              '--fa-primary-color': '#fb923c',
               '--fa-primary-opacity': 0.9,
               '--fa-secondary-opacity': 0.8,
               fontSize: '0.875em',
             } as React.CSSProperties
           }
-          title={peer.exitNode ? 'Active Exit Node' : 'Exit Node Available'}
+          title='Exit Node'
         />
       </wa-tag>
     );
@@ -123,7 +123,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
   // App connector tag (icon only)
   if (isAppConnector) {
     miniTags.push(
-      <wa-tag key='app-connector' variant='brand' size='small'>
+      <wa-tag key='app-connector' variant='neutral' size='small'>
         <FontAwesomeIcon
           icon={faPlugCircleBolt}
           style={
@@ -142,7 +142,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
   // Subnet routes tag (icon only)
   if (peer.subnetRoutes && peer.subnetRoutes.length > 0) {
     miniTags.push(
-      <wa-tag key='subnets' variant='success' size='small'>
+      <wa-tag key='subnets' variant='neutral' size='small'>
         <FontAwesomeIcon
           icon={faRoute}
           style={
@@ -161,7 +161,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
   // SSH tag (icon only)
   if (peer.sshEnabled) {
     miniTags.push(
-      <wa-tag key='ssh' variant='brand' size='small'>
+      <wa-tag key='ssh' variant='neutral' size='small'>
         <FontAwesomeIcon
           icon={faTerminal}
           style={
@@ -191,12 +191,13 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
         style={{
           cursor: 'pointer',
           position: 'relative',
+          height: '100%',
         }}
       >
         <wa-callout
           appearance='outlined'
           variant={peer.online ? 'success' : 'neutral'}
-          style={{ pointerEvents: 'none' }}
+          style={{ pointerEvents: 'none', height: '100%' }}
         >
           <div className='wa-flank wa-gap-m wa-align-items-center'>
             {/* Computer Icon with status color */}
@@ -253,7 +254,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                 {/* Detailed tags */}
                 <div className='wa-cluster wa-gap-xs'>
                   {/* OS tag with label */}
-                  <wa-tag variant='success' size='small'>
+                  <wa-tag variant='neutral' size='small'>
                     <div className='wa-flank wa-gap-xs'>
                       <wa-icon family='brands' name={osInfo.icon} style={{ color: osInfo.color }} />
                       <span>
@@ -272,7 +273,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                     peer.tailscaleIPs
                       .filter(ip => ip.includes(':'))
                       .map((ipv6, idx) => (
-                        <wa-tag key={`ipv6-${idx}`} variant='brand' size='small'>
+                        <wa-tag key={`ipv6-${idx}`} variant='neutral' size='small'>
                           <div className='wa-flank wa-gap-xs'>
                             <FontAwesomeIcon
                               icon={faGlobe}
@@ -289,25 +290,25 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                       ))}
 
                   {peer.exitNodeOption && (
-                    <wa-tag variant={peer.exitNode ? 'warning' : 'neutral'} size='small'>
+                    <wa-tag variant={peer.exitNode ? 'success' : 'neutral'} size='small'>
                       <div className='wa-flank wa-gap-xs'>
                         <FontAwesomeIcon
                           icon={faArrowRightFromBracket}
                           style={
                             {
-                              '--fa-primary-color': peer.exitNode ? '#fb923c' : '#6b7280',
+                              '--fa-primary-color': '#fb923c',
                               '--fa-primary-opacity': 0.9,
                             } as React.CSSProperties
                           }
                         />
-                        <span>{peer.exitNode ? 'Active Exit Node' : 'Exit Node Available'}</span>
+                        <span>Exit Node</span>
                       </div>
                     </wa-tag>
                   )}
 
                   {/* App connector tag */}
                   {isAppConnector && (
-                    <wa-tag variant='brand' size='small'>
+                    <wa-tag variant='neutral' size='small'>
                       <div className='wa-flank wa-gap-xs'>
                         <FontAwesomeIcon
                           icon={faPlugCircleBolt}
@@ -325,7 +326,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
 
                   {/* SSH with label */}
                   {peer.sshEnabled && (
-                    <wa-tag variant='brand' size='small'>
+                    <wa-tag variant='neutral' size='small'>
                       <div className='wa-flank wa-gap-xs'>
                         <FontAwesomeIcon
                           icon={faTerminal}
@@ -344,7 +345,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                   {/* Subnet routes with labels */}
                   {peer.subnetRoutes &&
                     peer.subnetRoutes.map((route, idx) => (
-                      <wa-tag key={`route-${idx}`} variant='success' size='small'>
+                      <wa-tag key={`route-${idx}`} variant='neutral' size='small'>
                         <div className='wa-flank wa-gap-xs'>
                           <FontAwesomeIcon
                             icon={faRoute}
@@ -368,7 +369,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                       if (tagName === 'exit-node' || tagName === 'connector') return null;
 
                       return (
-                        <wa-tag key={`tag-${idx}`} variant='brand' size='small'>
+                        <wa-tag key={`tag-${idx}`} variant='neutral' size='small'>
                           <div className='wa-flank wa-gap-xs'>
                             <FontAwesomeIcon
                               icon={faTag}

@@ -2,7 +2,6 @@ import {
   faNetworkWired,
   faTerminal,
   faRoute,
-  faArrowUpRightFromSquare,
   faCodeCompare,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
@@ -137,7 +136,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleTags.push({
       label: osInfo,
       icon: <wa-icon family='brands' name={osIcon} style={{ color: osColor }} />,
-      variant: 'success',
+      variant: 'neutral',
     });
   }
 
@@ -159,7 +158,7 @@ export const TailscaleTab: React.FC = () => {
             }
           />
         ),
-        variant: isIPv6 ? 'brand' : 'success',
+        variant: 'neutral',
       });
     });
   }
@@ -180,7 +179,7 @@ export const TailscaleTab: React.FC = () => {
           }
         />
       ),
-      variant: 'warning',
+      variant: 'success',
     });
   }
 
@@ -201,7 +200,7 @@ export const TailscaleTab: React.FC = () => {
             }
           />
         ),
-        variant: 'success',
+        variant: 'neutral',
       });
     });
   }
@@ -222,27 +221,7 @@ export const TailscaleTab: React.FC = () => {
           }
         />
       ),
-      variant: 'brand',
-    });
-  }
-
-  // Update available tag
-  if (settings?.latestVersion && settings.version !== settings.latestVersion) {
-    tailscaleTags.push({
-      label: 'Update Available',
-      value: cleanVersion(settings.latestVersion),
-      icon: (
-        <FontAwesomeIcon
-          icon={faArrowUpRightFromSquare}
-          style={
-            {
-              '--fa-primary-color': '#f59e0b',
-              '--fa-primary-opacity': 0.9,
-            } as React.CSSProperties
-          }
-        />
-      ),
-      variant: 'warning',
+      variant: 'neutral',
     });
   }
 
@@ -262,7 +241,7 @@ export const TailscaleTab: React.FC = () => {
           }
         />
       ),
-      variant: 'brand',
+      variant: 'neutral',
     });
   }
 
@@ -306,19 +285,46 @@ export const TailscaleTab: React.FC = () => {
               <div className='wa-cluster wa-gap-xs'>
                 {tailscaleInterface.acceptDNS && (
                   <wa-tag variant='success' size='small'>
-                    <FontAwesomeIcon icon={faGlobe} style={{ marginRight: '4px' }} />
+                    <FontAwesomeIcon
+                      icon={faGlobe}
+                      style={
+                        {
+                          '--fa-primary-color': '#10b981',
+                          '--fa-primary-opacity': 0.9,
+                          marginRight: '4px',
+                        } as React.CSSProperties
+                      }
+                    />
                     DNS
                   </wa-tag>
                 )}
                 {tailscaleInterface.acceptRoutes && (
                   <wa-tag variant='success' size='small'>
-                    <FontAwesomeIcon icon={faRoute} style={{ marginRight: '4px' }} />
+                    <FontAwesomeIcon
+                      icon={faRoute}
+                      style={
+                        {
+                          '--fa-primary-color': '#10b981',
+                          '--fa-primary-opacity': 0.9,
+                          marginRight: '4px',
+                        } as React.CSSProperties
+                      }
+                    />
                     Routes
                   </wa-tag>
                 )}
                 {tailscaleInterface.sshEnabled && (
                   <wa-tag variant='success' size='small'>
-                    <FontAwesomeIcon icon={faTerminal} style={{ marginRight: '4px' }} />
+                    <FontAwesomeIcon
+                      icon={faTerminal}
+                      style={
+                        {
+                          '--fa-primary-color': '#a855f7',
+                          '--fa-primary-opacity': 0.9,
+                          marginRight: '4px',
+                        } as React.CSSProperties
+                      }
+                    />
                     SSH
                   </wa-tag>
                 )}
