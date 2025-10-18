@@ -65,7 +65,7 @@ export const TailscaleTab: React.FC = () => {
       return peer1.hostname.localeCompare(peer2.hostname)
     } else if (peer1.online && !peer2.online) {
       return -1;
-    } else if (!peer1.online && peer2.online) {
+    } else  {
       return 1;
     }
   });
