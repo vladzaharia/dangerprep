@@ -443,10 +443,12 @@ function TailscaleSettingsContent() {
           headerSlot={
             <wa-switch
               defaultChecked={settings.advertiseConnector}
-              onchange={() =>
-                handleToggleSetting('advertiseConnector', settings.advertiseConnector)
+              disabled={true}
+              title={
+                settings.advertiseConnector
+                  ? 'Please disable this by removing the `connector` tag.'
+                  : 'Please enable this by adding the `connector` tag.'
               }
-              disabled={loading !== null || !settings.running}
             ></wa-switch>
           }
         />

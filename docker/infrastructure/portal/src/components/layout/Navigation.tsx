@@ -184,20 +184,22 @@ export const Navigation: React.FC = () => {
   };
 
   return (
-    <div className='app-navigation wa-split:column'>
-      {/* Top navigation section */}
-      {topNavItems.length > 0 && (
-        <div className='wa-stack app-navigation-list'>
-          {topNavItems.map((item, index) => renderNavItem(item, index))}
-        </div>
-      )}
+    <div className='app-navigation'>
+      <wa-card className='app-navigation-card' appearance='outlined'>
+        {/* Top navigation section - main body */}
+        {topNavItems.length > 0 && (
+          <div className='wa-stack wa-gap-xl'>
+            {topNavItems.map((item, index) => renderNavItem(item, index))}
+          </div>
+        )}
 
-      {/* Bottom navigation section */}
-      {bottomNavItems.length > 0 && (
-        <div className='wa-stack app-navigation-list'>
-          {bottomNavItems.map((item, index) => renderNavItem(item, index))}
-        </div>
-      )}
+        {/* Bottom navigation section - footer slot */}
+        {bottomNavItems.length > 0 && (
+          <div slot='footer' className='wa-stack wa-gap-xl'>
+            {bottomNavItems.map((item, index) => renderNavItem(item, index))}
+          </div>
+        )}
+      </wa-card>
     </div>
   );
 };

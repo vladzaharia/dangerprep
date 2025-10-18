@@ -36,22 +36,25 @@ body {
 /* Navigation sidebar - Background layer */
 .app-navigation {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding-top: var(--wa-space-l);
-  padding-bottom: var(--wa-space-l);
+  padding: var(--wa-space-2xl);
+  padding-right: 0;
 }
 
-.app-navigation-list {
-  gap: var(--wa-space-xl);
+.app-navigation-card {
+  height: 100%;
+  background-color: color-mix(in srgb, var(--wa-color-neutral-fill-quiet) 50%, transparent) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-.app-navigation-bottom {
+.app-navigation-card::part(body) {
   display: flex;
   flex-direction: column;
-  gap: var(--wa-space-xl);
-  align-items: center;
+  flex: 1;
+}
+
+.app-navigation-card::part(footer) {
+  border-top: none;
 }
 
 .connection-status-button {
@@ -315,11 +318,16 @@ body {
   .app-navigation {
     order: 2; /* Navigation at bottom on mobile */
     height: auto;
-    padding: var(--wa-space-s);
-    flex-direction: row;
+    padding: var(--wa-space-2xl);
+    padding-top: 0;
   }
 
-  .app-navigation .wa-split\:column {
+  .app-navigation-card {
+    height: auto;
+  }
+
+  .app-navigation-card::part(body),
+  .app-navigation-card::part(footer) {
     flex-direction: row;
     justify-content: space-around;
     align-items: center;
