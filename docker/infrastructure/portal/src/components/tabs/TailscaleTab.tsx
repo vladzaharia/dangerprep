@@ -15,7 +15,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { useTailscaleInterface } from '../../hooks/useSWRData';
+import { useTailscaleInterface, useTailscalePeers } from '../../hooks/useSWRData';
 import type { TailscaleInterface, TailscalePeer } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
@@ -25,6 +25,7 @@ import type { StatusCardTag } from '../cards/StatusCard';
  */
 export const TailscaleTab: React.FC = () => {
   const { data: tailscale } = useTailscaleInterface();
+  const { data: peersData } = useTailscalePeers();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -58,8 +59,10 @@ export const TailscaleTab: React.FC = () => {
   }
 
   const tailscaleInterface = tailscale as TailscaleInterface;
-  const peers =
-    tailscaleInterface.peers?.sort((peer: TailscalePeer) => (peer.online ? -1 : 1)) || [];
+  // Use peers from dedicated endpoint, fallback to interface peers
+  const peers = (peersData || tailscaleInterface.peers || []).sort((peer: TailscalePeer) =>
+    peer.online ? -1 : 1
+  );
   const onlinePeers = peers.filter((peer: TailscalePeer) => peer.online);
 
   // Prepare Tailscale interface data
@@ -243,6 +246,14 @@ export const TailscaleTab: React.FC = () => {
               {peers.map((peer: TailscalePeer, index: number) => {
                 const peerTags: StatusCardTag[] = [];
 
+                // OS tag
+                if (peer.os) {
+                  peerTags.push({
+                    label: peer.os,
+                    variant: 'neutral',
+                  });
+                }
+
                 // Exit Node (currently being used)
                 if (peer.exitNode) {
                   peerTags.push({
@@ -301,6 +312,16 @@ export const TailscaleTab: React.FC = () => {
                   });
                 }
 
+                // Tailscale tags
+                if (peer.tags && peer.tags.length > 0) {
+                  peer.tags.forEach(tag => {
+                    peerTags.push({
+                      label: tag.replace('tag:', ''),
+                      variant: 'neutral',
+                    });
+                  });
+                }
+
                 // Subnet Routes
                 if (peer.subnetRoutes && peer.subnetRoutes.length > 0) {
                   peer.subnetRoutes.forEach(route => {
@@ -322,9 +343,26 @@ export const TailscaleTab: React.FC = () => {
                   });
                 }
 
+                // Expired key warning
+                if (peer.expired) {
+                  peerTags.push({
+                    label: 'Expired',
+                    variant: 'danger',
+                  });
+                }
+
+                // Build subtitle with IP and relay info
+                let subtitle = peer.ipAddress;
+                if (peer.relay) {
+                  subtitle += ` • Relay: ${peer.relay}`;
+                }
+                if (peer.lastSeen && !peer.online) {
+                  subtitle += ` • Last seen: ${new Date(peer.lastSeen).toLocaleDateString()}`;
+                }
+
                 return (
                   <StatusCard
-                    key={`peer-${index}`}
+                    key={peer.id || `peer-${index}`}
                     type='callout'
                     variant={peer.online ? 'success' : 'neutral'}
                     layout='horizontal'
@@ -342,7 +380,7 @@ export const TailscaleTab: React.FC = () => {
                       />
                     }
                     title={peer.hostname || peer.ipAddress}
-                    subtitle={peer.ipAddress}
+                    subtitle={subtitle}
                     tags={peerTags}
                     className='tailscale-peer'
                   />

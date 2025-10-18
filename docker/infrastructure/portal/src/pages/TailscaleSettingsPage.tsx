@@ -125,6 +125,46 @@ function TailscaleSettingsContent() {
     <div className='wa-stack wa-gap-xl'>
       <h2>Tailscale Settings</h2>
 
+      {/* Version and Health Information */}
+      {(settings.version || settings.health?.length || settings.certDomains?.length) && (
+        <div className='wa-stack wa-gap-s'>
+          {settings.version && (
+            <div className='wa-cluster wa-gap-s'>
+              <wa-tag variant='neutral' size='small'>
+                Version: {settings.version}
+              </wa-tag>
+              {settings.latestVersion && settings.version !== settings.latestVersion && (
+                <wa-tag variant='warning' size='small'>
+                  Update available: {settings.latestVersion}
+                </wa-tag>
+              )}
+            </div>
+          )}
+          {settings.health && settings.health.length > 0 && (
+            <wa-callout variant='warning'>
+              <strong>Health Issues:</strong>
+              <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                {settings.health.map((issue, idx) => (
+                  <li key={idx}>{issue}</li>
+                ))}
+              </ul>
+            </wa-callout>
+          )}
+          {settings.certDomains && settings.certDomains.length > 0 && (
+            <div className='wa-cluster wa-gap-xs'>
+              <span style={{ fontSize: '0.875rem', color: 'var(--wa-color-neutral-600)' }}>
+                Cert Domains:
+              </span>
+              {settings.certDomains.map((domain, idx) => (
+                <wa-tag key={idx} variant='neutral' size='small'>
+                  {domain}
+                </wa-tag>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Status message */}
       {message && (
         <wa-callout variant={message.type === 'success' ? 'success' : 'danger'}>
@@ -147,6 +187,13 @@ function TailscaleSettingsContent() {
           icon={faPowerOff}
           iconStyle={settings.running ? ICON_STYLES.success : ICON_STYLES.danger}
           title='Tailscale Status'
+          description={
+            settings.backendState
+              ? `Backend State: ${settings.backendState}`
+              : settings.running
+                ? 'Tailscale is running'
+                : 'Tailscale is stopped'
+          }
           loading={loading === 'tailscale-start' || loading === 'tailscale-stop'}
           footerSlot={
             settings.running ? (

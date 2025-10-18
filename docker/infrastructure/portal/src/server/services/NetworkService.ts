@@ -1090,52 +1090,49 @@ export class NetworkService {
           tailscaleInfo.routeAdvertising = status.Self.PrimaryRoutes || [];
         }
 
-        // Parse peers with enhanced information
+        // Parse peers with comprehensive information
         if (status.Peer) {
-          type TailscalePeerRaw = {
-            HostName: string;
-            TailscaleIPs?: string[];
-            Online: boolean;
-            LastSeen?: string;
-            OS?: string;
-            ExitNode?: boolean;
-            ExitNodeOption?: boolean;
-            CapMap?: { ssh?: boolean };
-            PrimaryRoutes?: string[];
-            Relay?: string;
-            Tags?: string[];
-          };
-
-          tailscaleInfo.peers = (Object.values(status.Peer) as TailscalePeerRaw[]).map(peer => {
-            const mappedPeer: {
-              hostname: string;
-              ipAddress: string;
-              online: boolean;
-              lastSeen?: string;
-              os?: string;
-              exitNode?: boolean;
-              exitNodeOption?: boolean;
-              sshEnabled?: boolean;
-              subnetRoutes?: string[];
-              relay?: string;
-              tags?: string[];
-            } = {
-              hostname: peer.HostName,
-              ipAddress: peer.TailscaleIPs?.[0] || '',
-              online: peer.Online,
-            };
-
-            if (peer.LastSeen !== undefined) mappedPeer.lastSeen = peer.LastSeen;
-            if (peer.OS !== undefined) mappedPeer.os = peer.OS;
-            if (peer.ExitNode !== undefined) mappedPeer.exitNode = peer.ExitNode;
-            if (peer.ExitNodeOption !== undefined) mappedPeer.exitNodeOption = peer.ExitNodeOption;
-            if (peer.CapMap?.ssh !== undefined) mappedPeer.sshEnabled = peer.CapMap.ssh;
-            if (peer.PrimaryRoutes !== undefined) mappedPeer.subnetRoutes = peer.PrimaryRoutes;
-            if (peer.Relay !== undefined) mappedPeer.relay = peer.Relay;
-            if (peer.Tags !== undefined) mappedPeer.tags = peer.Tags;
-
-            return mappedPeer;
-          });
+          tailscaleInfo.peers = Object.values(status.Peer).map((peer: any) => ({
+            id: peer.ID || '',
+            publicKey: peer.PublicKey || '',
+            hostname: peer.HostName || '',
+            dnsName: peer.DNSName || '',
+            os: peer.OS || '',
+            userId: peer.UserID || 0,
+            tailscaleIPs: peer.TailscaleIPs || [],
+            allowedIPs: peer.AllowedIPs || [],
+            tags: peer.Tags || undefined,
+            addrs: peer.Addrs || undefined,
+            curAddr: peer.CurAddr || undefined,
+            relay: peer.Relay || undefined,
+            peerRelay: peer.PeerRelay || undefined,
+            rxBytes: peer.RxBytes || 0,
+            txBytes: peer.TxBytes || 0,
+            created: peer.Created || '',
+            lastWrite: peer.LastWrite || undefined,
+            lastSeen: peer.LastSeen || undefined,
+            lastHandshake: peer.LastHandshake || undefined,
+            online: peer.Online || false,
+            exitNode: peer.ExitNode || false,
+            exitNodeOption: peer.ExitNodeOption || false,
+            active: peer.Active || false,
+            peerAPIURL: peer.PeerAPIURL || undefined,
+            taildropTarget: peer.TaildropTarget || undefined,
+            noFileSharingReason: peer.NoFileSharingReason || undefined,
+            sshHostKeys: peer.sshHostKeys || undefined,
+            capabilities: peer.Capabilities || undefined,
+            capMap: peer.CapMap || undefined,
+            inNetworkMap: peer.InNetworkMap || false,
+            inMagicSock: peer.InMagicSock || false,
+            inEngine: peer.InEngine || false,
+            expired: peer.Expired || undefined,
+            keyExpiry: peer.KeyExpiry || undefined,
+            primaryRoutes: peer.PrimaryRoutes || undefined,
+            // Legacy/computed fields
+            ipAddress: peer.TailscaleIPs?.[0] || '',
+            subnetRoutes: peer.PrimaryRoutes || undefined,
+            sshEnabled: peer.sshHostKeys && peer.sshHostKeys.length > 0,
+          }));
         }
       } catch (error) {
         this.logger.warn('Failed to parse Tailscale status JSON', {

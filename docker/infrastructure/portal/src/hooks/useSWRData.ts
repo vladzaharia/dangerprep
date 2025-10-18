@@ -7,6 +7,8 @@ import type {
   NetworkInterface,
   TailscaleSettings,
   TailscaleExitNode,
+  TailscalePeer,
+  TailscaleStatus,
 } from '../types/network';
 import type { ServiceMetadata } from '../types/service';
 
@@ -312,6 +314,32 @@ export function useTailscaleSettings(config?: SWRConfiguration) {
  */
 export function useTailscaleExitNodes(config?: SWRConfiguration) {
   return useSWR<TailscaleExitNode[]>('/api/tailscale/exit-nodes', fetcher, {
+    ...defaultConfig,
+    ...config,
+  });
+}
+
+/**
+ * Hook for fetching Tailscale peers
+ *
+ * @example
+ * const { data, error, isLoading } = useTailscalePeers();
+ */
+export function useTailscalePeers(config?: SWRConfiguration) {
+  return useSWR<TailscalePeer[]>('/api/tailscale/peers', fetcher, {
+    ...defaultConfig,
+    ...config,
+  });
+}
+
+/**
+ * Hook for fetching full Tailscale status
+ *
+ * @example
+ * const { data, error, isLoading } = useTailscaleStatus();
+ */
+export function useTailscaleStatus(config?: SWRConfiguration) {
+  return useSWR<TailscaleStatus>('/api/tailscale/status', fetcher, {
     ...defaultConfig,
     ...config,
   });

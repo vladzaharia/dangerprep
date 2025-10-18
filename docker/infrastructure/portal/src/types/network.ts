@@ -68,20 +68,48 @@ export interface WiFiInterface extends BaseNetworkInterface {
 }
 
 /**
- * Tailscale peer information
+ * Tailscale peer information (comprehensive)
  */
 export interface TailscalePeer {
+  id: string;
+  publicKey: string;
   hostname: string;
-  ipAddress: string;
-  online: boolean;
+  dnsName: string;
+  os: string;
+  userId: number;
+  tailscaleIPs: string[];
+  allowedIPs: string[];
+  tags?: string[];
+  addrs?: string[];
+  curAddr?: string;
+  relay?: string;
+  peerRelay?: string;
+  rxBytes: number;
+  txBytes: number;
+  created: string;
+  lastWrite?: string;
   lastSeen?: string;
-  os?: string;
-  exitNode?: boolean;
-  exitNodeOption?: boolean; // Can be used as exit node
-  sshEnabled?: boolean; // SSH is enabled on this peer
-  subnetRoutes?: string[]; // Advertised subnet routes
-  relay?: string; // Relay server being used
-  tags?: string[]; // Tailscale tags
+  lastHandshake?: string;
+  online: boolean;
+  exitNode: boolean;
+  exitNodeOption: boolean;
+  active: boolean;
+  peerAPIURL?: string[];
+  taildropTarget?: number;
+  noFileSharingReason?: string;
+  sshHostKeys?: string[];
+  capabilities?: string[];
+  capMap?: Record<string, unknown>;
+  inNetworkMap: boolean;
+  inMagicSock: boolean;
+  inEngine: boolean;
+  expired?: boolean;
+  keyExpiry?: string;
+  primaryRoutes?: string[];
+  // Legacy/computed fields for backward compatibility
+  ipAddress: string; // First Tailscale IP
+  subnetRoutes?: string[]; // Alias for primaryRoutes
+  sshEnabled?: boolean; // Computed from sshHostKeys
 }
 
 /**
@@ -111,6 +139,87 @@ export interface TailscaleSettings {
   advertiseConnector: boolean;
   snatSubnetRoutes: boolean;
   statefulFiltering: boolean;
+  // Additional status information
+  version?: string;
+  backendState?: string;
+  health?: string[];
+  certDomains?: string[];
+  latestVersion?: string;
+}
+
+/**
+ * Tailscale self node information
+ */
+export interface TailscaleSelf {
+  id: string;
+  publicKey: string;
+  hostname: string;
+  dnsName: string;
+  os: string;
+  userId: number;
+  tailscaleIPs: string[];
+  allowedIPs: string[];
+  addrs: string[];
+  curAddr?: string;
+  relay?: string;
+  peerRelay?: string;
+  rxBytes: number;
+  txBytes: number;
+  created: string;
+  lastWrite?: string;
+  lastSeen?: string;
+  lastHandshake?: string;
+  online: boolean;
+  exitNode: boolean;
+  exitNodeOption: boolean;
+  active: boolean;
+  peerAPIURL?: string[];
+  taildropTarget?: number;
+  noFileSharingReason?: string;
+  capabilities?: string[];
+  capMap?: Record<string, unknown>;
+  inNetworkMap: boolean;
+  inMagicSock: boolean;
+  inEngine: boolean;
+  keyExpiry?: string;
+}
+
+/**
+ * Tailscale tailnet information
+ */
+export interface TailscaleTailnet {
+  name: string;
+  magicDNSSuffix: string;
+  magicDNSEnabled: boolean;
+}
+
+/**
+ * Tailscale user information
+ */
+export interface TailscaleUser {
+  id: number;
+  loginName: string;
+  displayName: string;
+}
+
+/**
+ * Tailscale full status
+ */
+export interface TailscaleStatus {
+  version: string;
+  tun: boolean;
+  backendState: string;
+  haveNodeKey: boolean;
+  authURL?: string;
+  tailscaleIPs: string[];
+  self: TailscaleSelf;
+  health: string[];
+  magicDNSSuffix: string;
+  currentTailnet?: TailscaleTailnet;
+  certDomains?: string[];
+  clientVersion?: {
+    latestVersion: string;
+  };
 }
 
 /**

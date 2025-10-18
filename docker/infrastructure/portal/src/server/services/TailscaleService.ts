@@ -3,7 +3,14 @@ import { promisify } from 'util';
 
 import { LoggerFactory, LogLevel } from '@dangerprep/logging';
 
-import type { TailscaleSettings, TailscaleExitNode } from '../../types/network';
+import type {
+  TailscaleSettings,
+  TailscaleExitNode,
+  TailscalePeer,
+  TailscaleStatus,
+  TailscaleSelf,
+  TailscaleTailnet,
+} from '../../types/network';
 
 const execAsync = promisify(exec);
 
@@ -56,6 +63,12 @@ export class TailscaleService {
         advertiseConnector: status.Self?.CapMap?.['advertise-connector'] !== false,
         snatSubnetRoutes: status.Self?.CapMap?.['snat-subnet-routes'] !== false,
         statefulFiltering: status.Self?.CapMap?.['stateful-filtering'] !== false,
+        // Additional status information
+        version: status.Version,
+        backendState: status.BackendState,
+        health: status.Health || [],
+        certDomains: status.CertDomains || [],
+        latestVersion: status.ClientVersion?.LatestVersion,
       };
 
       this.logger.debug('Tailscale settings retrieved', { settings });
@@ -486,5 +499,164 @@ export class TailscaleService {
         message: `Failed to update settings: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
+  }
+
+  /**
+   * Get full Tailscale status
+   */
+  async getStatus(): Promise<TailscaleStatus | null> {
+    this.logger.debug('Getting Tailscale status');
+
+    try {
+      const { stdout } = await execAsync('tailscale status --json 2>/dev/null');
+      const rawStatus = JSON.parse(stdout);
+
+      const status: TailscaleStatus = {
+        version: rawStatus.Version || '',
+        tun: rawStatus.TUN || false,
+        backendState: rawStatus.BackendState || 'Unknown',
+        haveNodeKey: rawStatus.HaveNodeKey || false,
+        authURL: rawStatus.AuthURL || undefined,
+        tailscaleIPs: rawStatus.TailscaleIPs || [],
+        self: this.parseSelfNode(rawStatus.Self),
+        health: rawStatus.Health || [],
+        magicDNSSuffix: rawStatus.MagicDNSSuffix || '',
+        currentTailnet: rawStatus.CurrentTailnet
+          ? {
+              name: rawStatus.CurrentTailnet.Name || '',
+              magicDNSSuffix: rawStatus.CurrentTailnet.MagicDNSSuffix || '',
+              magicDNSEnabled: rawStatus.CurrentTailnet.MagicDNSEnabled || false,
+            }
+          : undefined,
+        certDomains: rawStatus.CertDomains || [],
+        clientVersion: rawStatus.ClientVersion
+          ? {
+              latestVersion: rawStatus.ClientVersion.LatestVersion || '',
+            }
+          : undefined,
+      };
+
+      this.logger.debug('Tailscale status retrieved', { status });
+      return status;
+    } catch (error) {
+      this.logger.error('Failed to get Tailscale status', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Get Tailscale peers
+   */
+  async getPeers(): Promise<TailscalePeer[]> {
+    this.logger.debug('Getting Tailscale peers');
+
+    try {
+      const { stdout } = await execAsync('tailscale status --json 2>/dev/null');
+      const status = JSON.parse(stdout);
+
+      const peers: TailscalePeer[] = [];
+
+      if (status.Peer) {
+        Object.values(status.Peer).forEach((peer: any) => {
+          peers.push(this.parsePeer(peer));
+        });
+      }
+
+      this.logger.debug('Tailscale peers retrieved', { count: peers.length });
+      return peers;
+    } catch (error) {
+      this.logger.error('Failed to get Tailscale peers', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Parse self node from raw status
+   */
+  private parseSelfNode(raw: any): TailscaleSelf {
+    return {
+      id: raw.ID || '',
+      publicKey: raw.PublicKey || '',
+      hostname: raw.HostName || '',
+      dnsName: raw.DNSName || '',
+      os: raw.OS || '',
+      userId: raw.UserID || 0,
+      tailscaleIPs: raw.TailscaleIPs || [],
+      allowedIPs: raw.AllowedIPs || [],
+      addrs: raw.Addrs || [],
+      curAddr: raw.CurAddr || undefined,
+      relay: raw.Relay || undefined,
+      peerRelay: raw.PeerRelay || undefined,
+      rxBytes: raw.RxBytes || 0,
+      txBytes: raw.TxBytes || 0,
+      created: raw.Created || '',
+      lastWrite: raw.LastWrite || undefined,
+      lastSeen: raw.LastSeen || undefined,
+      lastHandshake: raw.LastHandshake || undefined,
+      online: raw.Online || false,
+      exitNode: raw.ExitNode || false,
+      exitNodeOption: raw.ExitNodeOption || false,
+      active: raw.Active || false,
+      peerAPIURL: raw.PeerAPIURL || undefined,
+      taildropTarget: raw.TaildropTarget || undefined,
+      noFileSharingReason: raw.NoFileSharingReason || undefined,
+      capabilities: raw.Capabilities || undefined,
+      capMap: raw.CapMap || undefined,
+      inNetworkMap: raw.InNetworkMap || false,
+      inMagicSock: raw.InMagicSock || false,
+      inEngine: raw.InEngine || false,
+      keyExpiry: raw.KeyExpiry || undefined,
+    };
+  }
+
+  /**
+   * Parse peer from raw status
+   */
+  private parsePeer(raw: any): TailscalePeer {
+    return {
+      id: raw.ID || '',
+      publicKey: raw.PublicKey || '',
+      hostname: raw.HostName || '',
+      dnsName: raw.DNSName || '',
+      os: raw.OS || '',
+      userId: raw.UserID || 0,
+      tailscaleIPs: raw.TailscaleIPs || [],
+      allowedIPs: raw.AllowedIPs || [],
+      tags: raw.Tags || undefined,
+      addrs: raw.Addrs || undefined,
+      curAddr: raw.CurAddr || undefined,
+      relay: raw.Relay || undefined,
+      peerRelay: raw.PeerRelay || undefined,
+      rxBytes: raw.RxBytes || 0,
+      txBytes: raw.TxBytes || 0,
+      created: raw.Created || '',
+      lastWrite: raw.LastWrite || undefined,
+      lastSeen: raw.LastSeen || undefined,
+      lastHandshake: raw.LastHandshake || undefined,
+      online: raw.Online || false,
+      exitNode: raw.ExitNode || false,
+      exitNodeOption: raw.ExitNodeOption || false,
+      active: raw.Active || false,
+      peerAPIURL: raw.PeerAPIURL || undefined,
+      taildropTarget: raw.TaildropTarget || undefined,
+      noFileSharingReason: raw.NoFileSharingReason || undefined,
+      sshHostKeys: raw.sshHostKeys || undefined,
+      capabilities: raw.Capabilities || undefined,
+      capMap: raw.CapMap || undefined,
+      inNetworkMap: raw.InNetworkMap || false,
+      inMagicSock: raw.InMagicSock || false,
+      inEngine: raw.InEngine || false,
+      expired: raw.Expired || undefined,
+      keyExpiry: raw.KeyExpiry || undefined,
+      primaryRoutes: raw.PrimaryRoutes || undefined,
+      // Legacy/computed fields
+      ipAddress: raw.TailscaleIPs?.[0] || '',
+      subnetRoutes: raw.PrimaryRoutes || undefined,
+      sshEnabled: raw.sshHostKeys && raw.sshHostKeys.length > 0,
+    };
   }
 }

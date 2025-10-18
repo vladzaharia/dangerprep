@@ -269,4 +269,90 @@ tailscale.post('/stop', async c => {
   }
 });
 
+/**
+ * GET /api/tailscale/status
+ * Get full Tailscale status
+ */
+tailscale.get('/status', async c => {
+  const logger = c.get('logger');
+
+  try {
+    logger.debug('Getting Tailscale status');
+    const status = await tailscaleService.getStatus();
+
+    if (!status) {
+      return c.json(
+        {
+          success: false,
+          error: 'Tailscale not available',
+          message: 'Tailscale is not running or not configured',
+        },
+        404
+      );
+    }
+
+    logger.info('Tailscale status retrieved');
+
+    return c.json({
+      success: true,
+      data: status,
+      metadata: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to get Tailscale status', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    return c.json(
+      {
+        success: false,
+        error: 'Failed to get Tailscale status',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
+  }
+});
+
+/**
+ * GET /api/tailscale/peers
+ * Get Tailscale peers
+ */
+tailscale.get('/peers', async c => {
+  const logger = c.get('logger');
+
+  try {
+    logger.debug('Getting Tailscale peers');
+    const peers = await tailscaleService.getPeers();
+
+    logger.info('Tailscale peers retrieved', { count: peers.length });
+
+    return c.json({
+      success: true,
+      data: peers,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        count: peers.length,
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to get Tailscale peers', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    return c.json(
+      {
+        success: false,
+        error: 'Failed to get Tailscale peers',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
+  }
+});
+
 export default tailscale;
