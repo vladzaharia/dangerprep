@@ -10,7 +10,7 @@ Modern React 19 portal for DangerPrep hotspot services, built with TypeScript, V
 - **Dynamic Configuration**: Runtime environment variable loading via API endpoints
 - **Responsive Design**: Optimized for both mobile (800x480 touchscreen) and desktop
 - **Kiosk Mode**: URL parameter `?kiosk=true` disables clicks for touchscreen display
-- **Auto-Reset**: Automatically returns to homepage after 5 minutes of inactivity
+- **Auto-Reset**: Automatically returns to homepage 5 minutes after last user interaction
 - **Dark Theme**: WebAwesome Awesome theme with dark mode only
 - **Modern Stack**: React 19, TypeScript, Vite, Yarn v4, SWR
 
@@ -111,11 +111,20 @@ The portal is deployed as a Docker service with:
 
 ### Auto-Reset Feature
 The portal automatically returns to the homepage after 5 minutes of user inactivity. This feature:
-- Monitors user activity (mouse movement, touches, clicks, keyboard input, scrolling)
-- Preserves the kiosk mode state (if `?kiosk` is in the URL, it stays in kiosk mode)
-- Redirects to `/qr` in kiosk mode or `/services` in normal mode
-- Uses `react-idle-timer` library with event throttling for optimal performance
-- Ideal for public kiosk displays to reset to the default view
+- **Resets on each interaction**: The 5-minute timer resets every time the user interacts with the page
+- **5 minutes from LAST interaction**: The countdown is always from the most recent user activity, not from page load
+- **Comprehensive activity detection**: Monitors mouse movement, clicks, keyboard input, scrolling, touch gestures, and tab visibility
+- **Preserves kiosk mode**: If `?kiosk` is in the URL, it stays in kiosk mode after reset
+- **Smart routing**: Redirects to `/qr` in kiosk mode or `/services` in normal mode
+- **Optimized performance**: Uses `react-idle-timer` library with 200ms event throttling
+- **Development logging**: In development mode, logs user activity to console for debugging
+- **Ideal for kiosks**: Perfect for public kiosk displays to reset to the default view
+
+**Events that reset the timer:**
+- Mouse: clicks, movement, wheel scrolling
+- Keyboard: any key press
+- Touch: taps and gestures
+- Page: scrolling, tab visibility changes
 
 ## Architecture
 

@@ -2,6 +2,7 @@ import { faTerminal, faRoute } from '@awesome.me/kit-a765fc5647/icons/duotone/so
 import {
   faArrowRightFromBracket,
   faTag,
+  faComputerClassic,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import type WaPopup from '@awesome.me/webawesome/dist/components/popup/popup.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -14,7 +15,7 @@ interface TailscalePeerCardProps {
 }
 
 /**
- * Get OS icon name and color based on OS string
+ * Get OS color and brand icon based on OS string
  */
 const getOSInfo = (os: string): { icon: string; color: string; family: 'brands' } => {
   const osLower = os.toLowerCase();
@@ -99,7 +100,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
           icon={faArrowRightFromBracket}
           style={
             {
-              '--fa-primary-color': peer.exitNode ? '#f59e0b' : '#6b7280', // Orange if active, gray if available
+              '--fa-primary-color': peer.exitNode ? '#fb923c' : '#6b7280', // Bright orange if active, gray if available
               '--fa-primary-opacity': 0.9,
               '--fa-secondary-opacity': 0.8,
               fontSize: '0.875em',
@@ -171,23 +172,32 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
           style={{ pointerEvents: 'none' }}
         >
           <div className='wa-flank wa-gap-m wa-align-items-center'>
-            {/* OS Brand Icon */}
-            <wa-icon
-              family='brands'
-              name={osInfo.icon}
-              style={{ color: osInfo.color, fontSize: '2em' }}
-              label={peer.os}
-            />
+            {/* Computer Icon with OS color */}
+            <div style={{ maxWidth: '3rem', flexShrink: 0 }}>
+              <FontAwesomeIcon
+                icon={faComputerClassic}
+                size='2x'
+                style={
+                  {
+                    '--fa-primary-color': osInfo.color,
+                    '--fa-primary-opacity': 1,
+                    '--fa-secondary-opacity': 0.7,
+                  } as React.CSSProperties
+                }
+              />
+            </div>
 
-            {/* Hostname and IP with mini-tags */}
-            <div className='wa-stack wa-gap-3xs' style={{ flex: 1 }}>
+            {/* Hostname and IP - takes remaining space */}
+            <div className='wa-stack wa-gap-3xs' style={{ flex: 1, minWidth: 0 }}>
               <span className='wa-body-s' style={{ fontWeight: 600 }}>
                 {peer.hostname || peer.ipAddress}
               </span>
-              <div className='wa-flank wa-gap-xs wa-align-items-center'>
-                <span className='wa-caption-s'>{peer.ipAddress}</span>
-                <div className='wa-cluster wa-gap-3xs'>{miniTags}</div>
-              </div>
+              <span className='wa-caption-s'>{peer.ipAddress}</span>
+            </div>
+
+            {/* Mini-tags cluster - right-aligned */}
+            <div style={{ maxWidth: '8rem', flexShrink: 0 }}>
+              <div className='wa-cluster wa-gap-3xs wa-justify-content-end'>{miniTags}</div>
             </div>
           </div>
         </wa-callout>
@@ -198,7 +208,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
             ref={setPopupElement}
             anchor={cardRef.current}
             placement='bottom'
-            distance={4}
+            distance={0}
             active={popupOpen}
             shift
           >
@@ -236,7 +246,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                           icon={faArrowRightFromBracket}
                           style={
                             {
-                              '--fa-primary-color': '#f59e0b',
+                              '--fa-primary-color': '#fb923c',
                               '--fa-primary-opacity': 0.9,
                             } as React.CSSProperties
                           }

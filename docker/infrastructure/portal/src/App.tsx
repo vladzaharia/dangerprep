@@ -63,6 +63,11 @@ function AppLoadingFallback() {
   );
 }
 
+// Idle timeout configuration
+// The timer automatically resets on EACH user interaction, so this is
+// 5 minutes from the LAST interaction, not from page load
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
 /**
  * AppContent component that handles inactivity reset
  * Must be inside Router to use navigation hooks
@@ -71,9 +76,11 @@ function AppContent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Auto-reset to homepage after 5 minutes (300000ms) of inactivity
+  // Auto-reset to homepage after 5 minutes of inactivity
+  // IMPORTANT: The timer automatically resets on each user interaction
+  // This means the user will be redirected 5 minutes after their LAST interaction
   useIdleTimer({
-    timeout: 300000, // 5 minutes
+    timeout: IDLE_TIMEOUT_MS,
     onIdle: () => {
       // Preserve search params (including kiosk mode)
       const queryString = searchParams.toString();
@@ -81,9 +88,27 @@ function AppContent() {
       // Navigate to homepage (which will redirect to /qr or /services based on kiosk mode)
       navigate(`/${searchParamString}`, { replace: true });
     },
-    // Events to listen for user activity
-    events: ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'],
-    // Throttle events to improve performance
+    // Optional: Log user activity in development mode for debugging
+    onAction: event => {
+      if (process.env.NODE_ENV === 'development' && event) {
+        // eslint-disable-next-line no-console
+        console.log('[IdleTimer] User activity detected:', event.type);
+      }
+    },
+    // Events to listen for user activity - comprehensive list for all interaction types
+    // The timer resets whenever any of these events occur
+    events: [
+      'mousedown', // Mouse clicks
+      'mousemove', // Mouse movement
+      'keydown', // Keyboard input (replaces deprecated 'keypress')
+      'wheel', // Mouse wheel scrolling
+      'scroll', // Page scrolling
+      'touchstart', // Touch screen taps
+      'touchmove', // Touch screen gestures
+      'click', // Click events
+      'visibilitychange', // Tab becomes visible
+    ],
+    // Throttle events to improve performance (200ms is a good balance)
     eventsThrottle: 200,
   });
 
