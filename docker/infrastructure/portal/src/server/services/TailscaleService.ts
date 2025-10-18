@@ -49,6 +49,10 @@ export class TailscaleService {
         exitNodeAllowLAN = status.Self.CapMap['exit-node-allow-lan-access'];
       }
 
+      // Check if this node is an app connector by looking for tag:connector
+      const tags = status.Self?.Tags || [];
+      const isAppConnector = tags.some((tag: string) => tag === 'tag:connector');
+
       const settings: TailscaleSettings = {
         running,
         acceptDNS: status.Self?.CapMap?.['accept-dns'] !== false,
@@ -56,10 +60,10 @@ export class TailscaleService {
         ssh: status.Self?.CapMap?.ssh !== false,
         exitNode: status.ExitNodeStatus?.TailscaleIPs?.[0] || null,
         exitNodeAllowLAN,
-        advertiseExitNode: status.Self?.CapMap?.['advertise-exit-node'] !== false,
+        advertiseExitNode: status.Self?.CapMap?.['advertise-exit-node'] === true,
         advertiseRoutes: status.Self?.PrimaryRoutes || [],
         shieldsUp: status.Self?.CapMap?.['shields-up'] !== false,
-        advertiseConnector: status.Self?.CapMap?.['advertise-connector'] !== false,
+        advertiseConnector: isAppConnector,
         snatSubnetRoutes: status.Self?.CapMap?.['snat-subnet-routes'] !== false,
         statefulFiltering: status.Self?.CapMap?.['stateful-filtering'] !== false,
         // Additional status information
@@ -68,6 +72,7 @@ export class TailscaleService {
         health: status.Health || [],
         certDomains: status.CertDomains || [],
         latestVersion: status.ClientVersion?.LatestVersion,
+        tailnetDisplayName: status.Self?.CapMap?.['tailnet-display-name'] || undefined,
       };
 
       this.logger.debug('Tailscale settings retrieved', { settings });

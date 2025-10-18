@@ -2,6 +2,8 @@ import {
   faNetworkWired,
   faTerminal,
   faRoute,
+  faArrowUpRightFromSquare,
+  faCodeCompare,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
   faShieldCheck,
@@ -14,7 +16,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { useTailscaleInterface, useTailscalePeers } from '../../hooks/useSWRData';
+import {
+  useTailscaleInterface,
+  useTailscalePeers,
+  useTailscaleSettings,
+  useTailscaleStatus,
+} from '../../hooks/useSWRData';
 import type { TailscaleInterface, TailscalePeer } from '../../types/network';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
@@ -26,6 +33,8 @@ import { TailscalePeerCard } from '../cards/TailscalePeerCard';
 export const TailscaleTab: React.FC = () => {
   const { data: tailscale } = useTailscaleInterface();
   const { data: peersData } = useTailscalePeers();
+  const { data: settings } = useTailscaleSettings();
+  const { data: status } = useTailscaleStatus();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -94,23 +103,64 @@ export const TailscaleTab: React.FC = () => {
   // Prepare Tailscale interface data
   const tailscaleTags: StatusCardTag[] = [];
 
-  // IP Address tag
-  if (tailscaleInterface.ipAddress) {
+  // Get OS info from status
+  const osInfo = status?.self?.os;
+
+  // Helper to clean version string (remove commit SHA)
+  const cleanVersion = (version?: string) => {
+    if (!version) return undefined;
+    // Remove everything after the dash (commit SHA)
+    return version.split('-')[0];
+  };
+
+  // OS tag
+  if (osInfo) {
+    // Determine OS icon
+    const osLower = osInfo.toLowerCase();
+    let osIcon = 'computer';
+    let osColor = '#6b7280';
+
+    if (osLower.includes('linux')) {
+      osIcon = 'linux';
+      osColor = '#FCC624';
+    } else if (osLower.includes('android')) {
+      osIcon = 'android';
+      osColor = '#3DDC84';
+    } else if (osLower.includes('windows')) {
+      osIcon = 'windows';
+      osColor = '#0078D4';
+    } else if (osLower.includes('mac') || osLower.includes('ios') || osLower.includes('ipad')) {
+      osIcon = 'apple';
+      osColor = '#A855F7';
+    }
+
     tailscaleTags.push({
-      label: 'IP',
-      value: tailscaleInterface.ipAddress,
-      icon: (
-        <FontAwesomeIcon
-          icon={faGlobe}
-          style={
-            {
-              '--fa-primary-color': '#10b981', // Green for IP/network
-              '--fa-primary-opacity': 0.9,
-            } as React.CSSProperties
-          }
-        />
-      ),
-      variant: 'neutral',
+      label: osInfo,
+      icon: <wa-icon family='brands' name={osIcon} style={{ color: osColor }} />,
+      variant: 'success',
+    });
+  }
+
+  // IPv4 and IPv6 tags
+  if (status?.self?.tailscaleIPs) {
+    status.self.tailscaleIPs.forEach(ip => {
+      const isIPv6 = ip.includes(':');
+      tailscaleTags.push({
+        label: isIPv6 ? 'IPv6' : 'IPv4',
+        value: ip,
+        icon: (
+          <FontAwesomeIcon
+            icon={faGlobe}
+            style={
+              {
+                '--fa-primary-color': isIPv6 ? '#8b5cf6' : '#10b981',
+                '--fa-primary-opacity': 0.9,
+              } as React.CSSProperties
+            }
+          />
+        ),
+        variant: isIPv6 ? 'brand' : 'success',
+      });
     });
   }
 
@@ -123,14 +173,14 @@ export const TailscaleTab: React.FC = () => {
           icon={faArrowRightFromBracket}
           style={
             {
-              '--fa-primary-color': '#3b82f6', // Blue for exit node
+              '--fa-primary-color': '#fb923c',
               '--fa-primary-opacity': 0.9,
               '--fa-secondary-opacity': 0.8,
             } as React.CSSProperties
           }
         />
       ),
-      variant: 'brand',
+      variant: 'warning',
     });
   }
 
@@ -144,15 +194,75 @@ export const TailscaleTab: React.FC = () => {
             icon={faNetworkWired}
             style={
               {
-                '--fa-primary-color': '#10b981', // Green for routes
+                '--fa-primary-color': '#10b981',
                 '--fa-primary-opacity': 0.9,
                 '--fa-secondary-opacity': 0.8,
               } as React.CSSProperties
             }
           />
         ),
-        variant: 'neutral',
+        variant: 'success',
       });
+    });
+  }
+
+  // Version tag
+  if (settings?.version) {
+    tailscaleTags.push({
+      label: 'Version',
+      value: cleanVersion(settings.version),
+      icon: (
+        <FontAwesomeIcon
+          icon={faCodeCompare}
+          style={
+            {
+              '--fa-primary-color': '#6366f1',
+              '--fa-primary-opacity': 0.9,
+            } as React.CSSProperties
+          }
+        />
+      ),
+      variant: 'brand',
+    });
+  }
+
+  // Update available tag
+  if (settings?.latestVersion && settings.version !== settings.latestVersion) {
+    tailscaleTags.push({
+      label: 'Update Available',
+      value: cleanVersion(settings.latestVersion),
+      icon: (
+        <FontAwesomeIcon
+          icon={faArrowUpRightFromSquare}
+          style={
+            {
+              '--fa-primary-color': '#f59e0b',
+              '--fa-primary-opacity': 0.9,
+            } as React.CSSProperties
+          }
+        />
+      ),
+      variant: 'warning',
+    });
+  }
+
+  // Tailnet display name tag
+  if (settings?.tailnetDisplayName) {
+    tailscaleTags.push({
+      label: 'Tailnet',
+      value: settings.tailnetDisplayName,
+      icon: (
+        <FontAwesomeIcon
+          icon={faShieldCheck}
+          style={
+            {
+              '--fa-primary-color': '#a855f7',
+              '--fa-primary-opacity': 0.9,
+            } as React.CSSProperties
+          }
+        />
+      ),
+      variant: 'brand',
     });
   }
 

@@ -145,6 +145,7 @@ export interface TailscaleSettings {
   health?: string[];
   certDomains?: string[];
   latestVersion?: string;
+  tailnetDisplayName?: string;
 }
 
 /**

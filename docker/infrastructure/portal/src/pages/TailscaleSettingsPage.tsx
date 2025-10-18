@@ -281,9 +281,10 @@ function TailscaleSettingsContent() {
               disabled={loading !== null || !settings.running}
             >
               {exitNodes?.map((node: TailscaleExitNode) => (
-                <wa-option key={node.id} value={node.id}>
+                <wa-option key={node.id} value={node.id} disabled={!node.online}>
                   {node.name} {node.location ? `(${node.location})` : ''}
                   {node.suggested ? ' ⭐' : ''}
+                  {!node.online ? ' (Offline)' : ''}
                 </wa-option>
               ))}
             </wa-select>
