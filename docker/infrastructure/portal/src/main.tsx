@@ -12,6 +12,7 @@ import '@awesome.me/webawesome/dist/components/details/details.js';
 import '@awesome.me/webawesome/dist/components/icon/icon.js';
 import '@awesome.me/webawesome/dist/components/input/input.js';
 import '@awesome.me/webawesome/dist/components/option/option.js';
+import '@awesome.me/webawesome/dist/components/popup/popup.js';
 import '@awesome.me/webawesome/dist/components/qr-code/qr-code.js';
 import '@awesome.me/webawesome/dist/components/scroller/scroller.js';
 import '@awesome.me/webawesome/dist/components/select/select.js';
