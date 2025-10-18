@@ -119,8 +119,8 @@ export const PowerPage: React.FC = () => {
         {powerActions.map(action => (
           <SettingsCard
             key={action.id}
-            icon={action.icon}
-            stackedIcon={action.stackedIcon}
+            {...(action.icon ? { icon: action.icon } : {})}
+            {...(action.stackedIcon ? { stackedIcon: action.stackedIcon } : {})}
             iconStyle={ICON_STYLES[action.variant]}
             title={action.label}
             description={action.confirmMessage}

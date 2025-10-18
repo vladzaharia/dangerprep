@@ -324,9 +324,7 @@ function TailscaleSettingsContent() {
           headerSlot={
             <wa-switch
               checked={settings.advertiseExitNode}
-              onchange={() =>
-                handleToggleSetting('advertiseExitNode', settings.advertiseExitNode)
-              }
+              onchange={() => handleToggleSetting('advertiseExitNode', settings.advertiseExitNode)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
           }
@@ -343,10 +341,7 @@ function TailscaleSettingsContent() {
             <wa-input
               value={settings.advertiseRoutes?.join(',') || ''}
               placeholder='192.168.1.0/24,10.0.0.0/8'
-              {...({ disabled: loading !== null || !settings.running } as Record<
-                string,
-                unknown
-              >)}
+              {...({ disabled: loading !== null || !settings.running } as Record<string, unknown>)}
               onchange={async (e: Event) => {
                 const target = e.target as HTMLInputElement;
                 const routes = target.value
@@ -453,9 +448,7 @@ function TailscaleSettingsContent() {
           headerSlot={
             <wa-switch
               checked={settings.snatSubnetRoutes}
-              onchange={() =>
-                handleToggleSetting('snatSubnetRoutes', settings.snatSubnetRoutes)
-              }
+              onchange={() => handleToggleSetting('snatSubnetRoutes', settings.snatSubnetRoutes)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
           }
@@ -471,9 +464,7 @@ function TailscaleSettingsContent() {
           headerSlot={
             <wa-switch
               checked={settings.statefulFiltering}
-              onchange={() =>
-                handleToggleSetting('statefulFiltering', settings.statefulFiltering)
-              }
+              onchange={() => handleToggleSetting('statefulFiltering', settings.statefulFiltering)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
           }

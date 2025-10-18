@@ -1,5 +1,5 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 
 import { createIconStyle, type IconStyleConfig } from '../../utils/iconStyles';
@@ -45,19 +45,19 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
   const iconStyleObj = createIconStyle(iconStyle);
 
   return (
-    <wa-card appearance='outlined' className="settings-card">
+    <wa-card appearance='outlined' className='settings-card'>
       {/* Header slot - typically for switches */}
-      {headerSlot && <div slot='header' style={{ width: '100%' }}>{headerSlot}</div>}
+      {headerSlot && (
+        <div slot='header' style={{ width: '100%' }}>
+          {headerSlot}
+        </div>
+      )}
 
       {/* Main content - icon, title, description */}
       <div className='wa-stack wa-gap-s wa-align-items-center' style={{ justifyContent: 'center' }}>
         {stackedIcon ? (
           <span className='fa-stack fa-2x'>
-            <FontAwesomeIcon
-              icon={stackedIcon.base}
-              className='fa-stack-2x'
-              style={iconStyleObj}
-            />
+            <FontAwesomeIcon icon={stackedIcon.base} className='fa-stack-2x' style={iconStyleObj} />
             <FontAwesomeIcon
               icon={stackedIcon.overlay}
               className='fa-stack-1x'
@@ -85,4 +85,3 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
     </wa-card>
   );
 };
-
