@@ -44,6 +44,7 @@ export const COLORS = {
     upload: '#3b82f6', // Blue - Upload indicators
     download: '#f59e0b', // Amber - Download indicators
     maintenance: '#f59e0b', // Amber - Maintenance mode
+    ipv4: '#10b981', // Green - IPv4 addresses
     ipv6: '#8b5cf6', // Purple variant - IPv6 addresses
     tag: '#6366f1', // Indigo - Generic tags
   },
@@ -197,9 +198,15 @@ export const ICON_STYLES = {
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.medium,
   },
-  /** Network/IP - Green */
+  /** Network - Green */
   network: {
     primaryColor: COLORS.feature.network,
+    primaryOpacity: OPACITIES.high,
+    secondaryOpacity: OPACITIES.medium,
+  },
+  /** IPv4 addresses - Green */
+  ipv4: {
+    primaryColor: COLORS.ui.ipv4,
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.medium,
   },

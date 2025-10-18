@@ -149,9 +149,7 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'IP',
                 value: iface.ipAddress,
-                icon: (
-                  <FontAwesomeIcon icon={faGlobe} style={createIconStyle(ICON_STYLES.network)} />
-                ),
+                icon: <FontAwesomeIcon icon={faGlobe} style={createIconStyle(ICON_STYLES.ipv4)} />,
                 variant: 'neutral',
               });
             }
@@ -245,7 +243,7 @@ export const NetworkStatusTab: React.FC = () => {
                 icon: (
                   <FontAwesomeIcon
                     icon={faGlobe}
-                    style={{ ...createIconStyle(ICON_STYLES.network), maxWidth: '2rem' }}
+                    style={{ ...createIconStyle(ICON_STYLES.ipv4), maxWidth: '2rem' }}
                   />
                 ),
                 variant: 'neutral',

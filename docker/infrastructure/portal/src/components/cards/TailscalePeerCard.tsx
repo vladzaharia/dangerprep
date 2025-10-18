@@ -14,7 +14,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState, useRef, useEffect } from 'react';
 
 import type { TailscalePeer } from '../../types/network';
-import { COLORS, OPACITIES, getOSInfo } from '../../utils/iconStyles';
+import { COLORS, OPACITIES, createIconStyle, ICON_STYLES, getOSInfo } from '../../utils/iconStyles';
 
 interface TailscalePeerCardProps {
   peer: TailscalePeer;
@@ -260,12 +260,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                           <div className='wa-flank wa-gap-xs'>
                             <FontAwesomeIcon
                               icon={faGlobe}
-                              style={
-                                {
-                                  '--fa-primary-color': COLORS.ui.ipv6,
-                                  '--fa-primary-opacity': OPACITIES.high,
-                                } as React.CSSProperties
-                              }
+                              style={createIconStyle(ICON_STYLES.ipv6)}
                             />
                             <span>{ipv6}</span>
                           </div>
@@ -356,12 +351,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                           <div className='wa-flank wa-gap-xs'>
                             <FontAwesomeIcon
                               icon={faTag}
-                              style={
-                                {
-                                  '--fa-primary-color': COLORS.ui.tag,
-                                  '--fa-primary-opacity': OPACITIES.high,
-                                } as React.CSSProperties
-                              }
+                              style={createIconStyle(ICON_STYLES.tag)}
                             />
                             <span>{tagName}</span>
                           </div>

@@ -26,6 +26,11 @@ body {
   height: 100vh;
   width: 100vw;
   gap: 0;
+  background-image: url('/background.svg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 /* Navigation sidebar - Background layer */
@@ -281,7 +286,7 @@ body {
 }
 
 .tailscale-status {
-  min-width: 24rem;
+  width: 24rem;
 }
 
 .tailscale-peer {

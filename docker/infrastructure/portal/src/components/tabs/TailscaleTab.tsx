@@ -130,7 +130,7 @@ export const TailscaleTab: React.FC = () => {
         icon: (
           <FontAwesomeIcon
             icon={faGlobe}
-            style={createIconStyle(isIPv6 ? ICON_STYLES.ipv6 : ICON_STYLES.network)}
+            style={createIconStyle(isIPv6 ? ICON_STYLES.ipv6 : ICON_STYLES.ipv4)}
           />
         ),
         variant: 'neutral',
