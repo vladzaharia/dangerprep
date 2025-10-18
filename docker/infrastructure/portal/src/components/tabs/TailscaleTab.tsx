@@ -268,7 +268,7 @@ export const TailscaleTab: React.FC = () => {
             No peers connected.
           </wa-callout>
         ) : (
-          <wa-scroller orientation='vertical' style={{ maxHeight: '500px' }}>
+          <wa-scroller orientation='vertical'>
             <div
               className='wa-grid wa-gap-xs'
               style={{ '--min-column-size': '18rem' } as React.CSSProperties}
