@@ -1,4 +1,4 @@
-import { faEthernet, faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import { faEthernet, faRouter, faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
   faWifi,
   faGlobe,
@@ -230,7 +230,7 @@ export const NetworkStatusTab: React.FC = () => {
                 value: iface.gateway,
                 icon: (
                   <FontAwesomeIcon
-                    icon={faHardDrive}
+                    icon={faRouter}
                     style={createIconStyle(ICON_STYLES.gateway)}
                   />
                 ),
