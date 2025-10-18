@@ -4,6 +4,7 @@ import React, { Suspense } from 'react';
 
 import { ServiceGrid } from '../components';
 import { useServicesData } from '../hooks/useSWRData';
+import { createIconStyle, ICON_STYLES } from '../utils/iconStyles';
 
 /**
  * Loading skeleton for maintenance services page
@@ -72,16 +73,7 @@ function MaintenanceServicesContent() {
       {services.length === 0 ? (
         <wa-callout variant='neutral'>
           <div slot='icon' style={{ display: 'contents' }}>
-            <FontAwesomeIcon
-              icon={faCircleInfo}
-              style={
-                {
-                  '--fa-primary-color': '#3b82f6', // Blue for info
-                  '--fa-primary-opacity': 1,
-                  '--fa-secondary-opacity': 0.4,
-                } as React.CSSProperties
-              }
-            />
+            <FontAwesomeIcon icon={faCircleInfo} style={createIconStyle(ICON_STYLES.info)} />
           </div>
           No maintenance services are currently available.
         </wa-callout>

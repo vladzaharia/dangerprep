@@ -22,6 +22,7 @@ import {
   useTailscaleStatus,
 } from '../../hooks/useSWRData';
 import type { TailscaleInterface, TailscalePeer } from '../../types/network';
+import { createIconStyle, ICON_STYLES, getOSInfo } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 import { TailscalePeerCard } from '../cards/TailscalePeerCard';
@@ -50,16 +51,7 @@ export const TailscaleTab: React.FC = () => {
     return (
       <wa-callout variant='neutral' className='wa-gap-s'>
         <div slot='icon' style={{ display: 'contents' }}>
-          <FontAwesomeIcon
-            icon={faCircleInfo}
-            style={
-              {
-                '--fa-primary-color': '#3b82f6', // Blue for info
-                '--fa-primary-opacity': 1,
-                '--fa-secondary-opacity': 0.4,
-              } as React.CSSProperties
-            }
-          />
+          <FontAwesomeIcon icon={faCircleInfo} style={createIconStyle(ICON_STYLES.info)} />
         </div>
         Tailscale is not configured or not running.
       </wa-callout>
@@ -114,28 +106,16 @@ export const TailscaleTab: React.FC = () => {
 
   // OS tag
   if (osInfo) {
-    // Determine OS icon
-    const osLower = osInfo.toLowerCase();
-    let osIcon = 'computer';
-    let osColor = '#6b7280';
-
-    if (osLower.includes('linux')) {
-      osIcon = 'linux';
-      osColor = '#FCC624';
-    } else if (osLower.includes('android')) {
-      osIcon = 'android';
-      osColor = '#3DDC84';
-    } else if (osLower.includes('windows')) {
-      osIcon = 'windows';
-      osColor = '#0078D4';
-    } else if (osLower.includes('mac') || osLower.includes('ios') || osLower.includes('ipad')) {
-      osIcon = 'apple';
-      osColor = '#A855F7';
-    }
-
+    const osDetails = getOSInfo(osInfo);
     tailscaleTags.push({
       label: osInfo,
-      icon: <wa-icon family='brands' name={osIcon} style={{ color: osColor }} />,
+      icon: (
+        <wa-icon
+          family={osDetails.family}
+          name={osDetails.icon}
+          style={{ color: osDetails.color }}
+        />
+      ),
       variant: 'neutral',
     });
   }
@@ -150,12 +130,7 @@ export const TailscaleTab: React.FC = () => {
         icon: (
           <FontAwesomeIcon
             icon={faGlobe}
-            style={
-              {
-                '--fa-primary-color': isIPv6 ? '#8b5cf6' : '#10b981',
-                '--fa-primary-opacity': 0.9,
-              } as React.CSSProperties
-            }
+            style={createIconStyle(isIPv6 ? ICON_STYLES.ipv6 : ICON_STYLES.network)}
           />
         ),
         variant: 'neutral',
@@ -170,13 +145,7 @@ export const TailscaleTab: React.FC = () => {
       icon: (
         <FontAwesomeIcon
           icon={faArrowRightFromBracket}
-          style={
-            {
-              '--fa-primary-color': '#fb923c',
-              '--fa-primary-opacity': 0.9,
-              '--fa-secondary-opacity': 0.8,
-            } as React.CSSProperties
-          }
+          style={createIconStyle(ICON_STYLES.exitNode)}
         />
       ),
       variant: 'success',
@@ -188,18 +157,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleInterface.routeAdvertising.forEach(route => {
       tailscaleTags.push({
         label: route,
-        icon: (
-          <FontAwesomeIcon
-            icon={faNetworkWired}
-            style={
-              {
-                '--fa-primary-color': '#10b981',
-                '--fa-primary-opacity': 0.9,
-                '--fa-secondary-opacity': 0.8,
-              } as React.CSSProperties
-            }
-          />
-        ),
+        icon: <FontAwesomeIcon icon={faNetworkWired} style={createIconStyle(ICON_STYLES.routes)} />,
         variant: 'neutral',
       });
     });
@@ -210,17 +168,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleTags.push({
       label: 'Version',
       value: cleanVersion(settings.version),
-      icon: (
-        <FontAwesomeIcon
-          icon={faCodeCompare}
-          style={
-            {
-              '--fa-primary-color': '#6366f1',
-              '--fa-primary-opacity': 0.9,
-            } as React.CSSProperties
-          }
-        />
-      ),
+      icon: <FontAwesomeIcon icon={faCodeCompare} style={createIconStyle(ICON_STYLES.tag)} />,
       variant: 'neutral',
     });
   }
@@ -230,17 +178,7 @@ export const TailscaleTab: React.FC = () => {
     tailscaleTags.push({
       label: 'Tailnet',
       value: settings.tailnetDisplayName,
-      icon: (
-        <FontAwesomeIcon
-          icon={faShieldCheck}
-          style={
-            {
-              '--fa-primary-color': '#a855f7',
-              '--fa-primary-opacity': 0.9,
-            } as React.CSSProperties
-          }
-        />
-      ),
+      icon: <FontAwesomeIcon icon={faShieldCheck} style={createIconStyle(ICON_STYLES.tailscale)} />,
       variant: 'neutral',
     });
   }
@@ -262,14 +200,7 @@ export const TailscaleTab: React.FC = () => {
               <FontAwesomeIcon
                 icon={faShieldCheck}
                 size='lg'
-                style={
-                  {
-                    '--fa-primary-color': '#a855f7', // Purple for Tailscale/security
-                    '--fa-primary-opacity': 0.9,
-                    '--fa-secondary-opacity': 0.8,
-                    maxWidth: '2rem',
-                  } as React.CSSProperties
-                }
+                style={{ ...createIconStyle(ICON_STYLES.tailscale), maxWidth: '2rem' }}
               />
             }
             title={tailscaleInterface.name}
@@ -287,13 +218,7 @@ export const TailscaleTab: React.FC = () => {
                   <wa-tag variant='success' size='small'>
                     <FontAwesomeIcon
                       icon={faGlobe}
-                      style={
-                        {
-                          '--fa-primary-color': '#10b981',
-                          '--fa-primary-opacity': 0.9,
-                          marginRight: '4px',
-                        } as React.CSSProperties
-                      }
+                      style={{ ...createIconStyle(ICON_STYLES.network), marginRight: '4px' }}
                     />
                     DNS
                   </wa-tag>
@@ -302,13 +227,7 @@ export const TailscaleTab: React.FC = () => {
                   <wa-tag variant='success' size='small'>
                     <FontAwesomeIcon
                       icon={faRoute}
-                      style={
-                        {
-                          '--fa-primary-color': '#10b981',
-                          '--fa-primary-opacity': 0.9,
-                          marginRight: '4px',
-                        } as React.CSSProperties
-                      }
+                      style={{ ...createIconStyle(ICON_STYLES.routes), marginRight: '4px' }}
                     />
                     Routes
                   </wa-tag>
@@ -317,13 +236,7 @@ export const TailscaleTab: React.FC = () => {
                   <wa-tag variant='success' size='small'>
                     <FontAwesomeIcon
                       icon={faTerminal}
-                      style={
-                        {
-                          '--fa-primary-color': '#a855f7',
-                          '--fa-primary-opacity': 0.9,
-                          marginRight: '4px',
-                        } as React.CSSProperties
-                      }
+                      style={{ ...createIconStyle(ICON_STYLES.tailscale), marginRight: '4px' }}
                     />
                     SSH
                   </wa-tag>
@@ -370,16 +283,7 @@ export const TailscaleTab: React.FC = () => {
         {peers.length === 0 ? (
           <wa-callout variant='neutral'>
             <div slot='icon' style={{ display: 'contents' }}>
-              <FontAwesomeIcon
-                icon={faCircleInfo}
-                style={
-                  {
-                    '--fa-primary-color': '#3b82f6', // Blue for info
-                    '--fa-primary-opacity': 1,
-                    '--fa-secondary-opacity': 0.4,
-                  } as React.CSSProperties
-                }
-              />
+              <FontAwesomeIcon icon={faCircleInfo} style={createIconStyle(ICON_STYLES.info)} />
             </div>
             No peers connected.
           </wa-callout>

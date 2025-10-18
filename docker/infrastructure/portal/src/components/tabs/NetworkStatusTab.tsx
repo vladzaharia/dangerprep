@@ -17,7 +17,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useNetworkSummary, useTailscaleSettings, useTailscalePeers } from '../../hooks/useSWRData';
 import type { NetworkInterface, TailscaleInterface } from '../../types/network';
-import { createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
+import { COLORS, createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 
@@ -47,13 +47,13 @@ function getInterfaceIconColor(iface: NetworkInterface): string | undefined {
   switch (iface.type) {
     case 'wifi':
     case 'hotspot':
-      return '#3b82f6'; // Blue for WiFi
+      return COLORS.feature.wifi;
     case 'ethernet':
-      return '#10b981'; // Green for Ethernet
+      return COLORS.feature.ethernet;
     case 'tailscale':
-      return '#a855f7'; // Purple for Tailscale
+      return COLORS.feature.tailscale;
     default:
-      return '#6b7280'; // Gray for other
+      return COLORS.neutral.gray;
   }
 }
 
@@ -204,7 +204,7 @@ export const NetworkStatusTab: React.FC = () => {
               size='lg'
               style={
                 {
-                  '--fa-primary-color': '#6366f1', // Indigo for device
+                  '--fa-primary-color': COLORS.ui.device,
                   maxWidth: '2rem',
                 } as React.CSSProperties
               }
@@ -245,13 +245,7 @@ export const NetworkStatusTab: React.FC = () => {
                 icon: (
                   <FontAwesomeIcon
                     icon={faGlobe}
-                    style={
-                      {
-                        '--fa-primary-color': '#10b981', // Green for IP/network
-                        '--fa-primary-opacity': 0.9,
-                        maxWidth: '2rem',
-                      } as React.CSSProperties
-                    }
+                    style={{ ...createIconStyle(ICON_STYLES.network), maxWidth: '2rem' }}
                   />
                 ),
                 variant: 'neutral',
@@ -283,12 +277,7 @@ export const NetworkStatusTab: React.FC = () => {
                   icon: (
                     <FontAwesomeIcon
                       icon={faArrowRightFromBracket}
-                      style={
-                        {
-                          '--fa-primary-color': '#a855f7', // Purple for Tailscale
-                          '--fa-primary-opacity': 0.9,
-                        } as React.CSSProperties
-                      }
+                      style={createIconStyle(ICON_STYLES.tailscale)}
                     />
                   ),
                   variant: 'neutral',
@@ -312,12 +301,7 @@ export const NetworkStatusTab: React.FC = () => {
                     icon: (
                       <FontAwesomeIcon
                         icon={faNetworkWired}
-                        style={
-                          {
-                            '--fa-primary-color': '#10b981', // Green for routes
-                            '--fa-primary-opacity': 0.9,
-                          } as React.CSSProperties
-                        }
+                        style={createIconStyle(ICON_STYLES.routes)}
                       />
                     ),
                     variant: 'neutral',

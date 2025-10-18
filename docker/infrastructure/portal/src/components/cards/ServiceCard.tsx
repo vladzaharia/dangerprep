@@ -3,7 +3,7 @@ import React from 'react';
 
 import type { Service } from '../../App';
 import { getIcon } from '../../utils/iconCache';
-import { createIconStyle } from '../../utils/iconStyles';
+import { COLORS, createIconStyle } from '../../utils/iconStyles';
 
 interface ServiceCardProps {
   service: Service;
@@ -28,7 +28,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, pageType = 's
   const isClickable = Boolean(service.url);
 
   // Get icon color based on page type (matching navigation colors)
-  const iconColor = pageType === 'maintenance' ? '#f59e0b' : '#3b82f6'; // Amber for maintenance, Blue for services
+  const iconColor = pageType === 'maintenance' ? COLORS.semantic.warning : COLORS.semantic.info;
 
   return (
     <wa-card appearance='outlined'>

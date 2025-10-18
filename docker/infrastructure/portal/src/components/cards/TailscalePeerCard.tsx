@@ -14,30 +14,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState, useRef, useEffect } from 'react';
 
 import type { TailscalePeer } from '../../types/network';
+import { COLORS, OPACITIES, getOSInfo } from '../../utils/iconStyles';
 
 interface TailscalePeerCardProps {
   peer: TailscalePeer;
 }
-
-/**
- * Get OS color and brand icon based on OS string
- */
-const getOSInfo = (os: string): { icon: string; color: string; family: 'brands' } => {
-  const osLower = os.toLowerCase();
-
-  if (osLower.includes('linux')) {
-    return { icon: 'linux', color: '#FCC624', family: 'brands' }; // Linux yellow-orange
-  } else if (osLower.includes('android')) {
-    return { icon: 'android', color: '#3DDC84', family: 'brands' }; // Android green
-  } else if (osLower.includes('windows')) {
-    return { icon: 'windows', color: '#0078D4', family: 'brands' }; // Windows blue
-  } else if (osLower.includes('mac') || osLower.includes('ios') || osLower.includes('ipad')) {
-    return { icon: 'apple', color: '#A855F7', family: 'brands' }; // Apple purple
-  }
-
-  // Default fallback
-  return { icon: 'computer', color: '#6b7280', family: 'brands' };
-};
 
 /**
  * Tailscale Peer Card with expandable popup
@@ -108,9 +89,9 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
           icon={faArrowRightFromBracket}
           style={
             {
-              '--fa-primary-color': '#fb923c',
-              '--fa-primary-opacity': 0.9,
-              '--fa-secondary-opacity': 0.8,
+              '--fa-primary-color': COLORS.feature.exitNode,
+              '--fa-primary-opacity': OPACITIES.high,
+              '--fa-secondary-opacity': OPACITIES.medium,
               fontSize: '0.875em',
             } as React.CSSProperties
           }
@@ -128,8 +109,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
           icon={faPlugCircleBolt}
           style={
             {
-              '--fa-primary-color': '#8b5cf6',
-              '--fa-primary-opacity': 0.9,
+              '--fa-primary-color': COLORS.feature.appConnector,
+              '--fa-primary-opacity': OPACITIES.high,
               fontSize: '0.875em',
             } as React.CSSProperties
           }
@@ -147,8 +128,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
           icon={faRoute}
           style={
             {
-              '--fa-primary-color': '#10b981',
-              '--fa-primary-opacity': 0.9,
+              '--fa-primary-color': COLORS.semantic.success,
+              '--fa-primary-opacity': OPACITIES.high,
               fontSize: '0.875em',
             } as React.CSSProperties
           }
@@ -166,8 +147,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
           icon={faTerminal}
           style={
             {
-              '--fa-primary-color': '#a855f7',
-              '--fa-primary-opacity': 0.9,
+              '--fa-primary-color': COLORS.feature.tailscale,
+              '--fa-primary-opacity': OPACITIES.high,
               fontSize: '0.875em',
             } as React.CSSProperties
           }
@@ -207,9 +188,11 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                 size='2x'
                 style={
                   {
-                    '--fa-primary-color': peer.online ? '#10b981' : '#6b7280',
-                    '--fa-primary-opacity': 1,
-                    '--fa-secondary-opacity': 0.7,
+                    '--fa-primary-color': peer.online
+                      ? COLORS.semantic.success
+                      : COLORS.neutral.gray,
+                    '--fa-primary-opacity': OPACITIES.full,
+                    '--fa-secondary-opacity': OPACITIES.low,
                   } as React.CSSProperties
                 }
               />
@@ -279,8 +262,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                               icon={faGlobe}
                               style={
                                 {
-                                  '--fa-primary-color': '#8b5cf6',
-                                  '--fa-primary-opacity': 0.9,
+                                  '--fa-primary-color': COLORS.ui.ipv6,
+                                  '--fa-primary-opacity': OPACITIES.high,
                                 } as React.CSSProperties
                               }
                             />
@@ -296,8 +279,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                           icon={faArrowRightFromBracket}
                           style={
                             {
-                              '--fa-primary-color': '#fb923c',
-                              '--fa-primary-opacity': 0.9,
+                              '--fa-primary-color': COLORS.feature.exitNode,
+                              '--fa-primary-opacity': OPACITIES.high,
                             } as React.CSSProperties
                           }
                         />
@@ -314,8 +297,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                           icon={faPlugCircleBolt}
                           style={
                             {
-                              '--fa-primary-color': '#8b5cf6',
-                              '--fa-primary-opacity': 0.9,
+                              '--fa-primary-color': COLORS.feature.appConnector,
+                              '--fa-primary-opacity': OPACITIES.high,
                             } as React.CSSProperties
                           }
                         />
@@ -332,8 +315,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                           icon={faTerminal}
                           style={
                             {
-                              '--fa-primary-color': '#a855f7',
-                              '--fa-primary-opacity': 0.9,
+                              '--fa-primary-color': COLORS.feature.tailscale,
+                              '--fa-primary-opacity': OPACITIES.high,
                             } as React.CSSProperties
                           }
                         />
@@ -351,8 +334,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                             icon={faRoute}
                             style={
                               {
-                                '--fa-primary-color': '#10b981',
-                                '--fa-primary-opacity': 0.9,
+                                '--fa-primary-color': COLORS.semantic.success,
+                                '--fa-primary-opacity': OPACITIES.high,
                               } as React.CSSProperties
                             }
                           />
@@ -375,8 +358,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                               icon={faTag}
                               style={
                                 {
-                                  '--fa-primary-color': '#6366f1',
-                                  '--fa-primary-opacity': 0.9,
+                                  '--fa-primary-color': COLORS.ui.tag,
+                                  '--fa-primary-opacity': OPACITIES.high,
                                 } as React.CSSProperties
                               }
                             />

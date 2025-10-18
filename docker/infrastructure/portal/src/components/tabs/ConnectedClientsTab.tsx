@@ -34,16 +34,7 @@ export const ConnectedClientsTab: React.FC = () => {
     return (
       <wa-callout variant='neutral' className='wa-gap-s'>
         <div slot='icon' style={{ display: 'contents' }}>
-          <FontAwesomeIcon
-            icon={faCircleInfo}
-            style={
-              {
-                '--fa-primary-color': '#3b82f6', // Blue for info
-                '--fa-primary-opacity': 1,
-                '--fa-secondary-opacity': 0.4,
-              } as React.CSSProperties
-            }
-          />
+          <FontAwesomeIcon icon={faCircleInfo} style={createIconStyle(ICON_STYLES.info)} />
         </div>
         No clients currently connected to the hotspot.
       </wa-callout>
@@ -83,13 +74,7 @@ export const ConnectedClientsTab: React.FC = () => {
               icon: (
                 <FontAwesomeIcon
                   icon={faCloudArrowUp}
-                  style={
-                    {
-                      '--fa-primary-color': '#3b82f6', // Blue for upload
-                      '--fa-primary-opacity': 0.9,
-                      '--fa-secondary-opacity': 0.8,
-                    } as React.CSSProperties
-                  }
+                  style={createIconStyle(ICON_STYLES.upload)}
                 />
               ),
               variant: 'neutral',
@@ -104,13 +89,7 @@ export const ConnectedClientsTab: React.FC = () => {
               icon: (
                 <FontAwesomeIcon
                   icon={faCloudArrowDown}
-                  style={
-                    {
-                      '--fa-primary-color': '#f59e0b', // Amber for download
-                      '--fa-primary-opacity': 0.9,
-                      '--fa-secondary-opacity': 0.8,
-                    } as React.CSSProperties
-                  }
+                  style={createIconStyle(ICON_STYLES.download)}
                 />
               ),
               variant: 'neutral',
@@ -126,14 +105,7 @@ export const ConnectedClientsTab: React.FC = () => {
                 <FontAwesomeIcon
                   icon={faComputerClassic}
                   size='lg'
-                  style={
-                    {
-                      '--fa-primary-color': '#6366f1', // Indigo for client device
-                      '--fa-primary-opacity': 1,
-                      '--fa-secondary-opacity': 0.7,
-                      maxWidth: '2rem',
-                    } as React.CSSProperties
-                  }
+                  style={{ ...createIconStyle(ICON_STYLES.device), maxWidth: '2rem' }}
                 />
               }
               title={client.hostname || client.ipAddress || client.macAddress}

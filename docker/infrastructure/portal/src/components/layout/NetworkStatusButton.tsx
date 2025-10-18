@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useNetworkSummary, useHostapdStatus } from '../../hooks/useSWRData';
-import { createIconStyle } from '../../utils/iconStyles';
+import { COLORS, OPACITIES, createIconStyle } from '../../utils/iconStyles';
 
 /**
  * Connection Status Button Component
@@ -50,9 +50,9 @@ export const NetworkStatusButton: React.FC = () => {
 
   // Get icon color based on status
   const iconColor = useMemo(() => {
-    if (!isConnected) return '#ef4444'; // Red
-    if (!hasInternetInterface) return '#f59e0b'; // Amber
-    return '#10b981'; // Green
+    if (!isConnected) return COLORS.semantic.danger;
+    if (!hasInternetInterface) return COLORS.semantic.warning;
+    return COLORS.semantic.success;
   }, [isConnected, hasInternetInterface]);
 
   // Handle click to navigate to network status page
@@ -84,8 +84,8 @@ export const NetworkStatusButton: React.FC = () => {
           size='xl'
           style={createIconStyle({
             primaryColor: iconColor,
-            primaryOpacity: 0.9,
-            secondaryOpacity: 0.8,
+            primaryOpacity: OPACITIES.high,
+            secondaryOpacity: OPACITIES.medium,
           })}
         />
         <wa-badge variant={variant} attention={shouldPulse ? 'pulse' : 'none'}>
