@@ -177,7 +177,11 @@ export const NetworkStatusTab: React.FC = () => {
                 variant={iface.state === 'up' ? 'success' : 'danger'}
                 layout='vertical'
                 icon={
-                  <FontAwesomeIcon icon={getInterfaceIcon(iface)} size='lg' style={iconStyle} />
+                  <FontAwesomeIcon
+                    icon={getInterfaceIcon(iface)}
+                    size='lg'
+                    style={{ ...iconStyle, maxWidth: '2rem' }}
+                  />
                 }
                 title={title}
                 tags={tags}
@@ -245,6 +249,7 @@ export const NetworkStatusTab: React.FC = () => {
                       {
                         '--fa-primary-color': '#10b981', // Green for IP/network
                         '--fa-primary-opacity': 0.9,
+                        maxWidth: '2rem',
                       } as React.CSSProperties
                     }
                   />
