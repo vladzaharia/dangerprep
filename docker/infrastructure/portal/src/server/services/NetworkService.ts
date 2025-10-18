@@ -1092,6 +1092,7 @@ export class NetworkService {
 
         // Parse peers with comprehensive information
         if (status.Peer) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           tailscaleInfo.peers = Object.values(status.Peer).map((peer: any) => ({
             id: peer.ID || '',
             publicKey: peer.PublicKey || '',

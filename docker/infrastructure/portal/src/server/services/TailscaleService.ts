@@ -9,7 +9,6 @@ import type {
   TailscalePeer,
   TailscaleStatus,
   TailscaleSelf,
-  TailscaleTailnet,
 } from '../../types/network';
 
 const execAsync = promisify(exec);
@@ -521,19 +520,19 @@ export class TailscaleService {
         self: this.parseSelfNode(rawStatus.Self),
         health: rawStatus.Health || [],
         magicDNSSuffix: rawStatus.MagicDNSSuffix || '',
-        currentTailnet: rawStatus.CurrentTailnet
-          ? {
-              name: rawStatus.CurrentTailnet.Name || '',
-              magicDNSSuffix: rawStatus.CurrentTailnet.MagicDNSSuffix || '',
-              magicDNSEnabled: rawStatus.CurrentTailnet.MagicDNSEnabled || false,
-            }
-          : undefined,
-        certDomains: rawStatus.CertDomains || [],
-        clientVersion: rawStatus.ClientVersion
-          ? {
-              latestVersion: rawStatus.ClientVersion.LatestVersion || '',
-            }
-          : undefined,
+        ...(rawStatus.CurrentTailnet && {
+          currentTailnet: {
+            name: rawStatus.CurrentTailnet.Name || '',
+            magicDNSSuffix: rawStatus.CurrentTailnet.MagicDNSSuffix || '',
+            magicDNSEnabled: rawStatus.CurrentTailnet.MagicDNSEnabled || false,
+          },
+        }),
+        ...(rawStatus.CertDomains && { certDomains: rawStatus.CertDomains }),
+        ...(rawStatus.ClientVersion && {
+          clientVersion: {
+            latestVersion: rawStatus.ClientVersion.LatestVersion || '',
+          },
+        }),
       };
 
       this.logger.debug('Tailscale status retrieved', { status });
@@ -559,7 +558,7 @@ export class TailscaleService {
       const peers: TailscalePeer[] = [];
 
       if (status.Peer) {
-        Object.values(status.Peer).forEach((peer: any) => {
+        Object.values(status.Peer).forEach((peer: unknown) => {
           peers.push(this.parsePeer(peer));
         });
       }
@@ -577,6 +576,7 @@ export class TailscaleService {
   /**
    * Parse self node from raw status
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private parseSelfNode(raw: any): TailscaleSelf {
     return {
       id: raw.ID || '',
@@ -616,6 +616,7 @@ export class TailscaleService {
   /**
    * Parse peer from raw status
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private parsePeer(raw: any): TailscalePeer {
     return {
       id: raw.ID || '',
