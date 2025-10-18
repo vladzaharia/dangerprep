@@ -12,7 +12,7 @@ export interface SettingsCardProps {
 
   // Content
   title: string;
-  description: string;
+  description?: string;
 
   // Optional header slot (e.g., for switches)
   headerSlot?: React.ReactNode;
