@@ -8,7 +8,8 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 
-import { Navigation, DefaultRoute } from './components';
+import { Navigation, DefaultRoute, ErrorBoundary } from './components';
+import { NotFoundPage } from './pages';
 
 // Lazy load page components for better code splitting
 const QRCodePage = lazy(() => import('./pages/QRCodePage').then(m => ({ default: m.QRCodePage })));
@@ -122,19 +123,23 @@ function AppContent() {
         {/* Main Content Area - Raised Layer */}
         <main className='app-content'>
           <div className='app-content-inner'>
-            <Suspense fallback={<AppLoadingFallback />}>
-              <Routes>
-                {/* Modern React 19 routes with Suspense */}
-                <Route path='/' element={<DefaultRoute />} />
-                <Route path='/qr' element={<QRCodePage />} />
-                <Route path='/services' element={<ServicesPage />} />
-                <Route path='/maintenance' element={<MaintenanceServicesPage />} />
-                <Route path='/power' element={<PowerPage />} />
-                <Route path='/network' element={<NetworkStatusPage />} />
-                <Route path='/settings' element={<SettingsPage />} />
-                <Route path='/tailscale' element={<TailscaleSettingsPage />} />
-              </Routes>
-            </Suspense>
+            <ErrorBoundary variant='content'>
+              <Suspense fallback={<AppLoadingFallback />}>
+                <Routes>
+                  {/* Modern React 19 routes with Suspense */}
+                  <Route path='/' element={<DefaultRoute />} />
+                  <Route path='/qr' element={<QRCodePage />} />
+                  <Route path='/services' element={<ServicesPage />} />
+                  <Route path='/maintenance' element={<MaintenanceServicesPage />} />
+                  <Route path='/power' element={<PowerPage />} />
+                  <Route path='/network' element={<NetworkStatusPage />} />
+                  <Route path='/settings' element={<SettingsPage />} />
+                  <Route path='/tailscale' element={<TailscaleSettingsPage />} />
+                  {/* 404 catch-all route */}
+                  <Route path='*' element={<NotFoundPage />} />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </main>
       </div>
