@@ -33,7 +33,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, pageType = 's
   return (
     <wa-card appearance='outlined'>
       <div
-        className={`wa-stack wa-gap-m ${isClickable ? 'service-card--clickable' : ''}`}
+        className={`wa-stack wa-gap-m ${isClickable ? 'card service-card--clickable' : ''}`}
         onClick={isClickable ? handleClick : undefined}
         onKeyDown={isClickable ? handleKeyDown : undefined}
         role={isClickable ? 'button' : undefined}

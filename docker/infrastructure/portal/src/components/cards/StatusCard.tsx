@@ -91,7 +91,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   if (type === 'card') {
     const cardProps = {
       appearance: 'outlined' as const,
-      className,
+      className: `${className} card`,
       ...(layout === 'horizontal' && { orientation: 'horizontal' as const }),
     };
 

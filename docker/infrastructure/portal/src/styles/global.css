@@ -107,7 +107,7 @@ body {
   overflow: auto;
 }
 
-.settings-card::part(body) {
+.card::part(body) {
   height: 100%;
 }
 

@@ -16,8 +16,8 @@ function ServicesPageSkeleton() {
         {/* Create 3 skeleton service cards */}
         {Array.from({ length: 3 }, (_, index) => (
           <wa-card key={index} appearance='outlined'>
-            <div className='wa-stack service-card'>
-              <div className='service-card-header'>
+            <div className='wa-stack card service-card'>
+              <div className='card service-card-header'>
                 <div className='service-icon'>
                   {/* Icon skeleton - 48px to match actual FontAwesome icon size */}
                   <wa-skeleton
@@ -38,7 +38,7 @@ function ServicesPageSkeleton() {
                   ></wa-skeleton>
                 </div>
               </div>
-              <div className='service-card-footer'>
+              <div className='card service-card-footer'>
                 {/* URL text skeleton */}
                 <wa-skeleton
                   effect='sheen'

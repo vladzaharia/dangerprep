@@ -45,7 +45,7 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
   const iconStyleObj = createIconStyle(iconStyle);
 
   return (
-    <wa-card appearance='outlined' className='settings-card'>
+    <wa-card appearance='outlined' className='card settings-card'>
       {/* Header slot - typically for switches */}
       {headerSlot && (
         <div slot='header' style={{ width: '100%', textAlign: 'right' }}>
