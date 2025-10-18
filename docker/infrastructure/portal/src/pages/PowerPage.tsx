@@ -6,10 +6,10 @@ import {
   faBrowser,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState } from 'react';
 
-import { createIconStyle, ICON_STYLES } from '../utils/iconStyles';
+import { SettingsCard } from '../components/cards';
+import { ICON_STYLES } from '../utils/iconStyles';
 
 interface PowerAction {
   id: string;
@@ -116,64 +116,41 @@ export const PowerPage: React.FC = () => {
         className='wa-grid wa-gap-m'
         style={{ '--min-column-size': '250px' } as React.CSSProperties}
       >
-        {powerActions.map(action => {
-          const iconStyle = createIconStyle(ICON_STYLES[action.variant]);
-
-          return (
-            <wa-card key={action.id} appearance='outlined'>
-              <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-m)' }}>
-                <div className='wa-stack wa-gap-s' style={{ alignItems: 'center' }}>
-                  {action.stackedIcon ? (
-                    <span className='fa-stack fa-2x'>
-                      <FontAwesomeIcon
-                        icon={action.stackedIcon.base}
-                        className='fa-stack-2x'
-                        style={iconStyle}
-                      />
-                      <FontAwesomeIcon
-                        icon={action.stackedIcon.overlay}
-                        className='fa-stack-1x'
-                        transform='shrink-2 down-10 right-12'
-                        style={iconStyle}
-                      />
-                    </span>
-                  ) : action.icon ? (
-                    <FontAwesomeIcon icon={action.icon} size='4x' style={iconStyle} />
-                  ) : null}
-                </div>
-                <div
-                  onClick={() => loading === null && handlePowerAction(action)}
-                  style={{ cursor: loading === null ? 'pointer' : 'not-allowed' }}
-                  role='button'
-                  tabIndex={loading === null ? 0 : -1}
-                  onKeyDown={e => {
-                    if (loading === null && (e.key === 'Enter' || e.key === ' ')) {
-                      e.preventDefault();
-                      handlePowerAction(action);
-                    }
-                  }}
-                  aria-label={action.label}
+        {powerActions.map(action => (
+          <SettingsCard
+            key={action.id}
+            icon={action.icon}
+            stackedIcon={action.stackedIcon}
+            iconStyle={ICON_STYLES[action.variant]}
+            title={action.label}
+            description={action.confirmMessage}
+            loading={loading === action.id}
+            footerSlot={
+              <div
+                onClick={() => loading === null && handlePowerAction(action)}
+                style={{ cursor: loading === null ? 'pointer' : 'not-allowed' }}
+                role='button'
+                tabIndex={loading === null ? 0 : -1}
+                onKeyDown={e => {
+                  if (loading === null && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    handlePowerAction(action);
+                  }
+                }}
+                aria-label={action.label}
+              >
+                <wa-button
+                  appearance='filled'
+                  variant={action.variant}
+                  disabled={loading !== null}
+                  style={{ width: '100%', pointerEvents: 'none' }}
                 >
-                  <wa-button
-                    appearance='filled'
-                    variant={action.variant}
-                    disabled={loading !== null}
-                    style={{ width: '100%', pointerEvents: 'none' }}
-                  >
-                    {loading === action.id ? (
-                      <>
-                        <wa-spinner></wa-spinner>
-                        <span style={{ marginLeft: 'var(--wa-space-xs)' }}>Processing...</span>
-                      </>
-                    ) : (
-                      action.label
-                    )}
-                  </wa-button>
-                </div>
+                  {action.label}
+                </wa-button>
               </div>
-            </wa-card>
-          );
-        })}
+            }
+          />
+        ))}
       </div>
     </div>
   );

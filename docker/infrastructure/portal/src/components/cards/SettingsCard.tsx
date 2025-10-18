@@ -5,8 +5,9 @@ import React from 'react';
 import { createIconStyle, type IconStyleConfig } from '../../utils/iconStyles';
 
 export interface SettingsCardProps {
-  // Icon configuration
-  icon: IconDefinition;
+  // Icon configuration - either a single icon or stacked icons
+  icon?: IconDefinition;
+  stackedIcon?: { base: IconDefinition; overlay: IconDefinition };
   iconStyle: IconStyleConfig;
 
   // Content
@@ -32,6 +33,7 @@ export interface SettingsCardProps {
  */
 export const SettingsCard: React.FC<SettingsCardProps> = ({
   icon,
+  stackedIcon,
   iconStyle,
   title,
   description,
@@ -40,14 +42,32 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
   loading = false,
   children,
 }) => {
+  const iconStyleObj = createIconStyle(iconStyle);
+
   return (
-    <wa-card appearance='outlined'>
+    <wa-card appearance='outlined' className="settings-card">
       {/* Header slot - typically for switches */}
       {headerSlot && <div slot='header' style={{ width: '100%' }}>{headerSlot}</div>}
 
       {/* Main content - icon, title, description */}
-      <div className='wa-stack wa-gap-s wa-align-items-center'>
-        <FontAwesomeIcon icon={icon} size='4x' style={createIconStyle(iconStyle)} />
+      <div className='wa-stack wa-gap-s wa-align-items-center' style={{ justifyContent: 'center' }}>
+        {stackedIcon ? (
+          <span className='fa-stack fa-2x'>
+            <FontAwesomeIcon
+              icon={stackedIcon.base}
+              className='fa-stack-2x'
+              style={iconStyleObj}
+            />
+            <FontAwesomeIcon
+              icon={stackedIcon.overlay}
+              className='fa-stack-1x'
+              transform='shrink-2 down-10 right-12'
+              style={iconStyleObj}
+            />
+          </span>
+        ) : icon ? (
+          <FontAwesomeIcon icon={icon} size='4x' style={iconStyleObj} />
+        ) : null}
         <h3 className='wa-heading-s'>{title}</h3>
         <p className='wa-body-s' style={{ textAlign: 'center' }}>
           {description}

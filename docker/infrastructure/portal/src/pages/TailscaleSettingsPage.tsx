@@ -463,7 +463,7 @@ function TailscaleSettingsContent() {
 
         {/* Stateful Filtering Card */}
         <SettingsCard
-          icon={faShield}
+          stackedIcon={{ base: faNetworkWired, overlay: faShield }}
           iconStyle={ICON_STYLES.brand}
           title='Stateful Filtering'
           description='Enable stateful packet filtering for subnet routes'
