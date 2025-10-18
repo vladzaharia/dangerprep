@@ -263,7 +263,7 @@ function TailscaleSettingsContent() {
           loading={loading === 'acceptDNS'}
           headerSlot={
             <wa-switch
-              checked={settings.acceptDNS}
+              defaultChecked={settings.acceptDNS}
               onchange={() => handleToggleSetting('acceptDNS', settings.acceptDNS)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
@@ -279,7 +279,7 @@ function TailscaleSettingsContent() {
           loading={loading === 'acceptRoutes'}
           headerSlot={
             <wa-switch
-              checked={settings.acceptRoutes}
+              defaultChecked={settings.acceptRoutes}
               onchange={() => handleToggleSetting('acceptRoutes', settings.acceptRoutes)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
@@ -295,7 +295,7 @@ function TailscaleSettingsContent() {
           loading={loading === 'ssh'}
           headerSlot={
             <wa-switch
-              checked={settings.ssh}
+              defaultChecked={settings.ssh}
               onchange={() => handleToggleSetting('ssh', settings.ssh)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
@@ -323,7 +323,7 @@ function TailscaleSettingsContent() {
           loading={loading === 'advertiseExitNode'}
           headerSlot={
             <wa-switch
-              checked={settings.advertiseExitNode}
+              defaultChecked={settings.advertiseExitNode}
               onchange={() => handleToggleSetting('advertiseExitNode', settings.advertiseExitNode)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
@@ -385,7 +385,7 @@ function TailscaleSettingsContent() {
           loading={loading === 'advertiseConnector'}
           headerSlot={
             <wa-switch
-              checked={settings.advertiseConnector}
+              defaultChecked={settings.advertiseConnector}
               onchange={() =>
                 handleToggleSetting('advertiseConnector', settings.advertiseConnector)
               }
@@ -415,7 +415,7 @@ function TailscaleSettingsContent() {
           loading={loading === 'shieldsUp'}
           headerSlot={
             <wa-switch
-              checked={settings.shieldsUp}
+              defaultChecked={settings.shieldsUp}
               onchange={() => handleToggleSetting('shieldsUp', settings.shieldsUp)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
@@ -431,7 +431,7 @@ function TailscaleSettingsContent() {
           loading={loading === 'exitNodeAllowLAN'}
           headerSlot={
             <wa-switch
-              checked={settings.exitNodeAllowLAN}
+              defaultChecked={settings.exitNodeAllowLAN}
               onchange={() => handleToggleSetting('exitNodeAllowLAN', settings.exitNodeAllowLAN)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
@@ -447,7 +447,7 @@ function TailscaleSettingsContent() {
           loading={loading === 'snatSubnetRoutes'}
           headerSlot={
             <wa-switch
-              checked={settings.snatSubnetRoutes}
+              defaultChecked={settings.snatSubnetRoutes}
               onchange={() => handleToggleSetting('snatSubnetRoutes', settings.snatSubnetRoutes)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>
@@ -463,7 +463,7 @@ function TailscaleSettingsContent() {
           loading={loading === 'statefulFiltering'}
           headerSlot={
             <wa-switch
-              checked={settings.statefulFiltering}
+              defaultChecked={settings.statefulFiltering}
               onchange={() => handleToggleSetting('statefulFiltering', settings.statefulFiltering)}
               disabled={loading !== null || !settings.running}
             ></wa-switch>

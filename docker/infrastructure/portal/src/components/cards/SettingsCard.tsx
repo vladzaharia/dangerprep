@@ -54,7 +54,7 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
       )}
 
       {/* Main content - icon, title, description */}
-      <div className='wa-stack wa-gap-s wa-align-items-center' style={{ justifyContent: 'center' }}>
+      <div className='wa-stack wa-gap-s wa-align-items-center' style={{ justifyContent: 'center', height: '100%' }}>
         {stackedIcon ? (
           <span className='fa-stack fa-2x'>
             <FontAwesomeIcon icon={stackedIcon.base} className='fa-stack-2x' style={iconStyleObj} />
