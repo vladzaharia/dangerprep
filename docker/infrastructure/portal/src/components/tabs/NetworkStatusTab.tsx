@@ -3,7 +3,6 @@ import {
   faWifi,
   faGlobe,
   faShieldCheck,
-  faHardDrive,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo } from 'react';
