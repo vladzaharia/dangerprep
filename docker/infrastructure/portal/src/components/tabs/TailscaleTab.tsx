@@ -59,13 +59,33 @@ export const TailscaleTab: React.FC = () => {
   }
 
   const tailscaleInterface = tailscale as TailscaleInterface;
+
+  // Filter out peers that haven't been seen in over a month
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
   // Use peers from dedicated endpoint, fallback to interface peers
-  const peers = (peersData || tailscaleInterface.peers || []).sort((peer1: TailscalePeer, peer2: TailscalePeer) => {
+  const allPeers = peersData || tailscaleInterface.peers || [];
+  const recentPeers = allPeers.filter((peer: TailscalePeer) => {
+    // Always include online peers
+    if (peer.online) return true;
+
+    // For offline peers, check if they were seen within the last month
+    if (peer.lastSeen) {
+      const lastSeenDate = new Date(peer.lastSeen);
+      return lastSeenDate >= oneMonthAgo;
+    }
+
+    // If no lastSeen date, include the peer (might be a new peer)
+    return true;
+  });
+
+  const peers = recentPeers.sort((peer1: TailscalePeer, peer2: TailscalePeer) => {
     if ((peer1.online && peer2.online) || (!peer1.online && !peer2.online)) {
-      return peer1.hostname.localeCompare(peer2.hostname)
+      return peer1.hostname.localeCompare(peer2.hostname);
     } else if (peer1.online && !peer2.online) {
       return -1;
-    } else  {
+    } else {
       return 1;
     }
   });

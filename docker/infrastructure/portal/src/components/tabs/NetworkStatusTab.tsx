@@ -229,10 +229,7 @@ export const NetworkStatusTab: React.FC = () => {
                 label: 'Gateway',
                 value: iface.gateway,
                 icon: (
-                  <FontAwesomeIcon
-                    icon={faRouter}
-                    style={createIconStyle(ICON_STYLES.gateway)}
-                  />
+                  <FontAwesomeIcon icon={faRouter} style={createIconStyle(ICON_STYLES.gateway)} />
                 ),
                 variant: 'neutral',
               });
