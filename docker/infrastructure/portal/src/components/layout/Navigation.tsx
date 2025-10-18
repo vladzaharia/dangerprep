@@ -177,7 +177,7 @@ export const Navigation: React.FC = () => {
         aria-label={item.label}
       >
         <wa-button appearance='plain'>
-          <FontAwesomeIcon icon={item.icon} size='xl' style={iconStyle} />
+          <FontAwesomeIcon icon={item.icon} size='xl' style={{ ...iconStyle, maxWidth: '2rem' }} />
         </wa-button>
       </NavLink>
     );

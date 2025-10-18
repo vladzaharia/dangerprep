@@ -131,6 +131,7 @@ export const ConnectedClientsTab: React.FC = () => {
                       '--fa-primary-color': '#6366f1', // Indigo for client device
                       '--fa-primary-opacity': 1,
                       '--fa-secondary-opacity': 0.7,
+                      maxWidth: '2rem',
                     } as React.CSSProperties
                   }
                 />

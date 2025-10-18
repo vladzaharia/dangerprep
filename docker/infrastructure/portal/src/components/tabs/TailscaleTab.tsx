@@ -179,6 +179,7 @@ export const TailscaleTab: React.FC = () => {
                     '--fa-primary-color': '#a855f7', // Purple for Tailscale/security
                     '--fa-primary-opacity': 0.9,
                     '--fa-secondary-opacity': 0.8,
+                    maxWidth: '2rem',
                   } as React.CSSProperties
                 }
               />
@@ -420,6 +421,7 @@ export const TailscaleTab: React.FC = () => {
                             '--fa-primary-color': peer.online ? '#10b981' : '#6b7280', // Green if online, gray if offline
                             '--fa-primary-opacity': 0.7,
                             '--fa-secondary-opacity': 0.8,
+                            maxWidth: '2rem',
                           } as React.CSSProperties
                         }
                       />

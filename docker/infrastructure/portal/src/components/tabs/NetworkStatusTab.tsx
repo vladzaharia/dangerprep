@@ -201,6 +201,7 @@ export const NetworkStatusTab: React.FC = () => {
               style={
                 {
                   '--fa-primary-color': '#6366f1', // Indigo for device
+                  maxWidth: '2rem',
                 } as React.CSSProperties
               }
             />
@@ -351,7 +352,7 @@ export const NetworkStatusTab: React.FC = () => {
                   <FontAwesomeIcon
                     icon={getInterfaceIcon(iface)}
                     size='lg'
-                    style={createIconStyle(ICON_STYLES[iface.type])}
+                    style={{ ...createIconStyle(ICON_STYLES[iface.type]), maxWidth: '2rem' }}
                   />
                 }
                 title={title}
