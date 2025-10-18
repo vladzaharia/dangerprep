@@ -269,14 +269,14 @@ export const TailscaleTab: React.FC = () => {
           </wa-callout>
         ) : (
           <wa-scroller orientation='vertical' style={{ maxHeight: '500px' }}>
-            <div className='wa-grid wa-gap-xs'>
+            <div className='wa-grid wa-gap-xs' style={{ '--min-column-size': '30rem' } as React.CSSProperties}>
               {peers.map((peer: TailscalePeer, index: number) => {
                 const peerTags: StatusCardTag[] = [];
 
                 // OS tag
                 if (peer.os) {
                   peerTags.push({
-                    label: peer.os,
+                    label: peer.os.replace('linux', 'Linux').replace('windows', 'Windows').replace('android', 'Android'),
                     variant: 'neutral',
                   });
                 }
@@ -304,7 +304,7 @@ export const TailscaleTab: React.FC = () => {
                 // Exit Node Option (can be used as exit node)
                 if (peer.exitNodeOption && !peer.exitNode) {
                   peerTags.push({
-                    label: 'Can Exit',
+                    label: 'Exit Node',
                     icon: (
                       <FontAwesomeIcon
                         icon={faArrowRightFromBracket}
