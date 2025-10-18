@@ -147,7 +147,6 @@ function TailscaleSettingsContent() {
           icon={faPowerOff}
           iconStyle={settings.running ? ICON_STYLES.success : ICON_STYLES.danger}
           title='Tailscale Status'
-          description={settings.running ? 'Tailscale is running' : 'Tailscale is stopped'}
           loading={loading === 'tailscale-start' || loading === 'tailscale-stop'}
           footerSlot={
             settings.running ? (
