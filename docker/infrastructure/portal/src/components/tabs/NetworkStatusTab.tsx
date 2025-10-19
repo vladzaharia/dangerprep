@@ -412,10 +412,10 @@ export const NetworkStatusTab: React.FC = () => {
                     <FontAwesomeIcon
                       icon={faGlobe}
                       size='lg'
-                      style={createIconStyle(ICON_STYLES.brand)}
+                      style={{ ...createIconStyle(ICON_STYLES.brand), maxWidth: '2rem' }}
                     />
                   }
-                  title='Internet'
+                  title={iface.ispName || 'Internet'}
                   tags={
                     ispTags.length > 0
                       ? ispTags
