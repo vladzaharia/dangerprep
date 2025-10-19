@@ -121,18 +121,18 @@ export class ISPService {
 
       const data = (await response.json()) as Record<string, unknown>;
 
-      return {
-        publicIpv4: data.query as string | undefined,
-        ispName: data.isp as string | undefined,
-        organization: data.org as string | undefined,
-        country: data.country as string | undefined,
-        region: data.regionName as string | undefined,
-        city: data.city as string | undefined,
-        latitude: data.lat as number | undefined,
-        longitude: data.lon as number | undefined,
-        timezone: data.timezone as string | undefined,
-        asn: data.as as string | undefined,
-      };
+      const result: ISPInfo = {};
+      if (data.query) result.publicIpv4 = data.query as string;
+      if (data.isp) result.ispName = data.isp as string;
+      if (data.org) result.organization = data.org as string;
+      if (data.country) result.country = data.country as string;
+      if (data.regionName) result.region = data.regionName as string;
+      if (data.city) result.city = data.city as string;
+      if (data.lat) result.latitude = data.lat as number;
+      if (data.lon) result.longitude = data.lon as number;
+      if (data.timezone) result.timezone = data.timezone as string;
+      if (data.as) result.asn = data.as as string;
+      return result;
     } catch (error) {
       this.logger.warn('Failed to fetch from ip-api.com', {
         error: error instanceof Error ? error.message : String(error),
@@ -155,15 +155,15 @@ export class ISPService {
 
       const data = (await response.json()) as Record<string, unknown>;
 
-      return {
-        publicIpv4: data.ip as string | undefined,
-        country: data.country as string | undefined,
-        region: data.region as string | undefined,
-        city: data.city as string | undefined,
-        latitude: data.latitude as number | undefined,
-        longitude: data.longitude as number | undefined,
-        timezone: data.timezone as string | undefined,
-      };
+      const result: ISPInfo = {};
+      if (data.ip) result.publicIpv4 = data.ip as string;
+      if (data.country) result.country = data.country as string;
+      if (data.region) result.region = data.region as string;
+      if (data.city) result.city = data.city as string;
+      if (data.latitude) result.latitude = data.latitude as number;
+      if (data.longitude) result.longitude = data.longitude as number;
+      if (data.timezone) result.timezone = data.timezone as string;
+      return result;
     } catch (error) {
       this.logger.warn('Failed to fetch from ip2location.io', {
         error: error instanceof Error ? error.message : String(error),

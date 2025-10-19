@@ -5,7 +5,7 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
-      "env": ["NODE_ENV"]
+      "env": ["NODE_ENV", "FONTAWESOME_NPM_AUTH_TOKEN"]
     },
     "dev": {
       "cache": false,

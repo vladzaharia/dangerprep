@@ -1039,14 +1039,14 @@ export class NetworkService {
         const parts = line.split(/\s+/);
         if (parts.length >= 2) {
           const route: RouteInfo = {
-            destination: parts[0],
-            gateway: parts[2] || 'direct',
+            destination: parts[0] as string,
+            gateway: (parts[2] as string) || 'direct',
           };
 
           // Parse metric if present
           const metricIndex = parts.indexOf('metric');
           if (metricIndex !== -1 && parts[metricIndex + 1]) {
-            route.metric = parseInt(parts[metricIndex + 1]);
+            route.metric = parseInt(parts[metricIndex + 1] as string);
           }
 
           routes.push(route);
@@ -1126,7 +1126,7 @@ export class NetworkService {
         const parts = stdout.split(/\s+/);
         if (parts.length > 8) {
           // Broadcast packets are typically in a specific column
-          stats.broadcastPackets = parseInt(parts[8]);
+          stats.broadcastPackets = parseInt(parts[8] as string);
         }
       } catch {
         // Ignore if not available
