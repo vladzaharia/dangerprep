@@ -633,16 +633,17 @@ export class NetworkService {
   private async getBaseInterfaceInfo(
     name: string
   ): Promise<Omit<BaseNetworkInterface, 'type' | 'purpose'>> {
-    const [ipInfo, macInfo, mtuInfo, statsInfo, flagsInfo, bcastMcastInfo, dhcpInfo, uptimeInfo] = await Promise.allSettled([
-      this.getInterfaceIpInfo(name),
-      this.getInterfaceMacAddress(name),
-      this.getInterfaceMtu(name),
-      this.getInterfaceStats(name),
-      this.getInterfaceFlags(name),
-      this.getBroadcastMulticastStats(name),
-      this.checkDhcpStatus(name),
-      this.getConnectionUptime(name),
-    ]);
+    const [ipInfo, macInfo, mtuInfo, statsInfo, flagsInfo, bcastMcastInfo, dhcpInfo, uptimeInfo] =
+      await Promise.allSettled([
+        this.getInterfaceIpInfo(name),
+        this.getInterfaceMacAddress(name),
+        this.getInterfaceMtu(name),
+        this.getInterfaceStats(name),
+        this.getInterfaceFlags(name),
+        this.getBroadcastMulticastStats(name),
+        this.checkDhcpStatus(name),
+        this.getConnectionUptime(name),
+      ]);
 
     const state = await this.getInterfaceState(name);
 
@@ -847,7 +848,9 @@ export class NetworkService {
   private async getInterfaceIpInfo(
     name: string
   ): Promise<
-    Partial<Pick<BaseNetworkInterface, 'ipAddress' | 'ipv6Address' | 'netmask' | 'gateway' | 'dnsServers'>>
+    Partial<
+      Pick<BaseNetworkInterface, 'ipAddress' | 'ipv6Address' | 'netmask' | 'gateway' | 'dnsServers'>
+    >
   > {
     try {
       const [ipResult, gatewayResult, dnsResult] = await Promise.allSettled([
@@ -859,7 +862,10 @@ export class NetworkService {
       ]);
 
       const result: Partial<
-        Pick<BaseNetworkInterface, 'ipAddress' | 'ipv6Address' | 'netmask' | 'gateway' | 'dnsServers'>
+        Pick<
+          BaseNetworkInterface,
+          'ipAddress' | 'ipv6Address' | 'netmask' | 'gateway' | 'dnsServers'
+        >
       > = {};
 
       // Parse IP address and netmask
@@ -938,7 +944,14 @@ export class NetworkService {
     Partial<
       Pick<
         BaseNetworkInterface,
-        'rxBytes' | 'txBytes' | 'rxPackets' | 'txPackets' | 'rxErrors' | 'txErrors' | 'rxDropped' | 'txDropped'
+        | 'rxBytes'
+        | 'txBytes'
+        | 'rxPackets'
+        | 'txPackets'
+        | 'rxErrors'
+        | 'txErrors'
+        | 'rxDropped'
+        | 'txDropped'
       >
     >
   > {
@@ -946,12 +959,28 @@ export class NetworkService {
       const stats: Partial<
         Pick<
           BaseNetworkInterface,
-          'rxBytes' | 'txBytes' | 'rxPackets' | 'txPackets' | 'rxErrors' | 'txErrors' | 'rxDropped' | 'txDropped'
+          | 'rxBytes'
+          | 'txBytes'
+          | 'rxPackets'
+          | 'txPackets'
+          | 'rxErrors'
+          | 'txErrors'
+          | 'rxDropped'
+          | 'txDropped'
         >
       > = {};
 
       // Try to read individual stat files
-      const [rxBytesResult, txBytesResult, rxPacketsResult, txPacketsResult, rxErrorsResult, txErrorsResult, rxDroppedResult, txDroppedResult] = await Promise.allSettled([
+      const [
+        rxBytesResult,
+        txBytesResult,
+        rxPacketsResult,
+        txPacketsResult,
+        rxErrorsResult,
+        txErrorsResult,
+        rxDroppedResult,
+        txDroppedResult,
+      ] = await Promise.allSettled([
         execAsync(`cat /sys/class/net/${name}/statistics/rx_bytes`),
         execAsync(`cat /sys/class/net/${name}/statistics/tx_bytes`),
         execAsync(`cat /sys/class/net/${name}/statistics/rx_packets`),
@@ -1148,7 +1177,9 @@ export class NetworkService {
   /**
    * Get latency and packet loss to gateway
    */
-  private async getGatewayMetrics(gateway: string | undefined): Promise<{ latency?: number; packetLoss?: number }> {
+  private async getGatewayMetrics(
+    gateway: string | undefined
+  ): Promise<{ latency?: number; packetLoss?: number }> {
     if (!gateway) {
       return {};
     }
@@ -1270,14 +1301,15 @@ export class NetworkService {
     name: string,
     baseInfo: BaseNetworkInterface
   ): Promise<EthernetInterface> {
-    const [speedResult, duplexResult, driverResult, linkResult, autoNegResult, ethtoolFullResult] = await Promise.allSettled([
-      execAsync(`ethtool ${name} 2>/dev/null | grep Speed`),
-      execAsync(`ethtool ${name} 2>/dev/null | grep Duplex`),
-      execAsync(`readlink /sys/class/net/${name}/device/driver 2>/dev/null`),
-      execAsync(`ethtool ${name} 2>/dev/null | grep "Link detected"`),
-      execAsync(`ethtool ${name} 2>/dev/null | grep "Auto-negotiation"`),
-      execAsync(`ethtool ${name} 2>/dev/null`),
-    ]);
+    const [speedResult, duplexResult, driverResult, linkResult, autoNegResult, ethtoolFullResult] =
+      await Promise.allSettled([
+        execAsync(`ethtool ${name} 2>/dev/null | grep Speed`),
+        execAsync(`ethtool ${name} 2>/dev/null | grep Duplex`),
+        execAsync(`readlink /sys/class/net/${name}/device/driver 2>/dev/null`),
+        execAsync(`ethtool ${name} 2>/dev/null | grep "Link detected"`),
+        execAsync(`ethtool ${name} 2>/dev/null | grep "Auto-negotiation"`),
+        execAsync(`ethtool ${name} 2>/dev/null`),
+      ]);
 
     const ethernetInfo: EthernetInterface = {
       ...baseInfo,
@@ -1402,7 +1434,9 @@ export class NetworkService {
       // Link quality
       const qualityMatch = iwconfig.match(/Link Quality[=:](\d+)\/(\d+)/);
       if (qualityMatch && qualityMatch[1] && qualityMatch[2]) {
-        wifiInfo.linkQuality = Math.round((parseInt(qualityMatch[1]) / parseInt(qualityMatch[2])) * 100);
+        wifiInfo.linkQuality = Math.round(
+          (parseInt(qualityMatch[1]) / parseInt(qualityMatch[2])) * 100
+        );
       }
 
       // Bit rate
@@ -1517,7 +1551,9 @@ export class NetworkService {
 
     // Get regulatory domain
     try {
-      const { stdout: regOutput } = await execAsync(`iw reg get 2>/dev/null | grep country | head -1`);
+      const { stdout: regOutput } = await execAsync(
+        `iw reg get 2>/dev/null | grep country | head -1`
+      );
       const countryMatch = regOutput.match(/country ([A-Z]{2})/);
       if (countryMatch && countryMatch[1]) {
         wifiInfo.regulatoryDomain = countryMatch[1];

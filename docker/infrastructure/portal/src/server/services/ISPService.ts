@@ -86,12 +86,12 @@ export class ISPService {
       const info: Partial<ISPInfo> = {};
 
       if (ipv4Response.status === 'fulfilled' && ipv4Response.value.ok) {
-        const data = await ipv4Response.value.json() as { ip?: string };
+        const data = (await ipv4Response.value.json()) as { ip?: string };
         if (data.ip) info.publicIpv4 = data.ip;
       }
 
       if (ipv6Response.status === 'fulfilled' && ipv6Response.value.ok) {
-        const data = await ipv6Response.value.json() as { ip?: string };
+        const data = (await ipv6Response.value.json()) as { ip?: string };
         if (data.ip) info.publicIpv6 = data.ip;
       }
 
@@ -110,13 +110,16 @@ export class ISPService {
   private async fetchFromIPAPI(): Promise<Partial<ISPInfo>> {
     try {
       this.logger.debug('Fetching from ip-api.com');
-      const response = await fetch('http://ip-api.com/json/?fields=query,isp,org,country,regionName,city,lat,lon,timezone,as', {
-        signal: AbortSignal.timeout(5000),
-      });
+      const response = await fetch(
+        'http://ip-api.com/json/?fields=query,isp,org,country,regionName,city,lat,lon,timezone,as',
+        {
+          signal: AbortSignal.timeout(5000),
+        }
+      );
 
       if (!response.ok) return {};
 
-      const data = await response.json() as Record<string, unknown>;
+      const data = (await response.json()) as Record<string, unknown>;
 
       return {
         publicIpv4: data.query as string | undefined,
@@ -150,7 +153,7 @@ export class ISPService {
 
       if (!response.ok) return {};
 
-      const data = await response.json() as Record<string, unknown>;
+      const data = (await response.json()) as Record<string, unknown>;
 
       return {
         publicIpv4: data.ip as string | undefined,
@@ -178,4 +181,3 @@ export class ISPService {
     this.lastFetchTime = 0;
   }
 }
-

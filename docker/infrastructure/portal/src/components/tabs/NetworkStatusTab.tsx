@@ -10,7 +10,6 @@ import {
   faShieldCheck,
   faArrowRightFromBracket,
   faGear,
-  faEllipsisVertical,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo } from 'react';
@@ -396,12 +395,12 @@ export const NetworkStatusTab: React.FC = () => {
                     justifyContent: 'center',
                     alignItems: 'center',
                     minHeight: '2rem',
+                    color: 'var(--wa-color-text-secondary)',
+                    fontSize: '1.5rem',
+                    fontWeight: 'bold',
                   }}
                 >
-                  <FontAwesomeIcon
-                    icon={faEllipsisVertical}
-                    style={createIconStyle(ICON_STYLES.neutral)}
-                  />
+                  ⋮
                 </div>
 
                 {/* Internet/ISP Card */}
@@ -417,7 +416,11 @@ export const NetworkStatusTab: React.FC = () => {
                     />
                   }
                   title='Internet'
-                  tags={ispTags.length > 0 ? ispTags : [{ label: 'No ISP information available', variant: 'neutral' }]}
+                  tags={
+                    ispTags.length > 0
+                      ? ispTags
+                      : [{ label: 'No ISP information available', variant: 'neutral' }]
+                  }
                   className='interface-callout'
                 />
               </div>

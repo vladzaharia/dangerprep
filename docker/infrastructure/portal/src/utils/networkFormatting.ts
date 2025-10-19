@@ -7,16 +7,16 @@
  */
 export function formatBytes(bytes: number | undefined): string {
   if (bytes === undefined || bytes === null) return 'N/A';
-  
+
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let size = bytes;
   let unitIndex = 0;
-  
+
   while (size >= 1024 && unitIndex < units.length - 1) {
     size /= 1024;
     unitIndex++;
   }
-  
+
   return `${size.toFixed(2)} ${units[unitIndex]}`;
 }
 
@@ -25,18 +25,18 @@ export function formatBytes(bytes: number | undefined): string {
  */
 export function formatUptime(seconds: number | undefined): string {
   if (seconds === undefined || seconds === null) return 'N/A';
-  
+
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  
+
   const parts = [];
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
   if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
-  
+
   return parts.join(' ');
 }
 
@@ -75,46 +75,54 @@ export function formatBoolean(value: boolean | undefined): string {
 /**
  * Format offload features object
  */
-export function formatOffloadFeatures(features: {
-  tso?: boolean;
-  gso?: boolean;
-  gro?: boolean;
-  lro?: boolean;
-  rxvlan?: boolean;
-  txvlan?: boolean;
-} | undefined): string {
+export function formatOffloadFeatures(
+  features:
+    | {
+        tso?: boolean;
+        gso?: boolean;
+        gro?: boolean;
+        lro?: boolean;
+        rxvlan?: boolean;
+        txvlan?: boolean;
+      }
+    | undefined
+): string {
   if (!features) return 'N/A';
-  
+
   const enabled = Object.entries(features)
     .filter(([, value]) => value)
     .map(([key]) => key.toUpperCase());
-  
+
   return enabled.length > 0 ? enabled.join(', ') : 'None';
 }
 
 /**
  * Format interface flags
  */
-export function formatInterfaceFlags(flags: {
-  up?: boolean;
-  broadcast?: boolean;
-  running?: boolean;
-  multicast?: boolean;
-  loopback?: boolean;
-  pointToPoint?: boolean;
-  noarp?: boolean;
-  promisc?: boolean;
-  allmulti?: boolean;
-  master?: boolean;
-  slave?: boolean;
-  debug?: boolean;
-  dormant?: boolean;
-  simplex?: boolean;
-  lower_up?: boolean;
-  lower_down?: boolean;
-} | undefined): string {
+export function formatInterfaceFlags(
+  flags:
+    | {
+        up?: boolean;
+        broadcast?: boolean;
+        running?: boolean;
+        multicast?: boolean;
+        loopback?: boolean;
+        pointToPoint?: boolean;
+        noarp?: boolean;
+        promisc?: boolean;
+        allmulti?: boolean;
+        master?: boolean;
+        slave?: boolean;
+        debug?: boolean;
+        dormant?: boolean;
+        simplex?: boolean;
+        lower_up?: boolean;
+        lower_down?: boolean;
+      }
+    | undefined
+): string {
   if (!flags) return 'N/A';
-  
+
   const enabled = Object.entries(flags)
     .filter(([, value]) => value)
     .map(([key]) => {
@@ -124,7 +132,6 @@ export function formatInterfaceFlags(flags: {
         .toUpperCase()
         .replace(/^_/, '');
     });
-  
+
   return enabled.length > 0 ? enabled.join(', ') : 'None';
 }
-

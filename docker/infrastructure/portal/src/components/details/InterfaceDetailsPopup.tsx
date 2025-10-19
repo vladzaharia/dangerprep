@@ -1,4 +1,5 @@
 import React from 'react';
+
 import type { NetworkInterface, EthernetInterface, WiFiInterface } from '../../types/network';
 import {
   formatBytes,
@@ -128,7 +129,10 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
             (iface as EthernetInterface).wakeOnLan !== undefined) && (
             <DetailSection title='Power & Features'>
               {(iface as EthernetInterface).powerManagement && (
-                <DetailRow label='Power Management' value={(iface as EthernetInterface).powerManagement} />
+                <DetailRow
+                  label='Power Management'
+                  value={(iface as EthernetInterface).powerManagement}
+                />
               )}
               {(iface as EthernetInterface).offloadFeatures && (
                 <DetailRow
@@ -180,13 +184,22 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
             (iface as WiFiInterface).bitRate) && (
             <DetailSection title='WiFi Signal'>
               {(iface as WiFiInterface).signalStrength !== undefined && (
-                <DetailRow label='Signal Strength' value={`${(iface as WiFiInterface).signalStrength} dBm`} />
+                <DetailRow
+                  label='Signal Strength'
+                  value={`${(iface as WiFiInterface).signalStrength} dBm`}
+                />
               )}
               {(iface as WiFiInterface).linkQuality !== undefined && (
-                <DetailRow label='Link Quality' value={`${(iface as WiFiInterface).linkQuality}%`} />
+                <DetailRow
+                  label='Link Quality'
+                  value={`${(iface as WiFiInterface).linkQuality}%`}
+                />
               )}
               {(iface as WiFiInterface).noiseLevel !== undefined && (
-                <DetailRow label='Noise Level' value={`${(iface as WiFiInterface).noiseLevel} dBm`} />
+                <DetailRow
+                  label='Noise Level'
+                  value={`${(iface as WiFiInterface).noiseLevel} dBm`}
+                />
               )}
               {(iface as WiFiInterface).bitRate && (
                 <DetailRow label='Bit Rate' value={(iface as WiFiInterface).bitRate} />
@@ -208,10 +221,16 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
                 <DetailRow label='Channel Width' value={(iface as WiFiInterface).channelWidth} />
               )}
               {(iface as WiFiInterface).regulatoryDomain && (
-                <DetailRow label='Regulatory Domain' value={(iface as WiFiInterface).regulatoryDomain} />
+                <DetailRow
+                  label='Regulatory Domain'
+                  value={(iface as WiFiInterface).regulatoryDomain}
+                />
               )}
               {(iface as WiFiInterface).beaconInterval !== undefined && (
-                <DetailRow label='Beacon Interval' value={`${(iface as WiFiInterface).beaconInterval}ms`} />
+                <DetailRow
+                  label='Beacon Interval'
+                  value={`${(iface as WiFiInterface).beaconInterval}ms`}
+                />
               )}
               {(iface as WiFiInterface).dtimPeriod !== undefined && (
                 <DetailRow label='DTIM Period' value={(iface as WiFiInterface).dtimPeriod} />
@@ -239,8 +258,12 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
         iface.broadcastPackets !== undefined ||
         iface.multicastPackets !== undefined) && (
         <DetailSection title='Statistics'>
-          {iface.rxBytes !== undefined && <DetailRow label='RX Bytes' value={formatBytes(iface.rxBytes)} />}
-          {iface.txBytes !== undefined && <DetailRow label='TX Bytes' value={formatBytes(iface.txBytes)} />}
+          {iface.rxBytes !== undefined && (
+            <DetailRow label='RX Bytes' value={formatBytes(iface.rxBytes)} />
+          )}
+          {iface.txBytes !== undefined && (
+            <DetailRow label='TX Bytes' value={formatBytes(iface.txBytes)} />
+          )}
           {iface.rxPackets !== undefined && (
             <DetailRow label='RX Packets' value={formatNumber(iface.rxPackets)} />
           )}
@@ -277,4 +300,3 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
     </div>
   );
 };
-
