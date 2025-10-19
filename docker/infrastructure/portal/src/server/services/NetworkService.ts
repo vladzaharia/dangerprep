@@ -6,9 +6,42 @@ import { LoggerFactory, LogLevel } from '@dangerprep/logging';
 
 import type { TailscaleInterface } from '../../types/network';
 
+import { ISPService } from './ISPService';
 import { WifiConfigService } from './WifiConfigService';
 
 const execAsync = promisify(exec);
+
+/**
+ * Route information
+ */
+export interface RouteInfo {
+  destination: string;
+  gateway: string;
+  metric?: number;
+  flags?: string;
+}
+
+/**
+ * Interface flags
+ */
+export interface InterfaceFlags {
+  up?: boolean;
+  broadcast?: boolean;
+  running?: boolean;
+  multicast?: boolean;
+  loopback?: boolean;
+  pointToPoint?: boolean;
+  noarp?: boolean;
+  promisc?: boolean;
+  allmulti?: boolean;
+  master?: boolean;
+  slave?: boolean;
+  debug?: boolean;
+  dormant?: boolean;
+  simplex?: boolean;
+  lower_up?: boolean;
+  lower_down?: boolean;
+}
 
 /**
  * Base network interface information
@@ -19,11 +52,36 @@ export interface BaseNetworkInterface {
   purpose: 'wan' | 'lan' | 'wlan' | 'docker' | 'loopback' | 'unknown';
   state: 'up' | 'down' | 'unknown';
   ipAddress?: string | undefined;
+  ipv6Address?: string | undefined;
   gateway?: string | undefined;
   netmask?: string | undefined;
   dnsServers?: string[] | undefined;
   macAddress?: string | undefined;
   mtu?: number | undefined;
+  // Interface flags
+  flags?: InterfaceFlags | undefined;
+  // ISP information (for WAN interfaces)
+  ispName?: string | undefined;
+  publicIpv4?: string | undefined;
+  publicIpv6?: string | undefined;
+  // WAN-specific metrics
+  dhcpStatus?: boolean | undefined;
+  connectionUptime?: number | undefined; // in seconds
+  latencyToGateway?: number | undefined; // in milliseconds
+  packetLoss?: number | undefined; // percentage
+  // Interface statistics
+  rxBytes?: number;
+  txBytes?: number;
+  rxPackets?: number;
+  txPackets?: number;
+  rxErrors?: number;
+  txErrors?: number;
+  rxDropped?: number;
+  txDropped?: number;
+  broadcastPackets?: number;
+  multicastPackets?: number;
+  // Routing information (for WAN interfaces)
+  routes?: RouteInfo[] | undefined;
 }
 
 /**
@@ -35,6 +93,25 @@ export interface EthernetInterface extends BaseNetworkInterface {
   duplex?: 'full' | 'half' | 'unknown';
   driver?: string;
   linkDetected?: boolean;
+  autoNegotiation?: boolean;
+  powerManagement?: string;
+  offloadFeatures?: {
+    tso?: boolean;
+    gso?: boolean;
+    gro?: boolean;
+    lro?: boolean;
+    rxvlan?: boolean;
+    txvlan?: boolean;
+  };
+  wakeOnLan?: boolean;
+  rxBytes?: number;
+  txBytes?: number;
+  rxPackets?: number;
+  txPackets?: number;
+  rxErrors?: number;
+  txErrors?: number;
+  rxDropped?: number;
+  txDropped?: number;
 }
 
 /**
@@ -52,6 +129,25 @@ export interface WiFiInterface extends BaseNetworkInterface {
   connectedClients?: ConnectedClient[] | undefined; // For AP mode - detailed client information
   maxClients?: number | undefined; // For AP mode - maximum number of clients
   hidden?: boolean | undefined; // For AP mode - whether SSID is hidden
+  bssid?: string | undefined; // MAC address of access point
+  linkQuality?: number | undefined; // Link quality percentage
+  noiseLevel?: number | undefined; // Noise level in dBm
+  bitRate?: string | undefined; // Current bit rate
+  txPower?: string | undefined; // TX power level
+  channelWidth?: string | undefined; // e.g., "20MHz", "40MHz", "80MHz", "160MHz"
+  regulatoryDomain?: string | undefined; // Country code
+  supportedRates?: string[] | undefined; // Supported data rates
+  beaconInterval?: number | undefined; // Beacon interval in ms
+  dtimPeriod?: number | undefined; // DTIM period
+  roamingCapability?: boolean | undefined; // Whether roaming is enabled
+  rxBytes?: number;
+  txBytes?: number;
+  rxPackets?: number;
+  txPackets?: number;
+  rxErrors?: number;
+  txErrors?: number;
+  rxDropped?: number;
+  txDropped?: number;
 }
 
 /**
@@ -127,6 +223,7 @@ export class NetworkService {
   private readonly cacheTimeout = 30000; // 30 seconds
   private lastCacheUpdate = 0;
   private readonly wifiConfigService = new WifiConfigService();
+  private readonly ispService = new ISPService();
   private logger = LoggerFactory.createStructuredLogger(
     'NetworkService',
     '/var/log/dangerprep/portal.log',
@@ -484,7 +581,28 @@ export class NetworkService {
       const baseInfo = await this.getBaseInterfaceInfo(name);
       const { type, purpose } = await this.determineInterfaceTypeAndPurpose(name, baseInfo);
 
-      const interfaceWithTypePurpose = { ...baseInfo, type, purpose };
+      let interfaceWithTypePurpose = { ...baseInfo, type, purpose };
+
+      // Add ISP information and routing for WAN interfaces
+      if (purpose === 'wan') {
+        try {
+          const [ispInfo, routes] = await Promise.all([
+            this.ispService.getISPInfo(),
+            this.getInterfaceRoutes(name),
+          ]);
+          interfaceWithTypePurpose = {
+            ...interfaceWithTypePurpose,
+            ispName: ispInfo.ispName,
+            publicIpv4: ispInfo.publicIpv4,
+            publicIpv6: ispInfo.publicIpv6,
+            ...(routes && { routes }),
+          };
+        } catch (error) {
+          this.logger.warn('Failed to fetch ISP information or routes', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
 
       switch (type) {
         case 'ethernet':
@@ -515,13 +633,24 @@ export class NetworkService {
   private async getBaseInterfaceInfo(
     name: string
   ): Promise<Omit<BaseNetworkInterface, 'type' | 'purpose'>> {
-    const [ipInfo, macInfo, mtuInfo] = await Promise.allSettled([
+    const [ipInfo, macInfo, mtuInfo, statsInfo, flagsInfo, bcastMcastInfo, dhcpInfo, uptimeInfo] = await Promise.allSettled([
       this.getInterfaceIpInfo(name),
       this.getInterfaceMacAddress(name),
       this.getInterfaceMtu(name),
+      this.getInterfaceStats(name),
+      this.getInterfaceFlags(name),
+      this.getBroadcastMulticastStats(name),
+      this.checkDhcpStatus(name),
+      this.getConnectionUptime(name),
     ]);
 
     const state = await this.getInterfaceState(name);
+
+    // Get gateway metrics if we have a gateway
+    let gatewayMetrics = {};
+    if (ipInfo.status === 'fulfilled' && ipInfo.value.gateway) {
+      gatewayMetrics = await this.getGatewayMetrics(ipInfo.value.gateway);
+    }
 
     return {
       name,
@@ -529,6 +658,12 @@ export class NetworkService {
       ...(ipInfo.status === 'fulfilled' && ipInfo.value),
       ...(macInfo.status === 'fulfilled' && { macAddress: macInfo.value }),
       ...(mtuInfo.status === 'fulfilled' && { mtu: mtuInfo.value }),
+      ...(statsInfo.status === 'fulfilled' && statsInfo.value),
+      ...(flagsInfo.status === 'fulfilled' && { flags: flagsInfo.value }),
+      ...(bcastMcastInfo.status === 'fulfilled' && bcastMcastInfo.value),
+      ...(dhcpInfo.status === 'fulfilled' && { dhcpStatus: dhcpInfo.value }),
+      ...(uptimeInfo.status === 'fulfilled' && { connectionUptime: uptimeInfo.value }),
+      ...gatewayMetrics,
     };
   }
 
@@ -712,7 +847,7 @@ export class NetworkService {
   private async getInterfaceIpInfo(
     name: string
   ): Promise<
-    Partial<Pick<BaseNetworkInterface, 'ipAddress' | 'netmask' | 'gateway' | 'dnsServers'>>
+    Partial<Pick<BaseNetworkInterface, 'ipAddress' | 'ipv6Address' | 'netmask' | 'gateway' | 'dnsServers'>>
   > {
     try {
       const [ipResult, gatewayResult, dnsResult] = await Promise.allSettled([
@@ -724,7 +859,7 @@ export class NetworkService {
       ]);
 
       const result: Partial<
-        Pick<BaseNetworkInterface, 'ipAddress' | 'netmask' | 'gateway' | 'dnsServers'>
+        Pick<BaseNetworkInterface, 'ipAddress' | 'ipv6Address' | 'netmask' | 'gateway' | 'dnsServers'>
       > = {};
 
       // Parse IP address and netmask
@@ -733,6 +868,12 @@ export class NetworkService {
         if (ipMatch && ipMatch[1] && ipMatch[2]) {
           result.ipAddress = ipMatch[1];
           result.netmask = this.cidrToNetmask(parseInt(ipMatch[2]));
+        }
+
+        // Parse IPv6 address
+        const ipv6Match = ipResult.value.stdout.match(/inet6 ([a-f0-9:]+)\/\d+/);
+        if (ipv6Match && ipv6Match[1]) {
+          result.ipv6Address = ipv6Match[1];
         }
       }
 
@@ -789,6 +930,258 @@ export class NetworkService {
   }
 
   /**
+   * Get interface statistics (RX/TX bytes, packets, errors, dropped)
+   */
+  private async getInterfaceStats(
+    name: string
+  ): Promise<
+    Partial<
+      Pick<
+        BaseNetworkInterface,
+        'rxBytes' | 'txBytes' | 'rxPackets' | 'txPackets' | 'rxErrors' | 'txErrors' | 'rxDropped' | 'txDropped'
+      >
+    >
+  > {
+    try {
+      const stats: Partial<
+        Pick<
+          BaseNetworkInterface,
+          'rxBytes' | 'txBytes' | 'rxPackets' | 'txPackets' | 'rxErrors' | 'txErrors' | 'rxDropped' | 'txDropped'
+        >
+      > = {};
+
+      // Try to read individual stat files
+      const [rxBytesResult, txBytesResult, rxPacketsResult, txPacketsResult, rxErrorsResult, txErrorsResult, rxDroppedResult, txDroppedResult] = await Promise.allSettled([
+        execAsync(`cat /sys/class/net/${name}/statistics/rx_bytes`),
+        execAsync(`cat /sys/class/net/${name}/statistics/tx_bytes`),
+        execAsync(`cat /sys/class/net/${name}/statistics/rx_packets`),
+        execAsync(`cat /sys/class/net/${name}/statistics/tx_packets`),
+        execAsync(`cat /sys/class/net/${name}/statistics/rx_errors`),
+        execAsync(`cat /sys/class/net/${name}/statistics/tx_errors`),
+        execAsync(`cat /sys/class/net/${name}/statistics/rx_dropped`),
+        execAsync(`cat /sys/class/net/${name}/statistics/tx_dropped`),
+      ]);
+
+      if (rxBytesResult.status === 'fulfilled') {
+        stats.rxBytes = parseInt(rxBytesResult.value.stdout.trim());
+      }
+      if (txBytesResult.status === 'fulfilled') {
+        stats.txBytes = parseInt(txBytesResult.value.stdout.trim());
+      }
+      if (rxPacketsResult.status === 'fulfilled') {
+        stats.rxPackets = parseInt(rxPacketsResult.value.stdout.trim());
+      }
+      if (txPacketsResult.status === 'fulfilled') {
+        stats.txPackets = parseInt(txPacketsResult.value.stdout.trim());
+      }
+      if (rxErrorsResult.status === 'fulfilled') {
+        stats.rxErrors = parseInt(rxErrorsResult.value.stdout.trim());
+      }
+      if (txErrorsResult.status === 'fulfilled') {
+        stats.txErrors = parseInt(txErrorsResult.value.stdout.trim());
+      }
+      if (rxDroppedResult.status === 'fulfilled') {
+        stats.rxDropped = parseInt(rxDroppedResult.value.stdout.trim());
+      }
+      if (txDroppedResult.status === 'fulfilled') {
+        stats.txDropped = parseInt(txDroppedResult.value.stdout.trim());
+      }
+
+      return stats;
+    } catch (error) {
+      this.logger.warn('Failed to get interface stats', {
+        name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {};
+    }
+  }
+
+  /**
+   * Get routing information for an interface
+   */
+  private async getInterfaceRoutes(name: string): Promise<RouteInfo[] | undefined> {
+    try {
+      const { stdout } = await execAsync(`ip route show dev ${name}`);
+      const routes: RouteInfo[] = [];
+
+      const lines = stdout.split('\n').filter((line: string) => line.trim());
+      for (const line of lines) {
+        const parts = line.split(/\s+/);
+        if (parts.length >= 2) {
+          const route: RouteInfo = {
+            destination: parts[0],
+            gateway: parts[2] || 'direct',
+          };
+
+          // Parse metric if present
+          const metricIndex = parts.indexOf('metric');
+          if (metricIndex !== -1 && parts[metricIndex + 1]) {
+            route.metric = parseInt(parts[metricIndex + 1]);
+          }
+
+          routes.push(route);
+        }
+      }
+
+      return routes.length > 0 ? routes : undefined;
+    } catch (error) {
+      this.logger.warn('Failed to get interface routes', {
+        name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
+  /**
+   * Get interface flags (UP, RUNNING, BROADCAST, etc.)
+   */
+  private async getInterfaceFlags(name: string): Promise<InterfaceFlags | undefined> {
+    try {
+      const { stdout } = await execAsync(`ip link show ${name}`);
+      const flags: InterfaceFlags = {};
+
+      // Extract flags from output like: <UP,BROADCAST,RUNNING,MULTICAST>
+      const flagsMatch = stdout.match(/<([^>]+)>/);
+      if (flagsMatch && flagsMatch[1]) {
+        const flagList = flagsMatch[1].split(',');
+        for (const flag of flagList) {
+          const lowerFlag = flag.toLowerCase();
+          if (lowerFlag === 'up') flags.up = true;
+          if (lowerFlag === 'broadcast') flags.broadcast = true;
+          if (lowerFlag === 'running') flags.running = true;
+          if (lowerFlag === 'multicast') flags.multicast = true;
+          if (lowerFlag === 'loopback') flags.loopback = true;
+          if (lowerFlag === 'pointopoint') flags.pointToPoint = true;
+          if (lowerFlag === 'noarp') flags.noarp = true;
+          if (lowerFlag === 'promisc') flags.promisc = true;
+          if (lowerFlag === 'allmulti') flags.allmulti = true;
+          if (lowerFlag === 'master') flags.master = true;
+          if (lowerFlag === 'slave') flags.slave = true;
+          if (lowerFlag === 'debug') flags.debug = true;
+          if (lowerFlag === 'dormant') flags.dormant = true;
+          if (lowerFlag === 'simplex') flags.simplex = true;
+          if (lowerFlag === 'lower_up') flags.lower_up = true;
+          if (lowerFlag === 'lower_down') flags.lower_down = true;
+        }
+      }
+
+      return Object.keys(flags).length > 0 ? flags : undefined;
+    } catch (error) {
+      this.logger.warn('Failed to get interface flags', {
+        name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
+  /**
+   * Get broadcast and multicast packet statistics
+   */
+  private async getBroadcastMulticastStats(
+    name: string
+  ): Promise<{ broadcastPackets?: number; multicastPackets?: number }> {
+    try {
+      const [_bcastResult, mcastResult] = await Promise.allSettled([
+        execAsync(`cat /sys/class/net/${name}/statistics/rx_packets 2>/dev/null`),
+        execAsync(`cat /sys/class/net/${name}/statistics/multicast 2>/dev/null`),
+      ]);
+
+      const stats: { broadcastPackets?: number; multicastPackets?: number } = {};
+
+      // Try to get broadcast packets from /proc/net/dev
+      try {
+        const { stdout } = await execAsync(`grep ${name} /proc/net/dev`);
+        const parts = stdout.split(/\s+/);
+        if (parts.length > 8) {
+          // Broadcast packets are typically in a specific column
+          stats.broadcastPackets = parseInt(parts[8]);
+        }
+      } catch {
+        // Ignore if not available
+      }
+
+      if (mcastResult.status === 'fulfilled') {
+        stats.multicastPackets = parseInt(mcastResult.value.stdout.trim());
+      }
+
+      return stats;
+    } catch (error) {
+      this.logger.warn('Failed to get broadcast/multicast stats', {
+        name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {};
+    }
+  }
+
+  /**
+   * Check DHCP status for an interface
+   */
+  private async checkDhcpStatus(name: string): Promise<boolean> {
+    try {
+      // Check if dhclient is running for this interface
+      const { stdout } = await execAsync(`ps aux | grep dhclient | grep ${name} | grep -v grep`);
+      return stdout.trim().length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get connection uptime for an interface
+   */
+  private async getConnectionUptime(name: string): Promise<number | undefined> {
+    try {
+      // Get interface creation time from /sys/class/net/{name}/
+      const { stdout } = await execAsync(`stat -c %Y /sys/class/net/${name}`);
+      const creationTime = parseInt(stdout.trim());
+      const currentTime = Math.floor(Date.now() / 1000);
+      return Math.max(0, currentTime - creationTime);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Get latency and packet loss to gateway
+   */
+  private async getGatewayMetrics(gateway: string | undefined): Promise<{ latency?: number; packetLoss?: number }> {
+    if (!gateway) {
+      return {};
+    }
+
+    try {
+      // Ping gateway 4 times with 1 second timeout
+      const { stdout } = await execAsync(`ping -c 4 -W 1 ${gateway} 2>/dev/null || true`);
+
+      const metrics: { latency?: number; packetLoss?: number } = {};
+
+      // Extract average latency
+      const avgMatch = stdout.match(/min\/avg\/max\/stddev = [\d.]+\/([\d.]+)\/[\d.]+\/[\d.]+/);
+      if (avgMatch && avgMatch[1]) {
+        metrics.latency = parseFloat(avgMatch[1]);
+      }
+
+      // Extract packet loss
+      const lossMatch = stdout.match(/(\d+(?:\.\d+)?)% packet loss/);
+      if (lossMatch && lossMatch[1]) {
+        metrics.packetLoss = parseFloat(lossMatch[1]);
+      }
+
+      return metrics;
+    } catch (error) {
+      this.logger.debug('Failed to get gateway metrics', {
+        gateway,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {};
+    }
+  }
+
+  /**
    * Get bridge-specific information
    */
   private async getBridgeInterfaceInfo(
@@ -818,7 +1211,7 @@ export class NetworkService {
       // Extract connected interfaces
       const interfaceMatches = output.match(/^\s+(\w+)$/gm);
       if (interfaceMatches) {
-        bridgeInfo.interfaces = interfaceMatches.map(match => match.trim());
+        bridgeInfo.interfaces = interfaceMatches.map((match: string) => match.trim());
       }
     }
 
@@ -877,11 +1270,13 @@ export class NetworkService {
     name: string,
     baseInfo: BaseNetworkInterface
   ): Promise<EthernetInterface> {
-    const [speedResult, duplexResult, driverResult, linkResult] = await Promise.allSettled([
+    const [speedResult, duplexResult, driverResult, linkResult, autoNegResult, ethtoolFullResult] = await Promise.allSettled([
       execAsync(`ethtool ${name} 2>/dev/null | grep Speed`),
       execAsync(`ethtool ${name} 2>/dev/null | grep Duplex`),
       execAsync(`readlink /sys/class/net/${name}/device/driver 2>/dev/null`),
       execAsync(`ethtool ${name} 2>/dev/null | grep "Link detected"`),
+      execAsync(`ethtool ${name} 2>/dev/null | grep "Auto-negotiation"`),
+      execAsync(`ethtool ${name} 2>/dev/null`),
     ]);
 
     const ethernetInfo: EthernetInterface = {
@@ -916,6 +1311,38 @@ export class NetworkService {
       ethernetInfo.linkDetected = linkResult.value.stdout.includes('yes');
     }
 
+    // Parse auto-negotiation
+    if (autoNegResult.status === 'fulfilled') {
+      ethernetInfo.autoNegotiation = autoNegResult.value.stdout.includes('on');
+    }
+
+    // Parse full ethtool output for advanced features
+    if (ethtoolFullResult.status === 'fulfilled') {
+      const ethtoolOutput = ethtoolFullResult.value.stdout;
+
+      // Power management
+      const pmMatch = ethtoolOutput.match(/Power Management: (on|off)/i);
+      if (pmMatch && pmMatch[1]) {
+        ethernetInfo.powerManagement = pmMatch[1].toLowerCase();
+      }
+
+      // Offload features
+      ethernetInfo.offloadFeatures = {
+        tso: ethtoolOutput.includes('tcp-segmentation-offload') && ethtoolOutput.includes('on'),
+        gso: ethtoolOutput.includes('generic-segmentation-offload') && ethtoolOutput.includes('on'),
+        gro: ethtoolOutput.includes('generic-receive-offload') && ethtoolOutput.includes('on'),
+        lro: ethtoolOutput.includes('large-receive-offload') && ethtoolOutput.includes('on'),
+        rxvlan: ethtoolOutput.includes('rx-vlan-offload') && ethtoolOutput.includes('on'),
+        txvlan: ethtoolOutput.includes('tx-vlan-offload') && ethtoolOutput.includes('on'),
+      };
+
+      // Wake-on-LAN
+      const wolMatch = ethtoolOutput.match(/Wake-on: ([a-z])/i);
+      if (wolMatch && wolMatch[1]) {
+        ethernetInfo.wakeOnLan = wolMatch[1].toLowerCase() !== 'd';
+      }
+    }
+
     return ethernetInfo;
   }
 
@@ -928,12 +1355,13 @@ export class NetworkService {
   ): Promise<WiFiInterface> {
     this.logger.info('Getting WiFi interface info', { name });
 
-    const [iwConfigResult, iwInfoResult, clientsCountResult, clientsDetailResult] =
+    const [iwConfigResult, iwInfoResult, clientsCountResult, clientsDetailResult, linkResult] =
       await Promise.allSettled([
         execAsync(`iwconfig ${name} 2>/dev/null`),
         execAsync(`iw dev ${name} info 2>/dev/null`),
         execAsync(`iw dev ${name} station dump 2>/dev/null | grep Station | wc -l`),
         execAsync(`iw dev ${name} station dump 2>/dev/null`),
+        execAsync(`iw dev ${name} link 2>/dev/null`),
       ]);
 
     const wifiInfo: WiFiInterface = {
@@ -963,6 +1391,24 @@ export class NetworkService {
       const signalMatch = iwconfig.match(/Signal level=(-?\d+) dBm/);
       if (signalMatch && signalMatch[1]) {
         wifiInfo.signalStrength = parseInt(signalMatch[1]);
+      }
+
+      // Noise level
+      const noiseMatch = iwconfig.match(/Noise level=(-?\d+) dBm/);
+      if (noiseMatch && noiseMatch[1]) {
+        wifiInfo.noiseLevel = parseInt(noiseMatch[1]);
+      }
+
+      // Link quality
+      const qualityMatch = iwconfig.match(/Link Quality[=:](\d+)\/(\d+)/);
+      if (qualityMatch && qualityMatch[1] && qualityMatch[2]) {
+        wifiInfo.linkQuality = Math.round((parseInt(qualityMatch[1]) / parseInt(qualityMatch[2])) * 100);
+      }
+
+      // Bit rate
+      const bitRateMatch = iwconfig.match(/Bit Rate[=:]([^\n]+)/);
+      if (bitRateMatch && bitRateMatch[1]) {
+        wifiInfo.bitRate = bitRateMatch[1].trim();
       }
 
       // Frequency
@@ -1010,6 +1456,74 @@ export class NetworkService {
         name,
         reason: iwInfoResult.status === 'rejected' ? String(iwInfoResult.reason) : 'unknown',
       });
+    }
+
+    // Parse link information (BSSID for connected networks)
+    if (linkResult.status === 'fulfilled') {
+      const linkInfo = linkResult.value.stdout;
+
+      // BSSID (MAC address of connected AP)
+      const bssidMatch = linkInfo.match(/Connected to ([a-f0-9:]{17})/i);
+      if (bssidMatch && bssidMatch[1]) {
+        wifiInfo.bssid = bssidMatch[1];
+      }
+    }
+
+    // Parse iwconfig output for advanced metrics
+    if (iwConfigResult.status === 'fulfilled') {
+      const iwconfig = iwConfigResult.value.stdout;
+
+      // TX Power
+      const txPowerMatch = iwconfig.match(/Tx-Power[=:]([^\n]+)/);
+      if (txPowerMatch && txPowerMatch[1]) {
+        wifiInfo.txPower = txPowerMatch[1].trim();
+      }
+
+      // Supported rates
+      const ratesMatch = iwconfig.match(/Bit Rates[=:]([^\n]+)/);
+      if (ratesMatch && ratesMatch[1]) {
+        wifiInfo.supportedRates = ratesMatch[1]
+          .split(/\s+/)
+          .filter((rate: string) => rate.match(/\d+/))
+          .map((rate: string) => rate.trim());
+      }
+
+      // Roaming capability
+      wifiInfo.roamingCapability = !iwconfig.includes('Roaming:off');
+    }
+
+    // Parse iw output for advanced metrics
+    if (iwInfoResult.status === 'fulfilled') {
+      const iwinfo = iwInfoResult.value.stdout;
+
+      // Channel width
+      const widthMatch = iwinfo.match(/channel width: (\d+MHz)/i);
+      if (widthMatch && widthMatch[1]) {
+        wifiInfo.channelWidth = widthMatch[1];
+      }
+
+      // Beacon interval
+      const beaconMatch = iwinfo.match(/beacon interval: (\d+)/i);
+      if (beaconMatch && beaconMatch[1]) {
+        wifiInfo.beaconInterval = parseInt(beaconMatch[1]);
+      }
+
+      // DTIM period
+      const dtimMatch = iwinfo.match(/dtim period: (\d+)/i);
+      if (dtimMatch && dtimMatch[1]) {
+        wifiInfo.dtimPeriod = parseInt(dtimMatch[1]);
+      }
+    }
+
+    // Get regulatory domain
+    try {
+      const { stdout: regOutput } = await execAsync(`iw reg get 2>/dev/null | grep country | head -1`);
+      const countryMatch = regOutput.match(/country ([A-Z]{2})/);
+      if (countryMatch && countryMatch[1]) {
+        wifiInfo.regulatoryDomain = countryMatch[1];
+      }
+    } catch {
+      // Ignore if not available
     }
 
     // Connected clients - fetch for hotspot interfaces (purpose === 'wlan') or AP mode interfaces

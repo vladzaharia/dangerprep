@@ -3,6 +3,38 @@
  */
 
 /**
+ * Route information
+ */
+export interface RouteInfo {
+  destination: string;
+  gateway: string;
+  metric?: number;
+  flags?: string;
+}
+
+/**
+ * Interface flags
+ */
+export interface InterfaceFlags {
+  up?: boolean;
+  broadcast?: boolean;
+  running?: boolean;
+  multicast?: boolean;
+  loopback?: boolean;
+  pointToPoint?: boolean;
+  noarp?: boolean;
+  promisc?: boolean;
+  allmulti?: boolean;
+  master?: boolean;
+  slave?: boolean;
+  debug?: boolean;
+  dormant?: boolean;
+  simplex?: boolean;
+  lower_up?: boolean;
+  lower_down?: boolean;
+}
+
+/**
  * Base network interface information
  */
 export interface BaseNetworkInterface {
@@ -19,11 +51,36 @@ export interface BaseNetworkInterface {
   purpose: 'wan' | 'lan' | 'wlan' | 'docker' | 'loopback' | 'unknown';
   state: 'up' | 'down' | 'unknown';
   ipAddress?: string;
+  ipv6Address?: string;
   gateway?: string;
   netmask?: string;
   dnsServers?: string[];
   macAddress?: string;
   mtu?: number;
+  // Interface flags
+  flags?: InterfaceFlags;
+  // ISP information (for WAN interfaces)
+  ispName?: string;
+  publicIpv4?: string;
+  publicIpv6?: string;
+  // WAN-specific metrics
+  dhcpStatus?: boolean;
+  connectionUptime?: number; // in seconds
+  latencyToGateway?: number; // in milliseconds
+  packetLoss?: number; // percentage
+  // Interface statistics
+  rxBytes?: number;
+  txBytes?: number;
+  rxPackets?: number;
+  txPackets?: number;
+  rxErrors?: number;
+  txErrors?: number;
+  rxDropped?: number;
+  txDropped?: number;
+  broadcastPackets?: number;
+  multicastPackets?: number;
+  // Routing information (for WAN interfaces)
+  routes?: RouteInfo[];
 }
 
 /**
@@ -35,6 +92,17 @@ export interface EthernetInterface extends BaseNetworkInterface {
   duplex?: 'full' | 'half' | 'unknown';
   driver?: string;
   linkDetected?: boolean;
+  autoNegotiation?: boolean;
+  powerManagement?: string;
+  offloadFeatures?: {
+    tso?: boolean;
+    gso?: boolean;
+    gro?: boolean;
+    lro?: boolean;
+    rxvlan?: boolean;
+    txvlan?: boolean;
+  };
+  wakeOnLan?: boolean;
 }
 
 /**
@@ -65,6 +133,17 @@ export interface WiFiInterface extends BaseNetworkInterface {
   connectedClients?: ConnectedClient[]; // For AP mode - detailed client information
   maxClients?: number; // For AP mode - maximum number of clients
   hidden?: boolean; // For AP mode - whether SSID is hidden
+  bssid?: string;
+  linkQuality?: number;
+  noiseLevel?: number;
+  bitRate?: string;
+  txPower?: string;
+  channelWidth?: string;
+  regulatoryDomain?: string;
+  supportedRates?: string[];
+  beaconInterval?: number;
+  dtimPeriod?: number;
+  roamingCapability?: boolean;
 }
 
 /**

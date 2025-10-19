@@ -10,6 +10,7 @@ import {
   faShieldCheck,
   faArrowRightFromBracket,
   faGear,
+  faEllipsisVertical,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo } from 'react';
@@ -20,6 +21,7 @@ import type { NetworkInterface, TailscaleInterface } from '../../types/network';
 import { COLORS, createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
+import { InterfaceDetailsPopup } from '../details/InterfaceDetailsPopup';
 
 /**
  * Get icon for network interface type
@@ -184,6 +186,7 @@ export const NetworkStatusTab: React.FC = () => {
                 title={title}
                 tags={tags}
                 className='interface-callout'
+                detailsContent={<InterfaceDetailsPopup iface={iface} />}
               />
             );
           })
@@ -219,7 +222,7 @@ export const NetworkStatusTab: React.FC = () => {
         />
       </div>
 
-      {/* Right Column - WAN Interfaces */}
+      {/* Right Column - WAN Interfaces with ISP Information */}
       <div className='wa-stack wa-gap-m'>
         <h3 className='wa-heading-s'>Internet</h3>
         {wanInterfaces.length === 0 ? (
@@ -329,24 +332,95 @@ export const NetworkStatusTab: React.FC = () => {
               );
             }
 
-            return (
-              <StatusCard
-                key={iface.name}
-                type='callout'
-                variant={iface.state === 'up' ? 'success' : 'danger'}
-                layout='vertical'
-                icon={
+            // Build ISP tags
+            const ispTags: StatusCardTag[] = [];
+            if (iface.ispName) {
+              ispTags.push({
+                label: 'ISP',
+                value: iface.ispName,
+                variant: 'neutral',
+              });
+            }
+            if (iface.publicIpv4) {
+              ispTags.push({
+                label: 'IPv4',
+                value: iface.publicIpv4,
+                icon: (
                   <FontAwesomeIcon
-                    icon={getInterfaceIcon(iface)}
-                    size='lg'
-                    style={{ ...createIconStyle(ICON_STYLES[iface.type]), maxWidth: '2rem' }}
+                    icon={faGlobe}
+                    style={{ ...createIconStyle(ICON_STYLES.ipv4), maxWidth: '2rem' }}
                   />
-                }
-                title={title}
-                tags={tags}
-                actionButton={tailscaleActionButton}
-                className='interface-callout'
-              />
+                ),
+                variant: 'neutral',
+              });
+            }
+            if (iface.publicIpv6) {
+              ispTags.push({
+                label: 'IPv6',
+                value: iface.publicIpv6,
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faGlobe}
+                    style={{ ...createIconStyle(ICON_STYLES.ipv6), maxWidth: '2rem' }}
+                  />
+                ),
+                variant: 'neutral',
+              });
+            }
+
+            return (
+              <div key={iface.name} className='wa-stack wa-gap-m'>
+                {/* WAN Interface Card */}
+                <StatusCard
+                  type='callout'
+                  variant={iface.state === 'up' ? 'success' : 'danger'}
+                  layout='vertical'
+                  icon={
+                    <FontAwesomeIcon
+                      icon={getInterfaceIcon(iface)}
+                      size='lg'
+                      style={{ ...createIconStyle(ICON_STYLES[iface.type]), maxWidth: '2rem' }}
+                    />
+                  }
+                  title={title}
+                  tags={tags}
+                  actionButton={tailscaleActionButton}
+                  className='interface-callout'
+                  detailsContent={<InterfaceDetailsPopup iface={iface} />}
+                />
+
+                {/* Vertical Ellipsis Separator */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    minHeight: '2rem',
+                  }}
+                >
+                  <FontAwesomeIcon
+                    icon={faEllipsisVertical}
+                    style={createIconStyle(ICON_STYLES.neutral)}
+                  />
+                </div>
+
+                {/* Internet/ISP Card */}
+                <StatusCard
+                  type='callout'
+                  variant={iface.state === 'up' ? 'success' : 'danger'}
+                  layout='vertical'
+                  icon={
+                    <FontAwesomeIcon
+                      icon={faGlobe}
+                      size='lg'
+                      style={createIconStyle(ICON_STYLES.brand)}
+                    />
+                  }
+                  title='Internet'
+                  tags={ispTags.length > 0 ? ispTags : [{ label: 'No ISP information available', variant: 'neutral' }]}
+                  className='interface-callout'
+                />
+              </div>
             );
           })
         )}
