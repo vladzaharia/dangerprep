@@ -6,6 +6,7 @@ import {
   Route,
   useNavigate,
   useSearchParams,
+  useLocation,
 } from 'react-router-dom';
 
 import { Navigation, DefaultRoute, ErrorBoundary } from './components';
@@ -28,6 +29,9 @@ const SettingsPage = lazy(() =>
 );
 const TailscaleSettingsPage = lazy(() =>
   import('./pages/TailscaleSettingsPage').then(m => ({ default: m.TailscaleSettingsPage }))
+);
+const WelcomePage = lazy(() =>
+  import('./pages/WelcomePage').then(m => ({ default: m.WelcomePage }))
 );
 
 // Service configuration type
@@ -76,6 +80,10 @@ const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 function AppContent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+
+  // Check if we're on the welcome page (no navigation needed)
+  const isWelcomePage = location.pathname === '/welcome';
 
   // Auto-reset to homepage after 5 minutes of inactivity
   // IMPORTANT: The timer automatically resets on each user interaction
@@ -117,8 +125,8 @@ function AppContent() {
     <>
       {/* Main Layout using wa-flank for sidebar + content */}
       <div className='wa-flank app-layout'>
-        {/* Navigation Sidebar - Background Layer */}
-        <Navigation />
+        {/* Navigation Sidebar - Background Layer (hidden for welcome page) */}
+        {!isWelcomePage && <Navigation />}
 
         {/* Main Content Area - Raised Layer */}
         <main className='app-content'>
@@ -128,6 +136,7 @@ function AppContent() {
                 <Routes>
                   {/* Modern React 19 routes with Suspense */}
                   <Route path='/' element={<DefaultRoute />} />
+                  <Route path='/welcome' element={<WelcomePage />} />
                   <Route path='/qr' element={<QRCodePage />} />
                   <Route path='/services' element={<ServicesPage />} />
                   <Route path='/maintenance' element={<MaintenanceServicesPage />} />

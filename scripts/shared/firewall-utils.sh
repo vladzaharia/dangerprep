@@ -6,6 +6,7 @@
 readonly DP_CHAIN_INPUT="DANGERPREP_INPUT"
 readonly DP_CHAIN_FORWARD="DANGERPREP_FORWARD"
 readonly DP_CHAIN_NAT="DANGERPREP_NAT"
+readonly DP_CHAIN_CAPTIVE="DANGERPREP_CAPTIVE"
 
 #######################################
 # Create custom chains for DangerPrep hotspot
@@ -18,7 +19,8 @@ create_hotspot_chains() {
     iptables -N "${DP_CHAIN_INPUT}" 2>/dev/null || iptables -F "${DP_CHAIN_INPUT}"
     iptables -N "${DP_CHAIN_FORWARD}" 2>/dev/null || iptables -F "${DP_CHAIN_FORWARD}"
     iptables -t nat -N "${DP_CHAIN_NAT}" 2>/dev/null || iptables -t nat -F "${DP_CHAIN_NAT}"
-    
+    iptables -t nat -N "${DP_CHAIN_CAPTIVE}" 2>/dev/null || iptables -t nat -F "${DP_CHAIN_CAPTIVE}"
+
     return 0
 }
 
@@ -43,17 +45,25 @@ configure_hotspot_firewall() {
     iptables -F "${DP_CHAIN_INPUT}"
     iptables -F "${DP_CHAIN_FORWARD}"
     iptables -t nat -F "${DP_CHAIN_NAT}"
-    
+    iptables -t nat -F "${DP_CHAIN_CAPTIVE}"
+
     # INPUT chain rules (for traffic to the hotspot itself)
     iptables -A "${DP_CHAIN_INPUT}" -i "${hotspot_interface}" -j ACCEPT
     iptables -A "${DP_CHAIN_INPUT}" -i "${hotspot_interface}" -p udp --dport 67 -j ACCEPT  # DHCP
     iptables -A "${DP_CHAIN_INPUT}" -i "${hotspot_interface}" -p udp --dport 53 -j ACCEPT  # DNS
     iptables -A "${DP_CHAIN_INPUT}" -i "${hotspot_interface}" -p tcp --dport 53 -j ACCEPT  # DNS
-    
+    iptables -A "${DP_CHAIN_INPUT}" -i "${hotspot_interface}" -p tcp --dport 80 -j ACCEPT   # HTTP (captive portal)
+    iptables -A "${DP_CHAIN_INPUT}" -i "${hotspot_interface}" -p tcp --dport 443 -j ACCEPT  # HTTPS (portal)
+    iptables -A "${DP_CHAIN_INPUT}" -i "${hotspot_interface}" -p tcp --dport 3000 -j ACCEPT # Portal app
+
     # FORWARD chain rules (for traffic through the hotspot)
     iptables -A "${DP_CHAIN_FORWARD}" -i "${hotspot_interface}" -o "${wan_interface}" -j ACCEPT
     iptables -A "${DP_CHAIN_FORWARD}" -i "${wan_interface}" -o "${hotspot_interface}" -m state --state RELATED,ESTABLISHED -j ACCEPT
-    
+
+    # Captive Portal - Redirect HTTP traffic to portal on port 3000
+    # This catches captive portal detection attempts and redirects them to our portal
+    iptables -t nat -A "${DP_CHAIN_CAPTIVE}" -i "${hotspot_interface}" -p tcp --dport 80 -j DNAT --to-destination "${hotspot_ip}:3000"
+
     # NAT rules (for masquerading)
     iptables -t nat -A "${DP_CHAIN_NAT}" -o "${wan_interface}" -j MASQUERADE
     
@@ -61,15 +71,19 @@ configure_hotspot_firewall() {
     if ! iptables -C INPUT -j "${DP_CHAIN_INPUT}" 2>/dev/null; then
         iptables -I INPUT 1 -j "${DP_CHAIN_INPUT}"
     fi
-    
+
     if ! iptables -C FORWARD -j "${DP_CHAIN_FORWARD}" 2>/dev/null; then
         iptables -I FORWARD 1 -j "${DP_CHAIN_FORWARD}"
     fi
-    
+
+    if ! iptables -t nat -C PREROUTING -j "${DP_CHAIN_CAPTIVE}" 2>/dev/null; then
+        iptables -t nat -I PREROUTING 1 -j "${DP_CHAIN_CAPTIVE}"
+    fi
+
     if ! iptables -t nat -C POSTROUTING -j "${DP_CHAIN_NAT}" 2>/dev/null; then
         iptables -t nat -I POSTROUTING 1 -j "${DP_CHAIN_NAT}"
     fi
-    
+
     return 0
 }
 
@@ -83,17 +97,20 @@ remove_hotspot_firewall() {
     # Remove jumps to our custom chains from main chains
     iptables -D INPUT -j "${DP_CHAIN_INPUT}" 2>/dev/null || true
     iptables -D FORWARD -j "${DP_CHAIN_FORWARD}" 2>/dev/null || true
+    iptables -t nat -D PREROUTING -j "${DP_CHAIN_CAPTIVE}" 2>/dev/null || true
     iptables -t nat -D POSTROUTING -j "${DP_CHAIN_NAT}" 2>/dev/null || true
-    
+
     # Flush and delete our custom chains
     iptables -F "${DP_CHAIN_INPUT}" 2>/dev/null || true
     iptables -F "${DP_CHAIN_FORWARD}" 2>/dev/null || true
+    iptables -t nat -F "${DP_CHAIN_CAPTIVE}" 2>/dev/null || true
     iptables -t nat -F "${DP_CHAIN_NAT}" 2>/dev/null || true
-    
+
     iptables -X "${DP_CHAIN_INPUT}" 2>/dev/null || true
     iptables -X "${DP_CHAIN_FORWARD}" 2>/dev/null || true
+    iptables -t nat -X "${DP_CHAIN_CAPTIVE}" 2>/dev/null || true
     iptables -t nat -X "${DP_CHAIN_NAT}" 2>/dev/null || true
-    
+
     return 0
 }
 

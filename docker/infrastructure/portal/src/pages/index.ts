@@ -5,4 +5,5 @@ export { PowerPage } from './PowerPage';
 export { NetworkStatusPage } from './NetworkStatusPage';
 export { SettingsPage } from './SettingsPage';
 export { TailscaleSettingsPage } from './TailscaleSettingsPage';
+export { WelcomePage } from './WelcomePage';
 export { NotFoundPage } from './NotFoundPage';

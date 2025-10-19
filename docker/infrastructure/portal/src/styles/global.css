@@ -323,6 +323,71 @@ body {
 }
 
 /* =============================================================================
+   WELCOME PAGE - CAPTIVE PORTAL LANDING
+   ============================================================================= */
+
+.welcome-page-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: var(--wa-space-2xl);
+  text-align: center;
+}
+
+.welcome-logo {
+  flex-shrink: 0;
+  padding-top: var(--wa-space-xl);
+}
+
+.welcome-logo img {
+  min-width: 25vw;
+  height: auto;
+}
+
+.welcome-body {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wa-space-l);
+  max-width: 600px;
+}
+
+.welcome-footer {
+  flex-shrink: 0;
+  padding-bottom: var(--wa-space-xl);
+  gap: var(--wa-space-m);
+  align-items: center;
+}
+
+.welcome-url-container {
+  background-color: var(--wa-color-neutral-fill-normal);
+  border: solid var(--wa-border-width-s) var(--wa-color-neutral-border-normal);
+  border-radius: var(--wa-border-radius-m);
+  padding: var(--wa-space-s) var(--wa-space-m);
+  align-items: center;
+  --wa-color-overlay-inline: transparent;
+}
+
+.portal-url-text {
+  font-family: var(--wa-font-family-mono);
+  word-break: break-all;
+}
+
+.welcome-copy-button::part(button) {
+  /* Match small button dimensions exactly */
+  min-height: var(--wa-input-height-small);
+  font-size: var(--wa-button-font-size-small);
+  line-height: var(--wa-line-height-dense);
+  padding-inline-start: var(--wa-spacing-small);
+  padding-inline-end: var(--wa-spacing-small);
+  border-radius: var(--wa-border-radius-medium);
+}
+
+/* =============================================================================
    RESPONSIVE LAYOUT
    ============================================================================= */
 
@@ -331,6 +396,10 @@ body {
   .app-layout {
     flex-direction: column;
     --flank-size: auto;
+  }
+
+  .welcome-logo img {
+    min-width: 70vw;
   }
 
   .app-navigation {
@@ -415,6 +484,10 @@ body {
 
   .tailscale-status {
     min-width: 100%;
+  }
+
+  .welcome-logo img {
+    min-width: 70vw;
   }
 }
 

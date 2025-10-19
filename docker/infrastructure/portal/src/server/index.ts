@@ -9,6 +9,7 @@ import { secureHeaders } from 'hono/secure-headers';
 // Import middleware
 import { structuredLogging, type LoggerVariables } from './middleware/logging';
 // Import routes
+import captive from './routes/captive';
 import config from './routes/config';
 import health from './routes/health';
 import networks from './routes/networks';
@@ -70,6 +71,14 @@ app.use(
     maxAge: 86400, // Cache preflight for 24 hours
   })
 );
+
+// Mount captive portal routes (must come before API routes to handle detection URLs)
+app.route('/captive', captive);
+app.route('/generate_204', captive);
+app.route('/hotspot-detect.html', captive);
+app.route('/connecttest.txt', captive);
+app.route('/ncsi.txt', captive);
+app.route('/success.txt', captive);
 
 // Mount API routes
 app.route('/api/health', health);

@@ -883,12 +883,27 @@ dhcp-range=${dhcp_start},${dhcp_end},255.255.255.0,24h
 dhcp-option=3,${ip_address}
 dhcp-option=6,${ip_address}
 
+# DHCP Option 114 - Captive Portal URI (RFC 8910)
+# Points devices to the captive portal for automatic detection
+dhcp-option=114,"https://portal.danger.diy"
+
 # DNS configuration
 server=8.8.8.8
 server=1.1.1.1
 domain-needed
 bogus-priv
 no-resolv
+
+# Captive Portal Detection - DNS Interception
+# Intercept common captive portal detection URLs and redirect to gateway
+# This triggers the captive portal popup on iOS, Android, Windows, macOS
+address=/captive.apple.com/${ip_address}
+address=/connectivitycheck.gstatic.com/${ip_address}
+address=/connectivitycheck.android.com/${ip_address}
+address=/clients3.google.com/${ip_address}
+address=/www.msftconnecttest.com/${ip_address}
+address=/www.msftncsi.com/${ip_address}
+address=/detectportal.firefox.com/${ip_address}
 
 # Additional settings
 expand-hosts
