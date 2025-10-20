@@ -125,7 +125,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
 
   if (variant === 'full-page') {
     return (
-      <div className='error-display-full-page wa-cluster wa-gap-none wa-align-items-center wa-justify-content-center'>
+      <div className='error-display-full-page'>
         <div className='wa-stack wa-gap-s'>
           <div
             ref={cardRef}
@@ -242,7 +242,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
 
   // Content variant
   return (
-    <div className='error-display-content wa-cluster wa-gap-none wa-align-items-center wa-justify-content-center'>
+    <div className='error-display-content'>
       <div className='wa-stack wa-gap-s'>
         <div
           ref={cardRef}
