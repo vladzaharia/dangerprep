@@ -67,6 +67,7 @@ const defaultConfig: SWRConfiguration = {
   errorRetryInterval: 1000, // Wait 1 second between retries
   shouldRetryOnError: true, // Retry on error
   suspense: true, // Enable suspense by default for React 19
+  keepPreviousData: true, // Keep previous data while fetching
 };
 
 // =============================================================================
@@ -146,80 +147,7 @@ export function useServicesData(
   return useSWR<{ services: ServiceMetadata[] }>(url, fetcher, {
     ...defaultConfig,
     ...config,
-    // Fallback data for services
-    fallbackData: {
-      services: getFallbackServices(
-        serviceType || 'public',
-        domainOverride || import.meta.env.VITE_BASE_DOMAIN || 'danger.diy'
-      ),
-    },
   });
-}
-
-/**
- * Get fallback services based on service type and domain
- */
-function getFallbackServices(serviceType: string, baseDomain: string): ServiceMetadata[] {
-  const allServices: ServiceMetadata[] = [
-    {
-      name: 'Jellyfin',
-      description: 'Media streaming server',
-      icon: 'jellyfin',
-      url: `https://media.${baseDomain}`,
-      type: 'public',
-      status: 'healthy',
-    },
-    {
-      name: 'Kiwix',
-      description: 'Offline Wikipedia and educational content',
-      icon: 'kiwix',
-      url: `https://kiwix.${baseDomain}`,
-      type: 'public',
-      status: 'healthy',
-    },
-    {
-      name: 'ROMM',
-      description: 'Retro gaming collection manager',
-      icon: 'romm',
-      url: `https://retro.${baseDomain}`,
-      type: 'public',
-      status: 'healthy',
-    },
-    {
-      name: 'Docmost',
-      description: 'Documentation and knowledge base',
-      icon: 'docmost',
-      url: `https://docmost.${baseDomain}`,
-      type: 'public',
-      status: 'healthy',
-    },
-    {
-      name: 'OneDev',
-      description: 'Git repository and CI/CD platform',
-      icon: 'onedev',
-      url: `https://onedev.${baseDomain}`,
-      type: 'private',
-      status: 'healthy',
-    },
-    {
-      name: 'Traefik',
-      description: 'Reverse proxy and load balancer dashboard',
-      icon: 'traefik',
-      url: `https://traefik.${baseDomain}`,
-      type: 'maintenance',
-      status: 'healthy',
-    },
-    {
-      name: 'Komodo',
-      description: 'Docker container management',
-      icon: 'komodo',
-      url: `https://docker.${baseDomain}`,
-      type: 'maintenance',
-      status: 'healthy',
-    },
-  ];
-
-  return allServices.filter(service => service.type === serviceType);
 }
 
 // =============================================================================

@@ -7,6 +7,54 @@ import { useNetworkSummary, useHostapdStatus } from '../../hooks/useSWRData';
 import { COLORS, OPACITIES, createIconStyle } from '../../utils/iconStyles';
 
 /**
+ * Loading fallback for Network Status Button
+ * Shows a neutral/unknown state while network data is loading
+ */
+export function NetworkStatusButtonFallback() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const handleClick = () => {
+    const params = new URLSearchParams(searchParams);
+    const queryString = params.toString();
+    const path = queryString ? `/network?${queryString}` : '/network';
+    navigate(path);
+  };
+
+  return (
+    <div
+      className='connection-status-button'
+      onClick={handleClick}
+      style={{ cursor: 'pointer' }}
+      role='button'
+      tabIndex={0}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+      aria-label='View network status'
+    >
+      <wa-button appearance='outlined' variant='neutral'>
+        <FontAwesomeIcon
+          icon={faServer}
+          size='xl'
+          style={createIconStyle({
+            primaryColor: COLORS.neutral.gray,
+            primaryOpacity: OPACITIES.high,
+            secondaryOpacity: OPACITIES.medium,
+          })}
+        />
+        <wa-badge variant='neutral' attention='none'>
+          ?
+        </wa-badge>
+      </wa-button>
+    </div>
+  );
+}
+
+/**
  * Connection Status Button Component
  *
  * Displays a status button with badge showing:

@@ -2,12 +2,12 @@ import { faPowerOff, faBrowser, faQrcode } from '@awesome.me/kit-a765fc5647/icon
 import { faGear, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useMemo } from 'react';
+import React, { Suspense, useMemo } from 'react';
 import { NavLink, useSearchParams, useLocation } from 'react-router-dom';
 
 import { createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 
-import { NetworkStatusButton } from './NetworkStatusButton';
+import { NetworkStatusButton, NetworkStatusButtonFallback } from './NetworkStatusButton';
 
 /**
  * Navigation item configuration
@@ -155,10 +155,14 @@ export const Navigation: React.FC = () => {
    * Render a navigation item - either a standard NavLink or a custom component
    */
   const renderNavItem = (item: NavItem, index: number) => {
-    // If it's a custom component, render it directly
+    // If it's a custom component, render it with Suspense boundary
     if (item.customComponent) {
       const CustomComponent = item.customComponent;
-      return <CustomComponent key={`custom-${item.label}-${index}`} />;
+      return (
+        <Suspense key={`custom-${item.label}-${index}`} fallback={<NetworkStatusButtonFallback />}>
+          <CustomComponent />
+        </Suspense>
+      );
     }
 
     // Otherwise render a standard NavLink
