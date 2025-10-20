@@ -74,6 +74,8 @@ body {
   padding: var(--wa-space-s) 0;
 }
 
+
+
 /* Network Status Page - Full height layout */
 .network-status-page {
   height: 100%;
@@ -357,12 +359,6 @@ wa-card::part(footer) {
     font-size: var(--wa-font-size-s);
   }
 
-  .wifi-connection-content {
-    flex-direction: column;
-    gap: var(--wa-space-xl);
-    text-align: center;
-  }
-
   .wifi-details,
   .wifi-detail-value {
     width: 100%;
@@ -374,10 +370,6 @@ wa-card::part(footer) {
 
   .wifi-qr {
     order: 1;
-  }
-
-  .wifi-detail-item {
-    align-items: center;
   }
 
   .connected-client {
