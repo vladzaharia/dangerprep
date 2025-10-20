@@ -1,4 +1,11 @@
-import { faShieldCheck } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import {
+  faShieldCheck,
+  faWifi,
+  faGlobe,
+  faSatelliteDish,
+  faMobile,
+  faSignal,
+} from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -25,6 +32,161 @@ export const SettingsPage: React.FC = () => {
         className='wa-grid wa-gap-m'
         style={{ '--min-column-size': '250px' } as React.CSSProperties}
       >
+        {/* WiFi/WWAN Settings Card */}
+        <SettingsCard
+          icon={faWifi}
+          iconStyle={ICON_STYLES.wifi}
+          title='WiFi/WWAN Settings'
+          description='Configure WiFi and WWAN connectivity options'
+          footerSlot={
+            <div
+              onClick={() => navigate(getNavLinkTo('/wifi-wwan'))}
+              style={{ cursor: 'pointer' }}
+              role='button'
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(getNavLinkTo('/wifi-wwan'));
+                }
+              }}
+              aria-label='WiFi/WWAN Settings'
+            >
+              <wa-button
+                appearance='filled'
+                variant='brand'
+                style={{ width: '100%', pointerEvents: 'none' }}
+              >
+                Configure WiFi/WWAN
+              </wa-button>
+            </div>
+          }
+        />
+
+        {/* Hotspot/WLAN Settings Card */}
+        <SettingsCard
+          icon={faSignal}
+          iconStyle={ICON_STYLES.hotspot}
+          title='Hotspot/WLAN Settings'
+          description='Configure hotspot and WLAN access point settings'
+          footerSlot={
+            <div
+              onClick={() => navigate(getNavLinkTo('/hotspot-wlan'))}
+              style={{ cursor: 'pointer' }}
+              role='button'
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(getNavLinkTo('/hotspot-wlan'));
+                }
+              }}
+              aria-label='Hotspot/WLAN Settings'
+            >
+              <wa-button
+                appearance='filled'
+                variant='brand'
+                style={{ width: '100%', pointerEvents: 'none' }}
+              >
+                Configure Hotspot/WLAN
+              </wa-button>
+            </div>
+          }
+        />
+
+        {/* Internet Settings Card */}
+        <SettingsCard
+          icon={faGlobe}
+          iconStyle={ICON_STYLES.brand}
+          title='Internet Settings'
+          description='Configure internet connection and DNS settings'
+          footerSlot={
+            <div
+              onClick={() => navigate(getNavLinkTo('/internet'))}
+              style={{ cursor: 'pointer' }}
+              role='button'
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(getNavLinkTo('/internet'));
+                }
+              }}
+              aria-label='Internet Settings'
+            >
+              <wa-button
+                appearance='filled'
+                variant='brand'
+                style={{ width: '100%', pointerEvents: 'none' }}
+              >
+                Configure Internet
+              </wa-button>
+            </div>
+          }
+        />
+
+        {/* Starlink Settings Card */}
+        <SettingsCard
+          icon={faSatelliteDish}
+          iconStyle={ICON_STYLES.brand}
+          title='Starlink Settings'
+          description='Configure Starlink satellite internet settings'
+          footerSlot={
+            <div
+              onClick={() => navigate(getNavLinkTo('/starlink'))}
+              style={{ cursor: 'pointer' }}
+              role='button'
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(getNavLinkTo('/starlink'));
+                }
+              }}
+              aria-label='Starlink Settings'
+            >
+              <wa-button
+                appearance='filled'
+                variant='brand'
+                style={{ width: '100%', pointerEvents: 'none' }}
+              >
+                Configure Starlink
+              </wa-button>
+            </div>
+          }
+        />
+
+        {/* Device Settings Card */}
+        <SettingsCard
+          icon={faMobile}
+          iconStyle={ICON_STYLES.device}
+          title='Device Settings'
+          description='Configure device-specific settings and options'
+          footerSlot={
+            <div
+              onClick={() => navigate(getNavLinkTo('/device'))}
+              style={{ cursor: 'pointer' }}
+              role='button'
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(getNavLinkTo('/device'));
+                }
+              }}
+              aria-label='Device Settings'
+            >
+              <wa-button
+                appearance='filled'
+                variant='brand'
+                style={{ width: '100%', pointerEvents: 'none' }}
+              >
+                Configure Device
+              </wa-button>
+            </div>
+          }
+        />
+
         {/* Tailscale Settings Card */}
         <SettingsCard
           icon={faShieldCheck}
