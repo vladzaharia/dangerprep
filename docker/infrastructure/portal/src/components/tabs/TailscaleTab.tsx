@@ -193,7 +193,6 @@ export const TailscaleTab: React.FC = () => {
         <div className='wa-stack wa-gap-m tailscale-status'>
           <h3 className='wa-heading-s'>Tailscale Status</h3>
           <StatusCard
-            type='callout'
             variant={tailscaleInterface.status === 'connected' ? 'success' : 'danger'}
             layout='vertical'
             icon={
@@ -206,7 +205,7 @@ export const TailscaleTab: React.FC = () => {
             title={tailscaleInterface.name}
             subtitle={tailscaleInterface.tailnetName}
             tags={tailscaleTags}
-            className='interface-callout'
+            className='interface-card'
           />
 
           {/* Current Settings Tags */}

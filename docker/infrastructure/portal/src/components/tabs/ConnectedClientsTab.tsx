@@ -99,7 +99,6 @@ export const ConnectedClientsTab: React.FC = () => {
           return (
             <StatusCard
               key={client.macAddress || index}
-              type='card'
               layout='horizontal'
               icon={
                 <FontAwesomeIcon

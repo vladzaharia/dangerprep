@@ -26,7 +26,6 @@ import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 import { InterfaceDetailsPopup } from '../details/InterfaceDetailsPopup';
 import { ISPDetailsPopup } from '../details/ISPDetailsPopup';
-import { Ellipsis } from '../ui/Ellipsis';
 
 /**
  * Truncate IPv6 address to show first and last octet
@@ -212,7 +211,6 @@ export const NetworkStatusTab: React.FC = () => {
             return (
               <StatusCard
                 key={iface.name}
-                type='callout'
                 variant={iface.state === 'up' ? 'success' : 'danger'}
                 layout='vertical'
                 icon={
@@ -227,7 +225,7 @@ export const NetworkStatusTab: React.FC = () => {
                 }
                 title={title}
                 tags={tags}
-                className='interface-callout'
+                className='interface-card'
                 detailsContent={<InterfaceDetailsPopup iface={iface} />}
               />
             );
@@ -235,14 +233,10 @@ export const NetworkStatusTab: React.FC = () => {
         )}
       </div>
 
-      {/* Ellipsis between LAN and Device */}
-      <Ellipsis orientation='horizontal' />
-
       {/* Middle Column - Router/Device */}
       <div className='wa-stack wa-gap-m'>
         <h3 className='wa-heading-s'>&nbsp;</h3>
         <StatusCard
-          type='card'
           layout='vertical'
           icon={
             <FontAwesomeIcon
@@ -266,9 +260,6 @@ export const NetworkStatusTab: React.FC = () => {
             }))}
         />
       </div>
-
-      {/* Ellipsis between Device and WAN */}
-      <Ellipsis orientation='horizontal' />
 
       {/* Right Column - WAN Interfaces with ISP Information */}
       <div className='wa-stack wa-gap-m'>
@@ -441,7 +432,6 @@ export const NetworkStatusTab: React.FC = () => {
             return (
               <div key={iface.name} className='wa-stack wa-gap-m'>
                 <StatusCard
-                  type='callout'
                   variant={iface.state === 'up' ? 'success' : 'danger'}
                   layout='vertical'
                   icon={
@@ -454,7 +444,7 @@ export const NetworkStatusTab: React.FC = () => {
                   title={title}
                   tags={tags}
                   actionButton={tailscaleActionButton}
-                  className='interface-callout'
+                  className='interface-card'
                   detailsContent={<InterfaceDetailsPopup iface={iface} />}
                   footerContent={
                     (iface.rxBytes !== undefined || iface.txBytes !== undefined) && (
@@ -501,9 +491,7 @@ export const NetworkStatusTab: React.FC = () => {
                         }
                       }}
                       style={{ cursor: 'pointer' }}
-                    >
-                      <Ellipsis orientation='vertical' />
-                    </div>
+                    />
                     {ispChevronRef.current && (
                       <wa-popup
                         ref={setIspPopupElement}

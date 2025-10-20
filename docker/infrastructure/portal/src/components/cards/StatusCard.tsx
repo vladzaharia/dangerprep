@@ -9,7 +9,6 @@ export interface StatusCardTag {
 }
 
 export interface StatusCardProps {
-  type?: 'callout' | 'card' | undefined;
   variant?: 'success' | 'danger' | 'neutral' | 'warning' | undefined;
   layout?: 'vertical' | 'horizontal' | undefined;
   icon: React.ReactNode;
@@ -28,11 +27,10 @@ export interface StatusCardProps {
 
 /**
  * Unified status card component for displaying network interfaces, devices, peers, and clients
- * Supports both callout and card types with flexible layouts
- * Now supports popup for showing error/detail information on click with mouseout to close
+ * Uses wa-card with CSS border styling for variant colors
+ * Supports popup for showing error/detail information on click with mouseout to close
  */
 export const StatusCard: React.FC<StatusCardProps> = ({
-  type = 'card',
   variant = 'neutral',
   layout: _layout = 'vertical',
   icon,
@@ -151,58 +149,20 @@ export const StatusCard: React.FC<StatusCardProps> = ({
       </div>
     ));
 
-  if (type === 'card') {
-    return (
-      <div className='wa-stack wa-gap-s'>
-        <div
-          ref={cardRef}
-          onClick={handleCardClick}
-          onKeyDown={handleKeyDown}
-          onMouseLeave={handleMouseLeave}
-          role={hasPopupContent ? 'button' : undefined}
-          tabIndex={hasPopupContent ? 0 : undefined}
-          aria-expanded={hasPopupContent ? popupOpen : undefined}
-          style={{
-            cursor: hasPopupContent ? 'pointer' : undefined,
-            position: 'relative',
-          }}
-        >
-          <wa-card appearance='outlined' className={`${className} card`}>
-            {/* Header slot with icon and title */}
-            <div slot='header' style={{ width: '100%' }}>
-              {headerContent}
-            </div>
+  // Get border color based on variant
+  const getBorderColor = (): string => {
+    switch (variant) {
+      case 'success':
+        return 'var(--wa-color-success)';
+      case 'danger':
+        return 'var(--wa-color-danger)';
+      case 'warning':
+        return 'var(--wa-color-warning)';
+      default:
+        return 'var(--wa-color-neutral)';
+    }
+  };
 
-            {/* Body with tags/details */}
-            {tagsContent}
-          </wa-card>
-
-          {/* Popup for details */}
-          {hasPopupContent && cardRef.current && (
-            <wa-popup
-              ref={setPopupElement}
-              anchor={cardRef.current}
-              placement='bottom'
-              distance={4}
-              active={popupOpen}
-              shift
-            >
-              <div onMouseLeave={handleMouseLeave}>
-                <wa-card appearance='outlined' style={{ width: '100%', maxWidth: '400px' }}>
-                  {popupContent}
-                </wa-card>
-              </div>
-            </wa-popup>
-          )}
-        </div>
-
-        {/* Action button below card */}
-        {actionButton && <div>{actionButton}</div>}
-      </div>
-    );
-  }
-
-  // Callout type (legacy support)
   return (
     <div className='wa-stack wa-gap-s'>
       <div
@@ -218,21 +178,30 @@ export const StatusCard: React.FC<StatusCardProps> = ({
           position: 'relative',
         }}
       >
-        <wa-callout appearance='outlined' variant={variant} className={className}>
-          <div className='wa-stack wa-gap-m'>
-            <div className='wa-flank wa-gap-m'>
-              {icon}
-              <div className='wa-stack wa-gap-3xs' style={{ flex: 1 }}>
-                <span className='wa-body-s' style={{ fontWeight: 600 }}>
-                  {title}
-                </span>
-                {subtitle && <span className='wa-caption-s'>{subtitle}</span>}
-              </div>
-            </div>
-            {tagsContent}
-            {footerContent && <div className='wa-flank wa-gap-m'>{footerContent}</div>}
+        <wa-card
+          appearance='outlined'
+          className={className}
+          style={
+            {
+              borderColor: getBorderColor(),
+            } as Record<string, string | number>
+          }
+        >
+          {/* Header slot with icon and title */}
+          <div slot='header' style={{ width: '100%' }}>
+            {headerContent}
           </div>
-        </wa-callout>
+
+          {/* Body with tags/details */}
+          {tagsContent}
+
+          {/* Footer with optional content */}
+          {footerContent && (
+            <div slot='footer' style={{ width: '100%' }}>
+              <div className='wa-flank wa-gap-m'>{footerContent}</div>
+            </div>
+          )}
+        </wa-card>
 
         {/* Popup for details */}
         {hasPopupContent && cardRef.current && (
@@ -253,7 +222,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
         )}
       </div>
 
-      {/* Action button below callout */}
+      {/* Action button below card */}
       {actionButton && <div>{actionButton}</div>}
     </div>
   );
