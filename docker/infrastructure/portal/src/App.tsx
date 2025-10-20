@@ -61,20 +61,14 @@ export interface Service {
  */
 function AppLoadingFallback() {
   return (
-    <div className='wa-flank app-layout'>
-      <div className='app-content'>
-        <div className='app-content-inner'>
-          <div className='wa-stack wa-gap-xl'>
-            {/* Page title skeleton */}
-            <wa-skeleton effect='sheen' style={{ width: '240px', height: '36px' }}></wa-skeleton>
-            {/* Main content area skeleton */}
-            <wa-skeleton
-              effect='sheen'
-              style={{ width: '100%', height: '300px', borderRadius: '8px' }}
-            ></wa-skeleton>
-          </div>
-        </div>
-      </div>
+    <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-l)' }}>
+      {/* Page title skeleton */}
+      <wa-skeleton effect='sheen' style={{ width: '240px', height: '36px' }}></wa-skeleton>
+      {/* Main content area skeleton */}
+      <wa-skeleton
+        effect='sheen'
+        style={{ width: '100%', height: '300px', borderRadius: '8px' }}
+      ></wa-skeleton>
     </div>
   );
 }
