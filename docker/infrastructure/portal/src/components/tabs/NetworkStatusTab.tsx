@@ -89,19 +89,25 @@ export const NetworkStatusTab: React.FC = () => {
     return queryString ? `${path}?${queryString}` : path;
   };
 
-  // Get LAN interfaces (hotspot/wlan)
+  // Get LAN interfaces (hotspot/wlan), sorted with ethernet first
   const lanInterfaces = useMemo(() => {
     if (!networkData?.interfaces) return [];
-    return networkData.interfaces.filter(
+    const filtered = networkData.interfaces.filter(
       iface => iface.purpose === 'wlan' || iface.purpose === 'lan'
     );
+    // Sort: ethernet first, then wifi/hotspot
+    return filtered.sort((a, b) => {
+      if (a.type === 'ethernet' && b.type !== 'ethernet') return -1;
+      if (a.type !== 'ethernet' && b.type === 'ethernet') return 1;
+      return 0;
+    });
   }, [networkData]);
 
-  // Get WAN interfaces (internet)
+  // Get WAN interfaces (internet), sorted with ethernet first
   // Include Tailscale IF it's being used as an exit node OR accepting subnet routes
   const wanInterfaces = useMemo(() => {
     if (!networkData?.interfaces) return [];
-    return networkData.interfaces.filter(iface => {
+    const filtered = networkData.interfaces.filter(iface => {
       if (iface.purpose === 'wan' && iface.type !== 'tailscale') {
         return true;
       }
@@ -115,6 +121,12 @@ export const NetworkStatusTab: React.FC = () => {
       }
 
       return false;
+    });
+    // Sort: ethernet first, then wifi/hotspot, then tailscale
+    return filtered.sort((a, b) => {
+      if (a.type === 'ethernet' && b.type !== 'ethernet') return -1;
+      if (a.type !== 'ethernet' && b.type === 'ethernet') return 1;
+      return 0;
     });
   }, [networkData, tailscaleSettings]);
 
@@ -169,16 +181,45 @@ export const NetworkStatusTab: React.FC = () => {
               });
             }
 
+            // Add speed for all interfaces
+            if (iface.type === 'ethernet' && 'speed' in iface && iface.speed) {
+              tags.push({
+                label: 'Speed',
+                value: iface.speed,
+                variant: 'neutral',
+              });
+            }
+
             // Add WLAN-specific tags
             if (iface.type === 'wifi' || iface.type === 'hotspot') {
-              const wifiIface = iface as typeof iface & { frequency?: string; security?: string };
-              if (wifiIface.frequency) {
+              const wifiIface = iface as typeof iface & {
+                frequency?: string;
+                security?: string;
+                channel?: number;
+                signalStrength?: number;
+                bitRate?: string;
+              };
+              if (wifiIface.channel) {
                 tags.push({
-                  label: 'Frequency',
-                  value: wifiIface.frequency,
+                  label: 'Channel',
+                  value: wifiIface.channel.toString(),
                   icon: (
                     <FontAwesomeIcon icon={faRadio} style={createIconStyle(ICON_STYLES.neutral)} />
                   ),
+                  variant: 'neutral',
+                });
+              }
+              if (wifiIface.signalStrength) {
+                tags.push({
+                  label: 'Signal',
+                  value: `${wifiIface.signalStrength} dBm`,
+                  variant: 'neutral',
+                });
+              }
+              if (wifiIface.bitRate) {
+                tags.push({
+                  label: 'Speed',
+                  value: wifiIface.bitRate,
                   variant: 'neutral',
                 });
               }
@@ -291,6 +332,19 @@ export const NetworkStatusTab: React.FC = () => {
                 variant: 'neutral',
               });
             }
+            if (iface.publicIpv4) {
+              tags.push({
+                label: 'Public IP',
+                value: iface.publicIpv4,
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faGlobe}
+                    style={{ ...createIconStyle(ICON_STYLES.ipv4), maxWidth: '2rem' }}
+                  />
+                ),
+                variant: 'neutral',
+              });
+            }
             if (iface.gateway) {
               tags.push({
                 label: 'Gateway',
@@ -300,6 +354,50 @@ export const NetworkStatusTab: React.FC = () => {
                 ),
                 variant: 'neutral',
               });
+            }
+
+            // Add speed for all interfaces
+            if (iface.type === 'ethernet' && 'speed' in iface && iface.speed) {
+              tags.push({
+                label: 'Speed',
+                value: iface.speed,
+                variant: 'neutral',
+              });
+            }
+
+            // Add WLAN-specific tags
+            if (iface.type === 'wifi' || iface.type === 'hotspot') {
+              const wifiIface = iface as typeof iface & {
+                frequency?: string;
+                security?: string;
+                channel?: number;
+                signalStrength?: number;
+                bitRate?: string;
+              };
+              if (wifiIface.channel) {
+                tags.push({
+                  label: 'Channel',
+                  value: wifiIface.channel.toString(),
+                  icon: (
+                    <FontAwesomeIcon icon={faRadio} style={createIconStyle(ICON_STYLES.neutral)} />
+                  ),
+                  variant: 'neutral',
+                });
+              }
+              if (wifiIface.signalStrength) {
+                tags.push({
+                  label: 'Signal',
+                  value: `${wifiIface.signalStrength} dBm`,
+                  variant: 'neutral',
+                });
+              }
+              if (wifiIface.bitRate) {
+                tags.push({
+                  label: 'Speed',
+                  value: wifiIface.bitRate,
+                  variant: 'neutral',
+                });
+              }
             }
 
             // Add Tailscale-specific tags and action button
@@ -429,6 +527,79 @@ export const NetworkStatusTab: React.FC = () => {
 
             const hasISPInfo = iface.ispName || iface.publicIpv4 || iface.publicIpv6;
 
+            // Build footer content with WAN info and TX/RX
+            const footerContent = (iface.rxBytes !== undefined || iface.txBytes !== undefined) && (
+              <div className='wa-stack wa-gap-m' style={{ width: '100%' }}>
+                {/* WAN Information Section */}
+                <div className='wa-flank wa-gap-m wa-align-items-center'>
+                  <FontAwesomeIcon
+                    icon={getInterfaceIcon(iface)}
+                    size='lg'
+                    flip={
+                      iface.type === 'wifi' || iface.type === 'hotspot' ? 'horizontal' : undefined
+                    }
+                    style={{ ...createIconStyle(ICON_STYLES[iface.type]), maxWidth: '2rem' }}
+                  />
+                  <div className='wa-stack wa-gap-3xs' style={{ flex: 1 }}>
+                    <span className='wa-body-s' style={{ fontWeight: 600 }}>
+                      {iface.ispName || 'ISP'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <wa-divider></wa-divider>
+
+                {/* TX/RX Information - Centered */}
+                <div className='wa-flank wa-gap-m wa-align-items-center'>
+                  {iface.rxBytes !== undefined && (
+                    <div style={{ flex: 1, textAlign: 'center' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          marginBottom: '0.25rem',
+                        }}
+                      >
+                        <FontAwesomeIcon
+                          icon={faArrowRightFromBracket}
+                          style={createIconStyle(ICON_STYLES.neutral)}
+                        />
+                        <span className='wa-caption-s' style={{ opacity: 0.7 }}>
+                          RX
+                        </span>
+                      </div>
+                      <wa-format-bytes value={iface.rxBytes} display='short'></wa-format-bytes>
+                    </div>
+                  )}
+                  {iface.txBytes !== undefined && (
+                    <div style={{ flex: 1, textAlign: 'center' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          marginBottom: '0.25rem',
+                        }}
+                      >
+                        <FontAwesomeIcon
+                          icon={faArrowRightFromBracket}
+                          style={createIconStyle(ICON_STYLES.neutral)}
+                        />
+                        <span className='wa-caption-s' style={{ opacity: 0.7 }}>
+                          TX
+                        </span>
+                      </div>
+                      <wa-format-bytes value={iface.txBytes} display='short'></wa-format-bytes>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+
             return (
               <div key={iface.name} className='wa-stack wa-gap-m'>
                 <StatusCard
@@ -438,6 +609,9 @@ export const NetworkStatusTab: React.FC = () => {
                     <FontAwesomeIcon
                       icon={getInterfaceIcon(iface)}
                       size='lg'
+                      flip={
+                        iface.type === 'wifi' || iface.type === 'hotspot' ? 'horizontal' : undefined
+                      }
                       style={{ ...createIconStyle(ICON_STYLES[iface.type]), maxWidth: '2rem' }}
                     />
                   }
@@ -446,34 +620,7 @@ export const NetworkStatusTab: React.FC = () => {
                   actionButton={tailscaleActionButton}
                   className='interface-card'
                   detailsContent={<InterfaceDetailsPopup iface={iface} />}
-                  footerContent={
-                    (iface.rxBytes !== undefined || iface.txBytes !== undefined) && (
-                      <>
-                        {iface.rxBytes !== undefined && (
-                          <div style={{ flex: 1 }}>
-                            <span className='wa-caption-s' style={{ opacity: 0.7 }}>
-                              RX:{' '}
-                            </span>
-                            <wa-format-bytes
-                              value={iface.rxBytes}
-                              display='short'
-                            ></wa-format-bytes>
-                          </div>
-                        )}
-                        {iface.txBytes !== undefined && (
-                          <div style={{ flex: 1, textAlign: 'right' }}>
-                            <span className='wa-caption-s' style={{ opacity: 0.7 }}>
-                              TX:{' '}
-                            </span>
-                            <wa-format-bytes
-                              value={iface.txBytes}
-                              display='short'
-                            ></wa-format-bytes>
-                          </div>
-                        )}
-                      </>
-                    )
-                  }
+                  footerContent={footerContent}
                 />
 
                 {/* ISP Popup with Animated Ellipsis */}
