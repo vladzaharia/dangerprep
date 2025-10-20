@@ -7,21 +7,19 @@ import {
   faGaugeHigh,
   faMagnifyingGlass,
   faCloud,
+  faChevronsDown,
+  faChevronsUp,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
   faGlobe,
   faShieldCheck,
   faArrowRightFromBracket,
   faGear,
-  faRadio,
   faKey,
-  faArrowDown,
-  faArrowUp,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
-import type WaPopup from '@awesome.me/webawesome/dist/components/popup/popup.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import '@awesome.me/webawesome/dist/components/format-bytes/format-bytes.js';
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useNetworkSummary, useTailscaleSettings, useTailscalePeers } from '../../hooks/useSWRData';
@@ -29,7 +27,6 @@ import type { NetworkInterface, TailscaleInterface } from '../../types/network';
 import { COLORS, createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
-import { ISPDetailsPopup } from '../details/ISPDetailsPopup';
 
 /**
  * Truncate IPv6 address to show first and last octet
@@ -203,21 +200,14 @@ export const NetworkStatusTab: React.FC = () => {
                 frequency?: string;
                 security?: string;
                 channel?: number;
-                signalStrength?: number;
                 bitRate?: string;
               };
-              if (wifiIface.channel) {
-                tags.push({
-                  label: 'Channel',
-                  value: wifiIface.channel.toString(),
-                  icon: <FontAwesomeIcon icon={faRadio} style={createIconStyle(ICON_STYLES.tag)} />,
-                  variant: 'neutral',
-                });
-              }
               if (wifiIface.bitRate) {
+                // Remove "Sensitivity: X/X" from bitRate if present
+                const cleanedBitRate = wifiIface.bitRate.split(' Sensitivity')[0];
                 tags.push({
                   label: 'Speed',
-                  value: wifiIface.bitRate,
+                  value: cleanedBitRate,
                   icon: (
                     <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
                   ),
@@ -394,21 +384,14 @@ export const NetworkStatusTab: React.FC = () => {
                 frequency?: string;
                 security?: string;
                 channel?: number;
-                signalStrength?: number;
                 bitRate?: string;
               };
-              if (wifiIface.channel) {
-                tags.push({
-                  label: 'Channel',
-                  value: wifiIface.channel.toString(),
-                  icon: <FontAwesomeIcon icon={faRadio} style={createIconStyle(ICON_STYLES.tag)} />,
-                  variant: 'neutral',
-                });
-              }
               if (wifiIface.bitRate) {
+                // Remove "Sensitivity: X/X" from bitRate if present
+                const cleanedBitRate = wifiIface.bitRate.split(' Sensitivity')[0];
                 tags.push({
                   label: 'Speed',
-                  value: wifiIface.bitRate,
+                  value: cleanedBitRate,
                   icon: (
                     <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
                   ),
@@ -534,33 +517,6 @@ export const NetworkStatusTab: React.FC = () => {
               } as StatusCardTag & { title?: string });
             }
 
-            // ISP popup state
-            const [ispPopupOpen, setIspPopupOpen] = useState(false);
-            const ispChevronRef = useRef<HTMLDivElement>(null);
-            const [ispPopupElement, setIspPopupElement] = useState<WaPopup | null>(null);
-
-            // Close ISP popup when clicking outside
-            useEffect(() => {
-              const handleClickOutside = (event: MouseEvent) => {
-                if (
-                  ispPopupOpen &&
-                  ispChevronRef.current &&
-                  ispPopupElement &&
-                  !ispChevronRef.current.contains(event.target as Node) &&
-                  !ispPopupElement.contains(event.target as Node)
-                ) {
-                  setIspPopupOpen(false);
-                }
-              };
-
-              document.addEventListener('mousedown', handleClickOutside);
-              return () => {
-                document.removeEventListener('mousedown', handleClickOutside);
-              };
-            }, [ispPopupOpen, ispPopupElement]);
-
-            const hasISPInfo = iface.ispName || iface.publicIpv4 || iface.publicIpv6;
-
             // Build footer content with WAN info and TX/RX
             const footerContent = (iface.rxBytes !== undefined || iface.txBytes !== undefined) && (
               <div className='wa-stack wa-gap-m' style={{ width: '100%' }}>
@@ -581,24 +537,37 @@ export const NetworkStatusTab: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Divider */}
-                <wa-divider></wa-divider>
-
                 {/* TX/RX Information - Icon and Value */}
                 <div className='wa-flank wa-gap-m wa-align-items-center'>
                   {iface.rxBytes !== undefined && (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
                       <FontAwesomeIcon
-                        icon={faArrowUp}
+                        icon={faChevronsUp}
                         style={createIconStyle(ICON_STYLES.neutral)}
                       />
                       <wa-format-bytes value={iface.rxBytes} display='short'></wa-format-bytes>
                     </div>
                   )}
                   {iface.txBytes !== undefined && (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
                       <FontAwesomeIcon
-                        icon={faArrowDown}
+                        icon={faChevronsDown}
                         style={createIconStyle(ICON_STYLES.neutral)}
                       />
                       <wa-format-bytes value={iface.txBytes} display='short'></wa-format-bytes>
@@ -609,68 +578,26 @@ export const NetworkStatusTab: React.FC = () => {
             );
 
             return (
-              <div key={iface.name} className='wa-stack wa-gap-m'>
-                <StatusCard
-                  variant={iface.state === 'up' ? 'success' : 'danger'}
-                  layout='vertical'
-                  icon={
-                    <FontAwesomeIcon
-                      icon={getInterfaceIcon(iface)}
-                      size='lg'
-                      flip={
-                        iface.type === 'wifi' || iface.type === 'hotspot' ? 'horizontal' : undefined
-                      }
-                      style={{ ...createIconStyle(ICON_STYLES[iface.type]), maxWidth: '2rem' }}
-                    />
-                  }
-                  title={title}
-                  tags={tags}
-                  actionButton={tailscaleActionButton}
-                  className='interface-card'
-                  footerContent={footerContent}
-                />
-
-                {/* ISP Popup with Animated Ellipsis */}
-                {hasISPInfo && (
-                  <div style={{ position: 'relative' }}>
-                    <div
-                      ref={ispChevronRef}
-                      onClick={() => setIspPopupOpen(!ispPopupOpen)}
-                      role='button'
-                      tabIndex={0}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setIspPopupOpen(!ispPopupOpen);
-                        }
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    {ispChevronRef.current && (
-                      <wa-popup
-                        ref={setIspPopupElement}
-                        anchor={ispChevronRef.current}
-                        placement='bottom'
-                        distance={4}
-                        active={ispPopupOpen}
-                        shift
-                      >
-                        <div
-                          onMouseLeave={() => setIspPopupOpen(false)}
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <wa-card
-                            appearance='outlined'
-                            style={{ width: '100%', maxWidth: '400px' }}
-                          >
-                            <ISPDetailsPopup iface={iface} />
-                          </wa-card>
-                        </div>
-                      </wa-popup>
-                    )}
-                  </div>
-                )}
-              </div>
+              <StatusCard
+                key={iface.name}
+                variant={iface.state === 'up' ? 'success' : 'danger'}
+                layout='vertical'
+                icon={
+                  <FontAwesomeIcon
+                    icon={getInterfaceIcon(iface)}
+                    size='lg'
+                    flip={
+                      iface.type === 'wifi' || iface.type === 'hotspot' ? 'horizontal' : undefined
+                    }
+                    style={{ ...createIconStyle(ICON_STYLES[iface.type]), maxWidth: '2rem' }}
+                  />
+                }
+                title={title}
+                tags={tags}
+                actionButton={tailscaleActionButton}
+                className='interface-card'
+                footerContent={footerContent}
+              />
             );
           })
         )}
