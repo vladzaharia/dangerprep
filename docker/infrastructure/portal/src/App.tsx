@@ -29,11 +29,11 @@ const SettingsPage = lazy(() =>
 const TailscaleSettingsPage = lazy(() =>
   import('./pages/TailscaleSettingsPage').then(m => ({ default: m.TailscaleSettingsPage }))
 );
-const WifiWwanSettingsPage = lazy(() =>
-  import('./pages/WifiWwanSettingsPage').then(m => ({ default: m.WifiWwanSettingsPage }))
+const WifiSettingsPage = lazy(() =>
+  import('./pages/WifiSettingsPage').then(m => ({ default: m.WifiSettingsPage }))
 );
-const HotspotWlanSettingsPage = lazy(() =>
-  import('./pages/HotspotWlanSettingsPage').then(m => ({ default: m.HotspotWlanSettingsPage }))
+const HotspotSettingsPage = lazy(() =>
+  import('./pages/HotspotSettingsPage').then(m => ({ default: m.HotspotSettingsPage }))
 );
 const InternetSettingsPage = lazy(() =>
   import('./pages/InternetSettingsPage').then(m => ({ default: m.InternetSettingsPage }))
@@ -150,8 +150,8 @@ function AppContent() {
                   <Route path='/network' element={<NetworkStatusPage />} />
                   <Route path='/settings' element={<SettingsPage />} />
                   <Route path='/tailscale' element={<TailscaleSettingsPage />} />
-                  <Route path='/wifi-wwan' element={<WifiWwanSettingsPage />} />
-                  <Route path='/hotspot-wlan' element={<HotspotWlanSettingsPage />} />
+                  <Route path='/wifi' element={<WifiSettingsPage />} />
+                  <Route path='/hotspot' element={<HotspotSettingsPage />} />
                   <Route path='/internet' element={<InternetSettingsPage />} />
                   <Route path='/starlink' element={<StarlinkSettingsPage />} />
                   <Route path='/device' element={<DeviceSettingsPage />} />

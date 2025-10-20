@@ -1,9 +1,9 @@
 import {
   faShieldCheck,
-  faWifi,
+  faRainbowHalf,
   faGlobe,
   faSatelliteDish,
-  faMobile,
+  faServer,
   faSignal,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import React from 'react';
@@ -32,63 +32,64 @@ export const SettingsPage: React.FC = () => {
         className='wa-grid wa-gap-m'
         style={{ '--min-column-size': '250px' } as React.CSSProperties}
       >
-        {/* WiFi/WWAN Settings Card */}
+        {/* WiFi Settings Card */}
         <SettingsCard
-          icon={faWifi}
+          icon={faRainbowHalf}
+          iconFlip='horizontal'
           iconStyle={ICON_STYLES.wifi}
-          title='WiFi/WWAN Settings'
-          description='Configure WiFi and WWAN connectivity options'
+          title='WiFi Settings'
+          description='Configure WiFi connectivity options'
           footerSlot={
             <div
-              onClick={() => navigate(getNavLinkTo('/wifi-wwan'))}
+              onClick={() => navigate(getNavLinkTo('/wifi'))}
               style={{ cursor: 'pointer' }}
               role='button'
               tabIndex={0}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate(getNavLinkTo('/wifi-wwan'));
+                  navigate(getNavLinkTo('/wifi'));
                 }
               }}
-              aria-label='WiFi/WWAN Settings'
+              aria-label='WiFi Settings'
             >
               <wa-button
                 appearance='filled'
                 variant='brand'
                 style={{ width: '100%', pointerEvents: 'none' }}
               >
-                Configure WiFi/WWAN
+                Configure WiFi
               </wa-button>
             </div>
           }
         />
 
-        {/* Hotspot/WLAN Settings Card */}
+        {/* Hotspot Settings Card */}
         <SettingsCard
           icon={faSignal}
           iconStyle={ICON_STYLES.hotspot}
-          title='Hotspot/WLAN Settings'
-          description='Configure hotspot and WLAN access point settings'
+          title='Hotspot Settings'
+          description='Configure hotspot and access point settings'
           footerSlot={
             <div
-              onClick={() => navigate(getNavLinkTo('/hotspot-wlan'))}
+              onClick={() => navigate(getNavLinkTo('/hotspot'))}
               style={{ cursor: 'pointer' }}
               role='button'
               tabIndex={0}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate(getNavLinkTo('/hotspot-wlan'));
+                  navigate(getNavLinkTo('/hotspot'));
                 }
               }}
-              aria-label='Hotspot/WLAN Settings'
+              aria-label='Hotspot Settings'
             >
               <wa-button
                 appearance='filled'
                 variant='brand'
                 style={{ width: '100%', pointerEvents: 'none' }}
               >
-                Configure Hotspot/WLAN
+                Configure Hotspot
               </wa-button>
             </div>
           }
@@ -158,7 +159,7 @@ export const SettingsPage: React.FC = () => {
 
         {/* Device Settings Card */}
         <SettingsCard
-          icon={faMobile}
+          icon={faServer}
           iconStyle={ICON_STYLES.device}
           title='Device Settings'
           description='Configure device-specific settings and options'
