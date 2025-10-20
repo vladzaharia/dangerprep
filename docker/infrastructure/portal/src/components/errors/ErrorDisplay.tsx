@@ -66,7 +66,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
       : 'An unexpected error occurred. Please try refreshing the page.');
 
   // Show error details in development
-  const showErrorDetails = process.env.NODE_ENV === 'development' && error;
+  const showErrorDetails = !!error;
 
   // Close popup when clicking outside
   useEffect(() => {
