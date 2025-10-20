@@ -106,7 +106,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
 
   // Tags/details content for body
   const tagsContent = tags.length > 0 && (
-    <div className='wa-cluster wa-gap-xs'>
+    <div className='wa-cluster wa-gap-xs' style={{ justifyContent: 'center' }}>
       {tags.map((tag, idx) => {
         const tagWithTitle = tag as StatusCardTag & { title?: string };
         const tagProps: Record<string, unknown> = {
