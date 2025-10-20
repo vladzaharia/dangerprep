@@ -549,7 +549,11 @@ export const NetworkStatusTab: React.FC = () => {
                         icon={faChevronsUp}
                         style={createIconStyle(ICON_STYLES.neutral)}
                       />
-                      <wa-format-bytes value={iface.rxBytes} display='short'></wa-format-bytes>
+                      <wa-format-bytes
+                        value={iface.rxBytes}
+                        display='short'
+                        className='wa-body-s'
+                      ></wa-format-bytes>
                     </div>
                   )}
                   {iface.txBytes !== undefined && (
@@ -566,7 +570,11 @@ export const NetworkStatusTab: React.FC = () => {
                         icon={faChevronsDown}
                         style={createIconStyle(ICON_STYLES.neutral)}
                       />
-                      <wa-format-bytes value={iface.txBytes} display='short'></wa-format-bytes>
+                      <wa-format-bytes
+                        value={iface.txBytes}
+                        display='short'
+                        className='wa-body-s'
+                      ></wa-format-bytes>
                     </div>
                   )}
                 </div>
