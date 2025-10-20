@@ -4,6 +4,9 @@ import {
   faServer,
   faNetworkWired,
   faRainbowHalf,
+  faGaugeHigh,
+  faMagnifyingGlass,
+  faCloud,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
   faGlobe,
@@ -12,6 +15,8 @@ import {
   faGear,
   faRadio,
   faKey,
+  faArrowDown,
+  faArrowUp,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import type WaPopup from '@awesome.me/webawesome/dist/components/popup/popup.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -24,7 +29,6 @@ import type { NetworkInterface, TailscaleInterface } from '../../types/network';
 import { COLORS, createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
-import { InterfaceDetailsPopup } from '../details/InterfaceDetailsPopup';
 import { ISPDetailsPopup } from '../details/ISPDetailsPopup';
 
 /**
@@ -186,6 +190,9 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'Speed',
                 value: iface.speed,
+                icon: (
+                  <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                ),
                 variant: 'neutral',
               });
             }
@@ -203,16 +210,7 @@ export const NetworkStatusTab: React.FC = () => {
                 tags.push({
                   label: 'Channel',
                   value: wifiIface.channel.toString(),
-                  icon: (
-                    <FontAwesomeIcon icon={faRadio} style={createIconStyle(ICON_STYLES.neutral)} />
-                  ),
-                  variant: 'neutral',
-                });
-              }
-              if (wifiIface.signalStrength) {
-                tags.push({
-                  label: 'Signal',
-                  value: `${wifiIface.signalStrength} dBm`,
+                  icon: <FontAwesomeIcon icon={faRadio} style={createIconStyle(ICON_STYLES.tag)} />,
                   variant: 'neutral',
                 });
               }
@@ -220,6 +218,9 @@ export const NetworkStatusTab: React.FC = () => {
                 tags.push({
                   label: 'Speed',
                   value: wifiIface.bitRate,
+                  icon: (
+                    <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                  ),
                   variant: 'neutral',
                 });
               }
@@ -228,11 +229,28 @@ export const NetworkStatusTab: React.FC = () => {
                   label: 'Security',
                   value: wifiIface.security,
                   icon: (
-                    <FontAwesomeIcon icon={faKey} style={createIconStyle(ICON_STYLES.neutral)} />
+                    <FontAwesomeIcon icon={faKey} style={createIconStyle(ICON_STYLES.security)} />
                   ),
                   variant: 'neutral',
                 });
               }
+            }
+
+            // Add DNS servers
+            if (iface.dnsServers && iface.dnsServers.length > 0) {
+              iface.dnsServers.forEach(dns => {
+                tags.push({
+                  label: 'DNS',
+                  value: dns,
+                  icon: (
+                    <FontAwesomeIcon
+                      icon={faMagnifyingGlass}
+                      style={createIconStyle(ICON_STYLES.tag)}
+                    />
+                  ),
+                  variant: 'neutral',
+                });
+              });
             }
 
             const iconColor = getInterfaceIconColor(iface);
@@ -267,7 +285,6 @@ export const NetworkStatusTab: React.FC = () => {
                 title={title}
                 tags={tags}
                 className='interface-card'
-                detailsContent={<InterfaceDetailsPopup iface={iface} />}
               />
             );
           })
@@ -304,7 +321,10 @@ export const NetworkStatusTab: React.FC = () => {
 
       {/* Right Column - WAN Interfaces with ISP Information */}
       <div className='wa-stack wa-gap-m'>
-        <h3 className='wa-heading-s'>Internet</h3>
+        <div className='wa-flank wa-gap-s wa-align-items-center'>
+          <FontAwesomeIcon icon={faGlobe} size='lg' style={createIconStyle(ICON_STYLES.ipv4)} />
+          <h3 className='wa-heading-s'>Internet</h3>
+        </div>
         {wanInterfaces.length === 0 ? (
           <wa-card appearance='outlined'>
             <div className='wa-stack wa-gap-xs'>
@@ -338,7 +358,7 @@ export const NetworkStatusTab: React.FC = () => {
                 value: iface.publicIpv4,
                 icon: (
                   <FontAwesomeIcon
-                    icon={faGlobe}
+                    icon={faCloud}
                     style={{ ...createIconStyle(ICON_STYLES.ipv4), maxWidth: '2rem' }}
                   />
                 ),
@@ -361,6 +381,9 @@ export const NetworkStatusTab: React.FC = () => {
               tags.push({
                 label: 'Speed',
                 value: iface.speed,
+                icon: (
+                  <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                ),
                 variant: 'neutral',
               });
             }
@@ -378,16 +401,7 @@ export const NetworkStatusTab: React.FC = () => {
                 tags.push({
                   label: 'Channel',
                   value: wifiIface.channel.toString(),
-                  icon: (
-                    <FontAwesomeIcon icon={faRadio} style={createIconStyle(ICON_STYLES.neutral)} />
-                  ),
-                  variant: 'neutral',
-                });
-              }
-              if (wifiIface.signalStrength) {
-                tags.push({
-                  label: 'Signal',
-                  value: `${wifiIface.signalStrength} dBm`,
+                  icon: <FontAwesomeIcon icon={faRadio} style={createIconStyle(ICON_STYLES.tag)} />,
                   variant: 'neutral',
                 });
               }
@@ -395,9 +409,29 @@ export const NetworkStatusTab: React.FC = () => {
                 tags.push({
                   label: 'Speed',
                   value: wifiIface.bitRate,
+                  icon: (
+                    <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                  ),
                   variant: 'neutral',
                 });
               }
+            }
+
+            // Add DNS servers
+            if (iface.dnsServers && iface.dnsServers.length > 0) {
+              iface.dnsServers.forEach(dns => {
+                tags.push({
+                  label: 'DNS',
+                  value: dns,
+                  icon: (
+                    <FontAwesomeIcon
+                      icon={faMagnifyingGlass}
+                      style={createIconStyle(ICON_STYLES.tag)}
+                    />
+                  ),
+                  variant: 'neutral',
+                });
+              });
             }
 
             // Add Tailscale-specific tags and action button
@@ -550,49 +584,23 @@ export const NetworkStatusTab: React.FC = () => {
                 {/* Divider */}
                 <wa-divider></wa-divider>
 
-                {/* TX/RX Information - Centered */}
+                {/* TX/RX Information - Icon and Value */}
                 <div className='wa-flank wa-gap-m wa-align-items-center'>
                   {iface.rxBytes !== undefined && (
-                    <div style={{ flex: 1, textAlign: 'center' }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem',
-                          marginBottom: '0.25rem',
-                        }}
-                      >
-                        <FontAwesomeIcon
-                          icon={faArrowRightFromBracket}
-                          style={createIconStyle(ICON_STYLES.neutral)}
-                        />
-                        <span className='wa-caption-s' style={{ opacity: 0.7 }}>
-                          RX
-                        </span>
-                      </div>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <FontAwesomeIcon
+                        icon={faArrowUp}
+                        style={createIconStyle(ICON_STYLES.neutral)}
+                      />
                       <wa-format-bytes value={iface.rxBytes} display='short'></wa-format-bytes>
                     </div>
                   )}
                   {iface.txBytes !== undefined && (
-                    <div style={{ flex: 1, textAlign: 'center' }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem',
-                          marginBottom: '0.25rem',
-                        }}
-                      >
-                        <FontAwesomeIcon
-                          icon={faArrowRightFromBracket}
-                          style={createIconStyle(ICON_STYLES.neutral)}
-                        />
-                        <span className='wa-caption-s' style={{ opacity: 0.7 }}>
-                          TX
-                        </span>
-                      </div>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <FontAwesomeIcon
+                        icon={faArrowDown}
+                        style={createIconStyle(ICON_STYLES.neutral)}
+                      />
                       <wa-format-bytes value={iface.txBytes} display='short'></wa-format-bytes>
                     </div>
                   )}
@@ -619,7 +627,6 @@ export const NetworkStatusTab: React.FC = () => {
                   tags={tags}
                   actionButton={tailscaleActionButton}
                   className='interface-card'
-                  detailsContent={<InterfaceDetailsPopup iface={iface} />}
                   footerContent={footerContent}
                 />
 
