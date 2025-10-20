@@ -22,7 +22,7 @@ body {
 
 /* Main layout container */
 .app-layout {
-  --flank-size: 80px; /* Narrower sidebar for icon-only navigation */
+  --flank-size: 4rem; /* Narrower sidebar for icon-only navigation */
   height: 100vh;
   width: 100vw;
   gap: 0;
@@ -59,25 +59,26 @@ body {
 
 .app-navigation-card::part(footer) {
   border-top: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-m);
 }
 
-.connection-status-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.app-navigation-category {
+  font-size: var(--wa-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--wa-color-neutral-text-subtle);
+  text-align: center;
+  padding: var(--wa-space-s) 0;
 }
+
+
 
 /* Network Status Page - Full height layout */
 .network-status-page {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.network-status-tabs {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
 }
 
 .network-status-tabs::part(base) {
@@ -110,8 +111,11 @@ body {
   overflow: auto;
 }
 
-.app-content-inner {
+.app-content-wrapper {
   height: 100%;
+}
+
+.app-content-inner {
   background-color: color-mix(
     in srgb,
     var(--wa-color-neutral-fill-quiet) 70%,
@@ -123,6 +127,7 @@ body {
   border-radius: var(--wa-border-radius-l);
   padding: var(--wa-space-l);
   overflow: auto;
+  flex: 1;
 }
 
 .app-content-inner:has(.error-display-content) {
@@ -144,44 +149,25 @@ body {
 
 .qr-code-page {
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .wifi-connection-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--wa-space-xl);
   max-width: 600px;
   width: 100%;
 }
 
 .wifi-connection-content {
-  display: flex;
-  align-items: center;
-  gap: var(--wa-space-2xl);
   width: 100%;
 }
 
 .wifi-details {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--wa-space-m);
 }
 
 .wifi-details-title {
   font-size: 1.5rem;
   margin: 0 0 var(--wa-space-m) 0;
   color: var(--wa-color-neutral-text-normal);
-}
-
-.wifi-detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--wa-space-xs);
 }
 
 .wifi-detail-label {
@@ -205,9 +191,6 @@ body {
 
 .wifi-qr {
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .wifi-instructions {
@@ -278,12 +261,7 @@ body {
   box-sizing: border-box;
 }
 
-.service-url--split {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--wa-space-m);
-}
+
 
 .service-url-text {
   flex: 1;
@@ -297,10 +275,7 @@ body {
   color: var(--wa-color-neutral-text-subtle);
 }
 
-.service-action {
-  display: flex;
-  justify-content: center;
-}
+
 
 .interface-callout {
   background-color: var(--wa-color-surface-default) !important;
@@ -365,12 +340,6 @@ wa-card::part(footer) {
     padding-top: 0;
   }
 
-  .app-navigation .wa-stack {
-    flex-direction: row;
-    justify-content: center;
-    gap: var(--wa-space-m);
-  }
-
   .app-content {
     order: 1; /* Content at top on mobile */
     height: calc(100vh - 80px); /* Account for navigation height */
@@ -395,22 +364,12 @@ wa-card::part(footer) {
     width: 100%;
   }
 
-  .wifi-connection-content {
-    flex-direction: column;
-    gap: var(--wa-space-xl);
-    text-align: center;
-  }
-
   .wifi-details {
     order: 2;
   }
 
   .wifi-qr {
     order: 1;
-  }
-
-  .wifi-detail-item {
-    align-items: center;
   }
 
   .connected-client {
@@ -428,9 +387,6 @@ wa-card::part(footer) {
 
 /* Full-page error display - centered card */
 .error-display-full-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   min-height: 100vh;
   width: 100vw;
   padding: var(--wa-space-2xl);
@@ -455,9 +411,6 @@ wa-card::part(footer) {
 
 /* Content area error display - fills content area with danger background */
 .error-display-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   min-height: 100%;
   width: 100%;
   padding: var(--wa-space-2xl);
@@ -472,8 +425,79 @@ wa-card::part(footer) {
   background-color: color-mix(in srgb, var(--wa-color-danger-fill) 80%, transparent) !important;
 }
 
-/* Error display action buttons */
-.error-display-actions {
+/* =============================================================================
+   FOOTER NAVIGATION - HORIZONTAL BAR AT BOTTOM
+   ============================================================================= */
+
+.network-status-back-button {
+  background: none;
+  border: none;
+  color: var(--wa-color-neutral-text-normal);
+  cursor: pointer;
+  padding: 0;
+  font-size: 1.25rem;
+  transition: color 0.2s ease;
+}
+
+.network-status-back-button:hover {
+  color: var(--wa-color-primary-text-normal);
+}
+
+.footer-navigation {
+  padding: var(--wa-space-m) 0 0 0;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.footer-navigation-card {
+  background-color: color-mix(
+    in srgb,
+    var(--wa-color-neutral-fill-quiet) 50%,
+    transparent
+  ) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: solid var(--wa-border-width-s) var(--wa-color-neutral-border-normal);
+  border-bottom: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+}
+
+.footer-navigation-card::part(body) {
+  padding: var(--wa-space-m);
+}
+
+.footer-navigation-item {
+  text-decoration: none;
+  color: inherit;
+  padding: var(--wa-space-s);
+  border-radius: var(--wa-border-radius-m);
+  transition: background-color 0.2s ease;
+  /* Uses wa-stack wa-gap-xs wa-align-items-center classes for layout */
+}
+
+.footer-navigation-item wa-button {
+  width: 100%;
   justify-content: center;
-  flex-wrap: wrap;
+}
+
+.footer-navigation-label {
+  font-size: var(--wa-font-size-xs);
+  font-weight: 500;
+  text-align: center;
+  color: var(--wa-color-neutral-text-normal);
+}
+
+.footer-navigation-item--active {
+  background-color: var(--wa-color-primary-fill-quiet);
+}
+
+.footer-navigation-item--active wa-button {
+  color: var(--wa-color-primary-text-normal) !important;
+}
+
+.footer-navigation-item--active .footer-navigation-label {
+  color: var(--wa-color-primary-text-normal);
+  font-weight: 600;
 }

@@ -3,8 +3,9 @@ import { faGear, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/s
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo } from 'react';
-import { NavLink, useSearchParams, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useSearchParams } from 'react-router-dom';
 
+import { useFooterNavigation } from '../../hooks/useFooterNavigation';
 import { createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 
 import { NetworkStatusButton } from './NetworkStatusButton';
@@ -96,6 +97,7 @@ export const Navigation: React.FC = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const isKioskMode = searchParams.has('kiosk');
+  const { category } = useFooterNavigation();
 
   // Helper function to preserve search params in navigation
   const getNavLinkTo = (path: string) => {
@@ -194,11 +196,10 @@ export const Navigation: React.FC = () => {
         )}
 
         {/* Bottom navigation section - footer slot */}
-        {bottomNavItems.length > 0 && (
-          <div slot='footer' className='wa-stack wa-gap-xl'>
-            {bottomNavItems.map((item, index) => renderNavItem(item, index))}
-          </div>
-        )}
+        <div slot='footer' className='wa-stack wa-gap-xl'>
+          {bottomNavItems.map((item, index) => renderNavItem(item, index))}
+          {category && <div className='app-navigation-category'>{category}</div>}
+        </div>
       </wa-card>
     </div>
   );

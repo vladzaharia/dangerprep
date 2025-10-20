@@ -8,18 +8,18 @@ import type { WiFiInterface } from '../../types/network';
  */
 function QRCodeSkeleton() {
   return (
-    <div className='wifi-connection-container'>
-      <div className='wifi-connection-content'>
+    <div className='wifi-connection-container wa-stack wa-gap-xl wa-align-items-center wa-justify-content-center'>
+      <div className='wifi-connection-content wa-flank wa-gap-2xl wa-align-items-center wa-split:column@mobile'>
         {/* Left Side - Connection Details Skeleton */}
-        <div className='wifi-details'>
-          <div className='wifi-detail-item'>
+        <div className='wifi-details wa-stack wa-gap-m'>
+          <div className='wifi-detail-item wa-stack wa-gap-xs wa-align-items-center@mobile'>
             <span className='wifi-detail-label'>Network Name:</span>
             {/* Skeleton INSIDE the wifi-detail-value container to maintain layout */}
             <div className='wifi-detail-value'>
               <wa-skeleton effect='sheen' style={{ width: '100%', height: '2rem' }}></wa-skeleton>
             </div>
           </div>
-          <div className='wifi-detail-item'>
+          <div className='wifi-detail-item wa-stack wa-gap-xs wa-align-items-center@mobile'>
             <span className='wifi-detail-label'>Password:</span>
             {/* Skeleton INSIDE the wifi-detail-value container to maintain layout */}
             <div className='wifi-detail-value'>
@@ -29,7 +29,7 @@ function QRCodeSkeleton() {
         </div>
 
         {/* Right Side - QR Code Skeleton */}
-        <div className='wifi-qr'>
+        <div className='wifi-qr wa-cluster wa-gap-none wa-align-items-center wa-justify-content-center'>
           {/* QR code skeleton - exactly 200px to match wa-qr-code size */}
           <wa-skeleton
             effect='sheen'
@@ -76,23 +76,23 @@ function QRCodeContent() {
   }, [ssid, password]);
 
   return (
-    <div className='wifi-connection-container'>
+    <div className='wifi-connection-container wa-stack wa-gap-xl wa-align-items-center wa-justify-content-center'>
       {/* Connection Details and QR Code Side by Side */}
-      <div className='wifi-connection-content'>
+      <div className='wifi-connection-content wa-flank wa-gap-2xl wa-align-items-center wa-split:column@mobile'>
         {/* Left Side - Connection Details */}
-        <div className='wifi-details'>
-          <div className='wifi-detail-item'>
+        <div className='wifi-details wa-stack wa-gap-m'>
+          <div className='wifi-detail-item wa-stack wa-gap-xs wa-align-items-center@mobile'>
             <span className='wifi-detail-label'>Network Name:</span>
             <span className='wifi-detail-value'>{ssid}</span>
           </div>
-          <div className='wifi-detail-item'>
+          <div className='wifi-detail-item wa-stack wa-gap-xs wa-align-items-center@mobile'>
             <span className='wifi-detail-label'>Password:</span>
             <span className='wifi-detail-value'>{password}</span>
           </div>
         </div>
 
         {/* Right Side - QR Code */}
-        <div className='wifi-qr'>
+        <div className='wifi-qr wa-cluster wa-gap-none wa-align-items-center wa-justify-content-center'>
           <wa-qr-code
             value={wifiQRString}
             size={200}

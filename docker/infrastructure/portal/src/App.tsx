@@ -8,7 +8,8 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 
-import { Navigation, DefaultRoute, ErrorBoundary } from './components';
+import { Navigation, DefaultRoute, ErrorBoundary, FooterNavigation } from './components';
+import { useFooterNavigation } from './hooks/useFooterNavigation';
 import { NotFoundPage } from './pages';
 
 // Lazy load page components for better code splitting
@@ -22,6 +23,12 @@ const MaintenanceServicesPage = lazy(() =>
 const PowerPage = lazy(() => import('./pages/PowerPage').then(m => ({ default: m.PowerPage })));
 const NetworkStatusPage = lazy(() =>
   import('./pages/NetworkStatusPage').then(m => ({ default: m.NetworkStatusPage }))
+);
+const ConnectedClientsPage = lazy(() =>
+  import('./pages/ConnectedClientsPage').then(m => ({ default: m.ConnectedClientsPage }))
+);
+const TailscaleStatusPage = lazy(() =>
+  import('./pages/TailscaleStatusPage').then(m => ({ default: m.TailscaleStatusPage }))
 );
 const SettingsPage = lazy(() =>
   import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage }))
@@ -91,6 +98,7 @@ const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 function AppContent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { shouldShow: showFooterNav, items: footerItems } = useFooterNavigation();
 
   // Auto-reset to homepage after 5 minutes of inactivity
   // IMPORTANT: The timer automatically resets on each user interaction
@@ -128,6 +136,19 @@ function AppContent() {
     eventsThrottle: 200,
   });
 
+  // Helper function to preserve search params in navigation
+  const getNavLinkTo = (path: string) => {
+    const params = new URLSearchParams(searchParams);
+    const queryString = params.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
+
+  // Add search params to footer items
+  const footerItemsWithParams = footerItems.map(item => ({
+    ...item,
+    path: getNavLinkTo(item.path),
+  }));
+
   return (
     <>
       {/* Main Layout using wa-flank for sidebar + content */}
@@ -135,31 +156,37 @@ function AppContent() {
         {/* Navigation Sidebar - Background Layer */}
         <Navigation />
 
-        {/* Main Content Area - Raised Layer */}
+        {/* Main Content Area - Raised Layer with optional footer navigation */}
         <main className='app-content'>
-          <div className='app-content-inner'>
-            <ErrorBoundary variant='content'>
-              <Suspense fallback={<AppLoadingFallback />}>
-                <Routes>
-                  {/* Modern React 19 routes with Suspense */}
-                  <Route path='/' element={<DefaultRoute />} />
-                  <Route path='/qr' element={<QRCodePage />} />
-                  <Route path='/services' element={<ServicesPage />} />
-                  <Route path='/maintenance' element={<MaintenanceServicesPage />} />
-                  <Route path='/power' element={<PowerPage />} />
-                  <Route path='/network' element={<NetworkStatusPage />} />
-                  <Route path='/settings' element={<SettingsPage />} />
-                  <Route path='/tailscale' element={<TailscaleSettingsPage />} />
-                  <Route path='/wifi' element={<WifiSettingsPage />} />
-                  <Route path='/hotspot' element={<HotspotSettingsPage />} />
-                  <Route path='/internet' element={<InternetSettingsPage />} />
-                  <Route path='/starlink' element={<StarlinkSettingsPage />} />
-                  <Route path='/device' element={<DeviceSettingsPage />} />
-                  {/* 404 catch-all route */}
-                  <Route path='*' element={<NotFoundPage />} />
-                </Routes>
-              </Suspense>
-            </ErrorBoundary>
+          <div className='app-content-wrapper wa-stack wa-gap-none'>
+            <div className='app-content-inner'>
+              <ErrorBoundary variant='content'>
+                <Suspense fallback={<AppLoadingFallback />}>
+                  <Routes>
+                    {/* Modern React 19 routes with Suspense */}
+                    <Route path='/' element={<DefaultRoute />} />
+                    <Route path='/qr' element={<QRCodePage />} />
+                    <Route path='/services' element={<ServicesPage />} />
+                    <Route path='/maintenance' element={<MaintenanceServicesPage />} />
+                    <Route path='/power' element={<PowerPage />} />
+                    <Route path='/network' element={<NetworkStatusPage />} />
+                    <Route path='/network/status' element={<NetworkStatusPage />} />
+                    <Route path='/network/clients' element={<ConnectedClientsPage />} />
+                    <Route path='/network/tailscale' element={<TailscaleStatusPage />} />
+                    <Route path='/settings' element={<SettingsPage />} />
+                    <Route path='/tailscale' element={<TailscaleSettingsPage />} />
+                    <Route path='/wifi' element={<WifiSettingsPage />} />
+                    <Route path='/hotspot' element={<HotspotSettingsPage />} />
+                    <Route path='/internet' element={<InternetSettingsPage />} />
+                    <Route path='/starlink' element={<StarlinkSettingsPage />} />
+                    <Route path='/device' element={<DeviceSettingsPage />} />
+                    {/* 404 catch-all route */}
+                    <Route path='*' element={<NotFoundPage />} />
+                  </Routes>
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+            {showFooterNav && <FooterNavigation items={footerItemsWithParams} />}
           </div>
         </main>
       </div>

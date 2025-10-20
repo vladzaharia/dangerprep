@@ -3,12 +3,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { NetworkStatusTab } from '../components';
+import { ConnectedClientsTab } from '../components';
 
 /**
- * Network Status Page Component
+ * Connected Clients Page Component
  */
-export const NetworkStatusPage: React.FC = () => {
+export const ConnectedClientsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -29,9 +29,9 @@ export const NetworkStatusPage: React.FC = () => {
         >
           <FontAwesomeIcon icon={faChevronLeft} size='lg' />
         </button>
-        <h2>Network Status</h2>
+        <h2>Connected Clients</h2>
       </div>
-      <NetworkStatusTab />
+      <ConnectedClientsTab />
     </div>
   );
 };
