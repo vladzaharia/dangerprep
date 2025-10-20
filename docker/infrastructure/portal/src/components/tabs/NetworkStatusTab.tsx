@@ -312,7 +312,6 @@ export const NetworkStatusTab: React.FC = () => {
       {/* Right Column - WAN Interfaces with ISP Information */}
       <div className='wa-stack wa-gap-m'>
         <div className='wa-flank wa-gap-s wa-align-items-center'>
-          <FontAwesomeIcon icon={faGlobe} size='lg' style={createIconStyle(ICON_STYLES.ipv4)} />
           <h3 className='wa-heading-s'>Internet</h3>
         </div>
         {wanInterfaces.length === 0 ? (
@@ -523,12 +522,9 @@ export const NetworkStatusTab: React.FC = () => {
                 {/* WAN Information Section */}
                 <div className='wa-flank wa-gap-m wa-align-items-center'>
                   <FontAwesomeIcon
-                    icon={getInterfaceIcon(iface)}
+                    icon={faCloud}
                     size='lg'
-                    flip={
-                      iface.type === 'wifi' || iface.type === 'hotspot' ? 'horizontal' : undefined
-                    }
-                    style={{ ...createIconStyle(ICON_STYLES[iface.type]), maxWidth: '2rem' }}
+                    style={{ ...createIconStyle(ICON_STYLES.ipv4), maxWidth: '2rem' }}
                   />
                   <div className='wa-stack wa-gap-3xs' style={{ flex: 1 }}>
                     <span className='wa-body-s' style={{ fontWeight: 600 }}>
