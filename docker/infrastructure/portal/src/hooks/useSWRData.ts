@@ -31,14 +31,33 @@ export interface HostapdStatus {
 }
 
 /**
+ * Extended error type for SWR with status code and error info
+ */
+export interface FetchError extends Error {
+  status?: number;
+  info?: Record<string, unknown>;
+}
+
+/**
  * Generic fetcher for API endpoints
  * Handles both wrapped and unwrapped API responses
+ * Attaches status codes and structured error info for better error handling
  */
 async function fetcher<T>(url: string): Promise<T> {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch data: ${response.status} ${response.statusText}`);
+    const error = new Error(`Failed to fetch data: ${response.statusText}`) as FetchError;
+    error.status = response.status;
+
+    // Try to parse error details from response
+    try {
+      error.info = await response.json();
+    } catch {
+      error.info = {};
+    }
+
+    throw error;
   }
 
   const result = await response.json();
@@ -46,7 +65,10 @@ async function fetcher<T>(url: string): Promise<T> {
   // Handle both wrapped and unwrapped responses
   if (result.success !== undefined) {
     if (!result.success) {
-      throw new Error(result.error || 'API request failed');
+      const error = new Error(result.error || 'API request failed') as FetchError;
+      error.status = 400;
+      error.info = result;
+      throw error;
     }
     return result.data;
   }
@@ -68,6 +90,21 @@ const defaultConfig: SWRConfiguration = {
   shouldRetryOnError: true, // Retry on error
   suspense: true, // Enable suspense by default for React 19
   keepPreviousData: true, // Keep previous data while fetching
+  loadingTimeout: 3000, // Timeout to trigger onLoadingSlow event (3 seconds)
+  // Custom error retry logic
+  onErrorRetry: (error: FetchError, _key, _config, revalidate, { retryCount }) => {
+    // Don't retry 4xx errors (except 429 Too Many Requests)
+    if (error.status && error.status >= 400 && error.status < 500 && error.status !== 429) {
+      return;
+    }
+    // Don't retry more than 3 times
+    if (retryCount >= 3) {
+      return;
+    }
+    // Exponential backoff: 1s, 2s, 4s
+    const delay = 1000 * Math.pow(2, retryCount);
+    setTimeout(() => revalidate({ retryCount }), delay);
+  },
 };
 
 // =============================================================================

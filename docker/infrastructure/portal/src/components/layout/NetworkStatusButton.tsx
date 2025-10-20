@@ -1,7 +1,7 @@
 import { faServer } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 import { useNetworkSummary, useHostapdStatus } from '../../hooks/useSWRData';
 import { COLORS, OPACITIES, createIconStyle } from '../../utils/iconStyles';
@@ -12,13 +12,11 @@ import { COLORS, OPACITIES, createIconStyle } from '../../utils/iconStyles';
  */
 export function NetworkStatusButtonFallback() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
 
   const handleClick = () => {
-    const params = new URLSearchParams(searchParams);
-    const queryString = params.toString();
-    const path = queryString ? `/network?${queryString}` : '/network';
-    navigate(path);
+    // Navigate to network page while preserving current search params
+    navigate(`/network${location.search}`);
   };
 
   return (
@@ -66,7 +64,7 @@ export function NetworkStatusButtonFallback() {
  */
 export const NetworkStatusButton: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
 
   // Use SWR for real-time network updates with auto-reconnect
   const { data: networkData, error: networkError } = useNetworkSummary();
@@ -105,10 +103,8 @@ export const NetworkStatusButton: React.FC = () => {
 
   // Handle click to navigate to network status page
   const handleClick = () => {
-    const params = new URLSearchParams(searchParams);
-    const queryString = params.toString();
-    const path = queryString ? `/network?${queryString}` : '/network';
-    navigate(path);
+    // Navigate to network page while preserving current search params
+    navigate(`/network${location.search}`);
   };
 
   return (
