@@ -8,8 +8,8 @@ import {
   faGears,
   faNetworkWired,
   faArrowTurnDownLeft,
+  faRainbowHalf,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
-import { faWifi } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState, Suspense } from 'react';
 
@@ -365,7 +365,8 @@ function TailscaleSettingsContent() {
       >
         {/* Advertise Exit Node Card */}
         <SettingsCard
-          icon={faWifi}
+          icon={faRainbowHalf}
+          iconFlip='horizontal'
           iconStyle={ICON_STYLES.brand}
           title='Advertise Exit Node'
           description='Offer this device as an exit node for others'

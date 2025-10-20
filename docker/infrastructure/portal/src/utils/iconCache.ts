@@ -17,6 +17,7 @@ import {
   faBookOpen,
   faBox,
   faServer,
+  faRainbowHalf,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 // Utility Duotone Semibold icons (primary icon set)
 import {
@@ -28,7 +29,6 @@ import {
   faShieldCheck,
   faRadio,
   faGear,
-  faWifi,
   faDatabase,
   faChartPie,
   faGlobe,
@@ -93,7 +93,7 @@ export class IconCache {
     'hard-drive': faHardDrive,
 
     // Network & Connectivity
-    wifi: faWifi,
+    wifi: faRainbowHalf,
     ethernet: faEthernet,
     link: faLink,
     globe: faGlobe,

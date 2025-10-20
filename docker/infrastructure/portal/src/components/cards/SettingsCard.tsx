@@ -9,6 +9,7 @@ export interface SettingsCardProps {
   icon?: IconDefinition;
   stackedIcon?: { base: IconDefinition; overlay: IconDefinition };
   iconStyle: IconStyleConfig;
+  iconFlip?: 'horizontal' | 'vertical';
 
   // Content
   title: string;
@@ -35,6 +36,7 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
   icon,
   stackedIcon,
   iconStyle,
+  iconFlip,
   title,
   description,
   headerSlot,
@@ -69,7 +71,7 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
             />
           </span>
         ) : icon ? (
-          <FontAwesomeIcon icon={icon} size='4x' style={iconStyleObj} />
+          <FontAwesomeIcon icon={icon} size='4x' flip={iconFlip} style={iconStyleObj} />
         ) : null}
         <h3 className='wa-heading-s'>{title}</h3>
         <p className='wa-body-s' style={{ textAlign: 'center' }}>

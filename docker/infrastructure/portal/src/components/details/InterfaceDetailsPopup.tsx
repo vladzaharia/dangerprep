@@ -2,11 +2,9 @@ import React from 'react';
 
 import type { NetworkInterface, EthernetInterface, WiFiInterface } from '../../types/network';
 import {
-  formatBytes,
   formatUptime,
   formatLatency,
   formatPacketLoss,
-  formatNumber,
   formatBoolean,
 } from '../../utils/networkFormatting';
 
@@ -45,23 +43,21 @@ interface InterfaceDetailsPopupProps {
 export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ iface }) => {
   return (
     <div className='wa-stack wa-gap-m'>
-      {/* Connection Info */}
-      <DetailSection title='Connection'>
-        {iface.ipAddress && <DetailRow label='IPv4' value={iface.ipAddress} />}
-        {iface.ipv6Address && <DetailRow label='IPv6' value={iface.ipv6Address} />}
-        {iface.gateway && <DetailRow label='Gateway' value={iface.gateway} />}
-        {iface.macAddress && <DetailRow label='MAC Address' value={iface.macAddress} />}
-        {iface.dnsServers && iface.dnsServers.length > 0 && (
-          <DetailRow label='DNS Servers' value={iface.dnsServers.join(', ')} />
-        )}
-      </DetailSection>
+      {/* Connection Info - Only show gateway, MAC, DNS (IPv4 already in tags) */}
+      {(iface.gateway || iface.macAddress || (iface.dnsServers && iface.dnsServers.length > 0)) && (
+        <DetailSection title='Connection'>
+          {iface.gateway && <DetailRow label='Gateway' value={iface.gateway} />}
+          {iface.macAddress && <DetailRow label='MAC Address' value={iface.macAddress} />}
+          {iface.dnsServers && iface.dnsServers.length > 0 && (
+            <DetailRow label='DNS Servers' value={iface.dnsServers.join(', ')} />
+          )}
+        </DetailSection>
+      )}
 
-      {/* ISP Info (WAN only) */}
-      {iface.purpose === 'wan' && (iface.ispName || iface.publicIpv4 || iface.publicIpv6) && (
-        <DetailSection title='ISP Information'>
-          {iface.ispName && <DetailRow label='ISP' value={iface.ispName} />}
-          {iface.publicIpv4 && <DetailRow label='Public IPv4' value={iface.publicIpv4} />}
-          {iface.publicIpv6 && <DetailRow label='Public IPv6' value={iface.publicIpv6} />}
+      {/* IPv6 Address - Show separately if available */}
+      {iface.ipv6Address && (
+        <DetailSection title='IPv6'>
+          <DetailRow label='Address' value={iface.ipv6Address} />
         </DetailSection>
       )}
 
@@ -111,34 +107,18 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
         </>
       )}
 
-      {/* WiFi Details */}
+      {/* WiFi Details - Only show channel and signal info (frequency/security already in tags) */}
       {(iface.type === 'wifi' || iface.type === 'hotspot') && (
         <>
-          {((iface as WiFiInterface).ssid ||
-            (iface as WiFiInterface).channel ||
-            (iface as WiFiInterface).frequency ||
-            (iface as WiFiInterface).security) && (
-            <DetailSection title='WiFi Connection'>
-              {(iface as WiFiInterface).ssid && (
-                <DetailRow label='SSID' value={(iface as WiFiInterface).ssid} />
-              )}
-              {(iface as WiFiInterface).channel && (
-                <DetailRow label='Channel' value={(iface as WiFiInterface).channel} />
-              )}
-              {(iface as WiFiInterface).frequency && (
-                <DetailRow label='Frequency' value={(iface as WiFiInterface).frequency} />
-              )}
-              {(iface as WiFiInterface).security && (
-                <DetailRow label='Security' value={(iface as WiFiInterface).security} />
-              )}
-            </DetailSection>
-          )}
-
-          {((iface as WiFiInterface).signalStrength !== undefined ||
+          {((iface as WiFiInterface).channel ||
+            (iface as WiFiInterface).signalStrength !== undefined ||
             (iface as WiFiInterface).linkQuality !== undefined ||
             (iface as WiFiInterface).noiseLevel !== undefined ||
             (iface as WiFiInterface).bitRate) && (
-            <DetailSection title='WiFi Signal'>
+            <DetailSection title='WiFi Details'>
+              {(iface as WiFiInterface).channel && (
+                <DetailRow label='Channel' value={(iface as WiFiInterface).channel} />
+              )}
               {(iface as WiFiInterface).signalStrength !== undefined && (
                 <DetailRow
                   label='Signal Strength'
@@ -163,43 +143,6 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
             </DetailSection>
           )}
         </>
-      )}
-
-      {/* Statistics */}
-      {(iface.rxBytes !== undefined ||
-        iface.txBytes !== undefined ||
-        iface.rxPackets !== undefined ||
-        iface.txPackets !== undefined ||
-        iface.rxErrors !== undefined ||
-        iface.txErrors !== undefined ||
-        iface.rxDropped !== undefined ||
-        iface.txDropped !== undefined) && (
-        <DetailSection title='Statistics'>
-          {iface.rxBytes !== undefined && (
-            <DetailRow label='RX Bytes' value={formatBytes(iface.rxBytes)} />
-          )}
-          {iface.txBytes !== undefined && (
-            <DetailRow label='TX Bytes' value={formatBytes(iface.txBytes)} />
-          )}
-          {iface.rxPackets !== undefined && (
-            <DetailRow label='RX Packets' value={formatNumber(iface.rxPackets)} />
-          )}
-          {iface.txPackets !== undefined && (
-            <DetailRow label='TX Packets' value={formatNumber(iface.txPackets)} />
-          )}
-          {iface.rxErrors !== undefined && (
-            <DetailRow label='RX Errors' value={formatNumber(iface.rxErrors)} />
-          )}
-          {iface.txErrors !== undefined && (
-            <DetailRow label='TX Errors' value={formatNumber(iface.txErrors)} />
-          )}
-          {iface.rxDropped !== undefined && (
-            <DetailRow label='RX Dropped' value={formatNumber(iface.rxDropped)} />
-          )}
-          {iface.txDropped !== undefined && (
-            <DetailRow label='TX Dropped' value={formatNumber(iface.txDropped)} />
-          )}
-        </DetailSection>
       )}
     </div>
   );

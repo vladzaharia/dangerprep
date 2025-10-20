@@ -3,17 +3,20 @@ import {
   faRouter,
   faServer,
   faNetworkWired,
+  faRainbowHalf,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
-  faWifi,
   faGlobe,
   faShieldCheck,
   faArrowRightFromBracket,
   faGear,
+  faRadio,
+  faKey,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import type WaPopup from '@awesome.me/webawesome/dist/components/popup/popup.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import '@awesome.me/webawesome/dist/components/format-bytes/format-bytes.js';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useNetworkSummary, useTailscaleSettings, useTailscalePeers } from '../../hooks/useSWRData';
@@ -22,6 +25,8 @@ import { COLORS, createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 import { InterfaceDetailsPopup } from '../details/InterfaceDetailsPopup';
+import { ISPDetailsPopup } from '../details/ISPDetailsPopup';
+import { Ellipsis } from '../ui/Ellipsis';
 
 /**
  * Truncate IPv6 address to show first and last octet
@@ -39,7 +44,7 @@ function getInterfaceIcon(iface: NetworkInterface) {
   switch (iface.type) {
     case 'wifi':
     case 'hotspot':
-      return faWifi;
+      return faRainbowHalf;
     case 'ethernet':
       return faEthernet;
     case 'tailscale':
@@ -172,6 +177,9 @@ export const NetworkStatusTab: React.FC = () => {
                 tags.push({
                   label: 'Frequency',
                   value: wifiIface.frequency,
+                  icon: (
+                    <FontAwesomeIcon icon={faRadio} style={createIconStyle(ICON_STYLES.neutral)} />
+                  ),
                   variant: 'neutral',
                 });
               }
@@ -179,6 +187,9 @@ export const NetworkStatusTab: React.FC = () => {
                 tags.push({
                   label: 'Security',
                   value: wifiIface.security,
+                  icon: (
+                    <FontAwesomeIcon icon={faKey} style={createIconStyle(ICON_STYLES.neutral)} />
+                  ),
                   variant: 'neutral',
                 });
               }
@@ -208,6 +219,9 @@ export const NetworkStatusTab: React.FC = () => {
                   <FontAwesomeIcon
                     icon={getInterfaceIcon(iface)}
                     size='lg'
+                    flip={
+                      iface.type === 'wifi' || iface.type === 'hotspot' ? 'horizontal' : undefined
+                    }
                     style={{ ...iconStyle, maxWidth: '2rem' }}
                   />
                 }
@@ -220,6 +234,9 @@ export const NetworkStatusTab: React.FC = () => {
           })
         )}
       </div>
+
+      {/* Ellipsis between LAN and Device */}
+      <Ellipsis orientation='horizontal' />
 
       {/* Middle Column - Router/Device */}
       <div className='wa-stack wa-gap-m'>
@@ -249,6 +266,9 @@ export const NetworkStatusTab: React.FC = () => {
             }))}
         />
       </div>
+
+      {/* Ellipsis between Device and WAN */}
+      <Ellipsis orientation='horizontal' />
 
       {/* Right Column - WAN Interfaces with ISP Information */}
       <div className='wa-stack wa-gap-m'>
@@ -391,9 +411,35 @@ export const NetworkStatusTab: React.FC = () => {
               } as StatusCardTag & { title?: string });
             }
 
+            // ISP popup state
+            const [ispPopupOpen, setIspPopupOpen] = useState(false);
+            const ispChevronRef = useRef<HTMLDivElement>(null);
+            const [ispPopupElement, setIspPopupElement] = useState<WaPopup | null>(null);
+
+            // Close ISP popup when clicking outside
+            useEffect(() => {
+              const handleClickOutside = (event: MouseEvent) => {
+                if (
+                  ispPopupOpen &&
+                  ispChevronRef.current &&
+                  ispPopupElement &&
+                  !ispChevronRef.current.contains(event.target as Node) &&
+                  !ispPopupElement.contains(event.target as Node)
+                ) {
+                  setIspPopupOpen(false);
+                }
+              };
+
+              document.addEventListener('mousedown', handleClickOutside);
+              return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+              };
+            }, [ispPopupOpen, ispPopupElement]);
+
+            const hasISPInfo = iface.ispName || iface.publicIpv4 || iface.publicIpv6;
+
             return (
               <div key={iface.name} className='wa-stack wa-gap-m'>
-                {/* WAN Interface Card */}
                 <StatusCard
                   type='callout'
                   variant={iface.state === 'up' ? 'success' : 'danger'}
@@ -410,42 +456,6 @@ export const NetworkStatusTab: React.FC = () => {
                   actionButton={tailscaleActionButton}
                   className='interface-callout'
                   detailsContent={<InterfaceDetailsPopup iface={iface} />}
-                />
-
-                {/* Vertical Ellipsis Separator */}
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    minHeight: '2rem',
-                    color: 'var(--wa-color-text-secondary)',
-                    fontSize: '1.5rem',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  ⋮
-                </div>
-
-                {/* Internet/ISP Card */}
-                <StatusCard
-                  type='callout'
-                  variant={iface.state === 'up' ? 'success' : 'danger'}
-                  layout='vertical'
-                  icon={
-                    <FontAwesomeIcon
-                      icon={faGlobe}
-                      size='lg'
-                      style={{ ...createIconStyle(ICON_STYLES.brand), maxWidth: '2rem' }}
-                    />
-                  }
-                  title={iface.ispName || 'Internet'}
-                  tags={
-                    ispTags.length > 0
-                      ? ispTags
-                      : [{ label: 'No ISP information available', variant: 'neutral' }]
-                  }
-                  className='interface-callout'
                   footerContent={
                     (iface.rxBytes !== undefined || iface.txBytes !== undefined) && (
                       <>
@@ -475,6 +485,49 @@ export const NetworkStatusTab: React.FC = () => {
                     )
                   }
                 />
+
+                {/* ISP Popup with Animated Ellipsis */}
+                {hasISPInfo && (
+                  <div style={{ position: 'relative' }}>
+                    <div
+                      ref={ispChevronRef}
+                      onClick={() => setIspPopupOpen(!ispPopupOpen)}
+                      role='button'
+                      tabIndex={0}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setIspPopupOpen(!ispPopupOpen);
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <Ellipsis orientation='vertical' />
+                    </div>
+                    {ispChevronRef.current && (
+                      <wa-popup
+                        ref={setIspPopupElement}
+                        anchor={ispChevronRef.current}
+                        placement='bottom'
+                        distance={4}
+                        active={ispPopupOpen}
+                        shift
+                      >
+                        <div
+                          onMouseLeave={() => setIspPopupOpen(false)}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <wa-card
+                            appearance='outlined'
+                            style={{ width: '100%', maxWidth: '400px' }}
+                          >
+                            <ISPDetailsPopup iface={iface} />
+                          </wa-card>
+                        </div>
+                      </wa-popup>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
