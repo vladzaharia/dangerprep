@@ -22,6 +22,8 @@ export interface StatusCardProps {
   detailsContent?: React.ReactNode | undefined;
   /** Error details to show in popup (alternative to detailsContent) */
   errorDetails?: string | undefined;
+  /** Footer content displayed as a flank (left/right layout) */
+  footerContent?: React.ReactNode | undefined;
 }
 
 /**
@@ -41,6 +43,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   actionButton,
   detailsContent,
   errorDetails,
+  footerContent,
 }) => {
   const [popupOpen, setPopupOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -106,20 +109,31 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   // Tags/details content for body
   const tagsContent = tags.length > 0 && (
     <div className='wa-cluster wa-gap-xs'>
-      {tags.map((tag, idx) => (
-        <wa-tag key={idx} variant={tag.variant || 'neutral'} size='small'>
-          {tag.icon ? (
-            <div className='wa-flank wa-gap-xs'>
-              {tag.icon}
-              <span>{tag.value || tag.label}</span>
-            </div>
-          ) : tag.value ? (
-            `${tag.label}: ${tag.value}`
-          ) : (
-            tag.label
-          )}
-        </wa-tag>
-      ))}
+      {tags.map((tag, idx) => {
+        const tagWithTitle = tag as StatusCardTag & { title?: string };
+        const tagProps: Record<string, unknown> = {
+          key: idx,
+          variant: tag.variant || 'neutral',
+          size: 'small',
+        };
+        if (tagWithTitle.title) {
+          tagProps.title = tagWithTitle.title;
+        }
+        return (
+          <wa-tag {...tagProps}>
+            {tag.icon ? (
+              <div className='wa-flank wa-gap-xs'>
+                {tag.icon}
+                <span>{tag.value || tag.label}</span>
+              </div>
+            ) : tag.value ? (
+              `${tag.label}: ${tag.value}`
+            ) : (
+              tag.label
+            )}
+          </wa-tag>
+        );
+      })}
     </div>
   );
 
@@ -216,6 +230,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
               </div>
             </div>
             {tagsContent}
+            {footerContent && <div className='wa-flank wa-gap-m'>{footerContent}</div>}
           </div>
         </wa-callout>
 

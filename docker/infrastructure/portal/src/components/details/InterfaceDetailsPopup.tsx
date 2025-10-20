@@ -8,8 +8,6 @@ import {
   formatPacketLoss,
   formatNumber,
   formatBoolean,
-  formatOffloadFeatures,
-  formatInterfaceFlags,
 } from '../../utils/networkFormatting';
 
 interface DetailRowProps {
@@ -52,9 +50,7 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
         {iface.ipAddress && <DetailRow label='IPv4' value={iface.ipAddress} />}
         {iface.ipv6Address && <DetailRow label='IPv6' value={iface.ipv6Address} />}
         {iface.gateway && <DetailRow label='Gateway' value={iface.gateway} />}
-        {iface.netmask && <DetailRow label='Netmask' value={iface.netmask} />}
         {iface.macAddress && <DetailRow label='MAC Address' value={iface.macAddress} />}
-        {iface.mtu && <DetailRow label='MTU' value={iface.mtu} />}
         {iface.dnsServers && iface.dnsServers.length > 0 && (
           <DetailRow label='DNS Servers' value={iface.dnsServers.join(', ')} />
         )}
@@ -96,9 +92,7 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
         <>
           {((iface as EthernetInterface).speed ||
             (iface as EthernetInterface).duplex ||
-            (iface as EthernetInterface).driver ||
-            (iface as EthernetInterface).linkDetected !== undefined ||
-            (iface as EthernetInterface).autoNegotiation !== undefined) && (
+            (iface as EthernetInterface).linkDetected !== undefined) && (
             <DetailSection title='Ethernet'>
               {(iface as EthernetInterface).speed && (
                 <DetailRow label='Speed' value={(iface as EthernetInterface).speed} />
@@ -106,44 +100,10 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
               {(iface as EthernetInterface).duplex && (
                 <DetailRow label='Duplex' value={(iface as EthernetInterface).duplex} />
               )}
-              {(iface as EthernetInterface).driver && (
-                <DetailRow label='Driver' value={(iface as EthernetInterface).driver} />
-              )}
               {(iface as EthernetInterface).linkDetected !== undefined && (
                 <DetailRow
                   label='Link Detected'
                   value={formatBoolean((iface as EthernetInterface).linkDetected)}
-                />
-              )}
-              {(iface as EthernetInterface).autoNegotiation !== undefined && (
-                <DetailRow
-                  label='Auto-Negotiation'
-                  value={formatBoolean((iface as EthernetInterface).autoNegotiation)}
-                />
-              )}
-            </DetailSection>
-          )}
-
-          {((iface as EthernetInterface).powerManagement ||
-            (iface as EthernetInterface).offloadFeatures ||
-            (iface as EthernetInterface).wakeOnLan !== undefined) && (
-            <DetailSection title='Power & Features'>
-              {(iface as EthernetInterface).powerManagement && (
-                <DetailRow
-                  label='Power Management'
-                  value={(iface as EthernetInterface).powerManagement}
-                />
-              )}
-              {(iface as EthernetInterface).offloadFeatures && (
-                <DetailRow
-                  label='Offload Features'
-                  value={formatOffloadFeatures((iface as EthernetInterface).offloadFeatures)}
-                />
-              )}
-              {(iface as EthernetInterface).wakeOnLan !== undefined && (
-                <DetailRow
-                  label='Wake-on-LAN'
-                  value={formatBoolean((iface as EthernetInterface).wakeOnLan)}
                 />
               )}
             </DetailSection>
@@ -157,8 +117,7 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
           {((iface as WiFiInterface).ssid ||
             (iface as WiFiInterface).channel ||
             (iface as WiFiInterface).frequency ||
-            (iface as WiFiInterface).security ||
-            (iface as WiFiInterface).bssid) && (
+            (iface as WiFiInterface).security) && (
             <DetailSection title='WiFi Connection'>
               {(iface as WiFiInterface).ssid && (
                 <DetailRow label='SSID' value={(iface as WiFiInterface).ssid} />
@@ -171,9 +130,6 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
               )}
               {(iface as WiFiInterface).security && (
                 <DetailRow label='Security' value={(iface as WiFiInterface).security} />
-              )}
-              {(iface as WiFiInterface).bssid && (
-                <DetailRow label='BSSID' value={(iface as WiFiInterface).bssid} />
               )}
             </DetailSection>
           )}
@@ -206,43 +162,6 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
               )}
             </DetailSection>
           )}
-
-          {((iface as WiFiInterface).txPower ||
-            (iface as WiFiInterface).channelWidth ||
-            (iface as WiFiInterface).regulatoryDomain ||
-            (iface as WiFiInterface).beaconInterval !== undefined ||
-            (iface as WiFiInterface).dtimPeriod !== undefined ||
-            (iface as WiFiInterface).roamingCapability !== undefined) && (
-            <DetailSection title='WiFi Advanced'>
-              {(iface as WiFiInterface).txPower && (
-                <DetailRow label='TX Power' value={(iface as WiFiInterface).txPower} />
-              )}
-              {(iface as WiFiInterface).channelWidth && (
-                <DetailRow label='Channel Width' value={(iface as WiFiInterface).channelWidth} />
-              )}
-              {(iface as WiFiInterface).regulatoryDomain && (
-                <DetailRow
-                  label='Regulatory Domain'
-                  value={(iface as WiFiInterface).regulatoryDomain}
-                />
-              )}
-              {(iface as WiFiInterface).beaconInterval !== undefined && (
-                <DetailRow
-                  label='Beacon Interval'
-                  value={`${(iface as WiFiInterface).beaconInterval}ms`}
-                />
-              )}
-              {(iface as WiFiInterface).dtimPeriod !== undefined && (
-                <DetailRow label='DTIM Period' value={(iface as WiFiInterface).dtimPeriod} />
-              )}
-              {(iface as WiFiInterface).roamingCapability !== undefined && (
-                <DetailRow
-                  label='Roaming'
-                  value={formatBoolean((iface as WiFiInterface).roamingCapability)}
-                />
-              )}
-            </DetailSection>
-          )}
         </>
       )}
 
@@ -254,9 +173,7 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
         iface.rxErrors !== undefined ||
         iface.txErrors !== undefined ||
         iface.rxDropped !== undefined ||
-        iface.txDropped !== undefined ||
-        iface.broadcastPackets !== undefined ||
-        iface.multicastPackets !== undefined) && (
+        iface.txDropped !== undefined) && (
         <DetailSection title='Statistics'>
           {iface.rxBytes !== undefined && (
             <DetailRow label='RX Bytes' value={formatBytes(iface.rxBytes)} />
@@ -282,19 +199,6 @@ export const InterfaceDetailsPopup: React.FC<InterfaceDetailsPopupProps> = ({ if
           {iface.txDropped !== undefined && (
             <DetailRow label='TX Dropped' value={formatNumber(iface.txDropped)} />
           )}
-          {iface.broadcastPackets !== undefined && (
-            <DetailRow label='Broadcast Packets' value={formatNumber(iface.broadcastPackets)} />
-          )}
-          {iface.multicastPackets !== undefined && (
-            <DetailRow label='Multicast Packets' value={formatNumber(iface.multicastPackets)} />
-          )}
-        </DetailSection>
-      )}
-
-      {/* Interface Flags */}
-      {iface.flags && (
-        <DetailSection title='Flags'>
-          <DetailRow label='Status' value={formatInterfaceFlags(iface.flags)} />
         </DetailSection>
       )}
     </div>

@@ -12,6 +12,7 @@ import {
   faGear,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import '@awesome.me/webawesome/dist/components/format-bytes/format-bytes.js';
 import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -21,6 +22,15 @@ import { COLORS, createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
 import { StatusCard } from '../cards/StatusCard';
 import type { StatusCardTag } from '../cards/StatusCard';
 import { InterfaceDetailsPopup } from '../details/InterfaceDetailsPopup';
+
+/**
+ * Truncate IPv6 address to show first and last octet
+ */
+function truncateIPv6(ipv6: string): string {
+  const parts = ipv6.split(':');
+  if (parts.length <= 2) return ipv6;
+  return `${parts[0]}:...${parts[parts.length - 1]}`;
+}
 
 /**
  * Get icon for network interface type
@@ -153,6 +163,25 @@ export const NetworkStatusTab: React.FC = () => {
                 icon: <FontAwesomeIcon icon={faGlobe} style={createIconStyle(ICON_STYLES.ipv4)} />,
                 variant: 'neutral',
               });
+            }
+
+            // Add WLAN-specific tags
+            if (iface.type === 'wifi' || iface.type === 'hotspot') {
+              const wifiIface = iface as typeof iface & { frequency?: string; security?: string };
+              if (wifiIface.frequency) {
+                tags.push({
+                  label: 'Frequency',
+                  value: wifiIface.frequency,
+                  variant: 'neutral',
+                });
+              }
+              if (wifiIface.security) {
+                tags.push({
+                  label: 'Security',
+                  value: wifiIface.security,
+                  variant: 'neutral',
+                });
+              }
             }
 
             const iconColor = getInterfaceIconColor(iface);
@@ -333,13 +362,6 @@ export const NetworkStatusTab: React.FC = () => {
 
             // Build ISP tags
             const ispTags: StatusCardTag[] = [];
-            if (iface.ispName) {
-              ispTags.push({
-                label: 'ISP',
-                value: iface.ispName,
-                variant: 'neutral',
-              });
-            }
             if (iface.publicIpv4) {
               ispTags.push({
                 label: 'IPv4',
@@ -354,9 +376,10 @@ export const NetworkStatusTab: React.FC = () => {
               });
             }
             if (iface.publicIpv6) {
+              const truncatedIPv6 = truncateIPv6(iface.publicIpv6);
               ispTags.push({
                 label: 'IPv6',
-                value: iface.publicIpv6,
+                value: truncatedIPv6,
                 icon: (
                   <FontAwesomeIcon
                     icon={faGlobe}
@@ -364,7 +387,8 @@ export const NetworkStatusTab: React.FC = () => {
                   />
                 ),
                 variant: 'neutral',
-              });
+                title: iface.publicIpv6,
+              } as StatusCardTag & { title?: string });
             }
 
             return (
@@ -422,6 +446,34 @@ export const NetworkStatusTab: React.FC = () => {
                       : [{ label: 'No ISP information available', variant: 'neutral' }]
                   }
                   className='interface-callout'
+                  footerContent={
+                    (iface.rxBytes !== undefined || iface.txBytes !== undefined) && (
+                      <>
+                        {iface.rxBytes !== undefined && (
+                          <div style={{ flex: 1 }}>
+                            <span className='wa-caption-s' style={{ opacity: 0.7 }}>
+                              RX:{' '}
+                            </span>
+                            <wa-format-bytes
+                              value={iface.rxBytes}
+                              display='short'
+                            ></wa-format-bytes>
+                          </div>
+                        )}
+                        {iface.txBytes !== undefined && (
+                          <div style={{ flex: 1, textAlign: 'right' }}>
+                            <span className='wa-caption-s' style={{ opacity: 0.7 }}>
+                              TX:{' '}
+                            </span>
+                            <wa-format-bytes
+                              value={iface.txBytes}
+                              display='short'
+                            ></wa-format-bytes>
+                          </div>
+                        )}
+                      </>
+                    )
+                  }
                 />
               </div>
             );
