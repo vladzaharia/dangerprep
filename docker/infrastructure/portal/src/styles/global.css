@@ -36,7 +36,7 @@ body {
 /* Navigation sidebar - Background layer */
 .app-navigation {
   height: 100%;
-  padding: var(--wa-space-2xl);
+  padding: var(--wa-space-l);
   padding-right: 0;
 }
 
@@ -55,10 +55,20 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  padding: var(--wa-space-xs) var(--wa-space-m);
 }
 
-.app-navigation-card::part(footer) {
-  border-top: none;
+.app-secondary-navigation-card::part(body) {
+  padding: var(--wa-space-m);
+}
+
+.app-navigation-content {
+  flex: 1;
+  justify-content: flex-start;
+}
+
+.app-navigation-spacer {
+  flex: 1;
 }
 
 .connection-status-button {
@@ -106,12 +116,22 @@ body {
 /* Main content area - Raised layer */
 .app-content {
   height: 100%;
-  padding: var(--wa-space-2xl);
-  overflow: auto;
+  padding: var(--wa-space-l);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: var(--wa-space-m);
 }
 
 .app-content-inner {
-  height: 100%;
+  flex: 1;
+  overflow: auto;
   background-color: color-mix(
     in srgb,
     var(--wa-color-neutral-fill-quiet) 70%,
@@ -122,7 +142,6 @@ body {
   border: solid var(--wa-border-width-s) var(--wa-color-neutral-border-normal);
   border-radius: var(--wa-border-radius-l);
   padding: var(--wa-space-l);
-  overflow: auto;
 }
 
 .app-content-inner:has(.error-display-content) {
@@ -236,6 +255,10 @@ body {
   justify-content: center;
 }
 
+.navigation-item wa-button::part(base) {
+  height: 52px;
+}
+
 .navigation-item--active wa-button {
   background-color: var(--wa-color-primary-fill-normal) !important;
   color: var(--wa-color-primary-text-normal) !important;
@@ -243,6 +266,55 @@ body {
 }
 
 .navigation-item--active wa-button:hover {
+  background-color: var(--wa-color-primary-fill-hover) !important;
+  color: var(--wa-color-primary-text-hover) !important;
+}
+
+/* =============================================================================
+   SECONDARY NAVIGATION - HORIZONTAL LAYOUT
+   ============================================================================= */
+
+.app-secondary-navigation {
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.app-secondary-navigation-card {
+  background-color: color-mix(
+    in srgb,
+    var(--wa-color-neutral-fill-quiet) 50%,
+    transparent
+  ) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.secondary-navigation-item {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+}
+
+.secondary-navigation-item wa-button {
+  display: flex;
+  align-items: center;
+  gap: var(--wa-space-s);
+  justify-content: center;
+}
+
+.secondary-navigation-label {
+  font-size: var(--wa-font-size-sm);
+  font-weight: 500;
+}
+
+.secondary-navigation-item--active wa-button {
+  background-color: var(--wa-color-primary-fill-normal) !important;
+  color: var(--wa-color-primary-text-normal) !important;
+  border: solid var(--wa-border-width-s) var(--wa-color-primary-border-normal) !important;
+}
+
+.secondary-navigation-item--active wa-button:hover {
   background-color: var(--wa-color-primary-fill-hover) !important;
   color: var(--wa-color-primary-text-hover) !important;
 }
@@ -355,26 +427,44 @@ wa-card::part(footer) {
     justify-content: center;
     align-items: center;
     flex: 0;
-    padding-bottom: 0;
+    padding: var(--wa-space-s);
   }
 
-  .app-navigation-card::part(footer) {
+  .app-navigation-content {
     flex-direction: row;
     justify-content: center;
     align-items: center;
-    padding-top: 0;
+    flex: 0;
   }
 
   .app-navigation .wa-stack {
     flex-direction: row;
-    justify-content: center;
-    gap: var(--wa-space-m);
+    justify-content: space-between;
+    gap: var(--wa-space-s);
   }
 
   .app-content {
     order: 1; /* Content at top on mobile */
     height: calc(100vh - 80px); /* Account for navigation height */
     width: 100%;
+    padding: var(--wa-space-m);
+  }
+
+  .app-content-wrapper {
+    gap: var(--wa-space-s);
+  }
+
+  .app-secondary-navigation-card::part(body) {
+    padding: var(--wa-space-xs);
+  }
+
+  .app-secondary-navigation-card .wa-cluster {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .secondary-navigation-label {
+    display: none;
   }
 
   /* Service card responsive adjustments */

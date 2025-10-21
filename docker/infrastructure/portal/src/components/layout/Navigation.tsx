@@ -1,27 +1,28 @@
-import { faPowerOff, faBrowser, faQrcode } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import {
+  faPowerOff,
+  faBrowser,
+  faQrcode,
+  faNetworkWired,
+} from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import { faGear, faWrench } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { Suspense, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { NavLink, useSearchParams, useLocation } from 'react-router-dom';
 
 import { createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
-
-import { NetworkStatusButton, NetworkStatusButtonFallback } from './NetworkStatusButton';
 
 /**
  * Navigation item configuration
  */
 interface NavItem {
-  path?: string;
-  icon?: IconDefinition;
+  path: string;
+  icon: IconDefinition;
   label: string;
   /** Function to determine if this item should be visible */
   isVisible: (context: NavigationContext) => boolean;
   /** Position in navigation: 'top' or 'bottom' */
   position: 'top' | 'bottom';
-  /** Custom component to render (optional, for special items like NetworkStatusButton) */
-  customComponent?: React.ComponentType;
 }
 
 /**
@@ -68,9 +69,10 @@ const NAV_ITEMS: NavItem[] = [
     isVisible: ({ isKioskMode }) => isKioskMode,
   },
   {
+    path: '/network',
+    icon: faNetworkWired,
     label: 'Network Status',
     position: 'bottom',
-    customComponent: NetworkStatusButton,
     // Kiosk-only, always visible in kiosk mode
     isVisible: ({ isKioskMode }) => isKioskMode,
   },
@@ -142,6 +144,8 @@ export const Navigation: React.FC = () => {
         return createIconStyle(ICON_STYLES.warning);
       case 'qr':
         return createIconStyle(ICON_STYLES.tailscale);
+      case 'network':
+        return createIconStyle(ICON_STYLES.device);
       case 'settings':
         return createIconStyle(ICON_STYLES.settings);
       case 'power':
@@ -152,25 +156,9 @@ export const Navigation: React.FC = () => {
   };
 
   /**
-   * Render a navigation item - either a standard NavLink or a custom component
+   * Render a navigation item as a NavLink
    */
-  const renderNavItem = (item: NavItem, index: number) => {
-    // If it's a custom component, render it with Suspense boundary
-    if (item.customComponent) {
-      const CustomComponent = item.customComponent;
-      return (
-        <Suspense key={`custom-${item.label}-${index}`} fallback={<NetworkStatusButtonFallback />}>
-          <CustomComponent />
-        </Suspense>
-      );
-    }
-
-    // Otherwise render a standard NavLink
-    if (!item.path || !item.icon) {
-      // Skip rendering items without required properties
-      return null;
-    }
-
+  const renderNavItem = (item: NavItem) => {
     const iconStyle = getIconStyle(item.path);
 
     return (
@@ -180,8 +168,12 @@ export const Navigation: React.FC = () => {
         className={({ isActive }) => `navigation-item ${isActive ? 'navigation-item--active' : ''}`}
         aria-label={item.label}
       >
-        <wa-button appearance='plain'>
-          <FontAwesomeIcon icon={item.icon} size='xl' style={{ ...iconStyle, maxWidth: '2rem' }} />
+        <wa-button appearance='plain' size='small'>
+          <FontAwesomeIcon
+            icon={item.icon}
+            size='lg'
+            style={{ ...iconStyle, maxWidth: '1.5rem' }}
+          />
         </wa-button>
       </NavLink>
     );
@@ -190,19 +182,23 @@ export const Navigation: React.FC = () => {
   return (
     <div className='app-navigation'>
       <wa-card className='app-navigation-card' appearance='outlined'>
-        {/* Top navigation section - main body */}
-        {topNavItems.length > 0 && (
-          <div className='wa-stack wa-gap-xl'>
-            {topNavItems.map((item, index) => renderNavItem(item, index))}
-          </div>
-        )}
+        {/* Use stack with space-between to position items */}
+        <div className='wa-stack wa-gap-m app-navigation-content'>
+          {/* Top navigation section - services */}
+          {topNavItems.length > 0 && (
+            <div className='wa-stack wa-gap-m'>{topNavItems.map(item => renderNavItem(item))}</div>
+          )}
 
-        {/* Bottom navigation section - footer slot */}
-        {bottomNavItems.length > 0 && (
-          <div slot='footer' className='wa-stack wa-gap-xl'>
-            {bottomNavItems.map((item, index) => renderNavItem(item, index))}
-          </div>
-        )}
+          {/* Spacer to push bottom items down */}
+          <div className='app-navigation-spacer' />
+
+          {/* Bottom navigation section - status and management */}
+          {bottomNavItems.length > 0 && (
+            <div className='wa-stack wa-gap-m'>
+              {bottomNavItems.map(item => renderNavItem(item))}
+            </div>
+          )}
+        </div>
       </wa-card>
     </div>
   );

@@ -8,7 +8,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 
-import { Navigation, DefaultRoute, ErrorBoundary } from './components';
+import { Navigation, DefaultRoute, ErrorBoundary, SecondaryNavigation } from './components';
 import { NotFoundPage } from './pages';
 
 // Lazy load page components for better code splitting
@@ -22,6 +22,12 @@ const MaintenanceServicesPage = lazy(() =>
 const PowerPage = lazy(() => import('./pages/PowerPage').then(m => ({ default: m.PowerPage })));
 const NetworkStatusPage = lazy(() =>
   import('./pages/NetworkStatusPage').then(m => ({ default: m.NetworkStatusPage }))
+);
+const ConnectedClientsPage = lazy(() =>
+  import('./pages/ConnectedClientsPage').then(m => ({ default: m.ConnectedClientsPage }))
+);
+const TailscaleStatusPage = lazy(() =>
+  import('./pages/TailscaleStatusPage').then(m => ({ default: m.TailscaleStatusPage }))
 );
 const SettingsPage = lazy(() =>
   import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage }))
@@ -131,29 +137,34 @@ function AppContent() {
 
         {/* Main Content Area - Raised Layer */}
         <main className='app-content'>
-          <div className='app-content-inner'>
-            <ErrorBoundary variant='content'>
-              <Suspense fallback={<AppLoadingFallback />}>
-                <Routes>
-                  {/* Modern React 19 routes with Suspense */}
-                  <Route path='/' element={<DefaultRoute />} />
-                  <Route path='/qr' element={<QRCodePage />} />
-                  <Route path='/services' element={<ServicesPage />} />
-                  <Route path='/maintenance' element={<MaintenanceServicesPage />} />
-                  <Route path='/power' element={<PowerPage />} />
-                  <Route path='/network' element={<NetworkStatusPage />} />
-                  <Route path='/settings' element={<SettingsPage />} />
-                  <Route path='/tailscale' element={<TailscaleSettingsPage />} />
-                  <Route path='/wifi' element={<WifiSettingsPage />} />
-                  <Route path='/hotspot' element={<HotspotSettingsPage />} />
-                  <Route path='/internet' element={<InternetSettingsPage />} />
-                  <Route path='/starlink' element={<StarlinkSettingsPage />} />
-                  <Route path='/device' element={<DeviceSettingsPage />} />
-                  {/* 404 catch-all route */}
-                  <Route path='*' element={<NotFoundPage />} />
-                </Routes>
-              </Suspense>
-            </ErrorBoundary>
+          <div className='app-content-wrapper'>
+            <div className='app-content-inner'>
+              <ErrorBoundary variant='content'>
+                <Suspense fallback={<AppLoadingFallback />}>
+                  <Routes>
+                    {/* Modern React 19 routes with Suspense */}
+                    <Route path='/' element={<DefaultRoute />} />
+                    <Route path='/qr' element={<QRCodePage />} />
+                    <Route path='/services' element={<ServicesPage />} />
+                    <Route path='/maintenance' element={<MaintenanceServicesPage />} />
+                    <Route path='/power' element={<PowerPage />} />
+                    <Route path='/network' element={<NetworkStatusPage />} />
+                    <Route path='/network/clients' element={<ConnectedClientsPage />} />
+                    <Route path='/network/tailscale' element={<TailscaleStatusPage />} />
+                    <Route path='/settings' element={<SettingsPage />} />
+                    <Route path='/tailscale' element={<TailscaleSettingsPage />} />
+                    <Route path='/wifi' element={<WifiSettingsPage />} />
+                    <Route path='/hotspot' element={<HotspotSettingsPage />} />
+                    <Route path='/internet' element={<InternetSettingsPage />} />
+                    <Route path='/starlink' element={<StarlinkSettingsPage />} />
+                    <Route path='/device' element={<DeviceSettingsPage />} />
+                    {/* 404 catch-all route */}
+                    <Route path='*' element={<NotFoundPage />} />
+                  </Routes>
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+            <SecondaryNavigation />
           </div>
         </main>
       </div>
