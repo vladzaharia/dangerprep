@@ -154,7 +154,7 @@ function TailscaleSettingsContent() {
     return (
       <div className='wa-stack wa-gap-xl'>
         <h2>Tailscale Settings</h2>
-        <wa-callout variant='neutral'>
+        <wa-callout variant='warning'>
           Tailscale is not configured or settings could not be loaded.
         </wa-callout>
       </div>

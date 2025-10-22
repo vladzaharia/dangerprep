@@ -8,18 +8,19 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 
-import { Navigation, DefaultRoute, ErrorBoundary, SecondaryNavigation } from './components';
+import {
+  Navigation,
+  DefaultRoute,
+  ErrorBoundary,
+  SecondaryNavigation,
+  CardPage,
+  ServicePage,
+} from './components';
+import { POWER_ITEMS, SETTINGS_ITEMS } from './config/navigation';
 import { NotFoundPage } from './pages';
 
 // Lazy load page components for better code splitting
 const QRCodePage = lazy(() => import('./pages/QRCodePage').then(m => ({ default: m.QRCodePage })));
-const ServicesPage = lazy(() =>
-  import('./pages/ServicesPage').then(m => ({ default: m.ServicesPage }))
-);
-const MaintenanceServicesPage = lazy(() =>
-  import('./pages/MaintenanceServicesPage').then(m => ({ default: m.MaintenanceServicesPage }))
-);
-const PowerPage = lazy(() => import('./pages/PowerPage').then(m => ({ default: m.PowerPage })));
 const NetworkStatusPage = lazy(() =>
   import('./pages/NetworkStatusPage').then(m => ({ default: m.NetworkStatusPage }))
 );
@@ -28,9 +29,6 @@ const ConnectedClientsPage = lazy(() =>
 );
 const TailscaleStatusPage = lazy(() =>
   import('./pages/TailscaleStatusPage').then(m => ({ default: m.TailscaleStatusPage }))
-);
-const SettingsPage = lazy(() =>
-  import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage }))
 );
 const TailscaleSettingsPage = lazy(() =>
   import('./pages/TailscaleSettingsPage').then(m => ({ default: m.TailscaleSettingsPage }))
@@ -170,13 +168,34 @@ function AppContent() {
                     {/* Modern React 19 routes with Suspense */}
                     <Route path='/' element={<DefaultRoute />} />
                     <Route path='/qr' element={<QRCodePage />} />
-                    <Route path='/services' element={<ServicesPage />} />
-                    <Route path='/maintenance' element={<MaintenanceServicesPage />} />
-                    <Route path='/power' element={<PowerPage />} />
+                    <Route
+                      path='/services'
+                      element={
+                        <ServicePage
+                          title='Available Services'
+                          serviceType='public'
+                          skeletonCount={3}
+                        />
+                      }
+                    />
+                    <Route
+                      path='/maintenance'
+                      element={
+                        <ServicePage
+                          title='Maintenance Services'
+                          serviceType='maintenance'
+                          skeletonCount={2}
+                        />
+                      }
+                    />
+                    <Route path='/power' element={<CardPage title='Power' items={POWER_ITEMS} />} />
                     <Route path='/network' element={<NetworkStatusPage />} />
                     <Route path='/network/clients' element={<ConnectedClientsPage />} />
                     <Route path='/network/tailscale' element={<TailscaleStatusPage />} />
-                    <Route path='/settings' element={<SettingsPage />} />
+                    <Route
+                      path='/settings'
+                      element={<CardPage title='Settings' items={SETTINGS_ITEMS} />}
+                    />
                     <Route path='/settings/tailscale' element={<TailscaleSettingsPage />} />
                     <Route path='/settings/wifi' element={<WifiSettingsPage />} />
                     <Route path='/settings/hotspot' element={<HotspotSettingsPage />} />

@@ -1,123 +1,18 @@
-import {
-  faNetworkWired,
-  faUsers,
-  faShieldCheck,
-  faRainbowHalf,
-  faSignal,
-  faGlobe,
-  faSatelliteDish,
-  faServer,
-  faPowerOff,
-  faArrowsRotate,
-  faDesktop,
-  faWindowRestore,
-  faGear,
-} from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useMemo, useState } from 'react';
 import { NavLink, useLocation, useSearchParams } from 'react-router-dom';
 
-import { createIconStyle, ICON_STYLES } from '../../utils/iconStyles';
+import { NETWORK_STATUS_ITEMS, POWER_ITEMS, SETTINGS_ITEMS } from '../../config/navigation';
+import type { NavigationItem } from '../../types/navigation';
+import { createIconStyle } from '../../utils/iconStyles';
 
 /**
- * Secondary navigation item configuration
+ * All secondary navigation items
  */
-interface SecondaryNavItem {
-  path: string;
-  icon?: IconDefinition;
-  stackedIcon?: { base: IconDefinition; overlay: IconDefinition };
-  label: string;
-  category: 'status' | 'settings' | 'power';
-  flip?: 'horizontal' | 'vertical';
-}
-
-/**
- * Secondary navigation items configuration
- */
-const SECONDARY_NAV_ITEMS: SecondaryNavItem[] = [
-  // Status category
-  {
-    path: '/network',
-    icon: faNetworkWired,
-    label: 'Status',
-    category: 'status',
-  },
-  {
-    path: '/network/clients',
-    icon: faUsers,
-    label: 'Connected Clients',
-    category: 'status',
-  },
-  {
-    path: '/network/tailscale',
-    icon: faShieldCheck,
-    label: 'Tailscale',
-    category: 'status',
-  },
-  // Settings category
-  {
-    path: '/settings/wifi',
-    icon: faRainbowHalf,
-    label: 'WiFi',
-    category: 'settings',
-    flip: 'horizontal',
-  },
-  {
-    path: '/settings/hotspot',
-    icon: faSignal,
-    label: 'Hotspot',
-    category: 'settings',
-  },
-  {
-    path: '/settings/internet',
-    icon: faGlobe,
-    label: 'Internet',
-    category: 'settings',
-  },
-  {
-    path: '/settings/starlink',
-    icon: faSatelliteDish,
-    label: 'Starlink',
-    category: 'settings',
-  },
-  {
-    path: '/settings/device',
-    icon: faServer,
-    label: 'Device',
-    category: 'settings',
-  },
-  {
-    path: '/settings/tailscale',
-    stackedIcon: { base: faShieldCheck, overlay: faGear },
-    label: 'Tailscale',
-    category: 'settings',
-  },
-  // Power category
-  {
-    path: '/power/restart-browser',
-    icon: faWindowRestore,
-    label: 'Restart Browser',
-    category: 'power',
-  },
-  {
-    path: '/power/reboot',
-    icon: faArrowsRotate,
-    label: 'Reboot',
-    category: 'power',
-  },
-  {
-    path: '/power/shutdown',
-    icon: faPowerOff,
-    label: 'Shutdown',
-    category: 'power',
-  },
-  {
-    path: '/power/desktop',
-    icon: faDesktop,
-    label: 'Desktop',
-    category: 'power',
-  },
+const SECONDARY_NAV_ITEMS: NavigationItem[] = [
+  ...NETWORK_STATUS_ITEMS,
+  ...SETTINGS_ITEMS,
+  ...POWER_ITEMS,
 ];
 
 /**
@@ -129,77 +24,6 @@ function getCurrentCategory(pathname: string): 'status' | 'settings' | 'power' |
   if (pathname.startsWith('/power')) return 'power';
   return null;
 }
-
-/**
- * Get icon style based on the specific path for diverse colors
- */
-function getIconStyle(path: string): React.CSSProperties | undefined {
-  switch (path) {
-    // Status category
-    case '/network/status':
-    case '/network':
-      return createIconStyle(ICON_STYLES.network);
-    case '/network/clients':
-      return createIconStyle(ICON_STYLES.clients);
-    case '/network/tailscale':
-      return createIconStyle(ICON_STYLES.tailscale);
-    // Settings category
-    case '/settings/wifi':
-      return createIconStyle(ICON_STYLES.wifi);
-    case '/settings/hotspot':
-      return createIconStyle(ICON_STYLES.hotspot);
-    case '/settings/internet':
-      return createIconStyle(ICON_STYLES.internet);
-    case '/settings/starlink':
-      return createIconStyle(ICON_STYLES.starlink);
-    case '/settings/device':
-      return createIconStyle(ICON_STYLES.deviceSettings);
-    case '/settings/tailscale':
-      return createIconStyle(ICON_STYLES.tailscale);
-    // Power category
-    case '/power/restart-browser':
-    case '/power/reboot':
-    case '/power/shutdown':
-    case '/power/exit-to-desktop':
-      return createIconStyle(ICON_STYLES.danger);
-    default:
-      return undefined;
-  }
-}
-
-/**
- * Power action configuration
- */
-interface PowerAction {
-  path: string;
-  endpoint: string;
-  confirmMessage: string;
-}
-
-const POWER_ACTIONS: Record<string, PowerAction> = {
-  '/power/restart-browser': {
-    path: '/power/restart-browser',
-    endpoint: '/api/power/kiosk/restart',
-    confirmMessage: 'Are you sure you want to restart the kiosk browser?',
-  },
-  '/power/reboot': {
-    path: '/power/reboot',
-    endpoint: '/api/power/reboot',
-    confirmMessage:
-      'Are you sure you want to reboot the system? This will restart the entire device.',
-  },
-  '/power/shutdown': {
-    path: '/power/shutdown',
-    endpoint: '/api/power/shutdown',
-    confirmMessage:
-      'Are you sure you want to shutdown the system? You will need to manually power it back on.',
-  },
-  '/power/desktop': {
-    path: '/power/desktop',
-    endpoint: '/api/power/desktop',
-    confirmMessage: 'Are you sure you want to exit kiosk mode and switch to desktop?',
-  },
-};
 
 /**
  * Secondary Navigation Component
@@ -231,20 +55,24 @@ export const SecondaryNavigation: React.FC = () => {
   };
 
   // Handle power actions
-  const handlePowerAction = async (action: PowerAction, event: React.MouseEvent) => {
+  const handlePowerAction = async (item: NavigationItem, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
 
+    if (!item.endpoint || !item.confirmMessage) {
+      return;
+    }
+
     // Show confirmation dialog
-    const confirmed = window.confirm(action.confirmMessage);
+    const confirmed = window.confirm(item.confirmMessage);
     if (!confirmed) {
       return;
     }
 
-    setLoading(action.path);
+    setLoading(item.path || item.id);
 
     try {
-      const response = await fetch(action.endpoint, {
+      const response = await fetch(item.endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -268,13 +96,12 @@ export const SecondaryNavigation: React.FC = () => {
       <wa-card className='app-secondary-navigation-card' appearance='outlined'>
         <div className='wa-cluster wa-gap-m wa-align-items-center'>
           {visibleItems.map(item => {
-            const powerAction = POWER_ACTIONS[item.path];
-            const isPowerAction = !!powerAction;
+            const isPowerAction = !!item.endpoint;
 
             // Render icon (regular or stacked)
             const renderIcon = () => {
               const iconStyle = {
-                ...getIconStyle(item.path),
+                ...createIconStyle(item.iconStyle),
                 maxWidth: '1.5rem',
                 paddingRight: 'var(--wa-space-xs)',
                 '--fa-primary-opacity': 1,
@@ -305,7 +132,12 @@ export const SecondaryNavigation: React.FC = () => {
               if (!item.icon) return null;
 
               return (
-                <FontAwesomeIcon icon={item.icon} size='lg' flip={item.flip} style={iconStyle} />
+                <FontAwesomeIcon
+                  icon={item.icon}
+                  size='lg'
+                  flip={item.iconFlip}
+                  style={iconStyle}
+                />
               );
             };
 
@@ -313,15 +145,15 @@ export const SecondaryNavigation: React.FC = () => {
               // Power actions are clickable buttons, not navigation links
               return (
                 <div
-                  key={item.path}
+                  key={item.id}
                   className='secondary-navigation-item'
-                  onClick={e => handlePowerAction(powerAction, e)}
+                  onClick={e => handlePowerAction(item, e)}
                   role='button'
                   tabIndex={loading === null ? 0 : -1}
                   onKeyDown={e => {
                     if (loading === null && (e.key === 'Enter' || e.key === ' ')) {
                       e.preventDefault();
-                      handlePowerAction(powerAction, e as unknown as React.MouseEvent);
+                      handlePowerAction(item, e as unknown as React.MouseEvent);
                     }
                   }}
                   aria-label={item.label}
@@ -338,8 +170,8 @@ export const SecondaryNavigation: React.FC = () => {
             // Regular navigation links
             return (
               <NavLink
-                key={item.path}
-                to={getNavLinkTo(item.path)}
+                key={item.id}
+                to={getNavLinkTo(item.path || '/')}
                 className={({ isActive }) =>
                   `secondary-navigation-item ${isActive ? 'secondary-navigation-item--active' : ''}`
                 }
