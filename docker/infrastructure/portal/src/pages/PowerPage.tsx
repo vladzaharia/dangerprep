@@ -3,7 +3,7 @@ import {
   faPowerOff,
   faArrowsRotate,
   faDesktop,
-  faBrowser,
+  faWindowRestore,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import React, { useState } from 'react';
@@ -26,7 +26,7 @@ const powerActions: PowerAction[] = [
     id: 'kiosk-restart',
     label: 'Restart Browser',
     stackedIcon: {
-      base: faBrowser,
+      base: faWindowRestore,
       overlay: faRotate,
     },
     endpoint: '/api/power/kiosk/restart',

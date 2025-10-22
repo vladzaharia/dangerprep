@@ -139,9 +139,10 @@ function TailscaleSkeleton() {
 }
 
 /**
- * Tailscale Status Page Component
+ * Tailscale Status Content Component
+ * This component calls SWR hooks and must be wrapped in Suspense
  */
-export const TailscaleStatusPage: React.FC = () => {
+const TailscaleStatusContent: React.FC = () => {
   const { data: tailscale } = useTailscaleInterface();
   const { data: peersData } = useTailscalePeers();
   const { data: settings } = useTailscaleSettings();
@@ -157,6 +158,32 @@ export const TailscaleStatusPage: React.FC = () => {
   };
 
   const tailscaleInterface = tailscale as TailscaleInterface;
+
+  // Early exit if Tailscale is not configured
+  if (!tailscaleInterface || !status) {
+    return (
+      <div className='wa-stack wa-gap-xl'>
+        <h2>Tailscale Status</h2>
+        <wa-callout variant='warning'>
+          <strong>Tailscale Not Configured</strong>
+          <p>
+            Tailscale is not currently configured on this device. Please configure Tailscale in the{' '}
+            <a
+              href={getNavLinkTo('/settings/tailscale')}
+              onClick={e => {
+                e.preventDefault();
+                navigate(getNavLinkTo('/settings/tailscale'));
+              }}
+              style={{ textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              Tailscale Settings
+            </a>{' '}
+            page.
+          </p>
+        </wa-callout>
+      </div>
+    );
+  }
 
   // Filter out peers that haven't been seen in over a month
   const oneMonthAgo = new Date();
@@ -237,7 +264,7 @@ export const TailscaleStatusPage: React.FC = () => {
   }
 
   // Exit Node tag
-  if (tailscaleInterface.exitNode) {
+  if (tailscaleInterface?.exitNode) {
     tailscaleTags.push({
       label: 'Exit Node',
       icon: (
@@ -251,7 +278,7 @@ export const TailscaleStatusPage: React.FC = () => {
   }
 
   // Advertised Routes as individual tags
-  if (tailscaleInterface.routeAdvertising && tailscaleInterface.routeAdvertising.length > 0) {
+  if (tailscaleInterface?.routeAdvertising && tailscaleInterface?.routeAdvertising.length > 0) {
     tailscaleInterface.routeAdvertising.forEach(route => {
       tailscaleTags.push({
         label: route,
@@ -266,7 +293,7 @@ export const TailscaleStatusPage: React.FC = () => {
     tailscaleTags.push({
       label: 'Version',
       value: cleanVersion(settings.version),
-      icon: <FontAwesomeIcon icon={faCodeCompare} style={createIconStyle(ICON_STYLES.tag)} />,
+      icon: <FontAwesomeIcon icon={faCodeCompare} style={createIconStyle(ICON_STYLES.version)} />,
       variant: 'neutral',
     });
   }
@@ -291,7 +318,7 @@ export const TailscaleStatusPage: React.FC = () => {
         <div className='wa-stack wa-gap-m tailscale-status'>
           <h3 className='wa-heading-s'>Tailscale Status</h3>
           <StatusCard
-            variant={tailscaleInterface.status === 'connected' ? 'success' : 'danger'}
+            variant={tailscaleInterface?.status === 'connected' ? 'success' : 'danger'}
             layout='vertical'
             icon={
               <FontAwesomeIcon
@@ -300,18 +327,18 @@ export const TailscaleStatusPage: React.FC = () => {
                 style={{ ...createIconStyle(ICON_STYLES.tailscale), maxWidth: '2rem' }}
               />
             }
-            title={tailscaleInterface.name}
-            subtitle={tailscaleInterface.tailnetName}
+            title={tailscaleInterface?.name}
+            subtitle={tailscaleInterface?.tailnetName}
             tags={tailscaleTags}
             className='interface-card'
           />
 
           {/* Current Settings Tags */}
-          {tailscaleInterface.status === 'connected' && (
+          {tailscaleInterface?.status === 'connected' && (
             <div className='wa-stack wa-gap-xs'>
               <h4 className='wa-heading-xs'>Current Settings</h4>
               <div className='wa-cluster wa-gap-xs'>
-                {tailscaleInterface.acceptDNS && (
+                {tailscaleInterface?.acceptDNS && (
                   <wa-tag variant='success' size='small'>
                     <FontAwesomeIcon
                       icon={faGlobe}
@@ -320,7 +347,7 @@ export const TailscaleStatusPage: React.FC = () => {
                     DNS
                   </wa-tag>
                 )}
-                {tailscaleInterface.acceptRoutes && (
+                {tailscaleInterface?.acceptRoutes && (
                   <wa-tag variant='success' size='small'>
                     <FontAwesomeIcon
                       icon={faRoute}
@@ -333,7 +360,7 @@ export const TailscaleStatusPage: React.FC = () => {
                   <wa-tag variant='success' size='small'>
                     <FontAwesomeIcon
                       icon={faTerminal}
-                      style={{ ...createIconStyle(ICON_STYLES.tailscale), marginRight: '4px' }}
+                      style={{ ...createIconStyle(ICON_STYLES.terminal), marginRight: '4px' }}
                     />
                     SSH
                   </wa-tag>
@@ -400,9 +427,19 @@ export const TailscaleStatusPage: React.FC = () => {
     </div>
   );
 
+  return content;
+};
+
+/**
+ * Tailscale Status Page Component
+ * Wraps TailscaleStatusContent in Suspense to show skeleton while loading
+ */
+export const TailscaleStatusPage: React.FC = () => {
   return (
     <div className='tailscale-status-page'>
-      <Suspense fallback={<TailscaleSkeleton />}>{content}</Suspense>
+      <Suspense fallback={<TailscaleSkeleton />}>
+        <TailscaleStatusContent />
+      </Suspense>
     </div>
   );
 };

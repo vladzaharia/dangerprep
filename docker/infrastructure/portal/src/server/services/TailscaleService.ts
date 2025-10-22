@@ -444,10 +444,10 @@ export class TailscaleService {
     try {
       const flags: string[] = [];
 
-      if (settings.exitNode !== undefined) {
+      if (settings?.exitNode !== undefined) {
         flags.push(`--exit-node=${settings.exitNode || ''}`);
       }
-      if (settings.exitNodeAllowLAN !== undefined) {
+      if (settings?.exitNodeAllowLAN !== undefined) {
         flags.push(`--exit-node-allow-lan-access=${settings.exitNodeAllowLAN}`);
       }
       if (settings.acceptDNS !== undefined) {

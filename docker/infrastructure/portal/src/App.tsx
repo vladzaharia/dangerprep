@@ -64,17 +64,42 @@ export interface Service {
 
 /**
  * Global loading fallback for the entire app
+ * Provides a generic skeleton that works for most page types
  */
 function AppLoadingFallback() {
   return (
     <div className='wa-stack wa-gap-xl' style={{ padding: 'var(--wa-space-l)' }}>
       {/* Page title skeleton */}
       <wa-skeleton effect='sheen' style={{ width: '240px', height: '36px' }}></wa-skeleton>
-      {/* Main content area skeleton */}
-      <wa-skeleton
-        effect='sheen'
-        style={{ width: '100%', height: '300px', borderRadius: '8px' }}
-      ></wa-skeleton>
+
+      {/* Grid of content cards - works for services, settings, etc */}
+      <div
+        className='wa-grid wa-gap-m'
+        style={{ '--min-column-size': '18rem' } as React.CSSProperties}
+      >
+        {Array.from({ length: 3 }, (_, index) => (
+          <wa-card key={index} appearance='outlined'>
+            <div className='wa-stack wa-gap-m' style={{ padding: 'var(--wa-space-m)' }}>
+              <div className='wa-flank wa-gap-m wa-align-items-center'>
+                <wa-skeleton
+                  effect='sheen'
+                  style={{ width: '48px', height: '48px', borderRadius: '6px' }}
+                ></wa-skeleton>
+                <div className='wa-stack wa-gap-xs' style={{ flex: 1 }}>
+                  <wa-skeleton
+                    effect='sheen'
+                    style={{ width: `${140 + index * 20}px`, height: '20px' }}
+                  ></wa-skeleton>
+                  <wa-skeleton
+                    effect='sheen'
+                    style={{ width: `${180 + index * 15}px`, height: '16px' }}
+                  ></wa-skeleton>
+                </div>
+              </div>
+            </div>
+          </wa-card>
+        ))}
+      </div>
     </div>
   );
 }

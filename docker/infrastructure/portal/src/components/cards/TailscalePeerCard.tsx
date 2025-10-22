@@ -1,7 +1,7 @@
 import {
   faTerminal,
   faRoute,
-  faPlugCircleBolt,
+  faPlugCircleCheck,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 import {
   faArrowRightFromBracket,
@@ -82,9 +82,9 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
   );
 
   // Exit node tag (icon only)
-  if (peer.exitNode || peer.exitNodeOption) {
+  if (peer?.exitNode || peer.exitNodeOption) {
     miniTags.push(
-      <wa-tag key='exit-node' variant={peer.exitNode ? 'success' : 'neutral'} size='small'>
+      <wa-tag key='exit-node' variant={peer?.exitNode ? 'success' : 'neutral'} size='small'>
         <FontAwesomeIcon
           icon={faArrowRightFromBracket}
           style={
@@ -106,7 +106,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
     miniTags.push(
       <wa-tag key='app-connector' variant='neutral' size='small'>
         <FontAwesomeIcon
-          icon={faPlugCircleBolt}
+          icon={faPlugCircleCheck}
           style={
             {
               '--fa-primary-color': COLORS.feature.appConnector,
@@ -128,7 +128,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
           icon={faRoute}
           style={
             {
-              '--fa-primary-color': COLORS.semantic.success,
+              '--fa-primary-color': COLORS.feature.routes,
               '--fa-primary-opacity': OPACITIES.high,
               fontSize: '0.875em',
             } as React.CSSProperties
@@ -147,7 +147,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
           icon={faTerminal}
           style={
             {
-              '--fa-primary-color': COLORS.feature.tailscale,
+              '--fa-primary-color': COLORS.feature.terminal,
               '--fa-primary-opacity': OPACITIES.high,
               fontSize: '0.875em',
             } as React.CSSProperties
@@ -267,8 +267,8 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                         </wa-tag>
                       ))}
 
-                  {peer.exitNodeOption && (
-                    <wa-tag variant={peer.exitNode ? 'success' : 'neutral'} size='small'>
+                  {peer?.exitNodeOption && (
+                    <wa-tag variant={peer?.exitNode ? 'success' : 'neutral'} size='small'>
                       <div className='wa-flank wa-gap-xs'>
                         <FontAwesomeIcon
                           icon={faArrowRightFromBracket}
@@ -289,7 +289,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                     <wa-tag variant='neutral' size='small'>
                       <div className='wa-flank wa-gap-xs'>
                         <FontAwesomeIcon
-                          icon={faPlugCircleBolt}
+                          icon={faPlugCircleCheck}
                           style={
                             {
                               '--fa-primary-color': COLORS.feature.appConnector,
@@ -310,7 +310,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                           icon={faTerminal}
                           style={
                             {
-                              '--fa-primary-color': COLORS.feature.tailscale,
+                              '--fa-primary-color': COLORS.feature.terminal,
                               '--fa-primary-opacity': OPACITIES.high,
                             } as React.CSSProperties
                           }
@@ -329,7 +329,7 @@ export const TailscalePeerCard: React.FC<TailscalePeerCardProps> = ({ peer }) =>
                             icon={faRoute}
                             style={
                               {
-                                '--fa-primary-color': COLORS.semantic.success,
+                                '--fa-primary-color': COLORS.feature.routes,
                                 '--fa-primary-opacity': OPACITIES.high,
                               } as React.CSSProperties
                             }

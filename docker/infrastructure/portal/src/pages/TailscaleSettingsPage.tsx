@@ -19,22 +19,62 @@ import type { TailscaleExitNode } from '../types/network';
 import { ICON_STYLES } from '../utils/iconStyles';
 
 /**
- * Loading skeleton for settings page
+ * Loading skeleton for Tailscale settings page
+ * Matches the SettingsCard layout with icon, title, description, and footer
  */
 function TailscaleSettingsSkeleton() {
   return (
     <div className='wa-stack wa-gap-xl'>
-      <wa-skeleton effect='sheen' style={{ width: '300px', height: '36px' }}></wa-skeleton>
+      {/* Page title */}
+      <h2>Tailscale Settings</h2>
+
+      {/* Version/Health info skeleton */}
+      <div className='wa-cluster wa-gap-s'>
+        <wa-skeleton
+          effect='sheen'
+          style={{ width: '120px', height: '24px', borderRadius: '4px' }}
+        ></wa-skeleton>
+        <wa-skeleton
+          effect='sheen'
+          style={{ width: '140px', height: '24px', borderRadius: '4px' }}
+        ></wa-skeleton>
+      </div>
+
+      {/* Settings cards grid */}
       <div
         className='wa-grid wa-gap-m'
-        style={{ '--min-column-size': '250px' } as React.CSSProperties}
+        style={{ '--min-column-size': '250px', '--max-columns': '3' } as React.CSSProperties}
       >
-        {[1, 2, 3, 4].map(i => (
-          <wa-skeleton
-            key={i}
-            effect='sheen'
-            style={{ width: '100%', height: '200px' }}
-          ></wa-skeleton>
+        {Array.from({ length: 6 }, (_, index) => (
+          <wa-card key={index} appearance='outlined' className='card settings-card'>
+            <div
+              className='wa-stack wa-gap-s wa-align-items-center'
+              style={{ justifyContent: 'center', padding: 'var(--wa-space-m)' }}
+            >
+              {/* Icon skeleton */}
+              <wa-skeleton
+                effect='sheen'
+                style={{ width: '64px', height: '64px', borderRadius: '6px' }}
+              ></wa-skeleton>
+              {/* Title skeleton */}
+              <wa-skeleton
+                effect='sheen'
+                style={{ width: `${120 + index * 15}px`, height: '20px' }}
+              ></wa-skeleton>
+              {/* Description skeleton */}
+              <wa-skeleton
+                effect='sheen'
+                style={{ width: `${160 + index * 10}px`, height: '16px' }}
+              ></wa-skeleton>
+            </div>
+            {/* Footer button skeleton */}
+            <div slot='footer' style={{ width: '100%' }}>
+              <wa-skeleton
+                effect='sheen'
+                style={{ width: '100%', height: '36px', borderRadius: '4px' }}
+              ></wa-skeleton>
+            </div>
+          </wa-card>
         ))}
       </div>
     </div>
@@ -124,47 +164,6 @@ function TailscaleSettingsContent() {
   return (
     <div className='wa-stack wa-gap-xl'>
       <h2>Tailscale Settings</h2>
-
-      {/* Version and Health Information */}
-      {(settings.version || settings.health?.length || settings.certDomains?.length) && (
-        <div className='wa-stack wa-gap-s'>
-          {settings.version && (
-            <div className='wa-cluster wa-gap-s'>
-              <wa-tag variant='neutral' size='small'>
-                Version: {settings.version}
-              </wa-tag>
-              {settings.latestVersion && settings.version !== settings.latestVersion && (
-                <wa-tag variant='warning' size='small'>
-                  Update available: {settings.latestVersion}
-                </wa-tag>
-              )}
-            </div>
-          )}
-          {settings.health && settings.health.length > 0 && (
-            <wa-callout variant='warning'>
-              <strong>Health Issues:</strong>
-              <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
-                {settings.health.map((issue, idx) => (
-                  <li key={idx}>{issue}</li>
-                ))}
-              </ul>
-            </wa-callout>
-          )}
-          {settings.certDomains && settings.certDomains.length > 0 && (
-            <div className='wa-cluster wa-gap-xs'>
-              <span style={{ fontSize: '0.875rem', color: 'var(--wa-color-neutral-600)' }}>
-                Cert Domains:
-              </span>
-              {settings.certDomains.map((domain, idx) => (
-                <wa-tag key={idx} variant='neutral' size='small'>
-                  {domain}
-                </wa-tag>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Status message */}
       {message && (
         <wa-callout variant={message.type === 'success' ? 'success' : 'danger'}>
@@ -260,7 +259,35 @@ function TailscaleSettingsContent() {
               </wa-button>
             )
           }
-        />
+        >
+          {/* Version and Health Information */}
+          {(settings.version || settings.health?.length) && (
+            <div className='wa-stack wa-gap-s'>
+              {settings.version && (
+                <div className='wa-cluster wa-gap-s'>
+                  <wa-tag variant='neutral' size='small'>
+                    Version: {settings.version}
+                  </wa-tag>
+                  {settings.latestVersion && settings.version !== settings.latestVersion && (
+                    <wa-tag variant='warning' size='small'>
+                      Update available: {settings.latestVersion}
+                    </wa-tag>
+                  )}
+                </div>
+              )}
+              {settings.health && settings.health.length > 0 && (
+                <wa-callout variant='warning'>
+                  <strong>Health Issues:</strong>
+                  <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                    {settings.health.map((issue, idx) => (
+                      <li key={idx}>{issue}</li>
+                    ))}
+                  </ul>
+                </wa-callout>
+              )}
+            </div>
+          )}
+        </SettingsCard>
 
         {/* Exit Node Card */}
         <SettingsCard
@@ -271,14 +298,14 @@ function TailscaleSettingsContent() {
           loading={loading === 'exitNode'}
           footerSlot={
             <wa-select
-              value={settings.exitNode || ''}
+              value={settings?.exitNode || ''}
               placeholder='No exit node'
               {...({ clearable: true } as Record<string, unknown>)}
               onchange={(e: Event) => {
                 const target = e.target as HTMLSelectElement;
                 handleSetExitNode(target.value || null);
               }}
-              disabled={loading !== null || !settings.running}
+              disabled={loading !== null || !settings?.running}
             >
               {exitNodes?.map((node: TailscaleExitNode) => (
                 <wa-option key={node.id} value={node.id} disabled={!node.online}>

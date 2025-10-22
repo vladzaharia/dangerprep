@@ -6,6 +6,7 @@ import {
   faServer,
   faSignal,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import { faGear } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -98,7 +99,7 @@ export const SettingsPage: React.FC = () => {
         {/* Internet Settings Card */}
         <SettingsCard
           icon={faGlobe}
-          iconStyle={ICON_STYLES.brand}
+          iconStyle={ICON_STYLES.internet}
           title='Internet Settings'
           description='Configure internet connection and DNS settings'
           footerSlot={
@@ -129,7 +130,7 @@ export const SettingsPage: React.FC = () => {
         {/* Starlink Settings Card */}
         <SettingsCard
           icon={faSatelliteDish}
-          iconStyle={ICON_STYLES.brand}
+          iconStyle={ICON_STYLES.starlink}
           title='Starlink Settings'
           description='Configure Starlink satellite internet settings'
           footerSlot={
@@ -160,7 +161,7 @@ export const SettingsPage: React.FC = () => {
         {/* Device Settings Card */}
         <SettingsCard
           icon={faServer}
-          iconStyle={ICON_STYLES.device}
+          iconStyle={ICON_STYLES.deviceSettings}
           title='Device Settings'
           description='Configure device-specific settings and options'
           footerSlot={
@@ -190,7 +191,7 @@ export const SettingsPage: React.FC = () => {
 
         {/* Tailscale Settings Card */}
         <SettingsCard
-          icon={faShieldCheck}
+          stackedIcon={{ base: faShieldCheck, overlay: faGear }}
           iconStyle={ICON_STYLES.tailscale}
           title='Tailscale Settings'
           description='Configure Tailscale VPN settings, exit nodes, and network options'

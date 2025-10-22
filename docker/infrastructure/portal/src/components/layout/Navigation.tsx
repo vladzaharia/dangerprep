@@ -1,6 +1,6 @@
 import {
   faPowerOff,
-  faBrowser,
+  faWindowRestore,
   faQrcode,
   faNetworkWired,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
@@ -46,7 +46,7 @@ const MANAGEMENT_PAGES = ['/network', '/maintenance', '/settings', '/tailscale',
 const NAV_ITEMS: NavItem[] = [
   {
     path: '/services',
-    icon: faBrowser,
+    icon: faWindowRestore,
     label: 'Services',
     position: 'top',
     // Always visible (public and kiosk)
@@ -144,9 +144,9 @@ export const Navigation: React.FC = () => {
       case 'maintenance':
         return createIconStyle(ICON_STYLES.warning);
       case 'qr':
-        return createIconStyle(ICON_STYLES.tailscale);
+        return createIconStyle(ICON_STYLES.qrcode);
       case 'network':
-        return createIconStyle(ICON_STYLES.device);
+        return createIconStyle(ICON_STYLES.network);
       case 'settings':
         return createIconStyle(ICON_STYLES.settings);
       case 'power':

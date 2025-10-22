@@ -60,9 +60,10 @@ function ConnectedClientsSkeleton() {
 }
 
 /**
- * Connected Clients Page Component
+ * Connected Clients Content Component
+ * This component calls SWR hooks and must be wrapped in Suspense
  */
-export const ConnectedClientsPage: React.FC = () => {
+const ConnectedClientsContent: React.FC = () => {
   const { data: hotspot } = useHotspotInterface();
 
   // Get connected clients from hotspot interface
@@ -148,7 +149,7 @@ export const ConnectedClientsPage: React.FC = () => {
                     <FontAwesomeIcon
                       icon={faComputerClassic}
                       size='lg'
-                      style={{ ...createIconStyle(ICON_STYLES.device), maxWidth: '2rem' }}
+                      style={{ ...createIconStyle(ICON_STYLES.clients), maxWidth: '2rem' }}
                     />
                   }
                   title={client.hostname || client.ipAddress || client.macAddress}
@@ -164,9 +165,19 @@ export const ConnectedClientsPage: React.FC = () => {
     </>
   );
 
+  return content;
+};
+
+/**
+ * Connected Clients Page Component
+ * Wraps ConnectedClientsContent in Suspense to show skeleton while loading
+ */
+export const ConnectedClientsPage: React.FC = () => {
   return (
     <div className='connected-clients-page'>
-      <Suspense fallback={<ConnectedClientsSkeleton />}>{content}</Suspense>
+      <Suspense fallback={<ConnectedClientsSkeleton />}>
+        <ConnectedClientsContent />
+      </Suspense>
     </div>
   );
 };

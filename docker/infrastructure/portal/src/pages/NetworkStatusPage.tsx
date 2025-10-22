@@ -75,6 +75,7 @@ function getInterfaceIconColor(iface: NetworkInterface): string | undefined {
 
 /**
  * Loading skeleton for network status page
+ * Matches the StatusCard layout with icon, title, subtitle, and tags
  */
 function NetworkStatusSkeleton() {
   return (
@@ -104,6 +105,16 @@ function NetworkStatusSkeleton() {
                   ></wa-skeleton>
                 </div>
               </div>
+              {/* Tags skeleton */}
+              <div className='wa-cluster wa-gap-xs'>
+                {Array.from({ length: 2 + index }, (_, tagIndex) => (
+                  <wa-skeleton
+                    key={tagIndex}
+                    effect='sheen'
+                    style={{ width: '70px', height: '24px', borderRadius: '4px' }}
+                  ></wa-skeleton>
+                ))}
+              </div>
             </div>
           </wa-card>
         ))}
@@ -129,6 +140,16 @@ function NetworkStatusSkeleton() {
                   style={{ width: '180px', height: '16px' }}
                 ></wa-skeleton>
               </div>
+            </div>
+            {/* Tags skeleton */}
+            <div className='wa-cluster wa-gap-xs'>
+              {Array.from({ length: 3 }, (_, tagIndex) => (
+                <wa-skeleton
+                  key={tagIndex}
+                  effect='sheen'
+                  style={{ width: '90px', height: '24px', borderRadius: '4px' }}
+                ></wa-skeleton>
+              ))}
             </div>
           </div>
         </wa-card>
@@ -156,6 +177,29 @@ function NetworkStatusSkeleton() {
                   ></wa-skeleton>
                 </div>
               </div>
+              {/* Tags skeleton */}
+              <div className='wa-cluster wa-gap-xs'>
+                {Array.from({ length: 3 + index }, (_, tagIndex) => (
+                  <wa-skeleton
+                    key={tagIndex}
+                    effect='sheen'
+                    style={{ width: '80px', height: '24px', borderRadius: '4px' }}
+                  ></wa-skeleton>
+                ))}
+              </div>
+              {/* Footer skeleton for WAN cards */}
+              {index === 0 && (
+                <div slot='footer' className='wa-flank wa-gap-m wa-align-items-center'>
+                  <wa-skeleton
+                    effect='sheen'
+                    style={{ width: '100px', height: '16px' }}
+                  ></wa-skeleton>
+                  <wa-skeleton
+                    effect='sheen'
+                    style={{ width: '120px', height: '16px' }}
+                  ></wa-skeleton>
+                </div>
+              )}
             </div>
           </wa-card>
         ))}
@@ -165,9 +209,10 @@ function NetworkStatusSkeleton() {
 }
 
 /**
- * Network Status Page Component
+ * Network Status Content Component
+ * This component calls SWR hooks and must be wrapped in Suspense
  */
-export const NetworkStatusPage: React.FC = () => {
+const NetworkStatusContent: React.FC = () => {
   const { data: networkData } = useNetworkSummary();
   const { data: tailscaleSettings } = useTailscaleSettings();
   const { data: tailscalePeers } = useTailscalePeers();
@@ -207,7 +252,7 @@ export const NetworkStatusPage: React.FC = () => {
       // Include Tailscale if it has exit node or accepting routes
       if (iface.type === 'tailscale') {
         const tsInterface = iface as TailscaleInterface;
-        const hasExitNode = tsInterface.exitNode;
+        const hasExitNode = tsInterface?.exitNode;
         const acceptingRoutes = tailscaleSettings?.acceptRoutes && tsInterface.state === 'up';
         return hasExitNode || acceptingRoutes;
       }
@@ -270,7 +315,7 @@ export const NetworkStatusPage: React.FC = () => {
                 label: 'Speed',
                 value: iface.speed,
                 icon: (
-                  <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                  <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.speed)} />
                 ),
                 variant: 'neutral',
               });
@@ -291,7 +336,10 @@ export const NetworkStatusPage: React.FC = () => {
                   label: 'Speed',
                   value: cleanedBitRate,
                   icon: (
-                    <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                    <FontAwesomeIcon
+                      icon={faGaugeHigh}
+                      style={createIconStyle(ICON_STYLES.speed)}
+                    />
                   ),
                   variant: 'neutral',
                 });
@@ -317,7 +365,7 @@ export const NetworkStatusPage: React.FC = () => {
                   icon: (
                     <FontAwesomeIcon
                       icon={faMagnifyingGlass}
-                      style={createIconStyle(ICON_STYLES.tag)}
+                      style={createIconStyle(ICON_STYLES.dns)}
                     />
                   ),
                   variant: 'neutral',
@@ -453,7 +501,7 @@ export const NetworkStatusPage: React.FC = () => {
                 label: 'Speed',
                 value: iface.speed,
                 icon: (
-                  <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                  <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.speed)} />
                 ),
                 variant: 'neutral',
               });
@@ -474,7 +522,10 @@ export const NetworkStatusPage: React.FC = () => {
                   label: 'Speed',
                   value: cleanedBitRate,
                   icon: (
-                    <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                    <FontAwesomeIcon
+                      icon={faGaugeHigh}
+                      style={createIconStyle(ICON_STYLES.speed)}
+                    />
                   ),
                   variant: 'neutral',
                 });
@@ -490,7 +541,7 @@ export const NetworkStatusPage: React.FC = () => {
                   icon: (
                     <FontAwesomeIcon
                       icon={faMagnifyingGlass}
-                      style={createIconStyle(ICON_STYLES.tag)}
+                      style={createIconStyle(ICON_STYLES.dns)}
                     />
                   ),
                   variant: 'neutral',
@@ -504,9 +555,9 @@ export const NetworkStatusPage: React.FC = () => {
               const tsInterface = iface as TailscaleInterface;
 
               // Add exit node tag if using one
-              if (tsInterface.exitNode && tailscaleSettings?.exitNode) {
+              if (tsInterface?.exitNode && tailscaleSettings?.exitNode) {
                 // Find the exit node name from settings
-                const exitNodeName = tailscaleSettings.exitNode;
+                const exitNodeName = tailscaleSettings?.exitNode;
                 tags.push({
                   label: 'Exit Node',
                   value: exitNodeName,
@@ -691,9 +742,19 @@ export const NetworkStatusPage: React.FC = () => {
     </div>
   );
 
+  return content;
+};
+
+/**
+ * Network Status Page Component
+ * Wraps NetworkStatusContent in Suspense to show skeleton while loading
+ */
+export const NetworkStatusPage: React.FC = () => {
   return (
     <div className='network-status-page'>
-      <Suspense fallback={<NetworkStatusSkeleton />}>{content}</Suspense>
+      <Suspense fallback={<NetworkStatusSkeleton />}>
+        <NetworkStatusContent />
+      </Suspense>
     </div>
   );
 };

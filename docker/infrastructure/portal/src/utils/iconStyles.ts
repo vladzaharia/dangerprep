@@ -16,54 +16,67 @@ export interface IconStyleConfig {
 
 /**
  * Centralized color palette for consistent theming across the application
+ * Uses WebAwesome CSS color variables for consistent theming
  */
 export const COLORS = {
   /** Primary semantic colors */
   semantic: {
-    success: '#10b981', // Green - success states, connected, active
-    warning: '#f59e0b', // Amber - warnings, caution states
-    danger: '#ef4444', // Red - errors, disconnected, critical
-    info: '#3b82f6', // Blue - informational, brand
+    success: 'var(--wa-color-green-50)', // Green - success states, connected, active
+    warning: 'var(--wa-color-orange-50)', // Orange - warnings, caution states
+    danger: 'var(--wa-color-red-50)', // Red - errors, disconnected, critical
+    info: 'var(--wa-color-blue-50)', // Blue - informational, brand
   },
 
   /** Feature-specific colors */
   feature: {
-    wifi: '#3b82f6', // Blue - WiFi and hotspot
-    ethernet: '#10b981', // Green - Ethernet connections
-    tailscale: '#a855f7', // Purple - Tailscale/VPN
-    network: '#10b981', // Green - Network/IP addresses
-    gateway: '#ef4444', // Red - Gateway indicators
-    security: '#a855f7', // Purple - Security/encryption
-    exitNode: '#fb923c', // Orange - Exit nodes
-    appConnector: '#8b5cf6', // Purple variant - App connectors
+    wifi: 'var(--wa-color-cyan-50)', // Cyan - WiFi connectivity
+    hotspot: 'var(--wa-color-pink-50)', // Pink - Hotspot/access point (distinct from WiFi)
+    ethernet: 'var(--wa-color-green-50)', // Green - Ethernet connections
+    tailscale: 'var(--wa-color-purple-40)', // Purple - Tailscale/VPN
+    network: 'var(--wa-color-indigo-50)', // Indigo - Network status (distinct from services)
+    gateway: 'var(--wa-color-cyan-60)', // Cyan (bright) - Gateway/routing infrastructure
+    security: 'var(--wa-color-purple-50)', // Purple - Security/encryption
+    exitNode: 'var(--wa-color-orange-60)', // Orange - Exit nodes (brighter)
+    appConnector: 'var(--wa-color-purple-50)', // Purple - App connectors
+    dns: 'var(--wa-color-cyan-50)', // Cyan - DNS lookup/discovery
+    speed: 'var(--wa-color-cyan-60)', // Cyan (bright) - Speed/performance indicators
+    routes: 'var(--wa-color-cyan-50)', // Cyan - Network routes/paths
+    terminal: 'var(--wa-color-green-60)', // Green (bright) - Terminal/SSH (classic terminal green)
+    version: 'var(--wa-color-gray-60)', // Gray (bright) - Version/metadata
+    internet: 'var(--wa-color-blue-60)', // Blue (bright) - Internet/global connectivity
+    starlink: 'var(--wa-color-green-50)', // Yellow - Starlink satellite (sun/space theme)
+    device: 'var(--wa-color-pink-60)', // Pink (bright) - Device settings
+    clients: 'var(--wa-color-pink-50)', // Pink - Connected clients/users
+    qrcode: 'var(--wa-color-yellow-60)', // Indigo (bright) - QR code (distinct from Tailscale purple)
+    settings: 'var(--wa-color-gray-50)', // Gray - Settings (neutral, distinct from blue brand)
   },
 
   /** UI element colors */
   ui: {
-    device: '#6366f1', // Indigo - Device/client icons
-    upload: '#3b82f6', // Blue - Upload indicators
-    download: '#f59e0b', // Amber - Download indicators
-    maintenance: '#f59e0b', // Amber - Maintenance mode
-    ipv4: '#10b981', // Green - IPv4 addresses
-    ipv6: '#8b5cf6', // Purple variant - IPv6 addresses
-    tag: '#6366f1', // Indigo - Generic tags
+    device: 'var(--wa-color-indigo-50)', // Indigo - Device/client icons
+    upload: 'var(--wa-color-blue-50)', // Blue - Upload indicators
+    download: 'var(--wa-color-orange-50)', // Orange - Download indicators
+    maintenance: 'var(--wa-color-orange-50)', // Orange - Maintenance mode
+    ipv4: 'var(--wa-color-green-50)', // Green - IPv4 addresses
+    ipv6: 'var(--wa-color-purple-60)', // Purple variant - IPv6 addresses (lighter)
+    tag: 'var(--wa-color-indigo-50)', // Indigo - Generic tags
   },
 
   /** Neutral/state colors */
   neutral: {
-    gray: '#6b7280', // Gray - Inactive, unknown, default
-    loopback: '#6b7280', // Gray - Loopback interfaces
-    bridge: '#6b7280', // Gray - Bridge interfaces
-    virtual: '#6b7280', // Gray - Virtual interfaces
+    gray: 'var(--wa-color-gray-50)', // Gray - Inactive, unknown, default
+    loopback: 'var(--wa-color-gray-50)', // Gray - Loopback interfaces
+    bridge: 'var(--wa-color-gray-50)', // Gray - Bridge interfaces
+    virtual: 'var(--wa-color-gray-50)', // Gray - Virtual interfaces
   },
 
-  /** Operating system brand colors */
+  /** Operating system brand colors - kept as hex for brand accuracy */
   os: {
-    linux: '#FCC624', // Yellow-orange - Linux
-    android: '#3DDC84', // Green - Android
-    windows: '#0078D4', // Blue - Windows
+    linux: '#FCC624', // Yellow-orange - Linux (Tux yellow)
+    android: '#3DDC84', // Green - Android (official brand color)
+    windows: '#0078D4', // Blue - Windows (official brand color)
     apple: '#A855F7', // Purple - macOS/iOS/iPadOS
-    default: '#6b7280', // Gray - Unknown OS
+    default: 'var(--wa-color-gray-50)', // Gray - Unknown OS
   },
 } as const;
 
@@ -137,16 +150,17 @@ export function createIconStyle(config: IconStyleConfig): CSSProperties {
  * All colors reference the centralized COLORS object for consistency
  */
 export const ICON_STYLES = {
-  /** WiFi/Hotspot interfaces - Blue with lower primary opacity */
+  /** WiFi - Cyan with lower primary opacity */
   wifi: {
     primaryColor: COLORS.feature.wifi,
     secondaryColor: COLORS.feature.wifi,
     primaryOpacity: OPACITIES.veryLow,
     secondaryOpacity: OPACITIES.medium,
   },
+  /** Hotspot - Pink (distinct from WiFi) */
   hotspot: {
-    primaryColor: COLORS.feature.wifi,
-    secondaryColor: COLORS.feature.wifi,
+    primaryColor: COLORS.feature.hotspot,
+    secondaryColor: COLORS.feature.hotspot,
     primaryOpacity: OPACITIES.veryLow,
     secondaryOpacity: OPACITIES.medium,
   },
@@ -156,15 +170,15 @@ export const ICON_STYLES = {
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.medium,
   },
-  /** Tailscale/VPN - Purple */
+  /** Tailscale/VPN - Purple with inverted accent colors */
   tailscale: {
     primaryColor: COLORS.feature.tailscale,
-    primaryOpacity: OPACITIES.high,
-    secondaryOpacity: OPACITIES.medium,
+    primaryOpacity: OPACITIES.full,
+    secondaryOpacity: OPACITIES.low,
   },
-  /** Settings - Blue with subtle secondary */
+  /** Settings - Gray (neutral, distinct from blue brand) */
   settings: {
-    primaryColor: COLORS.semantic.info,
+    primaryColor: COLORS.feature.settings,
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.extraMinimal,
   },
@@ -198,11 +212,11 @@ export const ICON_STYLES = {
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.medium,
   },
-  /** Network - Green */
+  /** Network - Indigo (distinct from services blue) with vibrant accent */
   network: {
     primaryColor: COLORS.feature.network,
-    primaryOpacity: OPACITIES.high,
-    secondaryOpacity: OPACITIES.medium,
+    primaryOpacity: OPACITIES.full,
+    secondaryOpacity: OPACITIES.high,
   },
   /** IPv4 addresses - Green */
   ipv4: {
@@ -216,11 +230,11 @@ export const ICON_STYLES = {
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.medium,
   },
-  /** Gateway - Red secondary */
+  /** Gateway - Cyan for routing infrastructure */
   gateway: {
-    secondaryColor: COLORS.feature.gateway,
+    primaryColor: COLORS.feature.gateway,
     primaryOpacity: OPACITIES.high,
-    secondaryOpacity: OPACITIES.low,
+    secondaryOpacity: OPACITIES.medium,
   },
   /** Security/Key - Purple secondary */
   security: {
@@ -288,15 +302,39 @@ export const ICON_STYLES = {
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.medium,
   },
-  /** App Connector - Purple variant */
+  /** App Connector - Purple */
   appConnector: {
     primaryColor: COLORS.feature.appConnector,
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.medium,
   },
-  /** Routes - Green */
+  /** DNS - Cyan for lookup/discovery */
+  dns: {
+    primaryColor: COLORS.feature.dns,
+    primaryOpacity: OPACITIES.high,
+    secondaryOpacity: OPACITIES.medium,
+  },
+  /** Speed - Cyan (bright) for performance */
+  speed: {
+    primaryColor: COLORS.feature.speed,
+    primaryOpacity: OPACITIES.high,
+    secondaryOpacity: OPACITIES.medium,
+  },
+  /** Terminal/SSH - Green (classic terminal) */
+  terminal: {
+    primaryColor: COLORS.feature.terminal,
+    primaryOpacity: OPACITIES.high,
+    secondaryOpacity: OPACITIES.medium,
+  },
+  /** Version - Gray for metadata */
+  version: {
+    primaryColor: COLORS.feature.version,
+    primaryOpacity: OPACITIES.high,
+    secondaryOpacity: OPACITIES.medium,
+  },
+  /** Routes - Cyan for network paths */
   routes: {
-    primaryColor: COLORS.semantic.success,
+    primaryColor: COLORS.feature.routes,
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.medium,
   },
@@ -305,6 +343,36 @@ export const ICON_STYLES = {
     primaryColor: COLORS.ui.tag,
     primaryOpacity: OPACITIES.high,
     secondaryOpacity: OPACITIES.medium,
+  },
+  /** Internet - Blue (bright) for global connectivity */
+  internet: {
+    secondaryColor: COLORS.feature.internet,
+    primaryOpacity: OPACITIES.low,
+    secondaryOpacity: OPACITIES.veryLow,
+  },
+  /** Starlink - Yellow for satellite/sun theme */
+  starlink: {
+    secondaryColor: COLORS.feature.starlink,
+    primaryOpacity: OPACITIES.high,
+    secondaryOpacity: OPACITIES.medium,
+  },
+  /** Device Settings - Pink (bright) */
+  deviceSettings: {
+    primaryColor: COLORS.feature.device,
+    primaryOpacity: OPACITIES.high,
+    secondaryOpacity: OPACITIES.medium,
+  },
+  /** Connected Clients - Pink for users/social */
+  clients: {
+    primaryColor: COLORS.feature.clients,
+    primaryOpacity: OPACITIES.high,
+    secondaryOpacity: OPACITIES.medium,
+  },
+  /** QR Code - Indigo (bright, distinct from purple Tailscale) with vibrant accent */
+  qrcode: {
+    primaryColor: COLORS.feature.qrcode,
+    primaryOpacity: OPACITIES.full,
+    secondaryOpacity: OPACITIES.high,
   },
 } as const;
 

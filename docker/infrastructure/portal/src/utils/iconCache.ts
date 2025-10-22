@@ -3,7 +3,7 @@ import {
   faEthernet,
   faPowerOff,
   faQrcode,
-  faBrowser,
+  faWindowRestore,
   faRocket,
   faCodeBranch,
   faFolderTree,
@@ -18,6 +18,20 @@ import {
   faBox,
   faServer,
   faRainbowHalf,
+  faRouter,
+  faGaugeHigh,
+  faMagnifyingGlass,
+  faCloud,
+  faChevronsUp,
+  faChevronsDown,
+  faTerminal,
+  faRoute,
+  faPlugCircleCheck,
+  faCodeCompare,
+  faUsers,
+  faSatelliteDish,
+  faArrowsRotate,
+  faDesktop,
 } from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
 // Utility Duotone Semibold icons (primary icon set)
 import {
@@ -53,6 +67,7 @@ import {
   faCloudArrowUp,
   faCloudArrowDown,
   faHardDrive,
+  faTag,
 } from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 
@@ -98,6 +113,10 @@ export class IconCache {
     link: faLink,
     globe: faGlobe,
     signal: faSignal,
+    router: faRouter,
+    'network-wired': faNetworkWired,
+    cloud: faCloud,
+    'satellite-dish': faSatelliteDish,
 
     // Navigation & Location
     map: faMap,
@@ -111,24 +130,36 @@ export class IconCache {
     // Devices & Computers
     computer: faComputerClassic,
     user: faUser,
+    users: faUsers,
+    desktop: faDesktop,
+    terminal: faTerminal,
 
     // Arrows & Directions
     'arrow-up': faArrowUp,
     'arrow-down': faArrowDown,
     'external-link': faArrowRightFromBracket,
+    'chevrons-up': faChevronsUp,
+    'chevrons-down': faChevronsDown,
+    'arrows-rotate': faArrowsRotate,
+    route: faRoute,
 
     // Cloud & Transfer
     'cloud-arrow-up': faCloudArrowUp,
     'cloud-arrow-down': faCloudArrowDown,
     key: faKey,
+    'gauge-high': faGaugeHigh,
+    'magnifying-glass': faMagnifyingGlass,
 
     // UI Elements
     'power-off': faPowerOff,
     bolt: faBolt,
     'qr-code': faQrcode,
     'grid-2': faGrid2,
-    browser: faBrowser,
+    'window-restore': faWindowRestore,
     circle: faCircle,
+    tag: faTag,
+    'plug-circle-check': faPlugCircleCheck,
+    'code-compare': faCodeCompare,
 
     // Service-specific icons (from Docker labels)
     // Media Services
