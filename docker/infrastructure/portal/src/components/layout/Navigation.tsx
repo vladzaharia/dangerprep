@@ -107,7 +107,8 @@ export const Navigation: React.FC = () => {
   };
 
   // Determine if we're on a management page
-  const isOnManagePage = MANAGEMENT_PAGES.includes(location.pathname);
+  const isOnManagePage =
+    MANAGEMENT_PAGES.filter(path => location.pathname.startsWith(path)).length > 0;
 
   // Create navigation context
   const navContext: NavigationContext = useMemo(

@@ -47,9 +47,8 @@ export interface WifiConfigWithNetwork extends WifiConfigWithMetadata {
  */
 export class WifiConfigService {
   private readonly hostapdPath = '/etc/hostapd/hostapd.conf';
-  private logger = LoggerFactory.createStructuredLogger(
+  private logger = LoggerFactory.createConsoleLogger(
     'WifiConfigService',
-    '/var/log/dangerprep/portal.log',
     process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
   );
 

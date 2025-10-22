@@ -152,12 +152,12 @@ function AppContent() {
                     <Route path='/network/clients' element={<ConnectedClientsPage />} />
                     <Route path='/network/tailscale' element={<TailscaleStatusPage />} />
                     <Route path='/settings' element={<SettingsPage />} />
-                    <Route path='/tailscale' element={<TailscaleSettingsPage />} />
-                    <Route path='/wifi' element={<WifiSettingsPage />} />
-                    <Route path='/hotspot' element={<HotspotSettingsPage />} />
-                    <Route path='/internet' element={<InternetSettingsPage />} />
-                    <Route path='/starlink' element={<StarlinkSettingsPage />} />
-                    <Route path='/device' element={<DeviceSettingsPage />} />
+                    <Route path='/settings/tailscale' element={<TailscaleSettingsPage />} />
+                    <Route path='/settings/wifi' element={<WifiSettingsPage />} />
+                    <Route path='/settings/hotspot' element={<HotspotSettingsPage />} />
+                    <Route path='/settings/internet' element={<InternetSettingsPage />} />
+                    <Route path='/settings/starlink' element={<StarlinkSettingsPage />} />
+                    <Route path='/settings/device' element={<DeviceSettingsPage />} />
                     {/* 404 catch-all route */}
                     <Route path='*' element={<NotFoundPage />} />
                   </Routes>

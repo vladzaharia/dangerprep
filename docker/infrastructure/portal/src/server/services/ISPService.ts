@@ -26,9 +26,8 @@ export class ISPService {
   private readonly cacheTimeout = 300000; // 5 minutes
   private lastFetchTime = 0;
   private cachedInfo: ISPInfo | null = null;
-  private logger = LoggerFactory.createStructuredLogger(
+  private logger = LoggerFactory.createConsoleLogger(
     'ISPService',
-    '/var/log/dangerprep/portal.log',
     process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
   );
 

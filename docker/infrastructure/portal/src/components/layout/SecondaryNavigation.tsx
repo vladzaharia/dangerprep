@@ -189,7 +189,7 @@ export const SecondaryNavigation: React.FC = () => {
                 <FontAwesomeIcon
                   icon={item.icon}
                   size='lg'
-                  style={{ ...iconStyle, maxWidth: '1.5rem' }}
+                  style={{ ...iconStyle, maxWidth: '1.5rem', paddingRight: 'var(--wa-space-xs)' }}
                 />
                 <span className='secondary-navigation-label'>{item.label}</span>
               </wa-button>

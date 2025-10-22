@@ -41,14 +41,14 @@ export const SettingsPage: React.FC = () => {
           description='Configure WiFi connectivity options'
           footerSlot={
             <div
-              onClick={() => navigate(getNavLinkTo('/wifi'))}
+              onClick={() => navigate(getNavLinkTo('/settings/wifi'))}
               style={{ cursor: 'pointer' }}
               role='button'
               tabIndex={0}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate(getNavLinkTo('/wifi'));
+                  navigate(getNavLinkTo('/settings/wifi'));
                 }
               }}
               aria-label='WiFi Settings'
@@ -72,14 +72,14 @@ export const SettingsPage: React.FC = () => {
           description='Configure hotspot and access point settings'
           footerSlot={
             <div
-              onClick={() => navigate(getNavLinkTo('/hotspot'))}
+              onClick={() => navigate(getNavLinkTo('/settings/hotspot'))}
               style={{ cursor: 'pointer' }}
               role='button'
               tabIndex={0}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate(getNavLinkTo('/hotspot'));
+                  navigate(getNavLinkTo('/settings/hotspot'));
                 }
               }}
               aria-label='Hotspot Settings'
@@ -103,14 +103,14 @@ export const SettingsPage: React.FC = () => {
           description='Configure internet connection and DNS settings'
           footerSlot={
             <div
-              onClick={() => navigate(getNavLinkTo('/internet'))}
+              onClick={() => navigate(getNavLinkTo('/settings/internet'))}
               style={{ cursor: 'pointer' }}
               role='button'
               tabIndex={0}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate(getNavLinkTo('/internet'));
+                  navigate(getNavLinkTo('/settings/internet'));
                 }
               }}
               aria-label='Internet Settings'
@@ -134,14 +134,14 @@ export const SettingsPage: React.FC = () => {
           description='Configure Starlink satellite internet settings'
           footerSlot={
             <div
-              onClick={() => navigate(getNavLinkTo('/starlink'))}
+              onClick={() => navigate(getNavLinkTo('/settings/starlink'))}
               style={{ cursor: 'pointer' }}
               role='button'
               tabIndex={0}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate(getNavLinkTo('/starlink'));
+                  navigate(getNavLinkTo('/settings/starlink'));
                 }
               }}
               aria-label='Starlink Settings'
@@ -165,14 +165,14 @@ export const SettingsPage: React.FC = () => {
           description='Configure device-specific settings and options'
           footerSlot={
             <div
-              onClick={() => navigate(getNavLinkTo('/device'))}
+              onClick={() => navigate(getNavLinkTo('/settings/device'))}
               style={{ cursor: 'pointer' }}
               role='button'
               tabIndex={0}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate(getNavLinkTo('/device'));
+                  navigate(getNavLinkTo('/settings/device'));
                 }
               }}
               aria-label='Device Settings'
@@ -196,14 +196,14 @@ export const SettingsPage: React.FC = () => {
           description='Configure Tailscale VPN settings, exit nodes, and network options'
           footerSlot={
             <div
-              onClick={() => navigate(getNavLinkTo('/tailscale'))}
+              onClick={() => navigate(getNavLinkTo('/settings/tailscale'))}
               style={{ cursor: 'pointer' }}
               role='button'
               tabIndex={0}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate(getNavLinkTo('/tailscale'));
+                  navigate(getNavLinkTo('/settings/tailscale'));
                 }
               }}
               aria-label='Tailscale Settings'

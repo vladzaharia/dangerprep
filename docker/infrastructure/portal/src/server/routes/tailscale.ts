@@ -12,38 +12,36 @@ const tailscale = new Hono<{ Variables: LoggerVariables }>();
 /**
  * GET /api/tailscale/settings
  * Get current Tailscale settings
+ * Returns available settings, omitting any that cannot be retrieved
  */
 tailscale.get('/settings', async c => {
   const logger = c.get('logger');
 
-  try {
-    logger.debug('Getting Tailscale settings');
-    const settings = await tailscaleService.getSettings();
+  logger.debug('Getting Tailscale settings');
+  const settings = await tailscaleService.getSettings();
 
-    logger.info('Tailscale settings retrieved', { settings });
-
+  if (!settings) {
+    logger.warn('Tailscale settings unavailable');
     return c.json({
       success: true,
-      data: settings,
+      data: null,
       metadata: {
         timestamp: new Date().toISOString(),
+        available: false,
       },
     });
-  } catch (error) {
-    logger.error('Failed to get Tailscale settings', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-
-    return c.json(
-      {
-        success: false,
-        error: 'Failed to get Tailscale settings',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      500
-    );
   }
+
+  logger.info('Tailscale settings retrieved', { settings });
+
+  return c.json({
+    success: true,
+    data: settings,
+    metadata: {
+      timestamp: new Date().toISOString(),
+      available: true,
+    },
+  });
 });
 
 /**
@@ -100,75 +98,45 @@ tailscale.post('/settings', async c => {
 /**
  * GET /api/tailscale/exit-nodes
  * Get available exit nodes
+ * Returns empty array if unavailable
  */
 tailscale.get('/exit-nodes', async c => {
   const logger = c.get('logger');
 
-  try {
-    logger.debug('Getting available exit nodes');
-    const exitNodes = await tailscaleService.getExitNodes();
+  logger.debug('Getting available exit nodes');
+  const exitNodes = await tailscaleService.getExitNodes();
 
-    logger.info('Exit nodes retrieved', { count: exitNodes.length });
+  logger.info('Exit nodes retrieved', { count: exitNodes.length });
 
-    return c.json({
-      success: true,
-      data: exitNodes,
-      metadata: {
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    logger.error('Failed to get exit nodes', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-
-    return c.json(
-      {
-        success: false,
-        error: 'Failed to get exit nodes',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      500
-    );
-  }
+  return c.json({
+    success: true,
+    data: exitNodes,
+    metadata: {
+      timestamp: new Date().toISOString(),
+    },
+  });
 });
 
 /**
  * GET /api/tailscale/exit-nodes/suggest
  * Get suggested exit node
+ * Returns null if unavailable
  */
 tailscale.get('/exit-nodes/suggest', async c => {
   const logger = c.get('logger');
 
-  try {
-    logger.debug('Getting suggested exit node');
-    const suggestedNode = await tailscaleService.getSuggestedExitNode();
+  logger.debug('Getting suggested exit node');
+  const suggestedNode = await tailscaleService.getSuggestedExitNode();
 
-    logger.info('Suggested exit node retrieved', { suggestedNode });
+  logger.info('Suggested exit node retrieved', { suggestedNode });
 
-    return c.json({
-      success: true,
-      data: suggestedNode,
-      metadata: {
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    logger.error('Failed to get suggested exit node', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-
-    return c.json(
-      {
-        success: false,
-        error: 'Failed to get suggested exit node',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      500
-    );
-  }
+  return c.json({
+    success: true,
+    data: suggestedNode,
+    metadata: {
+      timestamp: new Date().toISOString(),
+    },
+  });
 });
 
 /**
@@ -272,87 +240,47 @@ tailscale.post('/stop', async c => {
 /**
  * GET /api/tailscale/status
  * Get full Tailscale status
+ * Returns null if unavailable
  */
 tailscale.get('/status', async c => {
   const logger = c.get('logger');
 
-  try {
-    logger.debug('Getting Tailscale status');
-    const status = await tailscaleService.getStatus();
+  logger.debug('Getting Tailscale status');
+  const status = await tailscaleService.getStatus();
 
-    if (!status) {
-      return c.json(
-        {
-          success: false,
-          error: 'Tailscale not available',
-          message: 'Tailscale is not running or not configured',
-        },
-        404
-      );
-    }
+  logger.info('Tailscale status retrieved', { available: !!status });
 
-    logger.info('Tailscale status retrieved');
-
-    return c.json({
-      success: true,
-      data: status,
-      metadata: {
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    logger.error('Failed to get Tailscale status', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-
-    return c.json(
-      {
-        success: false,
-        error: 'Failed to get Tailscale status',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      500
-    );
-  }
+  return c.json({
+    success: true,
+    data: status,
+    metadata: {
+      timestamp: new Date().toISOString(),
+      available: !!status,
+    },
+  });
 });
 
 /**
  * GET /api/tailscale/peers
  * Get Tailscale peers
+ * Returns empty array if unavailable
  */
 tailscale.get('/peers', async c => {
   const logger = c.get('logger');
 
-  try {
-    logger.debug('Getting Tailscale peers');
-    const peers = await tailscaleService.getPeers();
+  logger.debug('Getting Tailscale peers');
+  const peers = await tailscaleService.getPeers();
 
-    logger.info('Tailscale peers retrieved', { count: peers.length });
+  logger.info('Tailscale peers retrieved', { count: peers.length });
 
-    return c.json({
-      success: true,
-      data: peers,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        count: peers.length,
-      },
-    });
-  } catch (error) {
-    logger.error('Failed to get Tailscale peers', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-
-    return c.json(
-      {
-        success: false,
-        error: 'Failed to get Tailscale peers',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      500
-    );
-  }
+  return c.json({
+    success: true,
+    data: peers,
+    metadata: {
+      timestamp: new Date().toISOString(),
+      count: peers.length,
+    },
+  });
 });
 
 export default tailscale;

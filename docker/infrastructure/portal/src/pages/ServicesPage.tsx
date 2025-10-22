@@ -73,7 +73,10 @@ function ServicesContent() {
       {services.length === 0 ? (
         <wa-callout variant='neutral'>
           <div slot='icon' style={{ display: 'contents' }}>
-            <FontAwesomeIcon icon={faCircleInfo} style={createIconStyle(ICON_STYLES.info)} />
+            <FontAwesomeIcon
+              icon={faCircleInfo}
+              style={{ ...createIconStyle(ICON_STYLES.info), paddingRight: 'var(--wa-space-xs)' }}
+            />
           </div>
           No public services are currently available.
         </wa-callout>

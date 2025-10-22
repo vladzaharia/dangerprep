@@ -55,7 +55,7 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: var(--wa-space-xs) var(--wa-space-m);
+  padding: var(--wa-space-m) var(--wa-space-xs);
 }
 
 .app-secondary-navigation-card::part(body) {

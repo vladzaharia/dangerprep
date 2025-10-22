@@ -40,9 +40,8 @@ export class ServiceDiscoveryService {
   private lastScan = 0;
   private readonly scanInterval = 30000; // 30 seconds
   private docker: Docker;
-  private logger = LoggerFactory.createStructuredLogger(
+  private logger = LoggerFactory.createConsoleLogger(
     'ServiceDiscoveryService',
-    '/var/log/dangerprep/portal.log',
     process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
   );
 

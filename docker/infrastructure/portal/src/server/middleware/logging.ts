@@ -27,11 +27,7 @@ export function structuredLogging() {
   const logLevel = isDevelopment ? LogLevel.DEBUG : LogLevel.INFO;
 
   // Create base logger with appropriate configuration
-  const baseLogger = LoggerFactory.createStructuredLogger(
-    'portal',
-    '/var/log/dangerprep/portal.log',
-    logLevel
-  );
+  const baseLogger = LoggerFactory.createConsoleLogger('portal', logLevel);
 
   return async (c: Context, next: Next) => {
     const startTime = Date.now();

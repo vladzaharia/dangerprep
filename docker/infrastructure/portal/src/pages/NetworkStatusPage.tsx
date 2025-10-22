@@ -1,14 +1,699 @@
-import React from 'react';
+import {
+  faEthernet,
+  faRouter,
+  faServer,
+  faNetworkWired,
+  faRainbowHalf,
+  faGaugeHigh,
+  faMagnifyingGlass,
+  faCloud,
+  faChevronsDown,
+  faChevronsUp,
+} from '@awesome.me/kit-a765fc5647/icons/duotone/solid';
+import {
+  faGlobe,
+  faShieldCheck,
+  faArrowRightFromBracket,
+  faGear,
+  faKey,
+} from '@awesome.me/kit-a765fc5647/icons/utility-duo/semibold';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import '@awesome.me/webawesome/dist/components/format-bytes/format-bytes.js';
+import React, { useMemo, Suspense } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { NetworkStatusTab } from '../components';
+import { StatusCard } from '../components/cards/StatusCard';
+import type { StatusCardTag } from '../components/cards/StatusCard';
+import { useNetworkSummary, useTailscaleSettings, useTailscalePeers } from '../hooks/useSWRData';
+import type { NetworkInterface, TailscaleInterface } from '../types/network';
+import { COLORS, createIconStyle, ICON_STYLES } from '../utils/iconStyles';
+
+/**
+ * Truncate IPv6 address to show first and last octet
+ */
+function truncateIPv6(ipv6: string): string {
+  const parts = ipv6.split(':');
+  if (parts.length <= 2) return ipv6;
+  return `${parts[0]}:...${parts[parts.length - 1]}`;
+}
+
+/**
+ * Get icon for network interface type
+ */
+function getInterfaceIcon(iface: NetworkInterface) {
+  switch (iface.type) {
+    case 'wifi':
+    case 'hotspot':
+      return faRainbowHalf;
+    case 'ethernet':
+      return faEthernet;
+    case 'tailscale':
+      return faShieldCheck;
+    default:
+      return faGlobe;
+  }
+}
+
+/**
+ * Get icon color based on interface type and state
+ */
+function getInterfaceIconColor(iface: NetworkInterface): string | undefined {
+  if (iface.state !== 'up') return undefined;
+
+  switch (iface.type) {
+    case 'wifi':
+    case 'hotspot':
+      return COLORS.feature.wifi;
+    case 'ethernet':
+      return COLORS.feature.ethernet;
+    case 'tailscale':
+      return COLORS.feature.tailscale;
+    default:
+      return COLORS.neutral.gray;
+  }
+}
+
+/**
+ * Loading skeleton for network status page
+ */
+function NetworkStatusSkeleton() {
+  return (
+    <div
+      className='wa-grid wa-gap-l'
+      style={{ '--min-column-size': '18rem' } as React.CSSProperties}
+    >
+      {/* Left Column - LAN Interfaces Skeleton */}
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>LAN</h3>
+        {Array.from({ length: 2 }, (_, index) => (
+          <wa-card key={index} appearance='outlined'>
+            <div className='wa-stack wa-gap-m'>
+              <div className='wa-flank wa-gap-m wa-align-items-center'>
+                <wa-skeleton
+                  effect='sheen'
+                  style={{ width: '48px', height: '48px', borderRadius: '6px' }}
+                ></wa-skeleton>
+                <div className='wa-stack wa-gap-xs' style={{ flex: 1 }}>
+                  <wa-skeleton
+                    effect='sheen'
+                    style={{ width: `${150 + index * 30}px`, height: '20px' }}
+                  ></wa-skeleton>
+                  <wa-skeleton
+                    effect='sheen'
+                    style={{ width: `${200 + index * 40}px`, height: '16px' }}
+                  ></wa-skeleton>
+                </div>
+              </div>
+            </div>
+          </wa-card>
+        ))}
+      </div>
+
+      {/* Middle Column - Device Skeleton */}
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>&nbsp;</h3>
+        <wa-card appearance='outlined'>
+          <div className='wa-stack wa-gap-m'>
+            <div className='wa-flank wa-gap-m wa-align-items-center'>
+              <wa-skeleton
+                effect='sheen'
+                style={{ width: '48px', height: '48px', borderRadius: '6px' }}
+              ></wa-skeleton>
+              <div className='wa-stack wa-gap-xs' style={{ flex: 1 }}>
+                <wa-skeleton
+                  effect='sheen'
+                  style={{ width: '120px', height: '20px' }}
+                ></wa-skeleton>
+                <wa-skeleton
+                  effect='sheen'
+                  style={{ width: '180px', height: '16px' }}
+                ></wa-skeleton>
+              </div>
+            </div>
+          </div>
+        </wa-card>
+      </div>
+
+      {/* Right Column - Internet Skeleton */}
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>Internet</h3>
+        {Array.from({ length: 2 }, (_, index) => (
+          <wa-card key={index} appearance='outlined'>
+            <div className='wa-stack wa-gap-m'>
+              <div className='wa-flank wa-gap-m wa-align-items-center'>
+                <wa-skeleton
+                  effect='sheen'
+                  style={{ width: '48px', height: '48px', borderRadius: '6px' }}
+                ></wa-skeleton>
+                <div className='wa-stack wa-gap-xs' style={{ flex: 1 }}>
+                  <wa-skeleton
+                    effect='sheen'
+                    style={{ width: `${140 + index * 25}px`, height: '20px' }}
+                  ></wa-skeleton>
+                  <wa-skeleton
+                    effect='sheen'
+                    style={{ width: `${190 + index * 35}px`, height: '16px' }}
+                  ></wa-skeleton>
+                </div>
+              </div>
+            </div>
+          </wa-card>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Network Status Page Component
  */
 export const NetworkStatusPage: React.FC = () => {
+  const { data: networkData } = useNetworkSummary();
+  const { data: tailscaleSettings } = useTailscaleSettings();
+  const { data: tailscalePeers } = useTailscalePeers();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Helper function to preserve search params in navigation
+  const getNavLinkTo = (path: string) => {
+    const params = new URLSearchParams(searchParams);
+    const queryString = params.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
+
+  // Get LAN interfaces (hotspot/wlan), sorted with ethernet first
+  const lanInterfaces = useMemo(() => {
+    if (!networkData?.interfaces) return [];
+    const filtered = networkData.interfaces.filter(
+      iface => iface.purpose === 'wlan' || iface.purpose === 'lan'
+    );
+    // Sort: ethernet first, then wifi/hotspot
+    return filtered.sort((a, b) => {
+      if (a.type === 'ethernet' && b.type !== 'ethernet') return -1;
+      if (a.type !== 'ethernet' && b.type === 'ethernet') return 1;
+      return 0;
+    });
+  }, [networkData]);
+
+  // Get WAN interfaces (internet), sorted with ethernet first
+  // Include Tailscale IF it's being used as an exit node OR accepting subnet routes
+  const wanInterfaces = useMemo(() => {
+    if (!networkData?.interfaces) return [];
+    const filtered = networkData.interfaces.filter(iface => {
+      if (iface.purpose === 'wan' && iface.type !== 'tailscale') {
+        return true;
+      }
+
+      // Include Tailscale if it has exit node or accepting routes
+      if (iface.type === 'tailscale') {
+        const tsInterface = iface as TailscaleInterface;
+        const hasExitNode = tsInterface.exitNode;
+        const acceptingRoutes = tailscaleSettings?.acceptRoutes && tsInterface.state === 'up';
+        return hasExitNode || acceptingRoutes;
+      }
+
+      return false;
+    });
+    // Sort: ethernet first, then wifi/hotspot, then tailscale
+    return filtered.sort((a, b) => {
+      if (a.type === 'ethernet' && b.type !== 'ethernet') return -1;
+      if (a.type !== 'ethernet' && b.type === 'ethernet') return 1;
+      return 0;
+    });
+  }, [networkData, tailscaleSettings]);
+
+  // Get device IP addresses
+  const deviceIPs = useMemo(() => {
+    if (!networkData?.interfaces) return [];
+    return networkData.interfaces
+      .filter(
+        (iface): iface is typeof iface & { ipAddress: string } =>
+          iface.ipAddress !== undefined && iface.ipAddress !== null && iface.state === 'up'
+      )
+      .map(iface => ({ name: iface.name, ip: iface.ipAddress }));
+  }, [networkData]);
+
+  const content = (
+    <div
+      className='wa-grid wa-gap-l'
+      style={{ '--min-column-size': '18rem' } as React.CSSProperties}
+    >
+      {/* Left Column - LAN Interfaces */}
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>LAN</h3>
+        {lanInterfaces.length === 0 ? (
+          <wa-card appearance='outlined'>
+            <div className='wa-stack wa-gap-xs'>
+              <span className='wa-caption-s'>No LAN interfaces</span>
+            </div>
+          </wa-card>
+        ) : (
+          lanInterfaces.map(iface => {
+            const title =
+              iface.type === 'wifi' && 'ssid' in iface && iface.ssid
+                ? `${iface.ssid} (${iface.name})`
+                : iface.name;
+
+            const tags: StatusCardTag[] = [];
+            if (iface.ipAddress) {
+              tags.push({
+                label: 'IP',
+                value: iface.ipAddress,
+                icon: <FontAwesomeIcon icon={faGlobe} style={createIconStyle(ICON_STYLES.ipv4)} />,
+                variant: 'neutral',
+              });
+            }
+
+            // Add speed for all interfaces
+            if (iface.type === 'ethernet' && 'speed' in iface && iface.speed) {
+              tags.push({
+                label: 'Speed',
+                value: iface.speed,
+                icon: (
+                  <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                ),
+                variant: 'neutral',
+              });
+            }
+
+            // Add WLAN-specific tags
+            if (iface.type === 'wifi' || iface.type === 'hotspot') {
+              const wifiIface = iface as typeof iface & {
+                frequency?: string;
+                security?: string;
+                channel?: number;
+                bitRate?: string;
+              };
+              if (wifiIface.bitRate) {
+                // Remove "Sensitivity: X/X" from bitRate if present
+                const cleanedBitRate = wifiIface.bitRate.split(' Sensitivity')[0];
+                tags.push({
+                  label: 'Speed',
+                  value: cleanedBitRate,
+                  icon: (
+                    <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                  ),
+                  variant: 'neutral',
+                });
+              }
+              if (wifiIface.security) {
+                tags.push({
+                  label: 'Security',
+                  value: wifiIface.security,
+                  icon: (
+                    <FontAwesomeIcon icon={faKey} style={createIconStyle(ICON_STYLES.security)} />
+                  ),
+                  variant: 'neutral',
+                });
+              }
+            }
+
+            // Add DNS servers
+            if (iface.dnsServers && iface.dnsServers.length > 0) {
+              iface.dnsServers.forEach(dns => {
+                tags.push({
+                  label: 'DNS',
+                  value: dns,
+                  icon: (
+                    <FontAwesomeIcon
+                      icon={faMagnifyingGlass}
+                      style={createIconStyle(ICON_STYLES.tag)}
+                    />
+                  ),
+                  variant: 'neutral',
+                });
+              });
+            }
+
+            const iconColor = getInterfaceIconColor(iface);
+            let iconStyle;
+            if (iconColor) {
+              if (iface.type === 'wifi' || iface.type === 'hotspot') {
+                iconStyle = createIconStyle(ICON_STYLES.wifi);
+              } else if (iface.type === 'ethernet') {
+                iconStyle = createIconStyle(ICON_STYLES.ethernet);
+              } else if (iface.type === 'tailscale') {
+                iconStyle = createIconStyle(ICON_STYLES.tailscale);
+              } else {
+                iconStyle = createIconStyle(ICON_STYLES.neutral);
+              }
+            }
+
+            return (
+              <StatusCard
+                key={iface.name}
+                variant={iface.state === 'up' ? 'success' : 'danger'}
+                layout='vertical'
+                icon={
+                  <FontAwesomeIcon
+                    icon={getInterfaceIcon(iface)}
+                    size='lg'
+                    flip={
+                      iface.type === 'wifi' || iface.type === 'hotspot' ? 'horizontal' : undefined
+                    }
+                    style={{ ...iconStyle, maxWidth: '2rem' }}
+                  />
+                }
+                title={title}
+                tags={tags}
+                className='interface-card'
+              />
+            );
+          })
+        )}
+      </div>
+
+      {/* Middle Column - Router/Device */}
+      <div className='wa-stack wa-gap-m'>
+        <h3 className='wa-heading-s'>&nbsp;</h3>
+        <StatusCard
+          layout='vertical'
+          icon={
+            <FontAwesomeIcon
+              icon={faServer}
+              size='lg'
+              style={
+                {
+                  '--fa-primary-color': COLORS.ui.device,
+                  maxWidth: '2rem',
+                } as React.CSSProperties
+              }
+            />
+          }
+          title='This Device'
+          tags={deviceIPs
+            .filter(({ name }) => !name.startsWith('br'))
+            .map(({ name, ip }) => ({
+              label: name,
+              value: ip,
+              variant: 'neutral' as const,
+            }))}
+        />
+      </div>
+
+      {/* Right Column - WAN Interfaces with ISP Information */}
+      <div className='wa-stack wa-gap-m'>
+        <div className='wa-flank wa-gap-s wa-align-items-center'>
+          <h3 className='wa-heading-s'>Internet</h3>
+        </div>
+        {wanInterfaces.length === 0 ? (
+          <wa-card appearance='outlined'>
+            <div className='wa-stack wa-gap-xs'>
+              <span className='wa-caption-s'>No internet connection</span>
+            </div>
+          </wa-card>
+        ) : (
+          wanInterfaces.map(iface => {
+            const title =
+              iface.type === 'wifi' && 'ssid' in iface && iface.ssid
+                ? `${iface.ssid} (${iface.name})`
+                : iface.name;
+
+            const tags: StatusCardTag[] = [];
+            if (iface.ipAddress) {
+              tags.push({
+                label: 'IP',
+                value: iface.ipAddress,
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faGlobe}
+                    style={{ ...createIconStyle(ICON_STYLES.ipv4), maxWidth: '2rem' }}
+                  />
+                ),
+                variant: 'neutral',
+              });
+            }
+            if (iface.publicIpv4) {
+              tags.push({
+                label: 'Public IP',
+                value: iface.publicIpv4,
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faCloud}
+                    style={{ ...createIconStyle(ICON_STYLES.ipv4), maxWidth: '2rem' }}
+                  />
+                ),
+                variant: 'neutral',
+              });
+            }
+            if (iface.gateway) {
+              tags.push({
+                label: 'Gateway',
+                value: iface.gateway,
+                icon: (
+                  <FontAwesomeIcon icon={faRouter} style={createIconStyle(ICON_STYLES.gateway)} />
+                ),
+                variant: 'neutral',
+              });
+            }
+
+            // Add speed for all interfaces
+            if (iface.type === 'ethernet' && 'speed' in iface && iface.speed) {
+              tags.push({
+                label: 'Speed',
+                value: iface.speed,
+                icon: (
+                  <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                ),
+                variant: 'neutral',
+              });
+            }
+
+            // Add WLAN-specific tags
+            if (iface.type === 'wifi' || iface.type === 'hotspot') {
+              const wifiIface = iface as typeof iface & {
+                frequency?: string;
+                security?: string;
+                channel?: number;
+                bitRate?: string;
+              };
+              if (wifiIface.bitRate) {
+                // Remove "Sensitivity: X/X" from bitRate if present
+                const cleanedBitRate = wifiIface.bitRate.split(' Sensitivity')[0];
+                tags.push({
+                  label: 'Speed',
+                  value: cleanedBitRate,
+                  icon: (
+                    <FontAwesomeIcon icon={faGaugeHigh} style={createIconStyle(ICON_STYLES.tag)} />
+                  ),
+                  variant: 'neutral',
+                });
+              }
+            }
+
+            // Add DNS servers
+            if (iface.dnsServers && iface.dnsServers.length > 0) {
+              iface.dnsServers.forEach(dns => {
+                tags.push({
+                  label: 'DNS',
+                  value: dns,
+                  icon: (
+                    <FontAwesomeIcon
+                      icon={faMagnifyingGlass}
+                      style={createIconStyle(ICON_STYLES.tag)}
+                    />
+                  ),
+                  variant: 'neutral',
+                });
+              });
+            }
+
+            // Add Tailscale-specific tags and action button
+            let tailscaleActionButton: React.ReactNode | undefined;
+            if (iface.type === 'tailscale') {
+              const tsInterface = iface as TailscaleInterface;
+
+              // Add exit node tag if using one
+              if (tsInterface.exitNode && tailscaleSettings?.exitNode) {
+                // Find the exit node name from settings
+                const exitNodeName = tailscaleSettings.exitNode;
+                tags.push({
+                  label: 'Exit Node',
+                  value: exitNodeName,
+                  icon: (
+                    <FontAwesomeIcon
+                      icon={faArrowRightFromBracket}
+                      style={createIconStyle(ICON_STYLES.tailscale)}
+                    />
+                  ),
+                  variant: 'neutral',
+                });
+              }
+
+              // Add accepted subnet route tags from peers
+              if (tailscaleSettings?.acceptRoutes && tailscalePeers) {
+                // Collect all subnet routes from peers
+                const subnetRoutes = new Set<string>();
+                tailscalePeers.forEach(peer => {
+                  if (peer.subnetRoutes && peer.subnetRoutes.length > 0) {
+                    peer.subnetRoutes.forEach(route => subnetRoutes.add(route));
+                  }
+                });
+
+                // Add tags for each unique subnet route
+                subnetRoutes.forEach(route => {
+                  tags.push({
+                    label: route,
+                    icon: (
+                      <FontAwesomeIcon
+                        icon={faNetworkWired}
+                        style={createIconStyle(ICON_STYLES.routes)}
+                      />
+                    ),
+                    variant: 'neutral',
+                  });
+                });
+              }
+
+              // Add gear button for Tailscale settings
+              tailscaleActionButton = (
+                <div
+                  onClick={() => navigate(getNavLinkTo('/tailscale'))}
+                  style={{ cursor: 'pointer' }}
+                  role='button'
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(getNavLinkTo('/tailscale'));
+                    }
+                  }}
+                  aria-label='Tailscale Settings'
+                >
+                  <wa-button appearance='plain' size='small' style={{ pointerEvents: 'none' }}>
+                    <FontAwesomeIcon icon={faGear} style={createIconStyle(ICON_STYLES.settings)} />
+                  </wa-button>
+                </div>
+              );
+            }
+
+            // Build ISP tags
+            const ispTags: StatusCardTag[] = [];
+            if (iface.publicIpv4) {
+              ispTags.push({
+                label: 'IPv4',
+                value: iface.publicIpv4,
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faGlobe}
+                    style={{ ...createIconStyle(ICON_STYLES.ipv4), maxWidth: '2rem' }}
+                  />
+                ),
+                variant: 'neutral',
+              });
+            }
+            if (iface.publicIpv6) {
+              const truncatedIPv6 = truncateIPv6(iface.publicIpv6);
+              ispTags.push({
+                label: 'IPv6',
+                value: truncatedIPv6,
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faGlobe}
+                    style={{ ...createIconStyle(ICON_STYLES.ipv6), maxWidth: '2rem' }}
+                  />
+                ),
+                variant: 'neutral',
+                title: iface.publicIpv6,
+              } as StatusCardTag & { title?: string });
+            }
+
+            // Build footer content with WAN info and TX/RX
+            const footerContent = (iface.rxBytes !== undefined || iface.txBytes !== undefined) && (
+              <div className='wa-stack wa-gap-m' style={{ width: '100%' }}>
+                {/* WAN Information Section */}
+                <div className='wa-flank wa-gap-m wa-align-items-center'>
+                  <FontAwesomeIcon
+                    icon={faCloud}
+                    size='lg'
+                    style={{ ...createIconStyle(ICON_STYLES.ipv4), maxWidth: '2rem' }}
+                  />
+                  <div className='wa-stack wa-gap-3xs' style={{ flex: 1 }}>
+                    <span className='wa-body-s' style={{ fontWeight: 600 }}>
+                      {iface.ispName || 'ISP'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* TX/RX Information - Icon and Value */}
+                <div className='wa-flank wa-gap-m wa-align-items-center'>
+                  {iface.rxBytes !== undefined && (
+                    <div
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <FontAwesomeIcon
+                        icon={faChevronsUp}
+                        style={createIconStyle(ICON_STYLES.neutral)}
+                      />
+                      <wa-format-bytes
+                        value={iface.rxBytes}
+                        display='short'
+                        className='wa-body-s'
+                      ></wa-format-bytes>
+                    </div>
+                  )}
+                  {iface.txBytes !== undefined && (
+                    <div
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <FontAwesomeIcon
+                        icon={faChevronsDown}
+                        style={createIconStyle(ICON_STYLES.neutral)}
+                      />
+                      <wa-format-bytes
+                        value={iface.txBytes}
+                        display='short'
+                        className='wa-body-s'
+                      ></wa-format-bytes>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+
+            return (
+              <StatusCard
+                key={iface.name}
+                variant={iface.state === 'up' ? 'success' : 'danger'}
+                layout='vertical'
+                icon={
+                  <FontAwesomeIcon
+                    icon={getInterfaceIcon(iface)}
+                    size='lg'
+                    flip={
+                      iface.type === 'wifi' || iface.type === 'hotspot' ? 'horizontal' : undefined
+                    }
+                    style={{ ...createIconStyle(ICON_STYLES[iface.type]), maxWidth: '2rem' }}
+                  />
+                }
+                title={title}
+                tags={tags}
+                actionButton={tailscaleActionButton}
+                className='interface-card'
+                footerContent={footerContent}
+              />
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className='network-status-page'>
-      <NetworkStatusTab />
+      <Suspense fallback={<NetworkStatusSkeleton />}>{content}</Suspense>
     </div>
   );
 };

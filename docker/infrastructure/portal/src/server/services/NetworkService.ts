@@ -224,9 +224,8 @@ export class NetworkService {
   private lastCacheUpdate = 0;
   private readonly wifiConfigService = new WifiConfigService();
   private readonly ispService = new ISPService();
-  private logger = LoggerFactory.createStructuredLogger(
+  private logger = LoggerFactory.createConsoleLogger(
     'NetworkService',
-    '/var/log/dangerprep/portal.log',
     process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
   );
 

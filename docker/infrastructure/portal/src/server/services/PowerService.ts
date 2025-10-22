@@ -10,9 +10,8 @@ const execAsync = promisify(exec);
  * Handles kiosk restart, system reboot, shutdown, and desktop mode switching
  */
 export class PowerService {
-  private logger = LoggerFactory.createStructuredLogger(
+  private logger = LoggerFactory.createConsoleLogger(
     'PowerService',
-    '/var/log/dangerprep/portal.log',
     process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
   );
 

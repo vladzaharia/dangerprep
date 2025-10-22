@@ -18,16 +18,16 @@ const execAsync = promisify(exec);
  * Handles getting/setting exit nodes, DNS, routes, SSH, and other Tailscale preferences
  */
 export class TailscaleService {
-  private logger = LoggerFactory.createStructuredLogger(
+  private logger = LoggerFactory.createConsoleLogger(
     'TailscaleService',
-    '/var/log/dangerprep/portal.log',
     process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
   );
 
   /**
    * Get current Tailscale settings
+   * Returns null if Tailscale is not available or settings cannot be retrieved
    */
-  async getSettings(): Promise<TailscaleSettings> {
+  async getSettings(): Promise<TailscaleSettings | null> {
     this.logger.debug('Getting Tailscale settings');
 
     try {
@@ -81,7 +81,7 @@ export class TailscaleService {
       this.logger.error('Failed to get Tailscale settings', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new Error('Failed to get Tailscale settings');
+      return null;
     }
   }
 

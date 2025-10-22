@@ -25,9 +25,8 @@ export interface AppConfig {
  * Reads from environment variables
  */
 export class ConfigService {
-  private logger = LoggerFactory.createStructuredLogger(
+  private logger = LoggerFactory.createConsoleLogger(
     'ConfigService',
-    '/var/log/dangerprep/portal.log',
     process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO
   );
 
